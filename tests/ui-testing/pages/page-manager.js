@@ -32,6 +32,7 @@ import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
 import { MetricsPage } from "./metricsPages/metricsPage.js";
+import { MetricsQueryEditorPage } from "./metricsPages/metricsQueryEditorPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { RumPage } from "./logsPages/rumPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
@@ -47,6 +48,7 @@ import { ChangeOrgPage } from "./generalPages/changeOrgPage.js";
 import { EnrichmentPage } from "./generalPages/enrichmentPage.js";
 import { ThemePage } from "./generalPages/themePage.js";
 import { LanguagePage } from "./generalPages/languagePage.js";
+import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
@@ -59,6 +61,9 @@ import UnflattenedPage from "./logsPages/unflattened.js";
 import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
 import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
 import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
+
+// ===== FUNCTIONS PAGE OBJECTS =====
+const FunctionsPage = require("./functionsPages/functionsPage.js");
 
 class PageManager {
   /**
@@ -106,6 +111,7 @@ class PageManager {
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
     this.metricsPage = new MetricsPage(page);
+    this.metricsQueryEditorPage = new MetricsQueryEditorPage(page);
     this.tracesPage = new TracesPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
@@ -121,6 +127,7 @@ class PageManager {
     this.enrichmentPage = new EnrichmentPage(page);
     this.themePage = new ThemePage(page);
     this.languagePage = new LanguagePage(page);
+    this.correlationSettingsPage = new CorrelationSettingsPage(page);
     this.schemaPage = new SchemaPage(page);
     this.schemaLoadPage = new SchemaLoadPage(page);
 
@@ -132,6 +139,9 @@ class PageManager {
     this.sdrPatternsPage = new SDRPatternsPage(page);
     this.sdrVerificationPage = new SDRVerificationPage(page);
     this.streamAssociationPage = new StreamAssociationPage(page);
+
+    // ===== FUNCTIONS PAGE OBJECTS =====
+    this.functionsPage = new FunctionsPage(page);
   }
 }
 

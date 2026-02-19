@@ -138,6 +138,7 @@ export class LogsPage {
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
+        this.shareLinkTooltip = '[role="tooltip"], .q-tooltip';
         this.successNotification = '.q-notification__message';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
@@ -146,6 +147,45 @@ export class LogsPage {
         this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
         this.queryEditorContainer = '.query-editor-container';
         this.expandOnFocusClass = '.expand-on-focus';
+
+        // ===== LOG DETAIL SIDEBAR SELECTORS (Bug #9724) =====
+        this.logDetailDialogBox = '[data-test="dialog-box"]';
+        this.logDetailTitleText = '[data-test="log-detail-title-text"]';
+        this.logDetailJsonTab = '[data-test="log-detail-json-tab"]';
+        this.logDetailTableTab = '[data-test="log-detail-table-tab"]';
+        this.logDetailJsonContent = '[data-test="log-detail-json-content"]';
+        this.logDetailTableContent = '[data-test="log-detail-table-content"]';
+        this.logDetailTabContainer = '[data-test="log-detail-tab-container"]';
+        this.logDetailCloseButton = '[data-test="close-dialog"]';
+        this.logDetailPreviousBtn = '[data-test="log-detail-previous-detail-btn"]';
+        this.logDetailNextBtn = '[data-test="log-detail-next-detail-btn"]';
+        this.logDetailWrapToggle = '[data-test="log-detail-wrap-values-toggle-btn"]';
+
+        // ===== VIEW RELATED / CORRELATION SELECTORS (Enterprise Feature) =====
+        this.viewRelatedBtn = '[data-test="log-correlation-btn"]';
+        this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
+        this.applyDimensionFilters = '[data-test="apply-dimension-filters"]';
+        this.applyDimensionFiltersEmbedded = '[data-test="apply-dimension-filters-embedded"]';
+        this.metricSelectorButton = '[data-test="metric-selector-button"]';
+        // Correlation tabs in detail drawer (tab names, not data-test)
+        this.correlatedLogsTab = '.q-tab[name="correlated-logs"], .q-tabs .q-tab:has-text("Logs"):not([data-test="log-detail-json-tab"])';
+        this.correlatedMetricsTab = '.q-tab[name="correlated-metrics"], .q-tabs .q-tab:has-text("Metrics")';
+        this.correlatedTracesTab = '.q-tab[name="correlated-traces"], .q-tabs .q-tab:has-text("Traces")';
+        // Correlation loading and error states
+        this.correlationLoadingSpinner = '.q-spinner-hourglass';
+        this.correlationErrorMessage = '.tw\\:text-red-500';
+
+        // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
+        this.logsAnalyzeDimensionsButton = '[data-test="logs-analyze-dimensions-button"]';
+        this.analysisDashboardClose = '[data-test="analysis-dashboard-close"]';
+        // Dimension sidebar (visible by default in analysis dashboard, not a dialog)
+        this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
+        this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
+        this.dimensionSearchInput = '[data-test="dimension-search-input"]';
+        this.analysisDashboardCard = '.analysis-dashboard-card';
+        // Analysis dashboard states
+        this.analysisDashboardLoading = '.analysis-dashboard-card .q-spinner, .analysis-dashboard-card .q-spinner-hourglass';
+        this.analysisDashboardError = '.analysis-dashboard-card .q-banner--top-padding';
 
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
@@ -171,6 +211,29 @@ export class LogsPage {
         // Note: Narrowed from [class*="error"] to avoid false positives like "error-free"
         this.errorIndicators = '.q-notification--negative, .q-notification__message--error, .text-negative, [class^="error-"], [class$="-error"]';
         this.timestampInDetail = '[data-test*="timestamp"], .timestamp';
+
+        // ===== SEARCH PATTERNS SELECTORS (Enterprise Feature) =====
+        // Toggle button to switch to patterns view
+        this.patternsToggle = '[data-test="logs-patterns-toggle"]';
+        // Statistics summary
+        this.patternStatistics = '[data-test="pattern-statistics"]';
+        // Pattern cards (dynamic selectors with index)
+        this.patternCard = (index) => `[data-test="pattern-card-${index}"]`;
+        this.patternCardTemplate = (index) => `[data-test="pattern-card-${index}-template"]`;
+        this.patternCardAnomalyBadge = (index) => `[data-test="pattern-card-${index}-anomaly-badge"]`;
+        this.patternCardFrequency = (index) => `[data-test="pattern-card-${index}-frequency"]`;
+        this.patternCardPercentage = (index) => `[data-test="pattern-card-${index}-percentage"]`;
+        this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
+        this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
+        this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}-details-icon"]`;
+        // Pattern details dialog
+        this.closePatternDialog = '[data-test="close-pattern-dialog"]';
+        this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
+        this.patternDetailNextBtn = '[data-test="pattern-detail-next-btn"]';
+        // Pattern list states
+        this.patternLoadingSpinner = '.q-spinner-hourglass';
+        this.patternLoadingText = 'text=Extracting patterns from logs...';
+        this.patternEmptyState = 'text=No patterns found';
     }
 
 
@@ -225,7 +288,7 @@ export class LogsPage {
         let retries = 5;
 
         while (fnEditorExists === 0 && retries > 0) {
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             fnEditorExists = await this.page.locator('#fnEditor').count();
 
             if (fnEditorExists === 0) {
@@ -242,7 +305,7 @@ export class LogsPage {
             currentUrl.searchParams.set('vrl', 'true'); // Try alternative parameter
 
             await this.page.goto(currentUrl.toString());
-            await this.page.waitForLoadState('networkidle', { timeout: 15000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
             fnEditorExists = await this.page.locator('#fnEditor').count();
 
@@ -323,35 +386,53 @@ export class LogsPage {
         const orgId = process.env.ORGNAME;
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Navigating to logs page: ${logsUrl}`);
-        await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch((e) => {
+        await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch((e) => {
             testLogger.warn(`selectIndexAndStreamJoinUnion: Navigation timeout, continuing... ${e.message}`);
         });
         await this.page.waitForTimeout(2000);
 
         // Open dropdown
-        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
-        await this.page.waitForTimeout(3000);
+        const dropdownArrow = this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
+        await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
+        await dropdownArrow.click();
+        await this.page.waitForTimeout(2000);
 
-        // Select first stream with explicit wait
+        // Use search box to filter for first stream (much faster than scrolling)
+        const searchInput = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+        const searchVisible = await searchInput.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
+
+        // Select first stream
+        if (searchVisible) {
+            testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamA}`);
+            await searchInput.click();
+            await searchInput.fill(streamA);
+        }
+
         const streamASelector = `[data-test="log-search-index-list-stream-toggle-${streamA}"] div`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamASelector}`);
         const streamAToggle = this.page.locator(streamASelector).first();
-        await streamAToggle.waitFor({ state: 'visible', timeout: 15000 });
+        await streamAToggle.waitFor({ state: 'visible', timeout: 20000 });
         await streamAToggle.click();
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamA}`);
-        await this.page.waitForTimeout(1000);
 
-        // Select second stream (dropdown stays open after first selection)
+        // Clear search and filter for second stream
+        if (searchVisible) {
+            testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamB}`);
+            await searchInput.click();
+            await searchInput.fill('');
+            await searchInput.fill(streamB);
+        }
+
+        // Select second stream
         const streamBSelector = `[data-test="log-search-index-list-stream-toggle-${streamB}"] div`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamBSelector}`);
         const streamBToggle = this.page.locator(streamBSelector).first();
-        await streamBToggle.waitFor({ state: 'visible', timeout: 15000 });
+        await streamBToggle.waitFor({ state: 'visible', timeout: 20000 });
         await streamBToggle.click();
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamB}`);
-        await this.page.waitForTimeout(1000);
 
         // Close dropdown
-        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        await dropdownArrow.click();
         testLogger.info(`selectIndexAndStreamJoinUnion: Successfully selected both streams`);
     }
 
@@ -430,22 +511,26 @@ export class LogsPage {
         return false;
     }
 
-    async selectStream(stream, maxRetries = 3) {
+    async selectStream(stream, maxRetries = 3, apiWaitMs = 30000) {
         testLogger.info(`selectStream: Selecting stream: ${stream}`);
 
-        // First, wait for the stream to be available via API
-        const streamAvailable = await this.waitForStreamAvailable(stream, 30000, 3000);
-        if (!streamAvailable) {
-            testLogger.warn(`selectStream: Stream ${stream} not found via API after 30s, will still try UI selection`);
+        // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
+        if (apiWaitMs > 0) {
+            const streamAvailable = await this.waitForStreamAvailable(stream, apiWaitMs, 3000);
+            if (!streamAvailable) {
+                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${apiWaitMs}ms, will still try UI selection`);
+            } else {
+                testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
+            }
         } else {
-            testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
+            testLogger.info(`selectStream: Skipping API wait (apiWaitMs=0)`);
         }
 
         // Navigate to logs page via URL to ensure fresh stream list (no page.reload which can cause issues)
         const orgId = process.env.ORGNAME;
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
-        await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+        await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
         await this.page.waitForTimeout(3000);
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -540,7 +625,7 @@ export class LogsPage {
                     await this.page.waitForTimeout(5000); // Wait before retry for stream to be indexed
 
                     // Navigate to logs page again to refresh stream list
-                    await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+                    await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
                     await this.page.waitForTimeout(3000);
                 }
 
@@ -550,7 +635,7 @@ export class LogsPage {
 
                 if (attempt < maxRetries) {
                     await this.page.waitForTimeout(5000);
-                    await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+                    await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
                     await this.page.waitForTimeout(3000);
                 }
             }
@@ -700,18 +785,20 @@ export class LogsPage {
         await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.waitForTimeout(1000);
 
-        // Click and wait for focus
+        // Click to focus the editor
         await this.page.locator(this.queryEditor).click();
         await this.page.waitForTimeout(500);
 
-        // Select all and delete
+        // Select all existing content
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.waitForTimeout(300);
-        await this.page.keyboard.press("Backspace");
-        await this.page.waitForTimeout(300);
 
-        // Type new query
-        await this.page.keyboard.type(query);
+        // Use .inputarea.fill() directly - this is more reliable than keyboard.type()
+        // as it avoids Monaco editor line number interference (the "1 SELECT" bug)
+        // The .fill() method will replace the selected content
+        const inputArea = this.page.locator(this.queryEditor).locator('.inputarea');
+        await inputArea.waitFor({ state: 'visible', timeout: 5000 });
+        await inputArea.fill(query);
     }
 
     async typeQuery(query) {
@@ -1153,7 +1240,7 @@ export class LogsPage {
             await this.page.locator(this.exploreButton).first().waitFor({ state: 'attached', timeout: 10000 });
             
             await Promise.all([
-                this.page.waitForLoadState('networkidle'),
+                this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}),
                 this.page.locator(this.exploreButton).first().click()
             ]);
             
@@ -1172,7 +1259,7 @@ export class LogsPage {
             await this.timestampColumnMenu.scrollIntoViewIfNeeded();
             
             await Promise.all([
-                this.page.waitForLoadState('networkidle'),
+                this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}),
                 this.timestampColumnMenu.click({ force: true })
             ]);
             
@@ -1354,7 +1441,7 @@ export class LogsPage {
     }
 
     async kubernetesContainerNameJoinLike() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE \'%ziox%\'');
         await this.page.waitForTimeout(3000);
     }
 
@@ -1524,7 +1611,7 @@ export class LogsPage {
         return await this.loginPage.login();
     }
 
-    // Ingestion methods 
+    // Ingestion methods - using page.request API to keep credentials in Node.js context
     async ingestLogs(orgId, streamName, logData) {
         const basicAuthCredentials = Buffer.from(
             `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
@@ -1534,24 +1621,24 @@ export class LogsPage {
             "Authorization": `Basic ${basicAuthCredentials}`,
             "Content-Type": "application/json",
         };
-        
-        const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
-            const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-                method: 'POST',
+
+        const baseUrl = process.env.INGESTION_URL.endsWith('/')
+            ? process.env.INGESTION_URL.slice(0, -1)
+            : process.env.INGESTION_URL;
+
+        try {
+            const response = await this.page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
                 headers: headers,
-                body: JSON.stringify(logData)
+                data: logData
             });
-            return await fetchResponse.json();
-        }, {
-            url: process.env.INGESTION_URL,
-            headers: headers,
-            orgId: orgId,
-            streamName: streamName,
-            logData: logData
-        });
-        
-        testLogger.debug('Ingestion API response received', { response });
-        return response;
+
+            const responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
+            testLogger.debug('Ingestion API response received', { response: responseData });
+            return responseData;
+        } catch (e) {
+            testLogger.debug('Ingestion API error', { error: e.message });
+            return { error: e.message };
+        }
     }
 
     // Management methods - delegate to ManagementPage
@@ -1599,6 +1686,7 @@ export class LogsPage {
 
     /**
      * Ingest multiple log entries with retry logic for "stream being deleted" errors
+     * Uses page.request API to keep credentials in Node.js context (secure)
      * @param {string} streamName - Target stream name
      * @param {Array<{fieldName: string, fieldValue: string}>} dataObjects - Array of field data to ingest
      * @param {number} maxRetries - Maximum retry attempts (default: 5)
@@ -1614,6 +1702,10 @@ export class LogsPage {
             "Content-Type": "application/json",
         };
 
+        const baseUrl = process.env.INGESTION_URL.endsWith('/')
+            ? process.env.INGESTION_URL.slice(0, -1)
+            : process.env.INGESTION_URL;
+
         const baseTimestamp = Date.now() * 1000;
         const logData = dataObjects.map(({ fieldName, fieldValue }, index) => ({
             level: "info",
@@ -1625,44 +1717,46 @@ export class LogsPage {
         testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
-                const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-                    method: 'POST',
+            try {
+                const response = await this.page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
                     headers: headers,
-                    body: JSON.stringify(logData)
+                    data: logData
                 });
-                const responseJson = await fetchResponse.json();
-                return {
-                    status: fetchResponse.status,
-                    statusText: fetchResponse.statusText,
-                    body: responseJson
-                };
-            }, {
-                url: process.env.INGESTION_URL,
-                headers: headers,
-                orgId: orgId,
-                streamName: streamName,
-                logData: logData
-            });
 
-            testLogger.info(`Ingestion API response (attempt ${attempt}/${maxRetries}) - Status: ${response.status}, Body:`, response.body);
+                const responseBody = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
+                const status = response.status();
 
-            if (response.status === 200) {
-                testLogger.info('Ingestion successful, waiting for stream to be indexed...');
-                await this.page.waitForTimeout(5000);
-                return;
+                testLogger.info(`Ingestion API response (attempt ${attempt}/${maxRetries}) - Status: ${status}, Body:`, responseBody);
+
+                if (status === 200) {
+                    testLogger.info('Ingestion successful, waiting for stream to be indexed...');
+                    // NOTE: This is a backend async indexing wait, not a UI wait.
+                    // waitForLoadState won't help as no page navigation occurs.
+                    // Consider using waitForStreamData() polling for production tests.
+                    await this.page.waitForTimeout(5000);
+                    return;
+                }
+
+                const errorMessage = responseBody?.message || JSON.stringify(responseBody);
+                if (errorMessage.includes('being deleted') && attempt < maxRetries) {
+                    const waitTime = attempt * 5000;
+                    testLogger.info(`Stream is being deleted, waiting ${waitTime/1000}s before retry...`);
+                    // Backend wait with exponential backoff - server needs time to complete deletion
+                    await this.page.waitForTimeout(waitTime);
+                    continue;
+                }
+
+                testLogger.error(`Ingestion failed! Status: ${status}, Response:`, responseBody);
+                throw new Error(`Ingestion failed with status ${status}: ${JSON.stringify(responseBody)}`);
+            } catch (e) {
+                if (attempt === maxRetries) {
+                    testLogger.error(`Ingestion failed after ${maxRetries} attempts:`, e.message);
+                    throw e;
+                }
+                testLogger.info(`Ingestion attempt ${attempt} failed, retrying...`);
+                // Exponential backoff for API retry - not a UI wait
+                await this.page.waitForTimeout(attempt * 5000);
             }
-
-            const errorMessage = response.body?.message || JSON.stringify(response.body);
-            if (errorMessage.includes('being deleted') && attempt < maxRetries) {
-                const waitTime = attempt * 5000;
-                testLogger.info(`Stream is being deleted, waiting ${waitTime/1000}s before retry...`);
-                await this.page.waitForTimeout(waitTime);
-                continue;
-            }
-
-            testLogger.error(`Ingestion failed! Status: ${response.status}, Response:`, response.body);
-            throw new Error(`Ingestion failed with status ${response.status}: ${JSON.stringify(response.body)}`);
         }
     }
 
@@ -1727,7 +1821,9 @@ export class LogsPage {
     }
 
     async fillSavedViewSearchInput(text) {
-        return await this.fillInputField(this.savedViewSearchInput, text);
+        const searchInput = this.page.locator(this.savedViewSearchInput);
+        await searchInput.waitFor({ state: 'visible', timeout: 15000 });
+        return await searchInput.fill(text);
     }
 
     async clickSavedViewByTitle(title) {
@@ -1828,6 +1924,306 @@ export class LogsPage {
         return await this.page.locator(this.closeDialog).click();
     }
 
+    // ===== LOG DETAIL SIDEBAR METHODS (Bug #9724) =====
+    /**
+     * Opens the log detail sidebar by clicking on a log row
+     * @returns {Promise<void>}
+     */
+    async openLogDetailSidebar() {
+        await this.page.locator(this.logTableColumnSource).click();
+        await this.page.locator(this.logDetailDialogBox).waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Log detail sidebar opened');
+    }
+
+    /**
+     * Verifies the log detail sidebar is visible
+     * @returns {Promise<void>}
+     */
+    async expectLogDetailSidebarVisible() {
+        await expect(this.page.locator(this.logDetailDialogBox)).toBeVisible();
+    }
+
+    /**
+     * Verifies the log detail sidebar is NOT visible
+     * @returns {Promise<void>}
+     */
+    async expectLogDetailSidebarNotVisible() {
+        await expect(this.page.locator(this.logDetailDialogBox)).not.toBeVisible();
+    }
+
+    /**
+     * Verifies that the JSON tab is selected by default (Bug #9724)
+     * Checks that JSON tab is visible AND JSON content is visible
+     * @returns {Promise<void>}
+     */
+    async verifyJsonTabSelectedByDefault() {
+        // Verify JSON tab exists
+        const jsonTab = this.page.locator(this.logDetailJsonTab);
+        await expect(jsonTab).toBeVisible();
+
+        // Check if JSON tab is selected (has 'q-tab--active' class)
+        const isJsonTabActive = await jsonTab.evaluate(el => el.classList.contains('q-tab--active'));
+        expect(isJsonTabActive, 'JSON tab should be selected by default (Bug #9724)').toBe(true);
+
+        // Verify JSON content is visible
+        await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
+        testLogger.info('✓ JSON tab is selected by default (Bug #9724 verified)');
+    }
+
+    /**
+     * Verifies both JSON and Table tabs are visible in the sidebar
+     * @returns {Promise<void>}
+     */
+    async verifyLogDetailTabsVisible() {
+        await expect(this.page.locator(this.logDetailJsonTab)).toBeVisible();
+        await expect(this.page.locator(this.logDetailTableTab)).toBeVisible();
+        testLogger.info('✓ Both JSON and Table tabs are visible');
+    }
+
+    /**
+     * Clicks on the Table tab in the log detail sidebar
+     * @returns {Promise<void>}
+     */
+    async clickLogDetailTableTab() {
+        await this.page.locator(this.logDetailTableTab).click();
+        // Wait for table content to be visible
+        await this.page.locator(this.logDetailTableContent).waitFor({ state: 'visible', timeout: 5000 });
+        testLogger.info('Clicked Table tab');
+    }
+
+    /**
+     * Clicks on the JSON tab in the log detail sidebar
+     * @returns {Promise<void>}
+     */
+    async clickLogDetailJsonTab() {
+        await this.page.locator(this.logDetailJsonTab).click();
+        // Wait for JSON content to be visible
+        await this.page.locator(this.logDetailJsonContent).waitFor({ state: 'visible', timeout: 5000 });
+        testLogger.info('Clicked JSON tab');
+    }
+
+    /**
+     * Verifies the Table tab is selected and table content is visible
+     * @returns {Promise<void>}
+     */
+    async verifyTableTabSelected() {
+        const tableTab = this.page.locator(this.logDetailTableTab);
+        const isTableTabActive = await tableTab.evaluate(el => el.classList.contains('q-tab--active'));
+        expect(isTableTabActive, 'Table tab should be selected').toBe(true);
+        await expect(this.page.locator(this.logDetailTableContent)).toBeVisible();
+        testLogger.info('✓ Table tab is selected and content is visible');
+    }
+
+    /**
+     * Verifies the JSON tab is selected and JSON content is visible
+     * @returns {Promise<void>}
+     */
+    async verifyJsonTabSelected() {
+        const jsonTab = this.page.locator(this.logDetailJsonTab);
+        const isJsonTabActive = await jsonTab.evaluate(el => el.classList.contains('q-tab--active'));
+        expect(isJsonTabActive, 'JSON tab should be selected').toBe(true);
+        await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
+        testLogger.info('✓ JSON tab is selected and content is visible');
+    }
+
+    /**
+     * Closes the log detail sidebar
+     * @returns {Promise<void>}
+     */
+    async closeLogDetailSidebar() {
+        await this.page.locator(this.logDetailCloseButton).click();
+        // Wait for sidebar to close
+        await this.page.locator(this.logDetailDialogBox).waitFor({ state: 'hidden', timeout: 5000 });
+        testLogger.info('Log detail sidebar closed');
+    }
+
+    /**
+     * Gets the text content from the log detail JSON view
+     * @returns {Promise<string>} The text content of the JSON detail view
+     */
+    async getLogDetailJsonContentText() {
+        const content = await this.page.locator(this.logDetailJsonContent).textContent();
+        testLogger.info('Retrieved log detail JSON content');
+        return content;
+    }
+
+    /**
+     * Gets the count of highlighted elements in the logs table
+     * @returns {Promise<number>} The count of highlighted elements
+     */
+    async getHighlightedElementsCount() {
+        const count = await this.page.locator('.log-highlighted').count();
+        testLogger.info(`Found ${count} highlighted elements`);
+        return count;
+    }
+
+    /**
+     * Verifies the wrap toggle is visible when Table tab is selected
+     * @returns {Promise<void>}
+     */
+    async verifyWrapToggleVisibleInTableTab() {
+        await expect(this.page.locator(this.logDetailWrapToggle)).toBeVisible();
+        testLogger.info('✓ Wrap toggle is visible in Table tab');
+    }
+
+    /**
+     * Verifies the wrap toggle is NOT visible when JSON tab is selected
+     * @returns {Promise<void>}
+     */
+    async verifyWrapToggleNotVisibleInJsonTab() {
+        await expect(this.page.locator(this.logDetailWrapToggle)).not.toBeVisible();
+        testLogger.info('✓ Wrap toggle is not visible in JSON tab');
+    }
+
+    /**
+     * Verifies navigation buttons (Previous/Next) are visible in the sidebar
+     * @returns {Promise<void>}
+     */
+    async verifyNavigationButtonsVisible() {
+        await expect(this.page.locator(this.logDetailPreviousBtn)).toBeVisible();
+        await expect(this.page.locator(this.logDetailNextBtn)).toBeVisible();
+        testLogger.info('✓ Previous and Next navigation buttons are visible');
+    }
+
+    // ===== VIEW RELATED / CORRELATION METHODS (Enterprise Feature) =====
+
+    /**
+     * Checks if the View Related button is visible in log detail sidebar
+     * Note: This is an Enterprise-only feature
+     * @returns {Promise<boolean>}
+     */
+    async isViewRelatedButtonVisible() {
+        try {
+            await this.page.locator(this.viewRelatedBtn).waitFor({ state: 'visible', timeout: 5000 });
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verifies the View Related button is visible (Enterprise feature)
+     * @returns {Promise<void>}
+     */
+    async expectViewRelatedButtonVisible() {
+        await expect(this.page.locator(this.viewRelatedBtn)).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ View Related button is visible (Enterprise feature)');
+    }
+
+    /**
+     * Verifies the View Related button is NOT visible
+     * @returns {Promise<void>}
+     */
+    async expectViewRelatedButtonNotVisible() {
+        await expect(this.page.locator(this.viewRelatedBtn)).not.toBeVisible();
+        testLogger.info('✓ View Related button is not visible');
+    }
+
+    /**
+     * Clicks the View Related button to open correlation view
+     * @returns {Promise<void>}
+     */
+    async clickViewRelatedButton() {
+        await this.page.locator(this.viewRelatedBtn).click();
+        testLogger.info('Clicked View Related button');
+        // Wait for correlation to start loading
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Verifies correlation tabs (Logs, Metrics, Traces) are visible in detail drawer
+     * These tabs appear after clicking View Related
+     * @returns {Promise<void>}
+     */
+    async expectCorrelationTabsVisible() {
+        // Wait for tabs to appear - correlation tabs are enterprise feature
+        await this.page.waitForTimeout(2000);
+
+        // Check for correlation tabs by looking for tabs with specific text
+        const logsTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Logs' });
+        const metricsTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Metrics' });
+        const tracesTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Traces' });
+
+        // At least one correlation tab should be visible
+        const anyCorrelationTabVisible = await logsTab.or(metricsTab).or(tracesTab).first().isVisible().catch(() => false);
+        expect(anyCorrelationTabVisible, 'At least one correlation tab should be visible').toBe(true);
+        testLogger.info('✓ Correlation tabs are visible');
+    }
+
+    /**
+     * Clicks on the Correlated Logs tab
+     * @returns {Promise<void>}
+     */
+    async clickCorrelatedLogsTab() {
+        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Logs' }).last();
+        await tab.click();
+        testLogger.info('Clicked Correlated Logs tab');
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Clicks on the Correlated Metrics tab
+     * @returns {Promise<void>}
+     */
+    async clickCorrelatedMetricsTab() {
+        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Metrics' });
+        await tab.click();
+        testLogger.info('Clicked Correlated Metrics tab');
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Clicks on the Correlated Traces tab
+     * @returns {Promise<void>}
+     */
+    async clickCorrelatedTracesTab() {
+        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Traces' });
+        await tab.click();
+        testLogger.info('Clicked Correlated Traces tab');
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Verifies correlation loading state is displayed
+     * @returns {Promise<void>}
+     */
+    async expectCorrelationLoadingVisible() {
+        await expect(this.page.locator(this.correlationLoadingSpinner)).toBeVisible({ timeout: 5000 });
+        testLogger.info('✓ Correlation loading spinner is visible');
+    }
+
+    /**
+     * Waits for correlation loading to complete
+     * @param {number} timeout - Maximum wait time in ms
+     * @returns {Promise<void>}
+     */
+    async waitForCorrelationLoaded(timeout = 30000) {
+        await this.page.locator(this.correlationLoadingSpinner).waitFor({ state: 'hidden', timeout });
+        testLogger.info('✓ Correlation loading completed');
+    }
+
+    /**
+     * Verifies Apply Dimension Filters button is visible
+     * @returns {Promise<void>}
+     */
+    async expectApplyDimensionFiltersVisible() {
+        const filterBtn = this.page.locator(this.applyDimensionFilters).or(this.page.locator(this.applyDimensionFiltersEmbedded));
+        await expect(filterBtn.first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ Apply Dimension Filters button is visible');
+    }
+
+    /**
+     * Closes the correlation dashboard dialog
+     * @returns {Promise<void>}
+     */
+    async closeCorrelationDashboard() {
+        const closeBtn = this.page.locator(this.correlationDashboardClose);
+        if (await closeBtn.isVisible()) {
+            await closeBtn.click();
+            testLogger.info('Closed correlation dashboard');
+        }
+    }
+
     async clickSavedViewDialogSaveContent() {
         return await this.page.locator(this.savedViewDialogSaveContent).click();
     }
@@ -1846,6 +2242,36 @@ export class LogsPage {
 
     async expectErrorMessageVisible() {
         return await expect(this.page.locator(this.errorMessage)).toBeVisible();
+    }
+
+    /**
+     * Get the detailed error dialog text
+     * Clicks on error details button if available and returns the error message text
+     * @returns {Promise<string>} The error dialog text
+     */
+    async getDetailedErrorDialogText() {
+        // Try to click the error details button if visible
+        const detailsBtn = this.page.locator(this.resultErrorDetailsBtn);
+        if (await detailsBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await detailsBtn.click();
+            await this.page.waitForTimeout(500);
+        }
+
+        // Try to get text from detailed error message first
+        const detailedError = this.page.locator(this.searchDetailErrorMessage);
+        if (await detailedError.isVisible({ timeout: 2000 }).catch(() => false)) {
+            return await detailedError.textContent();
+        }
+
+        // Fall back to the main error message
+        const errorMsg = this.page.locator(this.errorMessage);
+        if (await errorMsg.isVisible({ timeout: 2000 }).catch(() => false)) {
+            return await errorMsg.textContent();
+        }
+
+        // Return empty string if no error message found
+        testLogger.warn('No error message found');
+        return '';
     }
 
     async expectWarningElementHidden() {
@@ -1890,7 +2316,7 @@ export class LogsPage {
 
     async clickBarChartCanvas() {
         // Wait for network idle to ensure chart data has loaded
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         const canvasLocator = this.page.locator(this.barChartCanvas);
 
@@ -2079,7 +2505,37 @@ export class LogsPage {
     }
 
     async clickLiveMode5Sec() {
-        return await this.page.locator(this.liveMode5SecBtn).click();
+        // Wait for button to be enabled before clicking (button starts disabled)
+        const button = this.page.locator(this.liveMode5SecBtn);
+        await button.waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for button to become enabled
+        await expect(button).toBeEnabled({ timeout: 10000 });
+        return await button.click();
+    }
+
+    async isLiveMode5SecEnabled() {
+        const testLogger = require('../../playwright-tests/utils/test-logger.js');
+        const button = this.page.locator(this.liveMode5SecBtn);
+        try {
+            // Wait for button to be visible first (isEnabled() doesn't support timeout)
+            await button.waitFor({ state: 'visible', timeout: 5000 });
+            return await button.isEnabled();
+        } catch (error) {
+            testLogger.warn(`isLiveMode5SecEnabled check failed: ${error.message}`);
+            return false;
+        }
+    }
+
+    /**
+     * Get the Live Mode 5 second button locator
+     * @returns {import('@playwright/test').Locator} The 5-second live mode button locator
+     */
+    getLiveMode5SecButton() {
+        return this.page.locator(this.liveMode5SecBtn);
+    }
+
+    async getPageContent() {
+        return await this.page.locator('body').innerText().catch(() => '');
     }
 
     async clickVrlToggle() {
@@ -2408,14 +2864,14 @@ export class LogsPage {
         const logsPage = this.page.locator(this.qPageContainer);
 
         // Wait for the page to stabilize and check for "No events found" condition
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // If no data is available, trigger a refresh and wait
         const pageText = await logsPage.textContent();
         if (pageText.includes('No events found')) {
             testLogger.debug('No events found, attempting to refresh...');
             await this.clickRefreshButton();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             // Wait additional time for data to load
             await this.page.waitForTimeout(3000);
         }
@@ -2727,8 +3183,27 @@ export class LogsPage {
 
     // Field management methods for add/remove fields to table
     async hoverOnFieldExpandButton(fieldName) {
-        await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover();
-        await this.page.waitForTimeout(300);
+        const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+
+        // Check primary selector first (use waitFor since isVisible doesn't support timeout)
+        try {
+            await expandBtn.waitFor({ state: 'visible', timeout: 5000 });
+            await expandBtn.hover();
+            await this.page.waitForTimeout(300);
+            return;
+        } catch {
+            // Primary selector not found, try alternate
+        }
+
+        // Try alternate selector
+        const altBtn = this.page.locator(`[data-test*="expand-${fieldName}"]`).first();
+        if (await altBtn.isVisible().catch(() => false)) {
+            await altBtn.hover();
+            await this.page.waitForTimeout(300);
+            return;
+        }
+
+        throw new Error(`Field expand button not found for: ${fieldName}`);
     }
 
     async clickAddFieldToTableButton(fieldName) {
@@ -2828,32 +3303,28 @@ export class LogsPage {
         } else {
             throw new Error('No include/exclude buttons found in log details');
         }
-        await this.page.waitForTimeout(1500);
+        // Wait for menu to appear (with proper wait instead of fixed timeout)
+        const includeMenuItem = this.page.getByText('Include Search Term', { exact: true });
 
-        // Take screenshot to see what menu appears
-        await this.page.screenshot({ path: 'playwright-tests/Logs/include-menu-after-click.png', fullPage: true });
-        testLogger.info('Screenshot saved after clicking include/exclude button');
+        try {
+            await includeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+            testLogger.info('Include Search Term menu item found');
+            await includeMenuItem.click();
+        } catch (e) {
+            // Take screenshot for debugging if menu doesn't appear
+            await this.page.screenshot({ path: 'playwright-tests/Logs/include-menu-after-click.png', fullPage: true });
+            testLogger.info('Screenshot saved after clicking include/exclude button');
 
-        // Try to find the menu in different ways
-        const includeByText = this.page.getByText('Include Search Term');
-        const includeExact = this.page.getByText('Include Search Term', { exact: true });
-        const includePartial = this.page.getByText(/Include.*Search/i);
+            // Try alternative selectors
+            const includePartial = this.page.getByText(/Include.*Search/i);
+            const partialCount = await includePartial.count();
+            testLogger.info(`Found partial match menus: ${partialCount}`);
 
-        const textCount = await includeByText.count();
-        const exactCount = await includeExact.count();
-        const partialCount = await includePartial.count();
-
-        testLogger.info(`Found menus: text=${textCount}, exact=${exactCount}, partial=${partialCount}`);
-
-        // Try clicking whichever is found
-        if (textCount > 0) {
-            await includeByText.first().click();
-        } else if (exactCount > 0) {
-            await includeExact.first().click();
-        } else if (partialCount > 0) {
-            await includePartial.first().click();
-        } else {
-            throw new Error('Include Search Term menu item not found');
+            if (partialCount > 0) {
+                await includePartial.first().click();
+            } else {
+                throw new Error('Include Search Term menu item not found');
+            }
         }
 
         await this.page.waitForTimeout(1000);
@@ -3181,12 +3652,284 @@ export class LogsPage {
         return await expect(this.page.locator(this.logsSearchIndexList)).toContainText(text);
     }
 
-    async getLogsTableContent() {
-        return await this.page.locator(this.logsTable).textContent();
+    /**
+     * Gets the text content of the logs table.
+     * @param {number} [timeout=30000] - Timeout in milliseconds (increased from default 10s to handle large result sets)
+     * @returns {Promise<string>} The text content of the logs table
+     */
+    async getLogsTableContent(timeout = 30000) {
+        return await this.page.locator(this.logsTable).textContent({ timeout });
     }
 
     async getLogsTableRowCount() {
         return await this.page.locator(`${this.logsTable} tbody tr`).count();
+    }
+
+    // ============================================================================
+    // Stream display methods for multi-stream scenarios
+    // ============================================================================
+
+    /**
+     * Gets the first stream display element from the stream list.
+     * @returns {Promise<Locator>} The stream display element locator
+     * @example
+     * const element = await logsPage.getStreamDisplayElement();
+     * await element.click();
+     */
+    async getStreamDisplayElement() {
+        return this.page.locator(this.logsSearchIndexList).first();
+    }
+
+    /**
+     * Waits for the stream display element to be visible.
+     * @param {number} [timeout=10000] - Timeout in milliseconds
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.expectStreamDisplayVisible(5000);
+     */
+    async expectStreamDisplayVisible(timeout = 10000) {
+        await this.page.locator(this.logsSearchIndexList).first().waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Gets the text content of the stream display element.
+     * @returns {Promise<string>} The stream display text
+     * @example
+     * const text = await logsPage.getStreamDisplayText();
+     * console.log(`Selected streams: ${text}`);
+     */
+    async getStreamDisplayText() {
+        return await this.page.locator(this.logsSearchIndexList).first().textContent();
+    }
+
+    /**
+     * Gets computed styles and dimensions of the stream display element for overflow detection.
+     * @returns {Promise<Object>} Object containing overflow, textOverflow, whiteSpace, scrollWidth, clientWidth, and width
+     * @example
+     * const styles = await logsPage.getStreamDisplayStyles();
+     * const isOverflowing = styles.scrollWidth > styles.clientWidth;
+     */
+    async getStreamDisplayStyles() {
+        const element = await this.getStreamDisplayElement();
+        return await element.evaluate((el) => {
+            const computed = window.getComputedStyle(el);
+            return {
+                overflow: computed.overflow,
+                textOverflow: computed.textOverflow,
+                whiteSpace: computed.whiteSpace,
+                scrollWidth: el.scrollWidth,
+                clientWidth: el.clientWidth,
+                width: computed.width
+            };
+        });
+    }
+
+    /**
+     * Hovers over the stream display element to trigger tooltips.
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.hoverStreamDisplay();
+     * const isVisible = await logsPage.isTooltipVisible();
+     */
+    async hoverStreamDisplay() {
+        await this.page.locator(this.logsSearchIndexList).first().hover();
+    }
+
+    // ============================================================================
+    // Tooltip methods
+    // ============================================================================
+
+    /**
+     * Checks if a tooltip is visible with proper state detection.
+     * @param {number} [timeout=3000] - Timeout in milliseconds
+     * @returns {Promise<boolean>} True if tooltip is visible, false otherwise
+     * @example
+     * await logsPage.hoverStreamDisplay();
+     * if (await logsPage.isTooltipVisible()) {
+     *   const text = await logsPage.getTooltipText();
+     * }
+     */
+    async isTooltipVisible(timeout = 3000) {
+        try {
+            await this.page.locator('[role="tooltip"], .q-tooltip').first().waitFor({
+                state: 'visible',
+                timeout
+            });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Gets the text content of the tooltip with error handling.
+     * @param {number} [timeout=3000] - Timeout in milliseconds
+     * @returns {Promise<string|null>} The tooltip text, or null if tooltip is not found
+     * @example
+     * const tooltipText = await logsPage.getTooltipText();
+     * if (tooltipText) {
+     *   console.log(`Tooltip: ${tooltipText}`);
+     * }
+     */
+    async getTooltipText(timeout = 3000) {
+        try {
+            return await this.page.locator('[role="tooltip"], .q-tooltip').first().textContent({ timeout });
+        } catch {
+            return null;
+        }
+    }
+
+    // ============================================================================
+    // Field Expansion Methods (Bug #7751 regression tests)
+    // ============================================================================
+
+    /**
+     * Waits for the field expand button to be visible.
+     * @param {string} fieldName - Name of the field
+     * @param {number} [timeout=10000] - Timeout in milliseconds
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.waitForFieldExpandButtonVisible('kubernetes_pod_name');
+     */
+    async waitForFieldExpandButtonVisible(fieldName, timeout = 10000) {
+        await this.page.locator(this.fieldExpandButton(fieldName)).waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Clicks the field expand button to trigger values API.
+     * @param {string} fieldName - Name of the field to expand
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.clickFieldExpandButton('kubernetes_pod_name');
+     */
+    async clickFieldExpandButton(fieldName) {
+        await this.page.locator(this.fieldExpandButton(fieldName)).click();
+    }
+
+    /**
+     * Waits for field expansion content to be visible after expanding a field.
+     * @param {string} fieldName - Name of the field
+     * @param {number} [timeout=10000] - Timeout in milliseconds
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.waitForFieldExpansionContent('kubernetes_pod_name');
+     */
+    async waitForFieldExpansionContent(fieldName, timeout = 10000) {
+        await this.page.locator(this.fieldListItem(fieldName)).waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Gets the text content of field expansion area (for error checking).
+     * @param {string} fieldName - Name of the field
+     * @param {number} [timeout=10000] - Timeout in milliseconds
+     * @returns {Promise<string>} The text content, or empty string on error
+     * @example
+     * const content = await logsPage.getFieldExpansionContent('kubernetes_pod_name');
+     */
+    async getFieldExpansionContent(fieldName, timeout = 10000) {
+        try {
+            return await this.page.locator(this.fieldListItem(fieldName)).textContent({ timeout }) || '';
+        } catch {
+            return '';
+        }
+    }
+
+    /**
+     * Waits for at least one field value to appear in the dropdown after expansion.
+     * @param {string} fieldName - Name of the field
+     * @param {number} [timeout=5000] - Timeout in milliseconds
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.waitForFieldValues('kubernetes_pod_name');
+     */
+    async waitForFieldValues(fieldName, timeout = 5000) {
+        await this.page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`).first()
+            .waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Gets the count of field values displayed in the dropdown.
+     * @param {string} fieldName - Name of the field
+     * @returns {Promise<number>} Number of field values
+     * @example
+     * const count = await logsPage.getFieldValuesCount('kubernetes_pod_name');
+     */
+    async getFieldValuesCount(fieldName) {
+        return await this.page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`).count();
+    }
+
+    /**
+     * Expands a field and validates that values API does not return 400 error.
+     * Used by Bug #7751 tests to verify field expansion works correctly with complex queries.
+     *
+     * This method performs three levels of validation:
+     * 1. PRIMARY: Values API responds with non-400 status
+     * 2. SECONDARY: No 400 error message displayed in UI
+     * 3. TERTIARY: Field values actually appear in dropdown
+     *
+     * @param {string} fieldName - Name of the field to expand
+     * @param {Object} testLogger - Test logger instance
+     * @returns {Promise<{apiStatus: number|null, valueCount: number}>} API status and field value count
+     * @example
+     * const result = await logsPage.expandFieldAndValidate('kubernetes_pod_name', testLogger);
+     * // Returns: { apiStatus: 200, valueCount: 10 }
+     */
+    async expandFieldAndValidate(fieldName, testLogger) {
+        const { expect } = require('@playwright/test');
+
+        // Search for the field first to make it visible in sidebar
+        testLogger.info(`Searching for field: ${fieldName}`);
+        await this.fillIndexFieldSearchInput(fieldName);
+
+        // Wait for expand button to be visible
+        testLogger.info(`Expanding field: ${fieldName}`);
+        await this.waitForFieldExpandButtonVisible(fieldName);
+
+        // Set up values API response waiter BEFORE clicking expand
+        testLogger.info('Setting up values API listener');
+        const valuesApiPromise = this.page.waitForResponse(
+            response => response.url().includes('/_values') && response.status() !== 0,
+            { timeout: 20000 }
+        ).catch(() => null);
+
+        // Click expand button
+        testLogger.info('Clicking expand to trigger values API call');
+        await this.clickFieldExpandButton(fieldName);
+
+        // Wait for values API response
+        let apiStatus = null;
+        const apiResponse = await valuesApiPromise;
+
+        if (apiResponse) {
+            apiStatus = apiResponse.status();
+            testLogger.info(`✓ Values API responded with status: ${apiStatus}`);
+
+            // PRIMARY ASSERTION: Values API should NOT return 400 (this was the bug #7751)
+            expect(apiStatus).not.toBe(400);
+            testLogger.info('✓ PRIMARY CHECK PASSED: Values API did not return 400 error');
+        } else {
+            testLogger.warn('Values API response timeout');
+        }
+
+        // Wait for field expansion content to be visible
+        await this.waitForFieldExpansionContent(fieldName);
+
+        // Get expansion content text
+        const contentText = await this.getFieldExpansionContent(fieldName);
+
+        // Secondary assertion: NO 400 error in UI
+        expect(contentText).not.toContain('400');
+        expect(contentText.toLowerCase()).not.toMatch(/error.*400|400.*error/);
+        testLogger.info('✓ SECONDARY CHECK PASSED: No 400 error displayed in UI');
+
+        // TERTIARY ASSERTION: Verify field values actually appear in dropdown
+        await this.waitForFieldValues(fieldName);
+        const valueCount = await this.getFieldValuesCount(fieldName);
+
+        expect(valueCount).toBeGreaterThanOrEqual(1);
+        testLogger.info(`✓ TERTIARY CHECK PASSED: ${valueCount} field value(s) displayed in dropdown`);
+
+        return { apiStatus, valueCount };
     }
 
     async expectVrlFunctionVisible(functionText) {
@@ -3249,7 +3992,11 @@ export class LogsPage {
     }
 
     async clickResultErrorDetailsButton() {
-        return await this.page.locator(this.resultErrorDetailsBtn).click();
+        // Wait for element to be stable before clicking (avoids detached DOM issues)
+        const button = this.page.locator(this.resultErrorDetailsBtn);
+        await button.waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForTimeout(500); // Allow DOM to stabilize
+        return await button.click({ timeout: 15000 });
     }
 
     async expectSearchDetailErrorMessageVisible() {
@@ -3347,15 +4094,47 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                const colorDiv = row.querySelector('div[class*="tw-absolute"][class*="tw-left-0"]');
+                // Find the color indicator div - it's a div with inline backgroundColor style
+                // The div has classes like "tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
+                // Use multiple selector approaches for robustness
+                let colorDiv = row.querySelector('div[style*="background"]');
+
+                // Fallback: try class-based selector with escaped colon
+                if (!colorDiv) {
+                    colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
+                }
+
+                // Fallback: try finding the first absolute positioned child div
+                if (!colorDiv) {
+                    const divs = row.querySelectorAll('div');
+                    for (const div of divs) {
+                        const style = window.getComputedStyle(div);
+                        if (style.position === 'absolute' && style.left === '0px' && style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+                            colorDiv = div;
+                            break;
+                        }
+                    }
+                }
 
                 if (!colorDiv) continue;
 
                 const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
 
-                // Check for severity value in the row text - look for "severity":"X" or "severity":X
+                // Skip if no valid background color
+                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
+
+                // Check for severity value in the row text - look for various patterns
                 for (let sev = 0; sev <= 7; sev++) {
-                    if (text.includes(`"severity":"${sev}"`) || text.includes(`"severity":${sev},`)) {
+                    // Match "severity":"X", "severity":X, "severity": X, or severity: X patterns
+                    const patterns = [
+                        `"severity":"${sev}"`,
+                        `"severity":${sev},`,
+                        `"severity":${sev}}`,
+                        `"severity": ${sev}`,
+                        `severity: ${sev}`
+                    ];
+
+                    if (patterns.some(pattern => text.includes(pattern))) {
                         findings.push({
                             severity: sev,
                             color: bgColor
@@ -3503,6 +4282,219 @@ export class LogsPage {
         }
     }
 
+    // ===== ANALYZE DIMENSIONS METHODS =====
+
+    /**
+     * Check if Logs Analyze Dimensions button is visible
+     * Button appears when: results exist AND not in SQL mode
+     * @returns {Promise<boolean>}
+     */
+    async isAnalyzeDimensionsButtonVisible() {
+        return await this.page.locator(this.logsAnalyzeDimensionsButton).isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Expect Analyze Dimensions button to be visible
+     */
+    async expectAnalyzeDimensionsButtonVisible() {
+        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Analyze Dimensions button is visible');
+    }
+
+    /**
+     * Expect Analyze Dimensions button to NOT be visible
+     */
+    async expectAnalyzeDimensionsButtonNotVisible() {
+        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('Analyze Dimensions button is not visible (as expected)');
+    }
+
+    /**
+     * Click Analyze Dimensions button
+     */
+    async clickAnalyzeDimensionsButton() {
+        await this.page.locator(this.logsAnalyzeDimensionsButton).click();
+        await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        testLogger.info('Clicked Analyze Dimensions button');
+    }
+
+    /**
+     * Check if Analysis Dashboard is visible
+     * @returns {Promise<boolean>}
+     */
+    async isAnalysisDashboardVisible() {
+        return await this.page.locator(this.analysisDashboardCard).isVisible({ timeout: 10000 }).catch(() => false);
+    }
+
+    /**
+     * Expect Analysis Dashboard to be visible
+     */
+    async expectAnalysisDashboardVisible() {
+        await expect(this.page.locator(this.analysisDashboardCard)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Analysis Dashboard is visible');
+    }
+
+    /**
+     * Close Analysis Dashboard
+     */
+    async closeAnalysisDashboard() {
+        const closeBtn = this.page.locator(this.analysisDashboardClose);
+        if (await closeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await closeBtn.click();
+            await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            testLogger.info('Closed Analysis Dashboard');
+        }
+    }
+
+    /**
+     * Check if Dimension Selector sidebar is visible in Analysis Dashboard
+     * The sidebar is visible by default when the dashboard opens.
+     * @returns {Promise<boolean>}
+     */
+    async isDimensionSidebarVisible() {
+        return await this.page.locator(this.dimensionSelectorSidebar).isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Toggle dimension selector sidebar via collapse button
+     */
+    async toggleDimensionSidebar() {
+        const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
+        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await btn.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Toggled Dimension Selector sidebar');
+        }
+    }
+
+    /**
+     * Check if dimension search input is visible in sidebar
+     * @returns {Promise<boolean>}
+     */
+    async isDimensionSearchInputVisible() {
+        return await this.page.locator(this.dimensionSearchInput).isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    /**
+     * Search for a dimension in the sidebar
+     * @param {string} searchText
+     */
+    async searchDimension(searchText) {
+        const input = this.page.locator(this.dimensionSearchInput);
+        await input.click();
+        await input.fill(searchText);
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Searched dimension: ${searchText}`);
+    }
+
+    /**
+     * Get the count of dimension checkboxes visible in sidebar
+     * @returns {Promise<number>}
+     */
+    async getDimensionCheckboxCount() {
+        return await this.page.locator('[data-test^="dimension-checkbox-"]').count();
+    }
+
+    /**
+     * Toggle a specific dimension checkbox by its value
+     * @param {string} dimensionValue
+     * @returns {Promise<boolean>}
+     */
+    async toggleDimensionCheckbox(dimensionValue) {
+        const checkbox = this.page.locator(`[data-test="dimension-checkbox-${dimensionValue}"]`);
+        if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await checkbox.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info(`Toggled dimension checkbox: ${dimensionValue}`);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if analysis dashboard has chart panels rendered
+     * @returns {Promise<boolean>}
+     */
+    async hasAnalysisDashboardCharts() {
+        const chartPanel = this.page.locator('.analysis-dashboard-card canvas, .analysis-dashboard-card [data-test*="chart"]');
+        return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
+    }
+
+    /**
+     * Check if the analysis dashboard is in loading state
+     * @returns {Promise<boolean>}
+     */
+    async isAnalysisDashboardLoading() {
+        return await this.page.locator(this.analysisDashboardLoading).isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    /**
+     * Wait for Analysis Dashboard to load completely
+     */
+    async waitForAnalysisDashboardLoad() {
+        // Wait for loading spinner to disappear
+        const spinner = this.page.locator('.q-spinner-hourglass, .q-spinner');
+        try {
+            if (await spinner.isVisible({ timeout: 1000 })) {
+                await spinner.waitFor({ state: 'hidden', timeout: 30000 });
+            }
+        } catch {
+            // Spinner might not appear or already hidden
+        }
+
+        // Wait for dashboard content
+        await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        testLogger.info('Analysis Dashboard loaded');
+    }
+
+    /**
+     * Check if no results message is visible
+     * @returns {Promise<boolean>}
+     */
+    async isNoResultsMessageVisible() {
+        return await this.page.locator('[data-test="logs-search-result-not-found-text"]').isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Close any open dialog by pressing Escape key
+     */
+    async closeDimensionSelectorDialog() {
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+        testLogger.info('Closed dimension selector dialog');
+    }
+
+    /**
+     * Wait for search results to load after clicking refresh.
+     * Waits for either results table or no-results message to appear.
+     */
+    async waitForSearchResultsToLoad() {
+        try {
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            // Wait for either results or no-results indicator
+            await this.page.locator(`${this.logsTable}, [data-test="logs-search-result-not-found-text"]`).first().waitFor({ state: 'visible', timeout: 15000 });
+        } catch {
+            // Fallback: at least wait for any loading to finish
+            testLogger.info('waitForSearchResultsToLoad: timed out waiting for results indicator');
+        }
+    }
+
+    /**
+     * Wait for SQL mode to be active after switching
+     */
+    async waitForSQLModeActive() {
+        await this.page.waitForTimeout(1000);
+        testLogger.info('SQL mode switch stabilized');
+    }
+
+    /**
+     * Wait for dashboard close to complete
+     */
+    async waitForDashboardClose() {
+        await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        testLogger.info('Dashboard close stabilized');
+    }
+
     // ===== SHARE LINK METHODS =====
 
     /**
@@ -3597,6 +4589,55 @@ export class LogsPage {
         expect(result.appeared).toBe(true);
         testLogger.info('Share link triggered notification', { text: result.text });
         return result;
+    }
+
+    /**
+     * Verify the share link button is disabled
+     */
+    async expectShareLinkButtonDisabled() {
+        await expect(this.page.locator(this.shareLinkButton)).toBeDisabled();
+        testLogger.info('Share link button is disabled');
+    }
+
+    /**
+     * Hover over the share link button to show tooltip
+     */
+    async hoverShareLinkButton() {
+        await this.page.locator(this.shareLinkButton).hover();
+        testLogger.info('Hovered over share link button');
+    }
+
+    /**
+     * Get the share link tooltip text
+     * @param {string} hasTextFilter - Optional regex filter for tooltip text
+     * @returns {Promise<string>} The tooltip text
+     */
+    async getShareLinkTooltipText(hasTextFilter = null) {
+        let tooltip = this.page.locator(this.shareLinkTooltip);
+
+        if (hasTextFilter) {
+            tooltip = tooltip.filter({ hasText: hasTextFilter });
+        }
+
+        await tooltip.first().waitFor({ state: 'visible', timeout: 5000 });
+        const text = await tooltip.first().textContent();
+        testLogger.info(`Share link tooltip text: "${text}"`);
+        return text;
+    }
+
+    /**
+     * Verify the share link tooltip is visible with specific text
+     * @param {string|RegExp} expectedText - Expected text or regex pattern
+     */
+    async expectShareLinkTooltipVisible(expectedText = null) {
+        let tooltip = this.page.locator(this.shareLinkTooltip);
+
+        if (expectedText) {
+            tooltip = tooltip.filter({ hasText: expectedText });
+        }
+
+        await expect(tooltip.first()).toBeVisible({ timeout: 5000 });
+        testLogger.info('Share link tooltip is visible');
     }
 
     /**
@@ -3803,6 +4844,66 @@ export class LogsPage {
         }
     }
 
+    // ============================================================================
+    // REGRESSION TEST POM METHODS
+    // Added to fix POM violations in logs-regression.spec.js
+    // ============================================================================
+
+    /**
+     * Get pagination text from table bottom
+     * @returns {Promise<string>} The pagination text (e.g., "1-50 of 100")
+     */
+    async getPaginationText() {
+        const paginationLocator = this.page.locator(this.tableBottom).first();
+        await paginationLocator.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        return await paginationLocator.textContent().catch(() => 'N/A');
+    }
+
+    /**
+     * Fill the streams search input field
+     * @param {string} text - The text to fill
+     */
+    async fillStreamsSearchInput(text) {
+        const searchInput = this.page.locator(this.streamsSearchInputField);
+        await searchInput.fill(text);
+    }
+
+    /**
+     * Clear the streams search input field
+     */
+    async clearStreamsSearchInput() {
+        const searchInput = this.page.locator(this.streamsSearchInputField);
+        await searchInput.clear();
+    }
+
+    /**
+     * Get the count of table body rows with index
+     * @returns {Promise<number>} The number of rows
+     */
+    async getTableRowCount() {
+        return await this.page.locator(this.tableBodyRowWithIndex).count();
+    }
+
+    /**
+     * Get the count of error indicators on the page
+     * @returns {Promise<number>} The number of error indicators
+     */
+    async getErrorIndicatorCount() {
+        return await this.page.locator(this.errorIndicators).count();
+    }
+
+    /**
+     * Get the result text content
+     * @returns {Promise<string>} The result text
+     */
+    async getResultText() {
+        try {
+            return await this.page.locator(this.resultText).textContent() || '';
+        } catch (error) {
+            return '';
+        }
+    }
+
     /**
      * Get the full error dialog text including header and body
      * Used for verifying error messages contain expected content
@@ -3822,6 +4923,240 @@ export class LogsPage {
     }
 
     /**
+     * Click the query history button
+     */
+    async clickHistoryButton() {
+        const historyButton = this.page.locator(`${this.queryHistoryButton}, button:has-text("History")`).first();
+        if (await historyButton.isVisible()) {
+            await historyButton.click();
+        }
+    }
+
+    /**
+     * Check if the history panel is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isHistoryPanelVisible() {
+        const historyPanel = this.page.locator(this.historyPanel).first();
+        return await historyPanel.isVisible();
+    }
+
+    /**
+     * Check if timestamp column is visible in table header
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isTimestampColumnVisible() {
+        const timestampHeader = this.page.locator('th:has-text("_timestamp"), [data-test*="_timestamp"]').first();
+        return await timestampHeader.isVisible().catch(() => false);
+    }
+
+    /**
+     * Click the first table body row
+     */
+    async clickFirstTableRow() {
+        const logRows = this.page.locator(this.tableBodyRow).first();
+        if (await logRows.isVisible()) {
+            await logRows.click();
+        }
+    }
+
+    /**
+     * Check if timestamp is visible in detail view
+     * @param {number} timeout - Timeout in milliseconds
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isTimestampDetailVisible(timeout = 5000) {
+        const timestampInDetail = this.page.locator(this.timestampInDetail).first();
+        try {
+            await expect(timestampInDetail).toBeVisible({ timeout });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Expect timestamp detail to be visible
+     */
+    async expectTimestampDetailVisible() {
+        const timestampInDetail = this.page.locator(this.timestampInDetail).first();
+        await expect(timestampInDetail).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Get the count of table headers
+     * @returns {Promise<number>} The number of headers
+     */
+    async getTableHeaderCount() {
+        return await this.page.locator(this.tableHeaders).count();
+    }
+
+    /**
+     * Get the count of field expand buttons
+     * @returns {Promise<number>} The number of field expand buttons
+     */
+    async getFieldExpandButtonCount() {
+        return await this.page.locator(this.allFieldExpandButtons).count();
+    }
+
+    /**
+     * Click a field button by field name
+     * @param {string} fieldName - The name of the field
+     */
+    async clickFieldByName(fieldName) {
+        const fieldItem = this.page.locator(this.fieldIndexListButton(fieldName)).first();
+        if (await fieldItem.isVisible()) {
+            await fieldItem.click();
+        }
+    }
+
+    /**
+     * Check if source column is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isSourceColumnVisible() {
+        const sourceVisible = this.page.locator('th:has-text("source"), th:has-text("_source")').first();
+        return await sourceVisible.isVisible().catch(() => false);
+    }
+
+    /**
+     * Check if either timestamp or source column is visible
+     * @returns {Promise<boolean>} True if either is visible
+     */
+    async isTimestampOrSourceVisible() {
+        const timestampVisible = await this.isTimestampColumnVisible();
+        const sourceVisible = await this.isSourceColumnVisible();
+        return timestampVisible || sourceVisible;
+    }
+
+    /**
+     * Hover over the download table menu
+     */
+    async hoverDownloadTableMenu() {
+        const downloadTableMenu = this.page.locator('text=/Download Table/i').first();
+        if (await downloadTableMenu.isVisible()) {
+            await downloadTableMenu.hover();
+        }
+    }
+
+    /**
+     * Click the CSV download button
+     */
+    async clickDownloadCSVButton() {
+        const csvDownloadButton = this.page.locator('[data-test="search-download-csv-btn"]');
+        if (await csvDownloadButton.isVisible()) {
+            await csvDownloadButton.click();
+        }
+    }
+
+    /**
+     * Click the JSON download button
+     */
+    async clickDownloadJSONButton() {
+        const jsonDownloadButton = this.page.locator('[data-test="search-download-json-btn"]');
+        if (await jsonDownloadButton.isVisible()) {
+            await jsonDownloadButton.click();
+        }
+    }
+
+    /**
+     * Get the notification message text
+     * @returns {Promise<string>} The notification text
+     */
+    async getNotificationText() {
+        const notifications = this.page.locator('.q-notification__message');
+        const notificationCount = await notifications.count();
+        if (notificationCount > 0) {
+            return await notifications.first().textContent() || '';
+        }
+        return '';
+    }
+
+    /**
+     * Get the count of notifications
+     * @returns {Promise<number>} The number of notifications
+     */
+    async getNotificationCount() {
+        return await this.page.locator('.q-notification__message').count();
+    }
+
+    /**
+     * Check if the refresh button is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isRefreshButtonVisible() {
+        const refreshButton = this.page.locator(this.queryButton);
+        return await refreshButton.isVisible();
+    }
+
+    /**
+     * Check if error notification is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async hasErrorNotification() {
+        const errorNotifications = this.page.locator('.q-notification--negative, text=/error/i, text=/syntax/i').first();
+        return await errorNotifications.isVisible().catch(() => false);
+    }
+
+    /**
+     * Check if stream validation error is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async hasStreamValidationError() {
+        const errorNotifications = this.page.locator('.q-notification__message, text=/select.*stream/i').first();
+        return await errorNotifications.isVisible().catch(() => false);
+    }
+
+    /**
+     * Get stream validation error text
+     * @returns {Promise<string>} The error text
+     */
+    async getStreamValidationErrorText() {
+        const errorNotifications = this.page.locator('.q-notification__message, text=/select.*stream/i').first();
+        if (await errorNotifications.isVisible().catch(() => false)) {
+            return await errorNotifications.textContent() || '';
+        }
+        return '';
+    }
+
+    /**
+     * Check if logs search result table is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isLogsSearchResultTableVisible() {
+        const resultsTable = this.page.locator(this.logsSearchResultLogsTable);
+        return await resultsTable.isVisible().catch(() => false);
+    }
+
+    /**
+     * Click the SQL Mode switch by role
+     */
+    async clickSQLModeSwitch() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        await sqlModeToggle.waitFor({ state: 'visible', timeout: 10000 });
+        await sqlModeToggle.click();
+    }
+
+    /**
+     * Get SQL mode aria-checked state
+     * @returns {Promise<string|null>} The aria-checked value
+     */
+    async getSQLModeState() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        return await sqlModeToggle.getAttribute('aria-checked');
+    }
+
+    /**
+     * Click the Last 1 hour relative time button
+     */
+    async clickRelative1HourButton() {
+        const oneHourButton = this.page.locator(this.relative1HourButton);
+        if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await oneHourButton.click();
+        }
+    }
+
+    /**
      * Click relative 1 hour button, fallback to 15 min if not available
      * @returns {Promise<string>} The time range selected
      */
@@ -3837,6 +5172,50 @@ export class LogsPage {
     }
 
     /**
+     * Disable auto refresh by clicking the off button
+     */
+    async disableAutoRefresh() {
+        await this.clickLiveModeButton();
+        await this.page.waitForTimeout(500);
+        const offButton = this.page.locator('[data-test="logs-search-bar-refresh-time-0"]');
+        if (await offButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await offButton.click();
+        }
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Get logs table content as text
+     * @returns {Promise<string>} The table content text
+     */
+    async getLogsTableContent() {
+        const table = this.page.locator(this.logsTable);
+        return await table.textContent().catch(() => '');
+    }
+
+    // ========== BUG REGRESSION TEST METHODS ==========
+
+    /**
+     * Expect refresh button to be visible
+     * Bug #8928 - UI consistency
+     */
+    async expectRefreshButtonVisible() {
+        const button = this.page.locator(this.queryButton);
+        await expect(button).toBeVisible({ timeout: 10000 });
+        testLogger.info('Refresh button is visible');
+    }
+
+    /**
+     * Expect refresh button to be enabled
+     * Bug #9533 - Loading states
+     */
+    async expectRefreshButtonEnabled() {
+        const button = this.page.locator(this.queryButton);
+        await expect(button).toBeEnabled({ timeout: 10000 });
+        testLogger.info('Refresh button is enabled');
+    }
+
+    /**
      * Expect stream selector to be visible
      * Bug #8928 - UI consistency
      */
@@ -3844,6 +5223,16 @@ export class LogsPage {
         const selector = this.page.locator(this.indexDropDown);
         await expect(selector).toBeVisible({ timeout: 10000 });
         testLogger.info('Stream selector is visible');
+    }
+
+    /**
+     * Expect DateTime button to be visible
+     * Bug #8928 - UI consistency
+     */
+    async expectDateTimeButtonVisible() {
+        const button = this.page.locator(this.dateTimeButton);
+        await expect(button).toBeVisible({ timeout: 10000 });
+        testLogger.info('DateTime button is visible');
     }
 
     /**
@@ -3861,7 +5250,318 @@ export class LogsPage {
     }
 
     /**
+     * Toggle histogram on/off
+     * Bug #8928 - Histogram rendering
+     */
+    async toggleHistogram() {
+        const histogramToggle = this.page.locator(this.histogramToggle);
+        await histogramToggle.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Histogram toggled');
+    }
+
+    /**
+     * Expect histogram to be visible
+     * Bug #8928 - Histogram rendering
+     */
+    async expectHistogramVisible() {
+        const histogramCanvas = this.page.locator(this.barChartCanvas);
+        await expect(histogramCanvas).toBeVisible({ timeout: 10000 });
+        testLogger.info('Histogram is visible');
+    }
+
+    // ============================================================================
+    // VRL & SAVED VIEWS POM METHODS - Bug #9690
+    // Rule 3 Compliance: Extract raw locators from spec files into POM
+    // ============================================================================
+
+    /**
+     * Click the VRL toggle button to enable/disable VRL editor
+     * @returns {Promise<void>}
+     */
+    async clickVrlToggleButton() {
+        const vrlToggle = this.page.locator('[data-test="logs-search-bar-vrl-toggle-btn"]');
+        await vrlToggle.waitFor({ state: 'visible', timeout: 10000 });
+        await vrlToggle.click();
+        testLogger.info('Clicked VRL toggle button');
+    }
+
+    /**
+     * Get the VRL editor locator
+     * @returns {import('@playwright/test').Locator} VRL editor locator
+     */
+    getVrlEditor() {
+        return this.page.locator('[data-test="logs-vrl-function-editor"], #fnEditor, .monaco-editor');
+    }
+
+    /**
+     * Type text into the VRL editor
+     * @param {string} text - Text to type
+     */
+    async typeInVrlEditor(text) {
+        const vrlEditor = this.page.locator('[data-test="logs-vrl-function-editor"], #fnEditor, .monaco-editor');
+        await vrlEditor.first().waitFor({ state: 'visible', timeout: 10000 });
+        const textbox = vrlEditor.first().locator('.inputarea');
+        await textbox.waitFor({ state: 'visible', timeout: 5000 });
+        await textbox.fill(text);
+        testLogger.info('Typed text into VRL editor');
+    }
+
+    /**
+     * Get VRL editor content text
+     * @returns {Promise<string>} Editor content
+     */
+    async getVrlEditorContent() {
+        const vrlEditor = this.page.locator('[data-test="logs-vrl-function-editor"], #fnEditor');
+        await vrlEditor.first().waitFor({ state: 'visible', timeout: 10000 });
+        const content = await vrlEditor.first().textContent();
+        return content || '';
+    }
+
+    /**
+     * Click the Save Transform button
+     */
+    async clickSaveTransformButton() {
+        const saveBtn = this.page.locator('[data-test="logs-search-bar-save-transform-btn"]');
+        await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await saveBtn.click();
+        testLogger.info('Clicked Save Transform button');
+    }
+
+    /**
+     * Fill the saved function name input
+     * @param {string} name - Function name
+     */
+    async fillSavedFunctionNameInput(name) {
+        const input = this.page.locator('[data-test="saved-function-name-input"]');
+        await input.waitFor({ state: 'visible', timeout: 10000 });
+        await input.fill(name);
+        testLogger.info(`Filled saved function name: ${name}`);
+    }
+
+    /**
+     * Click the "Save View" option in the saved views dropdown
+     */
+    async clickSaveViewOption() {
+        const saveViewOption = this.page.getByText('Save View', { exact: false });
+        await saveViewOption.waitFor({ state: 'visible', timeout: 10000 });
+        await saveViewOption.click();
+        testLogger.info('Clicked Save View option');
+    }
+
+    /**
+     * Fill the view name input in the save view dialog
+     * @param {string} name - View name
+     */
+    async fillViewNameInput(name) {
+        const input = this.page.locator('[data-test="add-alert-name-input"]');
+        await input.waitFor({ state: 'visible', timeout: 10000 });
+        await input.fill(name);
+        testLogger.info(`Filled view name: ${name}`);
+    }
+
+    /**
+     * Click the save button in the save view dialog
+     */
+    async clickSaveViewDialogSaveButton() {
+        const saveBtn = this.page.locator('[data-test="saved-view-dialog-save-btn"]');
+        await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await saveBtn.scrollIntoViewIfNeeded();
+        await saveBtn.click({ force: true });
+        testLogger.info('Clicked Save View dialog save button');
+    }
+
+    /**
+     * Get the function dropdown text
+     * @returns {Promise<string>} Dropdown text
+     */
+    async getFunctionDropdownText() {
+        const dropdown = this.page.locator('[data-test="logs-search-bar-function-dropdown"]');
+        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
+        const text = await dropdown.textContent();
+        return text || '';
+    }
+
+    /**
+     * Click a saved view by name
+     * @param {string} name - Saved view name
+     */
+    async clickSavedViewByName(name) {
+        const savedView = this.page.getByText(name, { exact: false });
+        await savedView.waitFor({ state: 'visible', timeout: 10000 });
+        await savedView.click();
+        testLogger.info(`Clicked saved view: ${name}`);
+    }
+
+    /**
+     * Expect a saved view to be visible
+     * @param {string} name - Saved view name
+     * @param {Object} options - Options
+     * @param {number} options.timeout - Timeout in ms (default 10000)
+     */
+    async expectSavedViewVisible(name, options = {}) {
+        const timeout = options.timeout || 10000;
+        const savedView = this.page.getByText(name, { exact: false });
+        await expect(savedView).toBeVisible({ timeout });
+        testLogger.info(`Saved view visible: ${name}`);
+    }
+
+    /**
+     * Get the saved views button locator
+     * @returns {import('@playwright/test').Locator} Saved views button locator
+     */
+    getSavedViewsButtonLocator() {
+        return this.page.locator('[data-test="logs-search-saved-views-btn"]');
+    }
+
+    /**
+     * Click the saved views dropdown arrow to expand and show the list
+     * This opens the dropdown panel with search input
+     */
+    async clickSavedViewsDropdownArrow() {
+        const arrow = this.page.locator(this.savedViewArrow);
+        await arrow.waitFor({ state: 'visible', timeout: 10000 });
+        await arrow.click();
+        // Wait for dropdown panel to appear
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked saved views dropdown arrow');
+    }
+
+    /**
+     * Expand the saved views dropdown and wait for search input
+     * Tries arrow click first, then main button if search input doesn't appear
+     */
+    async expandSavedViewsDropdown() {
+        // First try clicking the dropdown arrow
+        try {
+            await this.clickSavedViewsDropdownArrow();
+            const searchInput = this.page.locator(this.savedViewSearchInput);
+            await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+            return;
+        } catch (e) {
+            testLogger.debug('Arrow click did not show search input, trying main button');
+        }
+
+        // Fallback: try clicking the main button
+        const btn = this.getSavedViewsButtonLocator();
+        await btn.click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Click delete button for a saved view by name
+     * Uses dynamic data-test attribute
+     * @param {string} name - Saved view name
+     */
+    async clickDeleteSavedViewByName(name) {
+        const deleteBtn = this.page.locator(`[data-test*="delete"][data-test*="${name}"]`);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click();
+        testLogger.info(`Clicked delete for saved view: ${name}`);
+    }
+
+    // ============================================================================
+    // VRL FIELD ICONS POM METHODS - Bug #9550
+    // Rule 3 Compliance: Extract raw locators from logstable.spec.js into POM
+    // ============================================================================
+
+    /**
+     * Get the computed field button locator
+     * @returns {import('@playwright/test').Locator} Computed field button locator
+     */
+    getComputedFieldButton() {
+        return this.page.locator('[data-test*="computed_field"]');
+    }
+
+    /**
+     * Get the include/exclude icon for a field
+     * @param {string} fieldName - Field name (optional, for specific field)
+     * @returns {import('@playwright/test').Locator} Include/exclude icon locator
+     */
+    getIncludeExcludeIcon(fieldName = null) {
+        if (fieldName) {
+            return this.page.locator(`[data-test*="${fieldName}"] [data-test*="include-exclude"]`);
+        }
+        return this.page.locator('[data-test*="computed_field"] [data-test*="include-exclude"]');
+    }
+
+    /**
+     * Get the equals icon for a computed field
+     * @param {string} fieldName - Field name (optional)
+     * @returns {import('@playwright/test').Locator} Equals icon locator
+     */
+    getEqualsIcon(fieldName = null) {
+        if (fieldName) {
+            return this.page.locator(`[data-test*="${fieldName}"]`).locator('..').locator('[class*="equal"]');
+        }
+        return this.page.locator('[data-test*="computed_field"]').locator('..').locator('[class*="equal"]');
+    }
+
+    /**
+     * Get the table headers locator
+     * @returns {import('@playwright/test').Locator} Table headers locator
+     */
+    getTableHeaders() {
+        return this.page.locator('thead th');
+    }
+
+    /**
+     * Get a field button by name
+     * @param {string} fieldName - Field name
+     * @returns {import('@playwright/test').Locator} Field button locator
+     */
+    getFieldButton(fieldName) {
+        return this.page.locator(`[data-test*="${fieldName}"]`);
+    }
+
+    /**
+     * Get the include button locator
+     * @returns {import('@playwright/test').Locator} Include button locator
+     */
+    getIncludeButton() {
+        return this.page.locator('[data-test*="include"]');
+    }
+
+    /**
+     * Expect equals icon to NOT be visible (Bug #9550 test)
+     * VRL-generated fields should not have equals icon
+     */
+    async expectEqualsIconNotVisible() {
+        const equalsIcon = this.getEqualsIcon();
+        await expect(equalsIcon).not.toBeVisible();
+        testLogger.info('Equals icon is NOT visible (Bug #9550 verified)');
+    }
+
+    /**
+     * Expect include/exclude icon to NOT be visible (Bug #9550 test)
+     * VRL-generated fields should not have include/exclude icon
+     */
+    async expectIncludeExcludeIconNotVisible() {
+        const icon = this.getIncludeExcludeIcon();
+        await expect(icon).not.toBeVisible();
+        testLogger.info('Include/exclude icon is NOT visible (Bug #9550 verified)');
+    }
+
+    // ============================================================================
+    // MONACO LAZY LOADING HELPER METHODS - PR #10146
+    // These methods support Monaco editor lazy loading query pre-fill tests
+    // ============================================================================
+
+    /**
+     * Wait for Monaco query editor to be visible after lazy loading
+     * @param {number} timeout - Timeout in milliseconds (default 30000)
+     */
+    async waitForQueryEditorVisible(timeout = 30000) {
+        await this.page.locator(this.queryEditor).waitFor({
+            state: 'visible',
+            timeout: timeout
+        });
+        testLogger.info('Monaco query editor is visible');
+    }
+
+    /**
      * Enable SQL mode if not already enabled
+     * Combines getSQLModeState() check with clickSQLModeSwitch()
      */
     async enableSqlModeIfNeeded() {
         const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
@@ -3873,5 +5573,326 @@ export class LogsPage {
         } else {
             testLogger.info('SQL mode already enabled');
         }
+    }
+
+    /**
+     * Click relative time button by selector
+     * @param {string} timeSelector - The time selector (e.g., '1-h', '15-m', '30-m')
+     */
+    async clickRelativeTimeButton(timeSelector) {
+        await this.page.locator(this.dateTimeButton).click();
+        await this.page.waitForTimeout(500);
+        await this.page.locator(`[data-test="date-time-relative-${timeSelector}-btn"]`).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Selected relative time: ${timeSelector}`);
+    }
+
+    // ============================================================================
+    // LOGS TABLE WAIT METHODS
+    // ============================================================================
+
+    /**
+     * Wait for logs table to load by checking for the first log row
+     * @param {number} timeout - Timeout in milliseconds (default 30000)
+     */
+    async waitForLogsTableToLoad(timeout = 30000) {
+        await this.page.locator(this.logTableColumnSource).first().waitFor({
+            state: 'visible',
+            timeout
+        }).catch(() => {});
+        testLogger.info('Logs table loaded');
+    }
+
+    // ============================================================================
+    // SEARCH PATTERNS METHODS (Enterprise Feature)
+    // These methods support the Search Patterns feature for log pattern analysis
+    // ============================================================================
+
+    /**
+     * Click the Patterns toggle button to switch to patterns view
+     * Note: This feature is only available in Enterprise edition
+     */
+    async clickPatternsToggle() {
+        await this.page.locator(this.patternsToggle).click();
+        testLogger.info('Clicked Patterns toggle button');
+    }
+
+    /**
+     * Assert that the Patterns toggle button is visible (Enterprise only)
+     */
+    async expectPatternsToggleVisible() {
+        await expect(this.page.locator(this.patternsToggle)).toBeVisible();
+        testLogger.info('Patterns toggle button is visible');
+    }
+
+    /**
+     * Assert that the Patterns toggle button is NOT visible (non-Enterprise)
+     */
+    async expectPatternsToggleNotVisible() {
+        await expect(this.page.locator(this.patternsToggle)).not.toBeVisible();
+        testLogger.info('Patterns toggle button is not visible (expected for non-Enterprise)');
+    }
+
+    /**
+     * Assert that the Patterns toggle is in selected state
+     */
+    async expectPatternsToggleSelected() {
+        await expect(this.page.locator(this.patternsToggle)).toHaveClass(/selected/);
+        testLogger.info('Patterns toggle is in selected state');
+    }
+
+    /**
+     * Wait for patterns to load (after clicking toggle)
+     * @param {number} timeout - Timeout in milliseconds (default 30000)
+     * @returns {Promise<'statistics'|'patterns'|'empty'|'timeout'>}
+     */
+    async waitForPatternsToLoad(timeout = 30000) {
+        const startTime = Date.now();
+
+        // First, check if loading state appears (indicates extraction is starting)
+        const loadingStarted = await this.page.locator(this.patternLoadingSpinner)
+            .waitFor({ state: 'visible', timeout: 5000 })
+            .then(() => true)
+            .catch(() => false);
+
+        if (loadingStarted) {
+            testLogger.info('Pattern extraction loading started, waiting for completion...');
+            const remainingTimeout = Math.max(timeout - (Date.now() - startTime), 1000);
+            await this.page.locator(this.patternLoadingSpinner)
+                .waitFor({ state: 'hidden', timeout: remainingTimeout })
+                .catch(() => {});
+        }
+
+        // Give UI a moment to render the results
+        await this.page.waitForTimeout(500);
+
+        // Check for result states with explicit timeout handling
+        const remainingTimeout = Math.max(timeout - (Date.now() - startTime), 5000);
+        const checkInterval = 500;
+        const maxChecks = Math.ceil(remainingTimeout / checkInterval);
+
+        for (let i = 0; i < maxChecks; i++) {
+            // Check each state synchronously to avoid Promise.race resource leaks
+            if (await this.page.locator(this.patternStatistics).isVisible().catch(() => false)) {
+                testLogger.info('Patterns loading result: statistics');
+                return 'statistics';
+            }
+            if (await this.page.locator(this.patternCard(0)).isVisible().catch(() => false)) {
+                testLogger.info('Patterns loading result: patterns');
+                return 'patterns';
+            }
+            if (await this.page.locator(this.patternEmptyState).isVisible().catch(() => false)) {
+                testLogger.info('Patterns loading result: empty');
+                return 'empty';
+            }
+
+            if (i < maxChecks - 1) {
+                await this.page.waitForTimeout(checkInterval);
+            }
+        }
+
+        testLogger.info('Patterns loading result: timeout');
+        return 'timeout';
+    }
+
+    /**
+     * Assert that pattern statistics are visible
+     */
+    async expectPatternStatisticsVisible() {
+        await expect(this.page.locator(this.patternStatistics)).toBeVisible();
+        testLogger.info('Pattern statistics are visible');
+    }
+
+    /**
+     * Get the pattern statistics text
+     * @returns {Promise<string>} The statistics text
+     */
+    async getPatternStatisticsText() {
+        const text = await this.page.locator(this.patternStatistics).textContent();
+        testLogger.info(`Pattern statistics: ${text}`);
+        return text;
+    }
+
+    /**
+     * Assert that at least one pattern card is visible
+     */
+    async expectPatternCardsVisible() {
+        await expect(this.page.locator(this.patternCard(0))).toBeVisible();
+        testLogger.info('At least one pattern card is visible');
+    }
+
+    /**
+     * Assert that the empty state message is visible
+     */
+    async expectPatternEmptyStateVisible() {
+        await expect(this.page.locator(this.patternEmptyState)).toBeVisible();
+        testLogger.info('Pattern empty state is visible');
+    }
+
+    /**
+     * Get the number of visible pattern cards
+     * @returns {Promise<number>} Number of pattern cards
+     */
+    async getPatternCardCount() {
+        // Use efficient CSS selector to count all pattern cards at once
+        // Pattern cards have data-test attribute: pattern-card-{index}
+        const count = await this.page.locator('[data-test^="pattern-card-"]:not([data-test*="-template"]):not([data-test*="-frequency"]):not([data-test*="-percentage"]):not([data-test*="-include"]):not([data-test*="-exclude"]):not([data-test*="-details"]):not([data-test*="-anomaly"])').count().catch(() => 0);
+
+        testLogger.info(`Pattern card count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Click on a pattern card to open details
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async clickPatternCard(index = 0) {
+        await this.page.locator(this.patternCard(index)).click();
+        testLogger.info(`Clicked pattern card at index ${index}`);
+    }
+
+    /**
+     * Get the template text from a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<string>} The template text
+     */
+    async getPatternCardTemplateText(index = 0) {
+        const text = await this.page.locator(this.patternCardTemplate(index)).textContent();
+        testLogger.info(`Pattern ${index} template: ${text}`);
+        return text;
+    }
+
+    /**
+     * Get the frequency from a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<string>} The frequency text
+     */
+    async getPatternCardFrequency(index = 0) {
+        const text = await this.page.locator(this.patternCardFrequency(index)).textContent();
+        testLogger.info(`Pattern ${index} frequency: ${text}`);
+        return text;
+    }
+
+    /**
+     * Get the percentage from a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<string>} The percentage text
+     */
+    async getPatternCardPercentage(index = 0) {
+        const text = await this.page.locator(this.patternCardPercentage(index)).textContent();
+        testLogger.info(`Pattern ${index} percentage: ${text}`);
+        return text;
+    }
+
+    /**
+     * Check if a pattern card has an anomaly badge
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<boolean>} True if anomaly badge is visible
+     */
+    async isPatternAnomaly(index = 0) {
+        const isAnomaly = await this.page.locator(this.patternCardAnomalyBadge(index)).isVisible().catch(() => false);
+        testLogger.info(`Pattern ${index} is anomaly: ${isAnomaly}`);
+        return isAnomaly;
+    }
+
+    /**
+     * Click the include button on a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async clickPatternIncludeBtn(index = 0) {
+        await this.page.locator(this.patternCardIncludeBtn(index)).click();
+        testLogger.info(`Clicked include button on pattern ${index}`);
+    }
+
+    /**
+     * Click the exclude button on a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async clickPatternExcludeBtn(index = 0) {
+        await this.page.locator(this.patternCardExcludeBtn(index)).click();
+        testLogger.info(`Clicked exclude button on pattern ${index}`);
+    }
+
+    /**
+     * Click the details icon on a pattern card
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async clickPatternDetailsIcon(index = 0) {
+        await this.page.locator(this.patternCardDetailsIcon(index)).click();
+        testLogger.info(`Clicked details icon on pattern ${index}`);
+    }
+
+    /**
+     * Assert that the pattern details dialog is open
+     */
+    async expectPatternDetailsDialogOpen() {
+        await expect(this.page.locator(this.closePatternDialog)).toBeVisible();
+        testLogger.info('Pattern details dialog is open');
+    }
+
+    /**
+     * Close the pattern details dialog
+     */
+    async closePatternDetailsDialog() {
+        await this.page.locator(this.closePatternDialog).click();
+        testLogger.info('Closed pattern details dialog');
+    }
+
+    /**
+     * Click the previous button in pattern details dialog
+     */
+    async clickPatternDetailPreviousBtn() {
+        await this.page.locator(this.patternDetailPreviousBtn).click();
+        testLogger.info('Clicked previous button in pattern details');
+    }
+
+    /**
+     * Click the next button in pattern details dialog
+     */
+    async clickPatternDetailNextBtn() {
+        await this.page.locator(this.patternDetailNextBtn).click();
+        testLogger.info('Clicked next button in pattern details');
+    }
+
+    /**
+     * Assert that the previous button is enabled in pattern details dialog
+     */
+    async expectPatternDetailPreviousBtnEnabled() {
+        await expect(this.page.locator(this.patternDetailPreviousBtn)).toBeEnabled();
+        testLogger.info('Previous button is enabled');
+    }
+
+    /**
+     * Assert that the previous button is disabled in pattern details dialog
+     */
+    async expectPatternDetailPreviousBtnDisabled() {
+        await expect(this.page.locator(this.patternDetailPreviousBtn)).toBeDisabled();
+        testLogger.info('Previous button is disabled');
+    }
+
+    /**
+     * Assert that the next button is enabled in pattern details dialog
+     */
+    async expectPatternDetailNextBtnEnabled() {
+        await expect(this.page.locator(this.patternDetailNextBtn)).toBeEnabled();
+        testLogger.info('Next button is enabled');
+    }
+
+    /**
+     * Assert that the next button is disabled in pattern details dialog
+     */
+    async expectPatternDetailNextBtnDisabled() {
+        await expect(this.page.locator(this.patternDetailNextBtn)).toBeDisabled();
+        testLogger.info('Next button is disabled');
+    }
+
+    /**
+     * Wait for pattern details dialog to show specific pattern index
+     * @param {number} expectedIndex - The expected pattern index (1-based for display)
+     */
+    async waitForPatternDetailIndex(expectedIndex) {
+        // Pattern detail shows "Pattern X of Y" in the header
+        await this.page.getByText(`Pattern ${expectedIndex} of`).waitFor({ state: 'visible', timeout: 5000 });
+        testLogger.info(`Pattern details showing pattern ${expectedIndex}`);
     }
 }

@@ -54,7 +54,7 @@ export class HomePage {
         // ===== PAGE LOAD INDICATORS (for verifying navigation completed) =====
         this.logsPageIndicator = page.locator('[data-test="logs-search-bar-refresh-btn"]').or(page.locator('[data-test="log-table-column-0-source"]')).first();
         this.streamsPageIndicator = page.locator('[data-test="streams-search-stream-input"]').or(page.locator('[data-test="stream-add-stream-btn"]')).first();
-        this.dashboardsPageIndicator = page.locator('[data-test="dashboard-add"]').or(page.getByText('Dashboards')).first();
+        this.dashboardsPageIndicator = page.locator('[data-test="dashboard-new"]').or(page.getByText('Dashboards')).first();
         this.alertsPageIndicator = page.locator('[data-test="alerts-page"]').or(page.getByRole('tab', { name: 'Alerts' })).first();
         this.metricsPageIndicator = page.locator('[data-test="metrics-search-bar-refresh-btn"]').or(page.getByText('Query')).first();
         this.tracesPageIndicator = page.locator('[data-test="traces-search-bar-refresh-btn"]').or(page.getByText('Query')).first();
@@ -67,6 +67,9 @@ export class HomePage {
         this.iamPageIndicator = page.locator('[data-test="iam-users-tab"]').or(page.getByRole('tab', { name: 'Users' })).first();
         this.pipelinesPageIndicator = page.locator('[data-test="function-list-add-function-btn"]').or(page.getByText('Functions')).first();
         this.homePageIndicator = page.locator('.home-page').or(page.getByText('Streams')).first();
+
+        // ===== FAVICON SELECTOR (Bug #9217) =====
+        this.faviconLink = page.locator('link#favicon');
     }
 
     // ===== NAVIGATION METHODS =====
@@ -676,7 +679,7 @@ export class HomePage {
      * Validate Dashboards page UI elements
      */
     async validateDashboardsPageElements() {
-        await expect(this.page.locator('[data-test="dashboard-add"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="dashboard-new"]')).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator('[data-test="dashboard-search"]')).toBeVisible({ timeout: 5000 });
         await expect(this.page.locator('[data-test="dashboard-import"]')).toBeVisible({ timeout: 5000 });
         await expect(this.page.locator('[data-test="dashboard-table"]')).toBeVisible({ timeout: 5000 });
@@ -827,5 +830,42 @@ export class HomePage {
     async validateSettingsSensitiveDataRedactionPageElements() {
         await expect(this.page.locator('[data-test="regex-pattern-list-title"]')).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator('[data-test="regex-pattern-list-add-pattern-btn"]')).toBeVisible({ timeout: 5000 });
+    }
+
+    // ===== FAVICON METHODS (Bug #9217) =====
+
+    /**
+     * Verify favicon is present and loads correctly
+     * Bug #9217: Favicon icon was missing on main branch
+     * @returns {Object} { domValid: boolean, resourceLoads: boolean, faviconHref: string }
+     */
+    async verifyFavicon() {
+        const result = {
+            domValid: false,
+            resourceLoads: false,
+            faviconHref: null
+        };
+
+        // Check favicon link in DOM
+        // Note: href may be '/favicon.ico' or './favicon.ico' depending on server config
+        const faviconHref = await this.faviconLink.getAttribute('href');
+        result.faviconHref = faviconHref;
+        result.domValid = Boolean(faviconHref) && faviconHref.includes('favicon.ico');
+
+        // Verify favicon resource loads via fetch inside page context
+        if (faviconHref) {
+            const fetchResult = await this.page.evaluate(async (href) => {
+                try {
+                    const response = await fetch(href);
+                    return { status: response.status, ok: response.ok };
+                } catch (error) {
+                    return { status: 0, ok: false, error: error.message };
+                }
+            }, faviconHref);
+
+            result.resourceLoads = fetchResult.ok && fetchResult.status === 200;
+        }
+
+        return result;
     }
 }
