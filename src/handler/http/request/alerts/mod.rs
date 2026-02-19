@@ -24,7 +24,7 @@ use svix_ksuid::Ksuid;
 
 #[cfg(feature = "enterprise")]
 use crate::handler::http::request::search::utils::{
-    check_resource_permissions, check_stream_permissions,
+    StreamPermissionResourceType, check_resource_permissions, check_stream_permissions,
 };
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
@@ -632,6 +632,7 @@ pub async fn generate_sql(
             &org_id,
             &user_email.user_id,
             &stream_type,
+            StreamPermissionResourceType::Search,
         )
         .await
         {

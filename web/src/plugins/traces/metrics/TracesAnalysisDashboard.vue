@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :currentTimeObj="currentTimeObj"
           :viewOnly="true"
           :allowAlertCreation="false"
-          searchType="dashboards"
+          :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
           @variablesData="handleVariablesDataChange"
           @refreshedVariablesDataUpdated="handleVariablesDataChange"
         />

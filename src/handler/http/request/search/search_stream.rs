@@ -42,7 +42,9 @@ use crate::common::utils::http::get_extract_patterns_from_request;
 #[cfg(feature = "enterprise")]
 use crate::{
     common::meta::search::AuditContext,
-    handler::http::request::search::utils::{check_resource_permissions, check_stream_permissions},
+    handler::http::request::search::utils::{
+        StreamPermissionResourceType, check_resource_permissions, check_stream_permissions,
+    },
     service::self_reporting::audit,
 };
 use crate::{
@@ -417,9 +419,23 @@ pub async fn search_http2_stream(
 
     // Check permissions for each stream
     #[cfg(feature = "enterprise")]
+    let permission_resource_type =
+        if req.search_type == Some(config::meta::search::SearchEventType::Insights) {
+            StreamPermissionResourceType::Insights
+        } else {
+            StreamPermissionResourceType::Search
+        };
+
+    #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
-        if let Some(res) =
-            check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            stream_name,
+            &org_id,
+            &user_id,
+            &stream_type,
+            permission_resource_type,
+        )
+        .await
         {
             // Add audit before closing
             #[cfg(feature = "enterprise")]
@@ -762,8 +778,14 @@ pub async fn values_http2_stream(
     // Check permissions for each stream
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
-        if let Some(res) =
-            check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            stream_name,
+            &org_id,
+            &user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
         {
             // Add audit before closing
             #[cfg(feature = "enterprise")]
