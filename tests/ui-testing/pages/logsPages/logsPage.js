@@ -2204,6 +2204,24 @@ export class LogsPage {
         return await expect(this.page.locator(this.searchBarRefreshButton)).toBeVisible();
     }
 
+    async expectRefreshButtonEnabled() {
+        const button = this.page.locator(this.queryButton);
+        await expect(button).toBeVisible();
+        await expect(button).toBeEnabled();
+    }
+
+    async expectRefreshButtonVisible() {
+        return await expect(this.page.locator(this.queryButton)).toBeVisible();
+    }
+
+    async expectHistogramVisible() {
+        return await expect(this.page.locator(this.barChartCanvas)).toBeVisible();
+    }
+
+    async expectDateTimeButtonVisible() {
+        return await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+    }
+
     async expectQuickModeToggleVisible() {
         return await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
     }
