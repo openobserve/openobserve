@@ -359,7 +359,7 @@ describe("CellActions.vue", () => {
       });
 
       const rootDiv = wrapper.find(".field_overlay");
-      expect(rootDiv.classes()).toContain("tw:bg-black");
+      expect(rootDiv.classes()).toContain("tw-bg-black");
     });
 
     it("should apply light theme class", () => {
@@ -378,7 +378,7 @@ describe("CellActions.vue", () => {
       });
 
       const rootDiv = wrapper.find(".field_overlay");
-      expect(rootDiv.classes()).toContain("tw:bg-white");
+      expect(rootDiv.classes()).toContain("tw-bg-white");
     });
   });
 
@@ -400,7 +400,7 @@ describe("CellActions.vue", () => {
 
       const rootDiv = wrapper.find(".field_overlay");
       expect(rootDiv.attributes("data-test")).toBe(
-        "log-add-data-from-column-200"
+        "log-add-data-from-column-200",
       );
     });
 
