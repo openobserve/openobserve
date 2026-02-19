@@ -1504,7 +1504,10 @@
     "add_template": "创建新模板",
     "skip_tls_verify": "跳过 TLS 验证",
     "action": "操作",
-    "output_format": "输出格式"
+    "output_format": "输出格式",
+    "separator": "分隔符",
+    "separator_placeholder": "输入分隔符（例如，|、\\n、\\ t、空格）",
+    "separator_hint": "在记录之间使用的分隔字符串（允许空格）"
   },
   "metrics": {
     "searchMetric": "搜索指标",

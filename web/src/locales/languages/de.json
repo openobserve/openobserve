@@ -1508,7 +1508,10 @@
     "add_template": "Neue Vorlage",
     "skip_tls_verify": "TLS-Verifizierung überspringen",
     "action": "Aktion",
-    "output_format": "Ausgabeformat"
+    "output_format": "Ausgabeformat",
+    "separator": "Trennzeichen",
+    "separator_placeholder": "Geben Sie ein Trennzeichen ein (z. B. |,\\n,\\ t, Leerzeichen)",
+    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)"
   },
   "metrics": {
     "searchMetric": "Suchen Sie nach einer Metrik",

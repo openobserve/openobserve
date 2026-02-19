@@ -1638,7 +1638,10 @@
     "add_template": "New Template",
     "skip_tls_verify": "Skip TLS Verify",
     "action": "Action",
-    "output_format": "Output Format"
+    "output_format": "Output Format",
+    "separator": "Separator",
+    "separator_placeholder": "Enter separator (e.g., |, \\n, \\t, space)",
+    "separator_hint": "Separator string to use between records (spaces allowed)"
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",

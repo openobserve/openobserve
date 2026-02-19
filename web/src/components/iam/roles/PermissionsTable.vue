@@ -100,9 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           parent ? parent.name : 'main'
         }-permissions-table`"
         :id="`permissions-table-${parent.resourceName}`"
-        style="max-height: 725px; overflow-x: hidden; overflow-y: auto; height: calc(100vh - 310px);"
+        style="max-height: calc(100vh - 310px); overflow-x: hidden; overflow-y: auto;"
         :style="{
-          'max-height': level > 0 ? '400px' : '100%',
+          'max-height': level > 0 ? '400px' : 'calc(100vh - 310px)',
+          'height': 'auto',
         }"
         :items-size="getFilteredRows.length"
         :virtual-scroll-item-size="39"

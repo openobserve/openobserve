@@ -1518,7 +1518,10 @@
     "add_template": "新規テンプレート",
     "skip_tls_verify": "TLS検証をスキップ",
     "action": "アクション",
-    "output_format": "出力フォーマット"
+    "output_format": "出力フォーマット",
+    "separator": "セパレーター",
+    "separator_placeholder": "セパレータを入力してください (例:|、\\n、\\ t、スペース)",
+    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)"
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",

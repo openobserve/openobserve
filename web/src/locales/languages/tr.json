@@ -1508,7 +1508,10 @@
     "add_template": "Yeni Şablon",
     "skip_tls_verify": "TLS Doğrulamasını Atla",
     "action": "Eylem",
-    "output_format": "Çıktı Biçimi"
+    "output_format": "Çıktı Biçimi",
+    "separator": "Ayırıcı",
+    "separator_placeholder": "Ayırıcı girin (örn. |,\\ n,\\ t, boşluk)",
+    "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)"
   },
   "metrics": {
     "searchMetric": "Bir Metrik Ara",
