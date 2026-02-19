@@ -18,13 +18,9 @@ use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
 use o2_dex::meta::auth::RoleRequest;
 
-use crate::{
-    common::{
-        meta::{
-            http::HttpResponse as MetaHttpResponse,
-            user::{UserGroup, UserGroupRequest, UserRoleRequest},
-        },
-    },
+use crate::common::meta::{
+    http::HttpResponse as MetaHttpResponse,
+    user::{UserGroup, UserGroupRequest, UserRoleRequest},
 };
 
 #[cfg(feature = "enterprise")]
