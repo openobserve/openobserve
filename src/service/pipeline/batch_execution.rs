@@ -1320,9 +1320,8 @@ async fn process_node(
         #[cfg(feature = "enterprise")]
         NodeData::LlmEvaluation(params) => {
             log::info!(
-                "[Pipeline]: LLM evaluation node {node_idx} starts processing (sampling_rate={}, enable_llm_judge={})",
+                "[Pipeline]: LLM evaluation node {node_idx} starts processing (sampling_rate={})",
                 params.sampling_rate,
-                params.enable_llm_judge
             );
 
             // Collect all records from receiver (fast — just drains the channel)
@@ -1352,7 +1351,7 @@ async fn process_node(
                 let eval_config =
                     o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationConfig {
                         sampling_rate: params.sampling_rate,
-                        enable_llm_judge: params.enable_llm_judge,
+                        enable_llm_judge: true,
                         llm_span_identifier: params.llm_span_identifier.clone(),
                         ..Default::default()
                     };

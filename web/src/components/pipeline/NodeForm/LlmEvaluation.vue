@@ -47,23 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <!-- LLM Judge Section -->
-        <div class="q-mb-md">
-          <div class="text-subtitle1 q-mb-sm">{{ t("pipeline.llmJudgeConfig") }}</div>
-
-          <q-toggle
-            v-model="enableLlmJudge"
-            :label="t('pipeline.enableLlmJudge')"
-            class="q-mb-sm tw:h-[36px] o2-toggle-button-lg -tw:ml-4"
-            size="lg"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-            data-test="llm-evaluation-enable-llm-judge-toggle"
-          />
-          <div class="text-caption text-grey-7 q-mb-md">
-            {{ t("pipeline.enableLlmJudgeHelp") }}
-          </div>
-        </div>
-
         <!-- LLM Span Identifier -->
         <div class="q-mb-md">
           <div class="text-subtitle1 q-mb-sm">{{ t("pipeline.llmSpanIdentifier") }}</div>
@@ -136,19 +119,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Info Box -->
-        <q-card class="note-container q-mb-md">
-          <q-card-section class="q-pa-sm">
-            <div class="note-heading">{{ t("pipeline.llmEvaluationInfo") }}</div>
-            <q-banner inline dense class="note-info">
-              <div>
-                <q-icon name="info" color="blue" class="q-mr-sm" />
-                <span>{{ t("pipeline.llmEvaluationInfoText") }}</span>
-              </div>
-            </q-banner>
-          </q-card-section>
-        </q-card>
-
         <!-- Action Buttons -->
         <div class="flex justify-center q-mt-lg">
           <q-btn
@@ -195,9 +165,8 @@ export default defineComponent({
     const { getStream } = useStreams();
 
     const nodeName = ref("");
-    const enableSampling = ref(false);
-    const samplingRate = ref(0.1);
-    const enableLlmJudge = ref(false);
+    const enableSampling = ref(true);
+    const samplingRate = ref(0.01);
     const llmSpanIdentifier = ref("gen_ai_system");
     const streamFields = ref<{ label: string; value: string }[]>([]);
     const filteredStreamFields = ref<{ label: string; value: string }[]>([]);
@@ -250,7 +219,6 @@ export default defineComponent({
       if (pipelineObj.isEditNode && pipelineObj.currentSelectedNodeData) {
         const data = pipelineObj.currentSelectedNodeData.data;
         nodeName.value = data.name || "";
-        enableLlmJudge.value = data.enable_llm_judge || false;
         llmSpanIdentifier.value = data.llm_span_identifier || "gen_ai_system";
 
         if (data.sampling_rate !== undefined && data.sampling_rate !== null && data.sampling_rate > 0) {
@@ -281,14 +249,10 @@ export default defineComponent({
       const nodeData: any = {
         name: nodeName.value.trim(),
         node_type: "llm_evaluation",
-        enable_llm_judge: enableLlmJudge.value,
+        enable_llm_judge: true,
         llm_span_identifier: llmSpanIdentifier.value || "gen_ai_system",
+        sampling_rate: enableSampling.value ? samplingRate.value : 0.0,
       };
-
-      // Only add sampling rate if enabled
-      if (enableSampling.value) {
-        nodeData.sampling_rate = samplingRate.value;
-      }
 
       // Add node to canvas (works for both new and edit)
       addNode(nodeData);
@@ -308,7 +272,6 @@ export default defineComponent({
       nodeName,
       enableSampling,
       samplingRate,
-      enableLlmJudge,
       llmSpanIdentifier,
       filteredStreamFields,
       loadingFields,

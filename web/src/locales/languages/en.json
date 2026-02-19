@@ -1106,7 +1106,8 @@
     "promqlOnlyForMetrics": "PromQL is only available for metrics stream type",
     "invalidCronExpression": "Invalid cron expression",
     "thresholdShouldNotBeEmpty": "Threshold should not be empty",
-    "errorGettingResults": "Error while getting results"
+    "errorGettingResults": "Error while getting results",
+    "save": "Save"
   },
   "function": {
     "header": "Functions",
