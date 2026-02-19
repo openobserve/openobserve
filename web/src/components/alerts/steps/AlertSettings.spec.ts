@@ -593,11 +593,14 @@ describe("AlertSettings.vue", () => {
     });
 
     it("should display cron input in cron mode", () => {
-      expect(wrapper.html()).toContain("Cron Schedule");
+      // Check that cron input field is rendered
+      const html = wrapper.html();
+      expect(html).toContain('placeholder="Cron Expression *"');
     });
 
     it("should display timezone selector in cron mode", () => {
-      expect(wrapper.html()).toContain("Timezone");
+      const html = wrapper.html();
+      expect(html).toContain('placeholder="Timezone *"');
     });
 
     it("should update cron expression", async () => {
