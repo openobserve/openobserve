@@ -1342,13 +1342,19 @@ async fn process_node(
             drop(child_senders);
 
             if !all_records.is_empty() {
-                // Spawn the entire LLM evaluation + direct ingestion as a background task.
-                // This avoids blocking the primary pipeline path (~10s for LLM judge).
+                // Spawn the LLM evaluation as a background task to avoid blocking
+                // the primary pipeline path (~10s for LLM judge).
+                //
+                // The eval node is retrieved from a global registry keyed by
+                // pipeline_id:node_id, so all pipeline executions share the same
+                // buffer task. This ensures spans from the same trace arriving in
+                // different ingestion batches are aggregated before evaluation.
                 let eval_config =
                     o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationConfig {
                         sampling_rate: params.sampling_rate,
                         enable_llm_judge: params.enable_llm_judge,
                         llm_span_identifier: params.llm_span_identifier.clone(),
+                        ..Default::default()
                     };
                 let params_name = params.name.clone();
                 let pl_name = pipeline_name.clone();
@@ -1356,63 +1362,44 @@ async fn process_node(
                 let dest = leaf_dest_stream
                     .clone()
                     .unwrap_or_else(|| StreamParams::new("", "llm_evaluations", StreamType::Logs));
+                let buffer_key = format!("{}:{}", pipeline_id, node.id);
+
+                // Build ingestion context for the buffer task to self-ingest
+                // deferred evaluation results.
+                let ingestion_ctx =
+                    o2_enterprise::enterprise::pipeline::llm_evaluation_node::IngestionContext {
+                        org_id: org.clone(),
+                        stream_name: dest.stream_name.to_string(),
+                        stream_type: dest.stream_type.to_string(),
+                        ingestion_fn: std::sync::Arc::new(|req| {
+                            Box::pin(async move {
+                                crate::service::ingestion::ingestion_service::ingest(req)
+                                    .await
+                                    .map_err(|e| anyhow::anyhow!(e.to_string()))
+                            })
+                        }),
+                    };
+
                 tokio::spawn(async move {
-                    match o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationNode::new(
+                    match o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationNode::get_or_create(
+                        buffer_key,
                         params_name,
                         eval_config,
-                    ) {
+                        ingestion_ctx,
+                    ).await {
                         Ok(eval_node) => {
                             use o2_enterprise::enterprise::pipeline::node::PipelineNode;
-                            match eval_node.process(all_records).await {
-                                Ok(eval_results) if !eval_results.is_empty() => {
-                                    let record_count = eval_results.len();
-                                    log::info!(
-                                        "[Pipeline] {pl_name}: LLM eval node {node_idx} produced {record_count} records, ingesting directly to {}:{}",
-                                        dest.stream_type, dest.stream_name,
-                                    );
-                                    let req = cluster_rpc::IngestionRequest {
-                                        org_id: org,
-                                        stream_name: dest.stream_name.to_string(),
-                                        stream_type: dest.stream_type.to_string(),
-                                        data: Some(cluster_rpc::IngestionData::from(eval_results)),
-                                        ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
-                                        metadata: None,
-                                    };
-                                    match crate::service::ingestion::ingestion_service::ingest(req).await {
-                                        Ok(resp) if resp.status_code == 200 => {
-                                            log::debug!(
-                                                "[Pipeline] {pl_name}: LLM eval ingestion successful to {}:{}, records: {record_count}",
-                                                dest.stream_type, dest.stream_name,
-                                            );
-                                        }
-                                        Ok(resp) => {
-                                            log::error!(
-                                                "[Pipeline] {pl_name}: LLM eval ingestion failed (status={}): {}",
-                                                resp.status_code, resp.message,
-                                            );
-                                        }
-                                        Err(e) => {
-                                            log::error!(
-                                                "[Pipeline] {pl_name}: LLM eval ingestion error: {e}",
-                                            );
-                                        }
-                                    }
-                                }
-                                Ok(_) => {
-                                    log::debug!(
-                                        "[Pipeline] {pl_name}: LLM eval node {node_idx} produced 0 records"
-                                    );
-                                }
-                                Err(e) => {
-                                    log::error!(
-                                        "[Pipeline] {pl_name}: LLM eval node {node_idx} processing failed: {e}"
-                                    );
-                                }
+                            if let Err(e) = eval_node.process(all_records).await {
+                                log::error!(
+                                    "[Pipeline] {pl_name}: LLM eval node {node_idx} processing failed: {e}"
+                                );
                             }
+                            // The shared buffer task accumulates spans by trace_id and
+                            // self-ingests eval results after the grace period expires.
                         }
                         Err(e) => {
                             log::error!(
-                                "[Pipeline] {pl_name}: Failed to create LLM eval node {node_idx}: {e}"
+                                "[Pipeline] {pl_name}: Failed to get/create LLM eval node {node_idx}: {e}"
                             );
                         }
                     }
