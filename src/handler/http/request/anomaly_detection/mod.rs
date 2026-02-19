@@ -335,27 +335,35 @@ pub async fn get_detection_history(
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
-    pub config_id: String,
+    pub name: String,
+    pub description: Option<String>,
     pub stream_name: String,
-    pub alert_id: Option<String>,
-    pub query_mode: String, // "filters" or "custom_sql"
-    pub filters: Option<Vec<FilterRequest>>,
+    pub stream_type: String, // "logs", "metrics", "traces"
+    pub query_mode: String,  // "filters" or "custom_sql"
+    pub filters: Option<serde_json::Value>,
     pub custom_sql: Option<String>,
     pub detection_function: String, // "count(*)", "avg(field)", etc.
-    pub anomaly_threshold: f64,
-    pub detection_frequency_hours: i64,
-    pub enabled: bool,
+    pub detection_interval: String, // "1h", "30m", etc.
+    pub training_window_days: Option<i32>,
+    pub sensitivity: Option<i32>,
+    pub rcf_num_trees: Option<i32>,
+    pub rcf_tree_size: Option<i32>,
+    pub rcf_shingle_size: Option<i32>,
+    pub alert_enabled: Option<bool>,
+    pub alert_destination_id: Option<String>,
+    pub enabled: Option<bool>,
+    pub created_by: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UpdateAnomalyConfigRequest {
-    pub alert_id: Option<String>,
-    pub query_mode: Option<String>,
-    pub filters: Option<Vec<FilterRequest>>,
-    pub custom_sql: Option<String>,
+    pub name: Option<String>,
+    pub description: Option<String>,
     pub detection_function: Option<String>,
-    pub anomaly_threshold: Option<f64>,
-    pub detection_frequency_hours: Option<i64>,
+    pub detection_interval: Option<String>,
+    pub sensitivity: Option<i32>,
+    pub alert_enabled: Option<bool>,
+    pub alert_destination_id: Option<String>,
     pub enabled: Option<bool>,
 }
 

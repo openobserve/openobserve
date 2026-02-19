@@ -3,9 +3,10 @@
 pub use super::{
     action_scripts::Entity as ActionScripts, alert_incident_alerts::Entity as AlertIncidentAlerts,
     alert_incidents::Entity as AlertIncidents, alerts::Entity as Alerts,
-    cipher_keys::Entity as CipherKeys, compactor_manual_jobs::Entity as CompactorManualJobs,
-    dashboards::Entity as Dashboards, destinations::Entity as Destinations,
-    distinct_value_fields::Entity as DistinctValueFields,
+    anomaly_detection_config::Entity as AnomalyDetectionConfig,
+    anomaly_detection_models::Entity as AnomalyDetectionModels, cipher_keys::Entity as CipherKeys,
+    compactor_manual_jobs::Entity as CompactorManualJobs, dashboards::Entity as Dashboards,
+    destinations::Entity as Destinations, distinct_value_fields::Entity as DistinctValueFields,
     enrichment_tables::Entity as EnrichmentTables, folders::Entity as Folders,
     kv_store::Entity as KvStore, org_users::Entity as OrgUsers,
     organizations::Entity as Organizations, pipeline_last_errors::Entity as PipelineLastErrors,
