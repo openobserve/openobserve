@@ -87,7 +87,7 @@ impl std::fmt::Display for Module {
 pub enum DestinationType {
     Http(Endpoint),
     Email(Email),
-    Sns(AwsSns)   
+    Sns(AwsSns),
 }
 
 impl Default for DestinationType {
