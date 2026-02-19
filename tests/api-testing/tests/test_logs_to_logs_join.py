@@ -16,11 +16,12 @@ Test Coverage:
 - JOIN with aggregations (COUNT, GROUP BY)
 - JOIN with WHERE filters
 - JOIN with LIMIT
-- Asymmetric data size handling (10 records vs 50 records)
+- Asymmetric data size handling (100 records vs 1500 records)
+- Subquery with LIMIT 1000 for broadcast join testing
 
 Test Data:
-- logs_small.json: 10 records (lookup/reference data)
-- logs_large.json: 50 records (event/transaction data)
+- logs_small.json: 100 records (lookup/reference data)
+- logs_large.json: 1500 records (event/transaction data)
 - Both share kubernetes_container_name as join key
 """
 
