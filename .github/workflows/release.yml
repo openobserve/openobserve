@@ -106,13 +106,13 @@ jobs:
         if: contains(matrix.arch, 'linux-gnu')
         run: |
           sudo apt-get -y update
-          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
+          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu mold clang lld
 
       - name: Install dependencies for linux-musl
         if: contains(matrix.arch, 'linux-musl')
         run: |
           sudo apt-get -y update
-          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
+          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools mold clang lld
           sudo ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
 
       - name: Install rust toolchain
