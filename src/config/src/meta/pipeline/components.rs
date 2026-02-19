@@ -264,17 +264,25 @@ impl MemorySize for FunctionParams {
 #[serde(default)]
 pub struct LlmEvaluationParams {
     pub name: String,
-    /// Sampling rate (0.0 = evaluate all, 0.01-1.0 = head sampling rate).
+    /// Sampling rate (0.01-1.0 = head sampling rate, default 0.01 = 1%).
     /// Uses hash-based sampling on trace_id for deterministic, consistent sampling.
-    #[serde(default, with = "sampling_rate_str")]
+    #[serde(default = "default_sampling_rate", with = "sampling_rate_str")]
     pub sampling_rate: f64,
-    /// Whether to enable LLM-as-Judge evaluation (uses LLM tokens).
-    #[serde(default)]
+    /// Backward-compat: ignored, LLM judge is always enabled.
+    #[serde(default = "default_enable_llm_judge")]
     pub enable_llm_judge: bool,
     /// Field name used to identify LLM spans within a trace (e.g., "gen_ai_system").
     /// Only spans containing this field (with a non-empty value) are considered LLM spans.
     #[serde(default = "default_llm_span_identifier")]
     pub llm_span_identifier: String,
+}
+
+fn default_sampling_rate() -> f64 {
+    0.01
+}
+
+fn default_enable_llm_judge() -> bool {
+    true
 }
 
 fn default_llm_span_identifier() -> String {
@@ -313,8 +321,8 @@ impl Default for LlmEvaluationParams {
     fn default() -> Self {
         Self {
             name: String::new(),
-            sampling_rate: 0.0,
-            enable_llm_judge: false,
+            sampling_rate: default_sampling_rate(),
+            enable_llm_judge: default_enable_llm_judge(),
             llm_span_identifier: default_llm_span_identifier(),
         }
     }
