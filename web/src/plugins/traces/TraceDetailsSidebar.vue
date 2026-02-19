@@ -950,6 +950,7 @@ import {
   formatModelParameters,
 } from "@/utils/llmUtils";
 import DOMPurify from "dompurify";
+import { escapeHtml } from "@/utils/html";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1030,12 +1031,6 @@ export default defineComponent({
       booleanValue: "var(--o2-json-boolean)",
       nullValue: "var(--o2-json-null)",
       objectValue: "var(--o2-json-object)",
-    };
-
-    const escapeHtml = (text: string): string => {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
     };
 
     const highlightTextMatch = (text: string, query: string): string => {
@@ -1395,13 +1390,14 @@ export default defineComponent({
             /(File\s+)"([^"]+)"(,\s+line\s+)(\d+)(,\s+in\s+)(.+)/,
           );
           if (fileMatch) {
-            return `<div class="stack-line stack-file">  ${fileMatch[1]}<span class="stack-path">"${fileMatch[2]}"</span>${fileMatch[3]}<span class="stack-lineno">${fileMatch[4]}</span>${fileMatch[5]}<span class="stack-function">${fileMatch[6]}</span></div>`;
+            return `<div class="stack-line stack-file">  ${escapeHtml(fileMatch[1])}<span class="stack-path">"${escapeHtml(fileMatch[2])}"</span>${escapeHtml(fileMatch[3])}<span class="stack-lineno">${escapeHtml(fileMatch[4])}</span>${escapeHtml(fileMatch[5])}<span class="stack-function">${escapeHtml(fileMatch[6])}</span></div>`;
           }
         }
 
         // Highlight exception raises (e.g., raise ContextWindowExceededError)
         if (trimmed.startsWith("raise ") || trimmed.includes("raise ")) {
-          const highlighted = line.replace(
+          // Escape the entire line first, then add highlighting spans
+          const highlighted = escapeHtml(line).replace(
             /(raise\s+)(\w+)/,
             '<span class="stack-keyword">$1</span><span class="stack-exception">$2</span>',
           );
@@ -1410,18 +1406,18 @@ export default defineComponent({
 
         // Highlight traceback headers
         if (trimmed.startsWith("Traceback ")) {
-          return `<div class="stack-line stack-traceback"><span class="stack-traceback-header">${line}</span></div>`;
+          return `<div class="stack-line stack-traceback"><span class="stack-traceback-header">${escapeHtml(line)}</span></div>`;
         }
 
         // Highlight "During handling" messages
         if (trimmed.startsWith("During handling of")) {
-          return `<div class="stack-line stack-during"><span class="stack-during-text">${line}</span></div>`;
+          return `<div class="stack-line stack-during"><span class="stack-during-text">${escapeHtml(line)}</span></div>`;
         }
 
         // Highlight code lines (indented lines that aren't file paths)
         if (line.startsWith("    ") && !trimmed.startsWith("File ")) {
-          // Check for common patterns like return, await, etc.
-          let highlighted = line
+          // Escape the entire line first, then add highlighting spans
+          let highlighted = escapeHtml(line)
             .replace(
               /(return|await|async|yield|raise|for|if|else|try|except|finally|with|as|import|from)\s/g,
               '<span class="stack-keyword">$1</span> ',
@@ -1435,12 +1431,12 @@ export default defineComponent({
         if (trimmed.match(/^\w+\.\w+Error:/)) {
           const errorMatch = line.match(/^(\s*)(\w+(?:\.\w+)*Error:)(.+)/);
           if (errorMatch) {
-            return `<div class="stack-line stack-error">${errorMatch[1]}<span class="stack-exception">${errorMatch[2]}</span><span class="stack-error-msg">${errorMatch[3]}</span></div>`;
+            return `<div class="stack-line stack-error">${escapeHtml(errorMatch[1])}<span class="stack-exception">${escapeHtml(errorMatch[2])}</span><span class="stack-error-msg">${escapeHtml(errorMatch[3])}</span></div>`;
           }
         }
 
         // Default line
-        return `<div class="stack-line">${line}</div>`;
+        return `<div class="stack-line">${escapeHtml(line)}</div>`;
       });
 
       return formattedLines.join("");
