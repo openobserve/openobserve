@@ -19,8 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tool-specific rendering -->
     <div v-if="isToolObservation && toolContent !== null" class="tool-content">
       <div v-if="toolMetadata" class="tool-metadata q-mb-sm">
-        <q-badge v-if="toolMetadata.name" :label="`Tool: ${toolMetadata.name}`" color="orange" class="q-mr-sm" />
-        <q-badge v-if="toolMetadata.callId" :label="`Call ID: ${toolMetadata.callId}`" color="grey" />
+        <q-badge v-if="toolMetadata.name" :label="`${t('traces.llm.tool')}: ${toolMetadata.name}`" color="orange" class="q-mr-sm" />
+        <q-badge v-if="toolMetadata.callId" :label="`${t('traces.llm.callId')}: ${toolMetadata.callId}`" color="grey" />
       </div>
       <div class="tool-data">
         <VueJsonPretty :data="toolContent" :deep="3" :showLength="true" />
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             @click="isExpanded = true"
           >
-            ...expand ({{ contentStats.remainingChars }} more characters)
+            {{ t('traces.llm.expandMore', { count: contentStats.remainingChars }) }}
           </q-btn>
         </div>
       </div>
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             @click="isExpanded = false"
           >
-            Collapse
+            {{ t('common.collapse') }}
           </q-btn>
         </div>
       </div>
@@ -108,8 +108,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import VueJsonPretty from 'vue-json-pretty';
 import 'vue-json-pretty/lib/styles.css';
+
+const { t } = useI18n();
 
 const INITIAL_LINE_LIMIT = 15;
 
@@ -480,10 +483,10 @@ const MessageItem = defineComponent({
 
     const roleLabel = (role: string) => {
       const labels: Record<string, string> = {
-        user: 'User',
-        assistant: 'Assistant',
-        system: 'System',
-        tool: 'Tool',
+        user: t('traces.llm.roleUser'),
+        assistant: t('traces.llm.roleAssistant'),
+        system: t('traces.llm.roleSystem'),
+        tool: t('traces.llm.roleTool'),
       };
       return labels[role] || role;
     };

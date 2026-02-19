@@ -50,23 +50,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="panel-section stats-section"
           data-test="service-graph-edge-panel-stats"
         >
-          <div class="section-title">Request Statistics</div>
+          <div class="section-title">
+            {{ t("traces.serviceGraph.requestStatistics") }}
+          </div>
           <div class="stats-grid">
-            <div class="stat-card" data-test="service-graph-edge-panel-total-requests">
-              <div class="stat-label">TOTAL REQUESTS</div>
+            <div
+              class="stat-card"
+              data-test="service-graph-edge-panel-total-requests"
+            >
+              <div class="stat-label">
+                {{ t("traces.serviceGraph.totalRequests").toUpperCase() }}
+              </div>
               <div class="stat-value">{{ edgeStats.totalRequests }}</div>
             </div>
-            <div class="stat-card" data-test="service-graph-edge-panel-request-rate">
-              <div class="stat-label">REQUEST RATE</div>
+            <div
+              class="stat-card"
+              data-test="service-graph-edge-panel-request-rate"
+            >
+              <div class="stat-label">
+                {{ t("traces.serviceGraph.requestRate").toUpperCase() }}
+              </div>
               <div class="stat-value">{{ edgeStats.requestRate }}</div>
             </div>
-            <div class="stat-card" data-test="service-graph-edge-panel-success-rate">
-              <div class="stat-label">SUCCESS RATE</div>
+            <div
+              class="stat-card"
+              data-test="service-graph-edge-panel-success-rate"
+            >
+              <div class="stat-label">
+                {{ t("traces.serviceGraph.successRate").toUpperCase() }}
+              </div>
               <div class="stat-value success">{{ edgeStats.successRate }}</div>
             </div>
-            <div class="stat-card" data-test="service-graph-edge-panel-error-rate">
-              <div class="stat-label">ERROR RATE</div>
-              <div class="stat-value" :class="{ error: edgeStats.errorRateValue > 5 }">
+            <div
+              class="stat-card"
+              data-test="service-graph-edge-panel-error-rate"
+            >
+              <div class="stat-label">
+                {{ t("traces.serviceGraph.errorRate").toUpperCase() }}
+              </div>
+              <div
+                class="stat-value"
+                :class="{ error: edgeStats.errorRateValue > 5 }"
+              >
                 {{ edgeStats.errorRate }}
               </div>
             </div>
@@ -78,7 +103,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="panel-section latency-section"
           data-test="service-graph-edge-panel-latency-distribution"
         >
-          <div class="section-title">Latency Distribution</div>
+          <div class="section-title">
+            {{ t("traces.serviceGraph.latencyDistribution") }}
+          </div>
 
           <!-- Chart -->
           <div class="latency-chart-container">
@@ -95,9 +122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, type PropType } from 'vue';
-import { useStore } from 'vuex';
-import CustomChartRenderer from '@/components/dashboards/panels/CustomChartRenderer.vue';
+import { defineComponent, computed, type PropType } from "vue";
+import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
+import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 
 export default defineComponent({
   name: 'ServiceGraphEdgePanel',
@@ -341,6 +369,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       sourceServiceName,
       targetServiceName,
       edgeStats,

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             dense
             size="sm"
-            label="Show telemetry"
+            :label="t('traces.serviceGraph.showTelemetry')"
             icon="manage_search"
             @click="handleShowTelemetry"
             data-test="service-graph-side-panel-show-telemetry-btn"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="metric-card metric-card-full" data-test="service-graph-side-panel-request-rate">
             <div class="metric-single-line">
               <div class="metric-total">
-                <span class="total-label">Requests:</span>
+                <span class="total-label">{{ t('traces.serviceGraph.requests') }}:</span>
                 <span class="total-value">{{ serviceMetrics.requestRateValue }}</span>
                 <span class="total-unit">/min</span>
               </div>
@@ -80,13 +80,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="metric-inline incoming">
                 <q-icon name="arrow_forward" size="12px" />
                 <span class="inline-value">{{ formatNumber(serviceMetrics.incomingRequests) }}</span>
-                <q-tooltip>Incoming Requests (requests coming into this service)</q-tooltip>
+                <q-tooltip>{{ t('traces.serviceGraph.incomingRequestsTooltip') }}</q-tooltip>
               </div>
               <div class="metric-divider"></div>
               <div class="metric-inline outgoing">
                 <span class="inline-value">{{ formatNumber(serviceMetrics.outgoingRequests) }}</span>
                 <q-icon name="arrow_forward" size="12px" />
-                <q-tooltip>Outgoing Requests (requests going out from this service)</q-tooltip>
+                <q-tooltip>{{ t('traces.serviceGraph.outgoingRequestsTooltip') }}</q-tooltip>
               </div>
             </div>
 
@@ -130,10 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="service-graph-side-panel-upstream-services"
         >
           <div class="section-title">
-            Upstream Services ({{ upstreamServices.length }})
+            {{ t('traces.serviceGraph.upstreamServices') }} ({{ upstreamServices.length }})
           </div>
           <div v-if="upstreamServices.length === 0" class="empty-state">
-            No upstream dependencies
+            {{ t('traces.serviceGraph.noUpstreamDependencies') }}
           </div>
           <div v-else class="service-list">
             <div
@@ -156,10 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="service-graph-side-panel-downstream-services"
         >
           <div class="section-title">
-            Downstream Services ({{ downstreamServices.length }})
+            {{ t('traces.serviceGraph.downstreamServices') }} ({{ downstreamServices.length }})
           </div>
           <div v-if="downstreamServices.length === 0" class="empty-state">
-            No downstream services
+            {{ t('traces.serviceGraph.noDownstreamServices') }}
           </div>
           <div v-else class="service-list">
             <div
@@ -182,17 +182,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="panel-section traces-section"
           data-test="service-graph-side-panel-recent-traces"
         >
-          <div class="section-title">Recent Traces ({{ recentTraces.length }})</div>
+          <div class="section-title">{{ t('traces.serviceGraph.recentTraces') }} ({{ recentTraces.length }})</div>
 
           <!-- Loading State -->
           <div v-if="loadingTraces" class="loading-state">
             <q-spinner color="primary" size="sm" />
-            <span>Loading traces...</span>
+            <span>{{ t('traces.serviceGraph.loadingTraces') }}</span>
           </div>
 
           <!-- Empty State -->
           <div v-else-if="recentTraces.length === 0" class="empty-state">
-            No traces found
+            {{ t('traces.serviceGraph.noTracesFound') }}
           </div>
 
           <!-- Traces List -->
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-tooltip class="bg-dark" anchor="top middle" self="bottom middle">
                       {{ trace.traceId }}
                       <br />
-                      <span style="font-size: 10px; opacity: 0.8;">Click to view full trace</span>
+                      <span style="font-size: 10px; opacity: 0.8;">{{ t('traces.serviceGraph.clickToViewFullTrace') }}</span>
                     </q-tooltip>
                   </div>
                   <q-btn
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="service-graph-side-panel-copy-trace-btn"
                   >
                     <q-tooltip class="bg-dark">
-                      {{ copiedTraceId === trace.traceId ? 'Copied!' : 'Copy trace ID' }}
+                      {{ copiedTraceId === trace.traceId ? t('common.copied') : t('traces.copyTraceId') }}
                     </q-tooltip>
                   </q-btn>
                 </div>
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="trace-spans">
                   <q-icon name="account_tree" size="xs" />
-                  {{ trace.spanCount }} spans
+                  {{ trace.spanCount }} {{ t('traces.spans') }}
                 </div>
                 <div class="trace-time">
                   {{ trace.timestamp }}
@@ -277,6 +277,7 @@ import { defineComponent, computed, ref, watch, defineAsyncComponent, type PropT
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useQuasar } from 'quasar';
+import { useI18n } from 'vue-i18n';
 import searchService from '@/services/search';
 import { getGroupedServices, correlate as correlateStreams } from '@/services/service_streams';
 import { escapeSingleQuotes } from '@/utils/zincutils';
@@ -317,6 +318,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const $q = useQuasar();
+    const { t } = useI18n();
 
     // Metrics Correlation State
     const showTelemetryDialog = ref(false);
@@ -362,7 +364,7 @@ export default defineComponent({
         }
 
         if (!fqn) {
-          correlationError.value = 'Service not found in service registry.';
+          correlationError.value = t('traces.serviceGraph.serviceNotFound');
           correlationData.value = null;
           return;
         }
@@ -376,7 +378,7 @@ export default defineComponent({
 
         const data = correlateResponse.data;
         if (!data) {
-          correlationError.value = 'No correlated streams found.';
+          correlationError.value = t('traces.serviceGraph.noCorrelatedStreamsFound');
           correlationData.value = null;
           return;
         }
@@ -391,9 +393,9 @@ export default defineComponent({
         };
       } catch (err: any) {
         if (err.response?.status === 403) {
-          correlationError.value = 'Service Discovery is an enterprise feature.';
+          correlationError.value = t('common.enterpriseFeature');
         } else {
-          correlationError.value = err.message || 'Failed to load service streams.';
+          correlationError.value = err.message || t('traces.serviceGraph.loadFailedMessage');
         }
         correlationData.value = null;
       } finally {
@@ -834,6 +836,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       upstreamServices,
       downstreamServices,
       serviceMetrics,

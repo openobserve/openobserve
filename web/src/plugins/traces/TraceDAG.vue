@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="trace-dag-container">
     <div v-if="isLoading" class="flex items-center justify-center column q-pa-xl loading-container">
       <q-spinner color="primary" size="50px" />
-      <div class="q-mt-md text-grey-7">Loading trace DAG...</div>
+      <div class="q-mt-md text-grey-7">
+        {{ t("traces.dag.loading") }} DAG...
+      </div>
     </div>
 
     <div v-else-if="error" class="error-message q-pa-md">
@@ -26,13 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #avatar>
           <q-icon name="error" color="white" />
         </template>
-        Failed to load DAG: {{ error }}
+        {{ t("traces.dag.loadFailed") }} DAG : {{ error }}
       </q-banner>
     </div>
 
     <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="flex items-center justify-center column q-pa-xl empty-container">
       <q-icon name="info" size="48px" color="grey-5" />
-      <div class="q-mt-md text-grey-7">No DAG data available</div>
+      <div class="q-mt-md text-grey-7">{{ t("traces.dag.noData") }}</div>
     </div>
 
     <div v-else class="dag-wrapper">
@@ -87,6 +89,7 @@ import { VueFlow, Position, MarkerType, Handle, useVueFlow } from "@vue-flow/cor
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 
 // VueFlow CSS imports
@@ -149,6 +152,7 @@ export default defineComponent({
   emits: ["node-click"],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const isLoading = ref(true);
     const error = ref<string | null>(null);
     const dagData = ref<DAGResponse | null>(null);
@@ -450,6 +454,7 @@ export default defineComponent({
     );
 
     return {
+      t,
       isLoading,
       error,
       dagData,

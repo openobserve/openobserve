@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.searchApplied
         "
       >
-        {{ searchObj.data.queryResults?.hits?.length || 0 }} Traces
+        {{ searchObj.data.queryResults?.hits?.length || 0 }} {{ t('traces.traceCountLabel') }}
       </div>
 
       <div
