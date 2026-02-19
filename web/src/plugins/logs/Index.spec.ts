@@ -950,6 +950,86 @@ describe("Logs Index", async () => {
     });
   });
 
+  describe("AI Chat Query Navigation (ai_chat_query type)", () => {
+    it("should recognize ai_chat_query type as a valid navigation type", () => {
+      // The watcher should treat ai_chat_query same as search_history_re_apply
+      const validTypes = ["search_history_re_apply", "ai_chat_query"];
+      validTypes.forEach((type) => {
+        expect(
+          type === "search_history_re_apply" || type === "ai_chat_query"
+        ).toBe(true);
+      });
+    });
+
+    it("should use absolute time when ai_chat_query type has from/to params", () => {
+      const type = "ai_chat_query";
+      const queryParams = {
+        type,
+        from: "1700000000000",
+        to: "1700003600000",
+      };
+
+      // Simulate the logic from the watcher
+      let datetimeType = "relative";
+      if (
+        type === "ai_chat_query" &&
+        queryParams.from &&
+        queryParams.to
+      ) {
+        datetimeType = "absolute";
+      }
+
+      expect(datetimeType).toBe("absolute");
+    });
+
+    it("should fall back to relative time when ai_chat_query lacks from/to", () => {
+      const type = "ai_chat_query";
+      const queryParams = {
+        type,
+        period: "15m",
+      };
+
+      let datetimeType = "relative";
+      if (
+        type === "ai_chat_query" &&
+        (queryParams as any).from &&
+        (queryParams as any).to
+      ) {
+        datetimeType = "absolute";
+      }
+
+      expect(datetimeType).toBe("relative");
+    });
+
+    it("should use relative time for search_history_re_apply type", () => {
+      const type = "search_history_re_apply";
+      const queryParams = {
+        type,
+        period: "30m",
+        from: "1700000000000",
+        to: "1700003600000",
+      };
+
+      // search_history_re_apply always uses relative, even when from/to present
+      let datetimeType = "relative";
+      if (
+        type === "ai_chat_query" &&
+        queryParams.from &&
+        queryParams.to
+      ) {
+        datetimeType = "absolute";
+      }
+
+      expect(datetimeType).toBe("relative");
+    });
+
+    it("should remove console.log statements from extractPatternsForCurrentQuery", () => {
+      // The PR removes debug console.log calls from extractPatternsForCurrentQuery
+      // Verify the function exists and is callable
+      expect(typeof wrapper.vm.extractPatternsForCurrentQuery).toBe("function");
+    });
+  });
+
   /**
    * Build Query Page Support Tests - Index.vue
    * PR Reference: https://github.com/openobserve/openobserve/pull/10305

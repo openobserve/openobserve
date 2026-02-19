@@ -2284,6 +2284,36 @@ export class LogsPage {
         return await expect(this.page.locator(this.errorMessage)).toBeVisible();
     }
 
+    /**
+     * Get the detailed error dialog text
+     * Clicks on error details button if available and returns the error message text
+     * @returns {Promise<string>} The error dialog text
+     */
+    async getDetailedErrorDialogText() {
+        // Try to click the error details button if visible
+        const detailsBtn = this.page.locator(this.resultErrorDetailsBtn);
+        if (await detailsBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await detailsBtn.click();
+            await this.page.waitForTimeout(500);
+        }
+
+        // Try to get text from detailed error message first
+        const detailedError = this.page.locator(this.searchDetailErrorMessage);
+        if (await detailedError.isVisible({ timeout: 2000 }).catch(() => false)) {
+            return await detailedError.textContent();
+        }
+
+        // Fall back to the main error message
+        const errorMsg = this.page.locator(this.errorMessage);
+        if (await errorMsg.isVisible({ timeout: 2000 }).catch(() => false)) {
+            return await errorMsg.textContent();
+        }
+
+        // Return empty string if no error message found
+        testLogger.warn('No error message found');
+        return '';
+    }
+
     async expectWarningElementHidden() {
         const warningElement = this.page.locator(this.warningElement);
         return await expect(warningElement).toBeHidden();
@@ -5316,6 +5346,22 @@ export class LogsPage {
             testLogger.info('SQL mode enabled');
         } else {
             testLogger.info('SQL mode already enabled');
+        }
+    }
+
+    /**
+     * Disable SQL mode if currently enabled
+     * Combines getSQLModeState() check with clickSQLModeSwitch()
+     */
+    async disableSqlModeIfNeeded() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+        if (isChecked === 'true') {
+            await sqlModeToggle.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('SQL mode disabled');
+        } else {
+            testLogger.info('SQL mode already disabled');
         }
     }
 
