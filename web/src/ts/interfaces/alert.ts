@@ -117,10 +117,11 @@ export interface Destination {
   emails?: string;
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
-  output_format?: "json" | "ndjson" | "nestedevent" | string; // string allows esbulk with dynamic index
+  output_format?: "json" | "ndjson" | "nestedevent" | string | any; // string allows esbulk with dynamic index, any for stringseparated object
   destination_type?: string; // Frontend internal use
   destination_type_name?: string; // From backend
   esbulk_index?: string; // For esbulk format index name
+  separator?: string; // For stringseparated format separator value
   metadata?: DestinationMetadata; // Destination-specific metadata as JSON object
 }
 
@@ -134,8 +135,9 @@ export interface DestinationPayload {
   emails?: string[];
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
-  output_format?: "json" | "ndjson" | "nestedevent" | string; // string allows esbulk with dynamic index
+  output_format?: "json" | "ndjson" | "nestedevent" | string | any; // string allows esbulk with dynamic index, any for stringseparated object
   destination_type?: string; // New field added
+  separator?: string; // For stringseparated format separator value
 }
 
 // Destination object which is modified in frontend to display in table and form
