@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-btn>
       <q-btn
         size="6px"
-        class="cursor-pointer"
+        class="cursor-pointer pattern-details-btn"
         round
         :data-test="`pattern-card-${index}-details-icon`"
         @click.stop="$emit('click', pattern, index)"
@@ -134,5 +134,11 @@ const { t } = useI18n();
 .pattern-template-text {
   font-family: monospace;
   font-size: 12px;
+}
+</style>
+
+<style lang="scss">
+.pattern-details-btn > span.q-btn__content {
+  display: block !important;
 }
 </style>
