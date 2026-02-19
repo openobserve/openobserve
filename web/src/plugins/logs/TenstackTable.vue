@@ -291,10 +291,10 @@ name="warning" class="q-mr-xs" />
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
                 @view-trace="
-                  viewTrace(formattedRows[virtualRow.index]?.original)
+                  viewTrace(formattedRows[virtualRow.index - 1]?.original)
                 "
                 @show-correlation="
-                  showCorrelation(formattedRows[virtualRow.index]?.original)
+                  showCorrelation(formattedRows[virtualRow.index - 1]?.original)
                 "
                 :streamName="jsonpreviewStreamName"
                 @send-to-ai-chat="sendToAiChat"
@@ -352,6 +352,7 @@ name="warning" class="q-mr-xs" />
                     "
                     :column="cell.column"
                     :row="cell.row.original as any"
+                    :selectedStreamFields="selectedStreamFields"
                     @copy="copyLogToClipboard"
                     @add-search-term="addSearchTerm"
                     @add-field-to-table="addFieldToTable"
@@ -360,12 +361,16 @@ name="warning" class="q-mr-xs" />
                 </template>
                 <span
                   v-if="
-                    processedResults[`${cell.column.id}_${virtualRow.index}`]
+                    processedResults[
+                      `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                    ]
                   "
-                  :key="`${cell.column.id}_${virtualRow.index}`"
+                  :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
                   :class="store.state.theme === 'dark' ? 'dark' : ''"
                   v-html="
-                    processedResults[`${cell.column.id}_${virtualRow.index}`]
+                    processedResults[
+                      `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                    ]
                   "
                 />
                 <span v-else>
@@ -399,10 +404,9 @@ import {
   onMounted,
   onBeforeUnmount,
   ComputedRef,
-  defineExpose,
 } from "vue";
+import type { PropType } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import HighLight from "@/components/HighLight.vue";
 import {
   FlexRender,
   type ColumnDef,
@@ -419,9 +423,13 @@ import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "quasar";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
-import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+
+interface StreamField {
+  name: string;
+  isSchemaField: boolean;
+}
 
 const props = defineProps({
   rows: {
@@ -475,7 +483,11 @@ const props = defineProps({
     required: false,
   },
   selectedStreamFtsKeys: {
-    type: Array as PropType<string[]>,
+    type: Array as PropType<StreamField[]>,
+    default: () => [],
+  },
+  selectedStreamFields: {
+    type: Array as PropType<StreamField[]>,
     default: () => [],
   },
 });
@@ -586,6 +598,8 @@ watch(
     expandedRowIndices.value.clear();
     // Clear height cache when rows change
     expandedRowHeights.value = {};
+    // Clear actual index cache when rows change
+    actualIndexCache.value.clear();
     setExpandedRows();
 
     await nextTick();
@@ -781,6 +795,8 @@ const setExpandedRows = () => {
       expandRow(virtualIndex as number);
     }
   });
+  // Clear the actual index cache since expanded rows are changing
+  actualIndexCache.value.clear();
 };
 
 const copyLogToClipboard = (value: any, copyAsJson: boolean = true) => {
@@ -827,9 +843,17 @@ const handleDragEnd = async () => {
 const expandedRowIndices = ref<Set<number>>(new Set());
 
 const handleExpandRow = (index: number) => {
-  emits("expandRow", calculateActualIndex(index));
+  // Calculate actual index BEFORE expanding (using current state)
+  const actualIndex = calculateActualIndex(index);
 
+  // Emit the event with the calculated actual index
+  emits("expandRow", actualIndex);
+
+  // Now expand the row (this modifies expandedRowIndices)
   expandRow(index);
+
+  // Clear the actual index cache since expanded rows have changed
+  actualIndexCache.value.clear();
 };
 
 const expandRow = async (index: number) => {
@@ -901,13 +925,34 @@ const expandRow = async (index: number) => {
   }
 };
 
-const calculateActualIndex = (index: number): number => {
-  let actualIndex = index;
+// Cache for calculated actual indices - maps virtual index to actual index
+// Cache is cleared whenever expandedRowIndices changes (expand/collapse operations)
+const actualIndexCache = ref<Map<number, number>>(new Map());
+
+/**
+ * Converts a virtual index (including expanded rows) to an actual index (in original data).
+ * Uses caching to avoid redundant calculations, especially during render and hover events.
+ *
+ * @param virtualIndex - Index in the displayed table (includes expanded rows)
+ * @returns Actual index in the original data array (without expanded rows)
+ */
+const calculateActualIndex = (virtualIndex: number): number => {
+  // Check cache first for O(1) lookup
+  if (actualIndexCache.value.has(virtualIndex)) {
+    return actualIndexCache.value.get(virtualIndex)!;
+  }
+
+  // Calculate actual index from virtual index
+  // For each expanded row before this virtual index, subtract 1
+  let actualIndex = virtualIndex;
   expandedRowIndices.value.forEach((expandedIndex) => {
-    if (expandedIndex !== -1 && expandedIndex < index) {
+    if (expandedIndex !== -1 && expandedIndex < virtualIndex) {
       actualIndex -= 1;
     }
   });
+
+  // Store in cache for future lookups
+  actualIndexCache.value.set(virtualIndex, actualIndex);
   return actualIndex;
 };
 
