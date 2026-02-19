@@ -93,79 +93,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
-    <!-- NEW: Panel Time Configuration -->
+    <!-- Panel Default Time Configuration -->
     <div class="q-mb-sm">
-      <div class="text-bold q-mb-sm row items-center">
-        {{ t("dashboard.panelTimeSettings") }}
-        <q-btn no-caps padding="xs" size="sm" flat icon="info_outline">
-          <q-tooltip>
-            {{ t("dashboard.panelTimeSettingsTooltip") }}
+      <!-- Toggle with tooltip -->
+      <div class="row items-center">
+        <q-toggle
+          v-model="useDefaultTime"
+          :label="t('dashboard.panelTimeEnabled')"
+          data-test="dashboard-config-allow-panel-time"
+          @update:model-value="onToggleDefaultTime"
+          class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        />
+        <q-btn
+          no-caps
+          padding="xs"
+          size="sm"
+          flat
+          icon="info_outline"
+          class="q-mt-xs"
+        >
+          <q-tooltip
+            anchor="bottom middle"
+            self="top middle"
+            style="font-size: 10px"
+            max-width="250px"
+          >
+            <span>
+              {{ t("dashboard.useDefaultTimeTooltip") }}
+            </span>
           </q-tooltip>
         </q-btn>
       </div>
 
-      <!-- Toggle to enable panel-level time -->
-      <q-toggle
-        v-model="panelTimeEnabled"
-        :label="t('dashboard.panelTimeEnabled')"
-        data-test="dashboard-config-allow-panel-time"
-        @update:model-value="onTogglePanelTime"
-        class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
-        size="lg"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-toggle-button-lg-dark'
-            : 'o2-toggle-button-lg-light'
-        "
-      />
-
-      <!-- Show mode selection when enabled -->
-      <div v-if="panelTimeEnabled" class="tw:mt-1">
-        <!-- Using individual q-radio components for better data-test support -->
-        <div class="q-gutter-none">
-          <label class="tw:text-gray-500 tw:font-semibold">{{ t("dashboard.panelTimeMode") }}</label>
-          <q-radio
-            v-model="panelTimeMode"
-            val="global"
-            :label="t('dashboard.useGlobalTime')"
-            color="primary"
-            data-test="dashboard-config-panel-time-mode-global"
-            @update:model-value="onPanelTimeModeChange"
-          >
-            <q-icon name="info" size="16px" class="q-ml-xs">
-              <q-tooltip>{{ t("dashboard.panelTimeGlobalHint") }}</q-tooltip>
-            </q-icon>
-          </q-radio>
-          <q-radio
-            v-model="panelTimeMode"
-            val="individual"
-            :label="t('dashboard.useIndividualTime')"
-            color="primary"
-            data-test="dashboard-config-panel-time-mode-individual"
-            @update:model-value="onPanelTimeModeChange"
-          >
-            <q-icon name="info" size="16px" class="q-ml-xs">
-              <q-tooltip>{{
-                t("dashboard.panelTimeIndividualHint")
-              }}</q-tooltip>
-            </q-icon>
-          </q-radio>
+      <!-- Show content when toggle ON -->
+      <div v-if="useDefaultTime" class="q-mt-sm">
+        <div class="text-bold q-mb-xs">
+          {{ t("dashboard.defaultDuration") }}
         </div>
-        <!-- NEW: Date Time Picker for Individual Panel Time -->
-        <div v-if="panelTimeMode === 'individual'" class="q-mt-xs">
-          <div class="q-mb-sm">
-            {{ t("dashboard.panelTimeRange") }}
-            <q-icon name="info" size="14px">
-              <q-tooltip>{{ t("dashboard.panelTimeRangeTooltip") }}</q-tooltip>
-            </q-icon>
-          </div>
+
+        <!-- Picker visible (time set or "+Set" was clicked) -->
+        <div
+          v-if="showTimePicker || (panelTimeRange !== null && panelTimeRange !== undefined)"
+          class="flex items-center"
+        >
           <DateTimePickerDashboard
             ref="panelTimePickerRef"
-            v-model="panelTimeValue"
+            v-model="pickerValue"
             :auto-apply-dashboard="true"
             data-test="dashboard-config-panel-time-picker"
           />
+          <q-icon
+            class="q-mr-xs q-ml-sm"
+            size="15px"
+            name="close"
+            style="cursor: pointer"
+            data-test="dashboard-config-cancel-panel-time"
+            @click="onCancelPanelTime"
+          />
         </div>
+
+        <!-- No time set → show "+Set" button -->
+        <div v-else>
+          <q-btn
+            @click="showTimePicker = true"
+            style="cursor: pointer; padding: 0px 5px"
+            :label="t('common.set')"
+            class="el-border"
+            no-caps
+            data-test="dashboard-config-set-panel-time"
+          />
+        </div>
+
         <q-separator class="q-my-sm" />
       </div>
     </div>
@@ -1968,7 +1972,6 @@ import { markRaw, watchEffect, watch } from "vue";
 import {
   convertPanelTimeRangeToPicker,
   buildPanelTimeRange,
-  shouldUsePanelTime,
 } from "@/utils/dashboard/panelTimeUtils";
 import {
   shouldShowLegendsToggle,
@@ -2621,81 +2624,66 @@ export default defineComponent({
       );
     });
 
-    // Panel time configuration
-    const panelTimeEnabled = ref(
+    // Panel default time configuration (v4.0)
+    const useDefaultTime = ref(
       !!dashboardPanelData.data.config?.panel_time_enabled,
     );
 
-    // Panel time mode: "global" or "individual"
-    const panelTimeMode = ref(
-      dashboardPanelData.data.config?.panel_time_mode || "global",
+    // Current panel time range (null = not set)
+    const panelTimeRange = ref(
+      dashboardPanelData.data.config?.panel_time_range ?? null,
     );
 
-    // Toggle panel time on/off
-    const onTogglePanelTime = (enabled: boolean) => {
+    // Picker value - initialize from existing config or default
+    const existingRange = dashboardPanelData.data.config?.panel_time_range;
+    const pickerValue = ref(
+      existingRange
+        ? convertPanelTimeRangeToPicker(existingRange) ?? {
+            type: "relative",
+            valueType: "relative",
+            relativeTimePeriod: "15m",
+          }
+        : {
+            type: "relative",
+            valueType: "relative",
+            relativeTimePeriod: "15m",
+          },
+    );
+
+    // Whether the picker is open (after clicking "+Set")
+    const showTimePicker = ref(false);
+
+    // Toggle on/off
+    const onToggleDefaultTime = (enabled: boolean) => {
       dashboardPanelData.data.config.panel_time_enabled = enabled;
 
-      if (enabled) {
-        // Default to global mode
-        dashboardPanelData.data.config.panel_time_mode = "global";
-        panelTimeMode.value = "global";
-      } else {
-        // Clear panel time settings
-        dashboardPanelData.data.config.panel_time_mode = undefined;
-        dashboardPanelData.data.config.panel_time_range = undefined;
+      if (!enabled) {
+        // Clear everything when turning off
+        dashboardPanelData.data.config.panel_time_range = null;
+        panelTimeRange.value = null;
+        showTimePicker.value = false;
       }
     };
 
-    // Change panel time mode
-    const onPanelTimeModeChange = (mode: string) => {
-      dashboardPanelData.data.config.panel_time_mode = mode;
-
-      if (mode === "individual") {
-        // INDIVIDUAL MODE: Initialize panel_time_range if not set
-        // User will set the actual time using the date time picker
-        if (!dashboardPanelData.data.config.panel_time_range) {
-          dashboardPanelData.data.config.panel_time_range = {
-            type: "relative",
-            relativeTimePeriod: "15m",
-          };
-        }
-
-        // Initialize panel time picker value using helper function
-        panelTimeValue.value = convertPanelTimeRangeToPicker(
-          dashboardPanelData.data.config.panel_time_range,
-        );
-      } else {
-        // GLOBAL MODE: DON'T save panel_time_range
-        // Clear panel_time_range when switching to global
-        // Panel will use dashboard.defaultDatetimeDuration at runtime
-        dashboardPanelData.data.config.panel_time_range = undefined;
-      }
-    };
-
-    // Panel time picker value
-    const panelTimeValue = ref<any>(null);
-
-    // Helper function to convert panel_time_range to picker value format
-
-    // Initialize panel time picker value if panel already has individual time configured
-    if (shouldUsePanelTime(dashboardPanelData.data)) {
-      panelTimeValue.value = convertPanelTimeRangeToPicker(
-        dashboardPanelData.data.config.panel_time_range,
-      );
-    }
-
-    // Watch for changes to panel time picker and sync to config
+    // Auto-save: watch picker value changes and sync to config
     watch(
-      panelTimeValue,
+      pickerValue,
       (newValue) => {
-        if (newValue && panelTimeMode.value === "individual") {
-          // Store panel time range using utility function
-          dashboardPanelData.data.config.panel_time_range =
-            buildPanelTimeRange(newValue);
+        if (newValue && useDefaultTime.value) {
+          const timeRange = buildPanelTimeRange(newValue as any);
+          dashboardPanelData.data.config.panel_time_range = timeRange;
+          panelTimeRange.value = timeRange;
         }
       },
       { deep: true },
     );
+
+    // Cancel (remove set time via X icon) → back to "+Set" button
+    const onCancelPanelTime = () => {
+      dashboardPanelData.data.config.panel_time_range = null;
+      panelTimeRange.value = null;
+      showTimePicker.value = false;
+    };
 
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {
@@ -2765,12 +2753,13 @@ export default defineComponent({
       shouldShowLegendHeightUnitContainer,
       shouldApplyChartAlign,
       shouldShowGridlines,
-      // Panel time configuration
-      panelTimeEnabled,
-      panelTimeMode,
-      onTogglePanelTime,
-      onPanelTimeModeChange,
-      panelTimeValue,
+      // Panel default time configuration (v4.0)
+      useDefaultTime,
+      panelTimeRange,
+      pickerValue,
+      showTimePicker,
+      onToggleDefaultTime,
+      onCancelPanelTime,
     };
   },
 });

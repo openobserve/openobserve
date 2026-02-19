@@ -153,27 +153,23 @@ export const buildPanelTimeRange = (
 };
 
 /**
- * Check if a panel has custom time configuration
+ * Check if a panel has panel-level time picker enabled
+ * Returns true if panel_time_enabled is ON (regardless of whether a custom range is set)
+ * When enabled with no custom range (panel_time_range=null), panel uses global time dynamically
  */
 export const hasPanelTime = (
   panel: any,
-  panelId: string,
-  query?: LocationQuery,
 ): boolean => {
-  return !!(
-    panel?.config?.panel_time_range ||
-    query?.[`pt-period.${panelId}`] ||
-    query?.[`pt-from.${panelId}`]
-  );
+  return !!panel?.config?.panel_time_enabled;
 };
 
 /**
- * Check if panel should use individual time (not global)
+ * Check if panel should use its own time (v4.0 simplified)
+ * Panel has its own time when panel_time_range is explicitly set (not null/undefined)
  */
 export const shouldUsePanelTime = (panel: any): boolean => {
   return !!(
     panel?.config?.panel_time_enabled &&
-    panel?.config?.panel_time_mode === "individual" &&
     panel?.config?.panel_time_range
   );
 };

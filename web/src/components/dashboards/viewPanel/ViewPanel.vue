@@ -660,6 +660,17 @@ export default defineComponent({
 
     watch(selectedDate, () => {
       updateDateTime(selectedDate.value);
+
+      // CRITICAL FIX: When date time changes (user clicked Apply), also commit any pending variable changes
+      // This ensures that if user changed both variables and date time,
+      // both changes are applied to the chart when Apply is clicked
+      Object.assign(
+        currentVariablesDataRef,
+        JSON.parse(JSON.stringify(variablesData)),
+      );
+
+      // Mark variables as in sync (flag logic is inverted)
+      isVariablesChanged.value = true;
     });
 
     const dateTimeForVariables = ref(null);
@@ -669,7 +680,9 @@ export default defineComponent({
       const startTime = new Date(date.startTime);
       const endTime = new Date(date.endTime);
 
-      // Update only the variables time object
+      // Update the variables time object for query_values variables
+      // This allows variables to load with the new time range
+      // NOTE: This does NOT commit variables to the chart - only refreshData() does that
       dateTimeForVariables.value = {
         start_time: startTime,
         end_time: endTime,

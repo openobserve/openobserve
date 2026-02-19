@@ -1356,48 +1356,53 @@ export default defineComponent({
           // Mark this panel as initializing to prevent change events
           panelsInitializing.value.add(panelId);
 
-          // Resolve panel time value using priority system
-          const resolvedValue = resolvePanelTimeValue(
-            panel,
-            panelId,
-            route.query,
-            props.currentTimeObj,
-          );
-
-          // Helper to check if two picker values are equal
+          // Helper to check if two picker values represent the same time
+          // DateTimePickerDashboard normalizes values (adds startTime/endTime, may drop "type"),
+          // so we compare semantically: for relative, only compare the period string
           const arePickerValuesEqual = (v1: any, v2: any) => {
             if (!v1 || !v2) return v1 === v2;
-            return (
-              v1.type === v2.type &&
-              v1.valueType === v2.valueType &&
-              v1.relativeTimePeriod === v2.relativeTimePeriod &&
-              v1.startTime === v2.startTime &&
-              v1.endTime === v2.endTime
-            );
+
+            const type1 = v1.valueType || v1.type;
+            const type2 = v2.valueType || v2.type;
+            if (type1 !== type2) return false;
+
+            // For relative: only the period matters (startTime/endTime are computed & change over time)
+            if (type1 === "relative") {
+              return v1.relativeTimePeriod === v2.relativeTimePeriod;
+            }
+
+            // For absolute: compare start and end times
+            return v1.startTime === v2.startTime && v1.endTime === v2.endTime;
           };
 
-          // If no resolved value from standard sources, try global time with route fallback
-          if (!resolvedValue && props.currentTimeObj?.["__global"]) {
-            const globalPickerValue = convertGlobalTimeToPickerFormat(
-              props.currentTimeObj["__global"],
+          // When panel has no custom time (panel_time_range is null) and no URL panel params,
+          // use local convertGlobalTimeToPickerFormat which preserves relative/absolute type
+          // from route.query. The imported resolvePanelTimeValue always converts global to absolute.
+          const hasUrlPanelTime = !!(
+            route.query[`pt-period.${panelId}`] ||
+            route.query[`pt-from.${panelId}`]
+          );
+          const hasPanelConfigTime = !!panel.config?.panel_time_range;
+
+          let pickerValue: any = null;
+
+          if (hasUrlPanelTime || hasPanelConfigTime) {
+            // Panel has its own time (URL or config) → use priority-based resolver
+            pickerValue = resolvePanelTimeValue(
+              panel,
+              panelId,
+              route.query,
+              props.currentTimeObj,
             );
-            if (
-              !arePickerValuesEqual(
-                panelTimeValues.value[panelId],
-                globalPickerValue,
-              )
-            ) {
-              panelTimeValues.value[panelId] = globalPickerValue;
-            }
-          } else if (resolvedValue) {
-            if (
-              !arePickerValuesEqual(
-                panelTimeValues.value[panelId],
-                resolvedValue,
-              )
-            ) {
-              panelTimeValues.value[panelId] = resolvedValue;
-            }
+          } else {
+            // Panel uses global time → use local converter that preserves relative type
+            pickerValue = convertGlobalTimeToPickerFormat(
+              props.currentTimeObj?.["__global"],
+            );
+          }
+
+          if (pickerValue && !arePickerValuesEqual(panelTimeValues.value[panelId], pickerValue)) {
+            panelTimeValues.value[panelId] = pickerValue;
           }
 
           // Cleanup initialization flag
@@ -1407,14 +1412,10 @@ export default defineComponent({
     };
 
     // Convert global time object to picker format (with route fallback)
+    // CRITICAL: Check route.query FIRST to preserve relative/absolute type
+    // The time object (globalTime) always has Date objects, losing the "relative" info
     const convertGlobalTimeToPickerFormat = (globalTime: any) => {
-      // First try to convert from time object
-      const fromTimeObj = convertTimeObjToPickerFormat(globalTime);
-      if (fromTimeObj) {
-        return fromTimeObj;
-      }
-
-      // Check if it's relative or absolute from route
+      // Check route first to preserve the original relative/absolute type
       if (route.query.period) {
         return {
           type: "relative",
@@ -1430,6 +1431,12 @@ export default defineComponent({
         };
       }
 
+      // Fall back to converting from time object (will be absolute)
+      const fromTimeObj = convertTimeObjToPickerFormat(globalTime);
+      if (fromTimeObj) {
+        return fromTimeObj;
+      }
+
       // Default
       return {
         type: "relative",
@@ -1442,6 +1449,12 @@ export default defineComponent({
     const onPanelTimeApply = async (panelId: string) => {
       // Guard against infinite recursion during state synchronization
       if (panelsSyncingDateTime.value.has(panelId)) {
+        return;
+      }
+
+      // Guard against firing during initialization (when initializePanelTimes sets values)
+      // This prevents null-config panels from creating spurious URL params
+      if (panelsInitializing.value.has(panelId)) {
         return;
       }
 
@@ -1481,7 +1494,17 @@ export default defineComponent({
         query[`pt-to.${panelId}`] = timeValue.endTime.toString();
       }
 
-      await router.replace({ query });
+      // CRITICAL: Only update URL if query has actually changed
+      // This prevents unnecessary route updates when panel refreshes without time changes
+      const hasQueryChanged = Object.keys(query).some(
+        key => query[key] !== route.query[key]
+      ) || Object.keys(route.query).some(
+        key => !query.hasOwnProperty(key)
+      );
+
+      if (hasQueryChanged) {
+        await router.replace({ query });
+      }
     };
 
     // Initialize panel times when component is mounted
