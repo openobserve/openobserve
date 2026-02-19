@@ -1,6 +1,6 @@
 //Dashboard Share and Export Page Object
 //Methods: Share dashboard, Export dashboard, Share and capture short URL
-const testLogger = require('../../playwright-tests/utils/test-logger.js');
+import testLogger from '../../playwright-tests/utils/test-logger.js';
 
 export default class DashboardShareExportPage {
   constructor(page) {

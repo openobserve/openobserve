@@ -9,9 +9,9 @@
  * by adding a dependency on route.fullPath.
  */
 
-const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
-const testLogger = require("../utils/test-logger.js");
-const PageManager = require("../../pages/page-manager.js");
+import { test, expect, navigateToBase } from "../utils/enhanced-baseFixtures.js";
+import testLogger from "../utils/test-logger.js";
+import PageManager from "../../pages/page-manager.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
@@ -297,9 +297,9 @@ test.describe("Dashboard Share Link Functional Tests", { tag: ["@dashboardShareL
 
     const sharedUrl = new URL(originalUrl);
     const receivedFrom = sharedUrl.searchParams.get("from");
-    expect(receivedFrom).toContain(fromTime);
+    expect(receivedFrom).toBe(fromTime);
     const receivedTo = sharedUrl.searchParams.get("to");
-    expect(receivedTo).toContain(toTime);
+    expect(receivedTo).toBe(toTime);
     testLogger.assertion("Share URL preserves absolute from/to timestamps");
 
     testLogger.step("Open short URL and verify time range is preserved");
@@ -313,8 +313,8 @@ test.describe("Dashboard Share Link Functional Tests", { tag: ["@dashboardShareL
     const newPageUrl = new URL(newPage.url());
     const newPageFrom = newPageUrl.searchParams.get("from");
     const newPageTo = newPageUrl.searchParams.get("to");
-    expect(newPageFrom).toContain(fromTime);
-    expect(newPageTo).toContain(toTime);
+    expect(newPageFrom).toBe(fromTime);
+    expect(newPageTo).toBe(toTime);
     testLogger.assertion("Absolute time range preserved after redirect");
 
     await newPage.close();
