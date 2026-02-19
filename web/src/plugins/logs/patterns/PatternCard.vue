@@ -31,14 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
       >
-        {{ pattern.template }}
+        <LogsHighLighting
+          :data="pattern.template"
+          :show-braces="false"
+          :show-quotes="false"
+          :query-string="''"
+          :simple-mode="false"
+        />
       </div>
-      <span
-        v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw:text-[0.625rem]"
-        :data-test="`pattern-card-${index}-anomaly-badge`"
-        >⚠️ {{ t("search.anomalyLabel") }}</span
-      >
     </div>
 
     <!-- Occurrence Column -->
@@ -58,6 +58,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`pattern-card-${index}-percentage`"
         >{{ pattern.percentage.toFixed(2) }}%</span
       >
+    </div>
+
+    <!-- Anomaly Column -->
+    <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:text-center">
+      <span
+        v-if="pattern.is_anomaly"
+        class="text-negative text-weight-bold tw:text-[1rem]"
+        :data-test="`pattern-card-${index}-anomaly-badge`"
+      >
+        ⚠️
+        <q-tooltip :delay="500">{{ t("search.anomalyDetected") }}</q-tooltip>
+      </span>
+      <span
+        v-else
+        class="text-grey-6 tw:text-[0.75rem]"
+        :data-test="`pattern-card-${index}-no-anomaly`"
+      >
+        --
+      </span>
     </div>
 
     <!-- Actions Column -->
@@ -111,6 +130,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 
 defineProps<{
   pattern: any;
@@ -135,6 +155,10 @@ const { t } = useI18n();
   font-family: monospace;
   font-size: 12px;
 }
+</style>
+
+<style lang="scss">
+@import "@/assets/styles/log-highlighting.css";
 </style>
 
 <style lang="scss">
