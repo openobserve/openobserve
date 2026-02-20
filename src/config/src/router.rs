@@ -23,8 +23,8 @@ const QUERIER_ROUTES: [(&str, usize); 29] = [
     ("streams", 2),        // /api/{org_id}/streams/...
     ("traces/latest", 3),        // /api/{org_id}/{stream_name}/traces/latest
     ("traces/latest_stream", 3), // /api/{org_id}/{stream_name}/traces/latest_stream
-    ("traces/session", 3), // /api/{org_id}/{stream_name}/traces/session
-    ("traces/user", 3),    // /api/{org_id}/{stream_name}/traces/user
+    ("traces/session", 3),       // /api/{org_id}/{stream_name}/traces/session
+    ("traces/user", 3),          // /api/{org_id}/{stream_name}/traces/user
     ("dag", 5),            // /api/{org_id}/{stream_name}/traces/{trace_id}/dag
     ("clusters", 1),       // /api/clusters
     ("query_manager", 2),  // /api/{org_id}/query_manager/...

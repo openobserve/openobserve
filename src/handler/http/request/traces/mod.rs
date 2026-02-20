@@ -884,6 +884,14 @@ async fn process_latest_traces_stream(
         return;
     }
 
+    // Sanitize filter before embedding in SQL. The filter is a user-supplied URL query param
+    // of the form "field=value AND field2=value2". We remove SQL comment sequences and
+    // semicolons to prevent injection; the broader pattern is consistent with get_latest_traces.
+    let filter = {
+        let f = filter.replace("--", "").replace(';', "");
+        f.trim().to_string()
+    };
+
     // Build the aggregation SQL (Query 1) — identical to get_latest_traces
     let query_sql_base = if is_llm_stream {
         format!(
@@ -995,6 +1003,9 @@ async fn process_latest_traces_stream(
     let mut hits_delivered: i64 = 0; // how many we've actually sent
     let mut total_across_partitions: usize = 0; // cumulative total count for UI display
     let mut range_error_sent = false; // send range_error only once
+    // Dedup: a trace whose spans straddle a partition boundary appears in multiple partitions'
+    // GROUP BY results. Track already-emitted trace IDs to avoid sending duplicates.
+    let mut seen_trace_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for (idx, partition) in partitions_desc.iter().enumerate() {
         if sender.is_closed() {
@@ -1011,8 +1022,8 @@ async fn process_latest_traces_stream(
         // capped at query_default_limit (default 1000) to prevent oversized Q1 scans.
         let remaining_to_skip = (hits_to_skip - hits_seen).max(0);
         let remaining_needed = hits_to_deliver - hits_delivered;
-        let fetch_size = (remaining_to_skip + remaining_needed)
-            .min(get_config().limit.query_default_limit);
+        let fetch_size =
+            (remaining_to_skip + remaining_needed).min(get_config().limit.query_default_limit);
 
         // ---------- Query 1: aggregate over this partition ----------
         let mut req1 = base_req.clone();
@@ -1044,14 +1055,27 @@ async fn process_latest_traces_stream(
             }
         };
 
-        // Use agg_res.total (actual matching trace count from backend) for hits_seen,
-        // not agg_res.hits.len() which is truncated by fetch_size. This ensures
-        // skip_in_partition is computed correctly even when fetch_size < actual matches.
-        let partition_total = agg_res.total as i64;
-        total_across_partitions += agg_res.total;
+        // Deduplicate against already-emitted trace IDs (a trace whose spans straddle a
+        // partition boundary can appear in multiple partitions' GROUP BY result).
+        // We filter hits *before* counting so that total and pagination are not inflated.
+        let deduped_hits: Vec<_> = agg_res
+            .hits
+            .into_iter()
+            .filter(|item| {
+                let tid = item
+                    .get("trace_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                !tid.is_empty() && !seen_trace_ids.contains(tid)
+            })
+            .collect();
+        // Use deduped count for both pagination tracking and total display.
+        // agg_res.total would be inflated by duplicates, so count only deduped hits.
+        let partition_total = deduped_hits.len() as i64;
+        total_across_partitions += deduped_hits.len();
         hits_seen += partition_total;
 
-        if agg_res.hits.is_empty() {
+        if deduped_hits.is_empty() {
             let progress = ((idx + 1) * 100) / total_partitions;
             let _ = sender
                 .send(Ok(StreamResponses::Progress { percent: progress }))
@@ -1061,16 +1085,17 @@ async fn process_latest_traces_stream(
 
         // ---------- Query 2: fetch span details for these trace IDs ----------
         let mut traces_data: HashMap<String, TraceResponseItem> =
-            HashMap::with_capacity(agg_res.hits.len());
+            HashMap::with_capacity(deduped_hits.len());
         let mut p_start_actual = p_start;
         let mut p_end_actual = p_end;
 
-        for item in &agg_res.hits {
+        for item in &deduped_hits {
             let tid = item
                 .get("trace_id")
                 .and_then(|v| v.as_str())
                 .unwrap_or_default()
                 .to_string();
+            seen_trace_ids.insert(tid.clone());
             let trace_start_time = json::get_int_value(
                 item.get("trace_start_time")
                     .unwrap_or(&serde_json::Value::Null),
@@ -1133,7 +1158,7 @@ async fn process_latest_traces_stream(
         let mut req2 = base_req.clone();
         req2.query.sql = detail_sql.clone();
         req2.query.from = 0;
-        req2.query.size = 9999;
+        req2.query.size = get_config().limit.query_default_limit;
         req2.query.start_time = p_start_actual;
         req2.query.end_time = p_end_actual;
         let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
