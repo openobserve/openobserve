@@ -4000,6 +4000,18 @@ export class LogsPage {
     }
 
     /**
+     * Wait for query editor to be visible
+     * @param {number} timeout - Timeout in milliseconds (default: 30000)
+     */
+    async waitForQueryEditorVisible(timeout = 30000) {
+        await this.page.locator(this.queryEditor).waitFor({
+            state: 'visible',
+            timeout: timeout
+        });
+        testLogger.info('Monaco query editor is visible');
+    }
+
+    /**
      * Get timestamp cell values
      * @param {number} count - Number of timestamps to get (default: 5)
      */
@@ -4008,7 +4020,11 @@ export class LogsPage {
         const timestampCount = await timestampCells.count();
         const timestamps = [];
         for (let i = 0; i < Math.min(timestampCount, count); i++) {
-            const cellText = await timestampCells.nth(i).textContent();
+            let cellText = await timestampCells.nth(i).textContent();
+            cellText = cellText?.trim() || '';
+            // Strip expand button icon text that appears before the timestamp
+            // The cell contains both the expand icon ("chevron_right" or "expand_more") and the timestamp
+            cellText = cellText.replace(/^(chevron_right|expand_more|chevron_left|expand_less)/, '').trim();
             timestamps.push(cellText);
         }
         return timestamps;
