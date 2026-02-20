@@ -1067,8 +1067,22 @@ class="q-pr-sm q-pt-xs" />
               </q-btn-dropdown>
               </div>
               <div v-else class="tw:flex">
+                <!-- Cancel button when query is running -->
+                <q-btn
+                v-if="
+                  visualizeSearchRequestTraceIds.length > 0
+                "
+                data-test="logs-search-bar-visualize-cancel-btn"
+                dense
+                flat
+                :title="t('search.cancel')"
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                @click="cancelVisualizeQueries"
+                >{{ t("search.cancel") }}</q-btn
+              >
                 <!-- Main action button -->
                 <q-btn
+                  v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
                   dense
                   flat
@@ -1087,8 +1101,9 @@ class="q-pr-sm q-pt-xs" />
                   >
                   {{ (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t("search.generateQuery") : t("search.runQuery") }}
                 </q-btn>
-                <q-separator class="tw:h-[29px] tw:w-[1px]" />
+                <q-separator v-if="visualizeSearchRequestTraceIds.length === 0" class="tw:h-[29px] tw:w-[1px]" />
                 <q-btn-dropdown
+                  v-if="visualizeSearchRequestTraceIds.length === 0"
                   flat
                   class="tw:h-[29px] search-button-dropdown"
                   :class="[
