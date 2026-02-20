@@ -1232,26 +1232,27 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(3000);
 
-    // Expand first log row to see field details
-    if (await pm.logsPage.isFirstExpandMenuVisible()) {
-      await pm.logsPage.clickFirstExpandMenu();
-      await page.waitForTimeout(1000);
+    // Wait for and expand first log row to see field details (hard assertion - must be present)
+    await pm.logsPage.waitForLogsTable(15000);
+    const expandMenuVisible = await pm.logsPage.isFirstExpandMenuVisible();
+    expect(expandMenuVisible).toBe(true);
+    testLogger.info('✓ Expand menu is visible - proceeding with VRL field check');
 
-      // Look for include/exclude buttons on VRL fields
-      // VRL-generated fields should NOT have these buttons
-      const vrlFieldIncludeExcludeCount = await pm.logsPage.getVrlFieldIncludeExcludeCount('vrl_test_field');
+    await pm.logsPage.clickFirstExpandMenu();
+    await page.waitForTimeout(1000);
 
-      // PRIMARY ASSERTION: VRL fields should NOT have include/exclude buttons
-      expect(vrlFieldIncludeExcludeCount).toBe(0);
-      testLogger.info('✓ VRL-generated field does not have include/exclude buttons');
+    // Look for include/exclude buttons on VRL fields
+    // VRL-generated fields should NOT have these buttons
+    const vrlFieldIncludeExcludeCount = await pm.logsPage.getVrlFieldIncludeExcludeCount('vrl_test_field');
 
-      // Verify regular fields still have include/exclude buttons
-      const regularFieldCount = await pm.logsPage.getRegularIncludeExcludeCount();
+    // PRIMARY ASSERTION: VRL fields should NOT have include/exclude buttons
+    expect(vrlFieldIncludeExcludeCount).toBe(0);
+    testLogger.info('✓ VRL-generated field does not have include/exclude buttons');
 
-      if (regularFieldCount > 0) {
-        testLogger.info(`✓ Regular fields still have ${regularFieldCount} include/exclude buttons`);
-      }
-    }
+    // Verify regular fields still have include/exclude buttons
+    const regularFieldCount = await pm.logsPage.getRegularIncludeExcludeCount();
+    expect(regularFieldCount).toBeGreaterThan(0);
+    testLogger.info(`✓ Regular fields have ${regularFieldCount} include/exclude buttons`);
 
     testLogger.info('✓ PRIMARY CHECK PASSED: VRL fields do not show include/exclude icons');
   });
@@ -1303,15 +1304,16 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.expectLogsTableVisible();
     testLogger.info('✓ Logs table remains visible after query inspector interaction');
 
-    // PRIMARY ASSERTION 2: Table should still have rows (streaming may add more, but data should not be lost)
+    // PRIMARY ASSERTION 2: Row count should not decrease (streaming may add more, but data should not be lost)
     const finalRowCount = await pm.logsPage.getLogRowCount();
-    expect(finalRowCount).toBeGreaterThanOrEqual(0);
-    testLogger.info(`✓ Table has rows after query inspector interaction: ${finalRowCount}`);
+    expect(finalRowCount).toBeGreaterThanOrEqual(initialRowCount);
+    testLogger.info(`✓ Row count preserved: initial=${initialRowCount}, final=${finalRowCount}`);
 
     // PRIMARY ASSERTION 3: Table content should exist (not empty/cleared by query inspector)
     const finalLogsContent = await pm.logsPage.getLogsTableContent();
     expect(finalLogsContent).toBeTruthy();
-    testLogger.info('✓ Logs content exists after query inspector interaction');
+    expect(finalLogsContent.length).toBeGreaterThanOrEqual(initialLogsContent?.length || 0);
+    testLogger.info('✓ Logs content exists and was not truncated after query inspector interaction');
 
     testLogger.info('✓ PRIMARY CHECK PASSED: Query inspector does not mutate logs state (readonly flag working)');
   });
@@ -1358,13 +1360,17 @@ test.describe("Logs Regression Bugs", () => {
         const curr = new Date(timestamps[i]).getTime();
         if (prev < curr) {
           isDescending = false;
+          testLogger.warn(`Sort order broken at index ${i}: ${timestamps[i-1]} > ${timestamps[i]}`);
           break;
         }
       }
 
-      // Logs should be sorted (descending is default, but any consistent order is valid)
+      // ASSERTION: Must have at least 2 timestamps to verify sorting
       expect(timestamps.length).toBeGreaterThanOrEqual(2);
-      testLogger.info(`✓ Logs are sorted (descending: ${isDescending})`);
+
+      // PRIMARY ASSERTION: Logs must be sorted in descending order (newest first)
+      expect(isDescending).toBe(true);
+      testLogger.info(`✓ Logs are correctly sorted in descending order`);
     }
 
     // PRIMARY ASSERTION: Results should be displayed
@@ -1454,10 +1460,17 @@ test.describe("Logs Regression Bugs", () => {
     const lastRowFinalClasses = await lastRow.getAttribute('class') || '';
     testLogger.info(`Last row final state - classes: ${lastRowFinalClasses}`);
 
-    // PRIMARY ASSERTION 2: Last row should have CSS classes (not stripped by expand interaction)
-    // The row should maintain its styling - checking it has any table row class
-    expect(lastRowFinalClasses.length).toBeGreaterThan(0);
-    testLogger.info('✓ Last row maintained its styling (has CSS classes)');
+    // PRIMARY ASSERTION 2: Last row should retain its original styling classes
+    // Compare that the classes from before expansion are still present
+    expect(lastRowFinalClasses).toBeTruthy();
+    // The row's classes should be preserved (either same or contain original classes)
+    const originalClassSet = new Set(lastRowClasses.split(/\s+/).filter(c => c));
+    const finalClassSet = new Set(lastRowFinalClasses.split(/\s+/).filter(c => c));
+    const classesPreserved = [...originalClassSet].every(cls => finalClassSet.has(cls)) ||
+                             lastRowFinalClasses.includes('table-row') ||
+                             lastRowFinalClasses.includes('hover');
+    expect(classesPreserved).toBe(true);
+    testLogger.info(`✓ Last row preserved styling: original had ${originalClassSet.size} classes, final has ${finalClassSet.size}`);
 
     // Close the expanded row
     await pm.logsPage.pressEscapeToCloseDialog();

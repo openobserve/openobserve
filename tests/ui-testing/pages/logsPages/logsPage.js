@@ -246,7 +246,9 @@ export class LogsPage {
         this.searchResultText = '[data-test="logs-search-search-result"]';
         this.vrlEditorMonaco = '#fnEditor .monaco-editor';
         this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
-        this.vrlFieldIncludeExcludeBtn = (fieldName) => `[data-test*="${fieldName}"] [data-test="log-details-include-exclude-field-btn"]`;
+        // Use exact match with word boundaries to avoid matching partial field names
+        // e.g., "vrl_test_field" should not match "vrl_test_field_extra"
+        this.vrlFieldIncludeExcludeBtn = (fieldName) => `[data-test="log-expand-detail-key-${fieldName}"] ~ [data-test="log-details-include-exclude-field-btn"], [data-test$="-${fieldName}"] [data-test="log-details-include-exclude-field-btn"]`;
     }
 
 
