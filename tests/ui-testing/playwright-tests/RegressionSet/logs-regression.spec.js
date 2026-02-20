@@ -1264,7 +1264,7 @@ test.describe("Logs Regression Bugs", () => {
     }
     // Most rows at same index should match (some tolerance for streaming)
     const matchRatio = sameIndexMatches / rowsToCompare;
-    expect(matchRatio, `Row content was mutated. Only ${sameIndexMatches}/${rowsToCompare} rows match at same index`).toBeGreaterThanOrEqual(0.5);
+    expect(matchRatio, `Row content was mutated. Only ${sameIndexMatches}/${rowsToCompare} rows match at same index`).toBeGreaterThanOrEqual(0.8);
     testLogger.info(`✓ Content integrity: ${sameIndexMatches}/${rowsToCompare} rows match at same index (${Math.round(matchRatio * 100)}%)`);
 
     // Also verify row count didn't decrease
@@ -1481,7 +1481,7 @@ test.describe("Logs Regression Bugs", () => {
     if (addedClasses.length > 0) testLogger.info(`Added classes: ${addedClasses.join(', ')}`);
 
     // Look for specific highlight/selection-related classes (known patterns in the app)
-    const highlightPatterns = ['selected', 'highlight', 'active', 'bg-', 'expanded'];
+    const highlightPatterns = ['selected', 'highlight', 'active', 'bg-'];
     const originalHighlightClasses = [...originalClassSet].filter(cls =>
       highlightPatterns.some(pattern => cls.toLowerCase().includes(pattern))
     );
