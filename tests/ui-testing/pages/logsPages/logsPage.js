@@ -247,7 +247,7 @@ export class LogsPage {
         this.vrlEditorMonaco = '#fnEditor .monaco-editor';
         this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
         // Selector for include/exclude button associated with a specific field
-        // Uses parent container approach to ensure we only match the button for this field
+        // Uses adjacent sibling combinator (+) to match only the immediately following button
         this.vrlFieldIncludeExcludeBtn = (fieldName) => `[data-test="log-expand-detail-key-${fieldName}"] + [data-test="log-details-include-exclude-field-btn"]`;
     }
 

@@ -1488,6 +1488,9 @@ test.describe("Logs Regression Bugs", () => {
     if (missingClasses.length > 0) testLogger.info(`Missing classes: ${missingClasses.join(', ')}`);
     if (addedClasses.length > 0) testLogger.info(`Added classes: ${addedClasses.join(', ')}`);
 
+    // Guard: Ensure we have meaningful classes to compare (not vacuously true)
+    expect(originalClassSet.size, 'Last row should have styling classes beyond generic table classes').toBeGreaterThan(0);
+
     // The original classes should be preserved in the final state
     const classesPreserved = [...originalClassSet].every(cls => finalClassSet.has(cls));
     expect(classesPreserved, `Last row lost classes after expanding different row. Missing: ${missingClasses.join(', ')}`).toBe(true);
