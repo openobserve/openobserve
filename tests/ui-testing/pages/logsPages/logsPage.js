@@ -3851,6 +3851,41 @@ export class LogsPage {
     }
 
     /**
+     * Disable auto refresh by clicking the off button
+     */
+    async disableAutoRefresh() {
+        await this.clickLiveModeButton();
+        await this.page.waitForTimeout(500);
+        const offButton = this.page.locator('[data-test="logs-search-bar-refresh-time-0"]');
+        if (await offButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await offButton.click();
+        }
+        await this.page.waitForTimeout(500);
+    }
+
+    // ========== BUG REGRESSION TEST METHODS ==========
+
+    /**
+     * Expect refresh button to be visible
+     * Bug #8928 - UI consistency
+     */
+    async expectRefreshButtonVisible() {
+        const button = this.page.locator(this.queryButton);
+        await expect(button).toBeVisible({ timeout: 10000 });
+        testLogger.info('Refresh button is visible');
+    }
+
+    /**
+     * Expect refresh button to be enabled
+     * Bug #9533 - Loading states
+     */
+    async expectRefreshButtonEnabled() {
+        const button = this.page.locator(this.queryButton);
+        await expect(button).toBeEnabled({ timeout: 10000 });
+        testLogger.info('Refresh button is enabled');
+    }
+
+    /**
      * Expect stream selector to be visible
      * Bug #8928 - UI consistency
      */
