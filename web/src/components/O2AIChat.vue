@@ -375,55 +375,6 @@
                         class="expand-icon"
                       />
                     </div>
-                    <!-- Inline confirmation buttons -->
-                    <div v-if="block.pendingConfirmation" class="tool-confirmation-inline" @click.stop>
-                      <span class="confirmation-message">{{ block.confirmationMessage }}</span>
-                      <!-- Navigation confirmation: show destination details -->
-                      <div v-if="block.tool === 'create_navigation' && block.confirmationArgs" class="confirmation-args">
-                        <div v-if="block.confirmationArgs.resource_type" class="confirmation-arg">
-                          <span class="arg-key">Destination:</span>
-                          <code class="arg-value">{{ block.confirmationArgs.resource_type }}</code>
-                        </div>
-                        <div v-if="block.confirmationArgs.target && block.confirmationArgs.target.query" class="confirmation-arg">
-                          <span class="arg-key">Query:</span>
-                          <code class="arg-value">{{ block.confirmationArgs.target.query }}</code>
-                        </div>
-                        <div v-if="block.confirmationArgs.target && block.confirmationArgs.target.stream" class="confirmation-arg">
-                          <span class="arg-key">Stream:</span>
-                          <code class="arg-value">{{ Array.isArray(block.confirmationArgs.target.stream) ? block.confirmationArgs.target.stream.join(', ') : block.confirmationArgs.target.stream }}</code>
-                        </div>
-                      </div>
-                      <!-- Generic tool confirmation: show all args -->
-                      <div v-else-if="block.confirmationArgs && Object.keys(block.confirmationArgs).length" class="confirmation-args">
-                        <div v-for="(value, key) in block.confirmationArgs" :key="key" class="confirmation-arg">
-                          <span class="arg-key">{{ key }}:</span>
-                          <code class="arg-value">{{ typeof value === 'object' ? JSON.stringify(value) : value }}</code>
-                        </div>
-                      </div>
-                      <div class="confirmation-buttons">
-                        <q-btn
-                          dense
-                          no-caps
-                          size="sm"
-                          outline
-                          :color="block.tool === 'create_navigation' ? 'primary' : 'grey'"
-                          :label="block.tool === 'create_navigation' ? 'Navigate' : 'Confirm'"
-                          :icon="block.tool === 'create_navigation' ? 'open_in_new' : 'check'"
-                          class="confirmation-btn"
-                          @click="handleToolConfirm"
-                        />
-                        <q-btn
-                          dense
-                          no-caps
-                          size="sm"
-                          color="negative"
-                          label="Cancel"
-                          icon="close"
-                          class="confirmation-btn"
-                          @click="handleToolCancel"
-                        />
-                      </div>
-                    </div>
                     <!-- Expandable details -->
                     <div v-if="isToolCallExpanded(index, blockIndex)" class="tool-call-details" @click.stop>
                       <!-- Error details for failed tool calls -->
@@ -829,6 +780,15 @@
       </div>
 
       <div class="chat-input-container q-ma-md">
+        <!-- Confirmation dialog -->
+        <O2AIConfirmDialog
+          :visible="pendingConfirmation !== null"
+          :confirmation="pendingConfirmation"
+          @confirm="handleToolConfirm"
+          @cancel="handleToolCancel"
+          @always-confirm="handleToolAlwaysConfirm"
+        />
+
         <!-- Hidden file input for image upload -->
         <input
           ref="imageInputRef"
@@ -840,6 +800,7 @@
         />
 
         <div
+          v-if="!pendingConfirmation"
           class="unified-input-box"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
           @dragover="handleDragOver"
@@ -887,20 +848,45 @@
 
           <!-- Bottom bar with buttons -->
           <div class="input-bottom-bar">
-            <!-- Image upload button -->
-            <q-btn
-              v-if="!isLoading"
-              @click.stop="triggerImageUpload"
-              round
-              dense
-              flat
-              size="sm"
-              class="image-upload-btn"
-            >
-              <q-icon name="image" size="18px" :color="store.state.theme == 'dark' ? 'white' : 'grey-7'" />
-              <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
-            </q-btn>
-            <div v-else class="tw:w-8"></div>
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <!-- Image upload button -->
+              <q-btn
+                v-if="!isLoading"
+                @click.stop="triggerImageUpload"
+                round
+                dense
+                flat
+                size="sm"
+                class="image-upload-btn"
+              >
+                <q-icon name="image" size="18px" :color="store.state.theme == 'dark' ? 'white' : 'grey-7'" />
+                <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
+              </q-btn>
+              <div v-else class="tw:w-8"></div>
+
+              <!-- Auto navigation toggle button -->
+              <q-btn
+                v-if="!isLoading"
+                @click.stop="isAutoNavigationEnabled = !isAutoNavigationEnabled"
+                dense
+                flat
+                no-caps
+                size="sm"
+                class="auto-nav-toggle-btn"
+                :class="{ 'auto-nav-enabled': isAutoNavigationEnabled }"
+              >
+                <q-icon
+                  :name="isAutoNavigationEnabled ? 'check_circle' : 'radio_button_unchecked'"
+                  size="14px"
+                  :color="!isAutoNavigationEnabled ? (store.state.theme == 'dark' ? 'grey-5' : 'grey-7') : undefined"
+                  class="auto-nav-icon"
+                />
+                <span class="auto-nav-label tw:ml-1">Auto Navigation</span>
+                <q-tooltip>
+                  {{ isAutoNavigationEnabled ? 'Auto navigation enabled - O2 Assistant will auto navigate without confirmation' : 'Auto navigation disabled - O2 Assistant will ask before navigating' }}
+                </q-tooltip>
+              </q-btn>
+            </div>
 
             <div class="tw:flex tw:items-center tw:gap-2">
               <!-- Send button - shown when not loading -->
@@ -954,6 +940,7 @@ import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, NavigationAction, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
+import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
 
 // Add IndexedDB setup
 const DB_NAME = 'o2ChatDB';
@@ -1019,6 +1006,7 @@ export default defineComponent({
   components: {
     ConfirmDialog,
     RichTextInput,
+    O2AIConfirmDialog,
   },
   props: {
     isOpen: {
@@ -1076,6 +1064,30 @@ export default defineComponent({
 
     // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
     const pendingConfirmation = ref<{ tool: string; args: Record<string, any>; message: string } | null>(null);
+
+    // Auto navigation state - per chat ID
+    // Stores chat ID -> boolean mapping for auto navigation preference
+    const autoNavigationPreferences = ref<Map<number, boolean>>(new Map());
+
+    // Pending auto navigation preference for new chats (before chat ID is created)
+    const pendingAutoNavigation = ref(false);
+
+    // Current chat's auto navigation state
+    const isAutoNavigationEnabled = computed({
+      get: () => {
+        if (!currentChatId.value) return pendingAutoNavigation.value;
+        return autoNavigationPreferences.value.get(currentChatId.value) ?? false;
+      },
+      set: (value: boolean) => {
+        if (currentChatId.value) {
+          autoNavigationPreferences.value.set(currentChatId.value, value);
+          saveAutoNavigationPreferences();
+        } else {
+          // Store temporarily for new chats
+          pendingAutoNavigation.value = value;
+        }
+      }
+    });
 
     // AI-generated chat title state
     const aiGeneratedTitle = ref<string | null>(null);
@@ -1603,6 +1615,26 @@ export default defineComponent({
 
                   // Handle confirmation_required events - add inline confirmation block in chat
                   if (data && data.type === 'confirmation_required') {
+                    // Check if this is a navigation action and auto navigation is enabled
+                    if (data.tool === 'navigation_action' && isAutoNavigationEnabled.value) {
+                      // Auto-approve navigation without showing confirmation
+                      try {
+                        const orgId = store.state.selectedOrganization.identifier;
+                        await fetch(
+                          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
+                          {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ approved: true }),
+                          }
+                        );
+                      } catch (error) {
+                        console.error('Error auto-confirming navigation:', error);
+                      }
+                      continue;
+                    }
+
                     // data.message is always set by the backend:
                     // - Navigation: validated label (e.g. "View in Logs")
                     // - Other tools: "Confirm execution of {tool}?"
@@ -1842,7 +1874,7 @@ export default defineComponent({
                     continue;
                   }
 
-                  // Handle navigation_action events - always navigate immediately
+                  // Handle navigation_action events - check auto navigation setting
                   // (clickable buttons on tool results are generated by frontend from tool_result data)
                   if (data && data.type === 'navigation_action') {
                     const navAction: NavigationAction = {
@@ -1851,7 +1883,50 @@ export default defineComponent({
                       label: data.label,
                       target: data.target,
                     };
-                    await handleNavigationAction(navAction);
+
+                    // Check if auto navigation is enabled
+                    if (isAutoNavigationEnabled.value) {
+                      // Auto-navigate without confirmation
+                      await handleNavigationAction(navAction);
+                    } else {
+                      // Show confirmation dialog
+                      // Store the navigation action for later use
+                      const confirmBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: 'navigation_action',
+                        message: data.label || 'Navigate',
+                        context: { navAction },
+                        pendingConfirmation: true,
+                        confirmationMessage: data.label,
+                        confirmationArgs: data.target || {},
+                      };
+                      activeToolCall.value = null;
+
+                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(confirmBlock);
+                      } else {
+                        chatMessages.value.push({
+                          role: 'assistant',
+                          content: '',
+                          contentBlocks: [...pendingToolCalls.value, confirmBlock],
+                        });
+                        pendingToolCalls.value = [];
+                      }
+
+                      // Set pending confirmation with navigation action data
+                      pendingConfirmation.value = {
+                        tool: 'navigation_action',
+                        args: data.target || {},
+                        message: data.label || 'Navigate',
+                      };
+
+                      // Store the navigation action for later execution
+                      (pendingConfirmation.value as any).navAction = navAction;
+
+                      await scrollToBottom();
+                    }
                     continue;
                   }
 
@@ -2363,6 +2438,12 @@ export default defineComponent({
         request.onsuccess = (event: Event) => {
           if (!currentChatId.value) {
             currentChatId.value = (event.target as IDBRequest).result as number;
+
+            // Apply pending auto navigation preference to the new chat
+            if (pendingAutoNavigation.value && currentChatId.value) {
+              autoNavigationPreferences.value.set(currentChatId.value, true);
+              saveAutoNavigationPreferences();
+            }
           }
         };
       } catch (error) {
@@ -2452,6 +2533,7 @@ export default defineComponent({
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
       resetTitleState(); // Clear AI-generated title for new chat
       resetTypewriterState(); // Clear typewriter animation state for new chat
+      pendingAutoNavigation.value = false; // Reset auto navigation for new chat
       store.dispatch('setCurrentChatTimestamp', null);
       store.dispatch('setChatUpdated', true);
     };
@@ -2577,6 +2659,17 @@ export default defineComponent({
 
     const handleToolConfirm = async () => {
       resolveConfirmationBlock(true);
+
+      // Check if this is a navigation action
+      if (pendingConfirmation.value?.tool === 'navigation_action') {
+        const navAction = (pendingConfirmation.value as any).navAction;
+        if (navAction) {
+          await handleNavigationAction(navAction);
+        }
+        pendingConfirmation.value = null;
+        return;
+      }
+
       if (!currentSessionId.value) return;
 
       try {
@@ -2598,6 +2691,14 @@ export default defineComponent({
 
     const handleToolCancel = async () => {
       resolveConfirmationBlock(false);
+
+      // Check if this is a navigation action
+      if (pendingConfirmation.value?.tool === 'navigation_action') {
+        // Just clear the confirmation, don't navigate
+        pendingConfirmation.value = null;
+        return;
+      }
+
       if (!currentSessionId.value) return;
 
       try {
@@ -2613,6 +2714,42 @@ export default defineComponent({
         );
       } catch (error) {
         console.error('Error cancelling action:', error);
+      }
+      pendingConfirmation.value = null;
+    };
+
+    const handleToolAlwaysConfirm = async () => {
+      // Enable auto navigation for this chat
+      isAutoNavigationEnabled.value = true;
+
+      // Then proceed with confirmation
+      resolveConfirmationBlock(true);
+
+      // Check if this is a navigation action
+      if (pendingConfirmation.value?.tool === 'navigation_action') {
+        const navAction = (pendingConfirmation.value as any).navAction;
+        if (navAction) {
+          await handleNavigationAction(navAction);
+        }
+        pendingConfirmation.value = null;
+        return;
+      }
+
+      if (!currentSessionId.value) return;
+
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ approved: true }),
+          }
+        );
+      } catch (error) {
+        console.error('Error confirming action:', error);
       }
       pendingConfirmation.value = null;
     };
@@ -2771,6 +2908,14 @@ export default defineComponent({
       // Helper to encode strings for URL (same as search history)
       const encodeForUrl = (str: string) => btoa(unescape(encodeURIComponent(str)));
 
+      // Extract page name for success message
+      let pageName = action.label || '';
+      if (!pageName) {
+        // Fallback: use target name or resource type
+        pageName = action.target.name ||
+                   action.resource_type.charAt(0).toUpperCase() + action.resource_type.slice(1);
+      }
+
       if (action.action === 'load_query') {
         const targetPath = `/${action.resource_type}`;
         const target = action.target;
@@ -2857,6 +3002,34 @@ export default defineComponent({
 
         await router.push({ path, query: queryParams });
       }
+
+      // Add success message to chat after navigation
+      const successMessage = `Successfully navigated to ${pageName}`;
+      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+
+      if (!lastMessage || lastMessage.role !== 'assistant') {
+        // Create new assistant message
+        chatMessages.value.push({
+          role: 'assistant',
+          content: successMessage,
+          contentBlocks: [{ type: 'text', text: successMessage }]
+        });
+      } else {
+        // Append to existing assistant message
+        if (lastMessage.content) {
+          lastMessage.content += '\n\n' + successMessage;
+        } else {
+          lastMessage.content = successMessage;
+        }
+        if (!lastMessage.contentBlocks) {
+          lastMessage.contentBlocks = [];
+        }
+        lastMessage.contentBlocks.push({ type: 'text', text: successMessage });
+      }
+
+      // Save to history and scroll to bottom
+      await saveToHistory();
+      await scrollToBottom();
     };
 
     const confirmClearAllConversations = async () => {
@@ -3564,6 +3737,31 @@ export default defineComponent({
       }
     };
 
+    // Auto navigation preferences localStorage functions
+    const AUTO_NAV_KEY = 'ai-chat-auto-navigation';
+
+    const loadAutoNavigationPreferences = () => {
+      try {
+        const stored = localStorage.getItem(AUTO_NAV_KEY);
+        if (stored) {
+          const data = JSON.parse(stored);
+          autoNavigationPreferences.value = new Map(Object.entries(data).map(([k, v]) => [parseInt(k), v as boolean]));
+        }
+      } catch (error) {
+        console.error('Error loading auto navigation preferences:', error);
+        autoNavigationPreferences.value = new Map();
+      }
+    };
+
+    const saveAutoNavigationPreferences = () => {
+      try {
+        const data = Object.fromEntries(autoNavigationPreferences.value);
+        localStorage.setItem(AUTO_NAV_KEY, JSON.stringify(data));
+      } catch (error) {
+        console.error('Error saving auto navigation preferences:', error);
+      }
+    };
+
     // Add query to history
     const addToHistory = (query: string) => {
       const trimmedQuery = query.trim();
@@ -3625,6 +3823,9 @@ export default defineComponent({
 
       // Load query history from localStorage
       loadQueryHistory();
+
+      // Load auto navigation preferences from localStorage
+      loadAutoNavigationPreferences();
     });
 
     onUnmounted(()=>{
@@ -4178,7 +4379,10 @@ export default defineComponent({
       pendingConfirmation,
       handleToolConfirm,
       handleToolCancel,
+      handleToolAlwaysConfirm,
       handleNavigationAction,
+      // Auto navigation
+      isAutoNavigationEnabled,
       processedMessages,
       pendingToolCalls,
       processTextBlock,
@@ -4481,6 +4685,7 @@ export default defineComponent({
   }
 
   .chat-input-container {
+    position: relative;
     flex-shrink: 0;
     max-width: 900px;
     width: calc(100% - 0px);
@@ -4531,6 +4736,46 @@ export default defineComponent({
     align-items: center;
     justify-content: space-between;
     padding-top: 8px;
+  }
+
+  .auto-nav-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+
+    .auto-nav-label {
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    &:hover {
+      .light-mode & {
+        background: #f3f4f6;
+      }
+      .dark-mode & {
+        background: #374151;
+      }
+    }
+
+    &.auto-nav-enabled {
+      .auto-nav-icon {
+        color: var(--q-primary) !important;
+      }
+
+      .auto-nav-label {
+        color: var(--q-primary);
+      }
+    }
+
+    .light-mode & .auto-nav-label {
+      color: #6b7280;
+    }
+    .dark-mode & .auto-nav-label {
+      color: #9ca3af;
+    }
   }
 
 
@@ -5351,78 +5596,22 @@ export default defineComponent({
   }
 
   .tool-confirmation-inline {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 193, 7, 0.3);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    margin-top: 12px;
 
-    .confirmation-message {
-      font-size: 13px;
-      font-weight: 500;
-
-      .light-mode & {
-        color: #6d5800;
-      }
-      .dark-mode & {
-        color: #ffd54f;
-      }
-    }
-
-    .confirmation-args {
+    .confirmation-content {
+      padding: 16px;
+      border-radius: 8px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      padding: 6px 10px;
-      border-radius: 4px;
+      gap: 12px;
 
       .light-mode & {
-        background: rgba(255, 193, 7, 0.08);
+        background: #fffbeb;
+        border: 1px solid #fde68a;
       }
       .dark-mode & {
-        background: rgba(255, 193, 7, 0.06);
-      }
-
-      .confirmation-arg {
-        display: flex;
-        align-items: baseline;
-        gap: 6px;
-        font-size: 12px;
-
-        .arg-key {
-          font-weight: 600;
-          white-space: nowrap;
-
-          .light-mode & {
-            color: #6d5800;
-          }
-          .dark-mode & {
-            color: #ffd54f;
-          }
-        }
-
-        .arg-value {
-          font-family: 'Fira Code', 'Consolas', monospace;
-          word-break: break-all;
-
-          .light-mode & {
-            color: #4a5568;
-          }
-          .dark-mode & {
-            color: #e2e8f0;
-          }
-        }
-      }
-    }
-
-    .confirmation-buttons {
-      display: flex;
-      gap: 8px;
-
-      .confirmation-btn {
-        font-size: 12px;
-        padding: 2px 12px;
+        background: rgba(251, 191, 36, 0.15);
+        border: 1px solid rgba(251, 191, 36, 0.3);
       }
     }
   }
