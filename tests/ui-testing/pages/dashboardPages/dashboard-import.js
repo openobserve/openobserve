@@ -12,6 +12,7 @@ export default class DashboardImport {
   async clickImportDashboard() {
     await this.importButton.waitFor({ state: "visible", timeout: 15000 });
     await this.importButton.click();
+    // In v0.40.0, import button navigates directly to import page (no dropdown)
     await this.page.locator('[data-test="tab-import_json_file"]').waitFor({ state: "visible", timeout: 10000 });
     await this.inputFile.waitFor({ state: "attached", timeout: 10000 });
   }
@@ -131,7 +132,7 @@ export default class DashboardImport {
       await dashboardRow.waitFor({ state: "detached", timeout: 10000 });
     } catch {
       try {
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
       } catch {
         try {
           await dashboardRow.waitFor({ state: "hidden", timeout: 5000 });

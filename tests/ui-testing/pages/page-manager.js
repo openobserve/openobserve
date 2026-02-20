@@ -32,6 +32,7 @@ import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
 import { MetricsPage } from "./metricsPages/metricsPage.js";
+import { MetricsQueryEditorPage } from "./metricsPages/metricsQueryEditorPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { RumPage } from "./logsPages/rumPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
@@ -59,6 +60,7 @@ import UnflattenedPage from "./logsPages/unflattened.js";
 import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
 import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
 import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
+
 
 class PageManager {
   /**
@@ -106,6 +108,7 @@ class PageManager {
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
     this.metricsPage = new MetricsPage(page);
+    this.metricsQueryEditorPage = new MetricsQueryEditorPage(page);
     this.tracesPage = new TracesPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);

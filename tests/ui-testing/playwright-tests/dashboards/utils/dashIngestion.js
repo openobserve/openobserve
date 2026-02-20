@@ -3,7 +3,7 @@ import logsdata from "../../../../test-data/logs_data.json";
 import geoMapdata from "../../../../test-data/geo_map.json";
 import dashboardChartJsonData from "../../../../test-data/dashboard_chart_json.json";
 // Fixed testLogger path - updated to use correct relative path
-import testLogger from '../../utils/test-logger.js';
+const testLogger = require('../../utils/test-logger.js');
 
 // Exported function to remove UTF characters
 const removeUTFCharacters = (text) => {

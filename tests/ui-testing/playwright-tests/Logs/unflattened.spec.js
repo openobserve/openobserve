@@ -500,7 +500,6 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Verifying timestamp field is visible (final verification)');
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
     await pageManager.unflattenedPage.logTableRowExpandMenu.click();
-    await page.waitForTimeout(500);
 
     testLogger.info('Opening log source details');
     await pageManager.unflattenedPage.logSourceColumn.waitFor();
