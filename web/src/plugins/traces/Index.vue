@@ -780,8 +780,11 @@ async function getQueryData() {
               };
             }
             searchObj.data.queryResults.hits.push(...formattedHits);
+            // Use backend total when available (cumulative across partitions);
+            // fall back to hits.length only if not provided.
+            const backendTotal = response.content?.results?.total;
             searchObj.data.queryResults.total =
-              searchObj.data.queryResults.hits.length;
+              backendTotal != null ? backendTotal : searchObj.data.queryResults.hits.length;
 
             updateFieldValues(rawHits);
             updateGridColumns();

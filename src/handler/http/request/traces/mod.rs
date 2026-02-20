@@ -906,12 +906,12 @@ async fn process_latest_traces_stream(
         format!("{query_sql_base} WHERE {filter} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
     };
 
-    // Build a base search request to get partitions
+    // Build a base search request. from/size are set per-partition; leave at 0 here.
     let base_req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql.clone(),
-            from,
-            size,
+            from: 0,
+            size: 0,
             start_time,
             end_time,
             quick_mode: false,
@@ -984,10 +984,17 @@ async fn process_latest_traces_stream(
 
     // `from` is a global offset: skip the first `from` hits across all partitions,
     // then deliver `size` hits. We track how many we've seen and delivered so far.
-    let mut hits_seen: i64 = 0; // total hits seen across all partitions so far
+    //
+    // NOTE: partition boundaries come from search_partition() which is sensitive to querier
+    // node count. Boundaries can shift between requests, so `from`-based pagination may
+    // produce overlapping or missing results if cluster topology changes between page requests.
+    // For stable pagination, callers should use time-based cursors (end_time of last seen trace).
+    let mut hits_seen: i64 = 0; // hits returned by Q1 across all partitions (may be truncated by fetch_size)
     let hits_to_skip = from; // global offset
     let hits_to_deliver = size; // how many the caller wants after the offset
     let mut hits_delivered: i64 = 0; // how many we've actually sent
+    let mut total_across_partitions: usize = 0; // cumulative total count for UI display
+    let mut range_error_sent = false; // send range_error only once
 
     for (idx, partition) in partitions_desc.iter().enumerate() {
         if sender.is_closed() {
@@ -1000,10 +1007,12 @@ async fn process_latest_traces_stream(
         let p_start = partition[0];
         let p_end = partition[1];
 
-        // Ask for enough rows to cover remaining offset + remaining needed
+        // Ask for enough rows to cover remaining offset + remaining needed,
+        // capped at query_default_limit (default 1000) to prevent oversized Q1 scans.
         let remaining_to_skip = (hits_to_skip - hits_seen).max(0);
         let remaining_needed = hits_to_deliver - hits_delivered;
-        let fetch_size = remaining_to_skip + remaining_needed;
+        let fetch_size = (remaining_to_skip + remaining_needed)
+            .min(get_config().limit.query_default_limit);
 
         // ---------- Query 1: aggregate over this partition ----------
         let mut req1 = base_req.clone();
@@ -1034,6 +1043,13 @@ async fn process_latest_traces_stream(
                 return;
             }
         };
+
+        // Use agg_res.total (actual matching trace count from backend) for hits_seen,
+        // not agg_res.hits.len() which is truncated by fetch_size. This ensures
+        // skip_in_partition is computed correctly even when fetch_size < actual matches.
+        let partition_total = agg_res.total as i64;
+        total_across_partitions += agg_res.total;
+        hits_seen += partition_total;
 
         if agg_res.hits.is_empty() {
             let progress = ((idx + 1) * 100) / total_partitions;
@@ -1097,9 +1113,20 @@ async fn process_latest_traces_stream(
             );
         }
 
-        let trace_ids_str = traces_data.keys().cloned().collect::<Vec<_>>().join("','");
+        // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
+        // Trace IDs originate from ingested data and could contain injected SQL if not validated.
+        let sanitized_ids: Vec<String> = traces_data
+            .keys()
+            .map(|tid| {
+                tid.chars()
+                    .filter(|c| c.is_ascii_hexdigit() || *c == '-')
+                    .collect::<String>()
+            })
+            .filter(|tid| !tid.is_empty())
+            .collect();
+        let trace_ids_str = sanitized_ids.join("','");
         let detail_sql = format!(
-            "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status \
+            "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, span_status \
              FROM \"{stream_name}\" WHERE trace_id IN ('{trace_ids_str}') ORDER BY {TIMESTAMP_COL_NAME} ASC"
         );
 
@@ -1204,11 +1231,14 @@ async fn process_latest_traces_stream(
         let mut partition_hits: Vec<&TraceResponseItem> = traces_data.values().collect();
         partition_hits.sort_by(|a, b| b.start_time.cmp(&a.start_time));
 
-        // Apply global offset: skip hits until we've seen `hits_to_skip` total,
-        // then deliver up to `hits_to_deliver` hits.
-        let partition_count = partition_hits.len() as i64;
-        let skip_in_partition = (hits_to_skip - hits_seen).max(0).min(partition_count);
-        hits_seen += partition_count;
+        // Apply global offset: hits_seen already includes this partition's total (set above).
+        // Compute how many of this partition's hits to skip based on cumulative offset.
+        // hits_seen = sum of partition_total for partitions processed so far (including current).
+        // Hits seen *before* this partition = hits_seen - partition_total.
+        let hits_seen_before = hits_seen - partition_total;
+        let skip_in_partition = (hits_to_skip - hits_seen_before)
+            .max(0)
+            .min(partition_hits.len() as i64);
 
         let deliverable: Vec<serde_json::Value> = partition_hits
             .iter()
@@ -1231,8 +1261,12 @@ async fn process_latest_traces_stream(
         for h in deliverable {
             results.add_hit(&h);
         }
-        if !range_error.is_empty() {
+        // Set total so the frontend can display "N of M" correctly.
+        results.set_total(total_across_partitions);
+        // Send range_error only once (with the first batch of hits).
+        if !range_error.is_empty() && !range_error_sent {
             results.function_error.push(range_error.clone());
+            range_error_sent = true;
         }
 
         let progress = ((idx + 1) * 100) / total_partitions;
