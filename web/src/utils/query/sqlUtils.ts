@@ -430,8 +430,8 @@ function extractJoinConditions(onClause: any, conditions: any[]): void {
       // Recurse into left and right
       extractJoinConditions(onClause.left, conditions);
       extractJoinConditions(onClause.right, conditions);
-    } else if (onClause.operator === "=") {
-      // This is a join condition like "a.field = b.field"
+    } else if (["=", "!=", "<>", ">", "<", ">=", "<="].includes(onClause.operator)) {
+      // Comparison condition like "a.field = b.field" or "a.field >= b.field"
       const leftField = {
         streamAlias: onClause.left?.table || null,
         field: onClause.left?.column?.expr?.value || onClause.left?.column || "",
@@ -441,10 +441,13 @@ function extractJoinConditions(onClause: any, conditions: any[]): void {
         field: onClause.right?.column?.expr?.value || onClause.right?.column || "",
       };
 
+      // Normalize "<>" to "!=" for consistency
+      const operation = onClause.operator === "<>" ? "!=" : onClause.operator;
+
       conditions.push({
         leftField,
         rightField,
-        operation: "=",
+        operation,
       });
     }
   }
