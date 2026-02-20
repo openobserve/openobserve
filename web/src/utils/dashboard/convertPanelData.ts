@@ -69,7 +69,7 @@ export const convertPanelData = async (
         !query?.fields?.breakdown?.length
       ) {
         throw new Error(
-          "Please select X-Axis or Y-Axis fields to render the chart",
+          "Please select required fields to render the chart",
         );
       }
 
