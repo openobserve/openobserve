@@ -143,7 +143,6 @@ const getConfig = async () => {
         beforeSend: (log) => {
           // Filter out specific logs before sending
           const logMessage = log.message || "";
-          const logStatus = log.status || "";
 
           // List of log patterns to ignore
           const ignoredLogPatterns = [/ResizeObserver loop/i];
@@ -155,14 +154,6 @@ const getConfig = async () => {
 
           if (shouldIgnore) {
             return false; // Don't send this log
-          }
-
-          // Filter by log level - ignore debug logs in production
-          if (
-            options.env === "production" &&
-            (logStatus === "debug" || log.level === "debug")
-          ) {
-            return false;
           }
 
           // Allow all other logs to be sent
