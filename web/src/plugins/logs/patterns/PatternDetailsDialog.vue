@@ -303,7 +303,9 @@ const variableColumns = [
 
 <style lang="scss">
 @import "@/assets/styles/log-highlighting.css";
+</style>
 
+<style scoped lang="scss">
 .pattern-detail-text {
   font-family: monospace;
 }
