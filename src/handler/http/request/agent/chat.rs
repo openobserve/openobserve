@@ -139,6 +139,7 @@ pub async fn agent_chat(
                 )
             },
             user_token: None,
+            images: None,
         };
 
         // Query agent
@@ -223,6 +224,7 @@ pub async fn agent_chat_stream(
                 )
             },
             user_token: None,
+            images: None,
         };
 
         // Create streaming response with immediate feedback

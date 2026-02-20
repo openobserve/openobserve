@@ -48,6 +48,9 @@ const mockStore = {
     selectedOrganization: {
       identifier: "test-org",
     },
+    zoConfig: {
+      service_streams_enabled: true,
+    },
   },
 };
 
@@ -147,8 +150,9 @@ describe("SettingsIndex", () => {
     vi.clearAllMocks();
     mockStore.state.theme = "light";
     mockStore.state.selectedOrganization = { identifier: "test-org" };
+    mockStore.state.zoConfig = { service_streams_enabled: true };
     mockRouterPush.mockClear();
-    
+
     // Set up router state
     await router.push('/');
   });

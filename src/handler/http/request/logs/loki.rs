@@ -54,6 +54,9 @@ use crate::{
         (status = 204, description = "Success - logs ingested successfully"),
         (status = 400, description = "Bad Request - Possible causes: empty stream data, invalid labels format (e.g., empty labels), invalid timestamp format (e.g., non-numeric timestamp), unsupported content type (only application/json and application/x-protobuf supported), unsupported content encoding (only gzip for JSON and snappy for Protobuf), protobuf decode errors, JSON parsing errors, or compression/decompression failures", content_type = "text/plain", body = String),
         (status = 500, description = "Internal Server Error - Server error during log processing", content_type = "text/plain", body = String),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/loki/api/v1/push")]

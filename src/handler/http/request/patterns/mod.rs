@@ -56,7 +56,8 @@ use crate::{
         (status = 500, description = "Internal Server Error"),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Extract log patterns", "category": "patterns"}))
     )
 )]
 #[post("/{org_id}/streams/{stream_name}/patterns/extract")]

@@ -502,6 +502,11 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.logTableRowExpandMenu.click();
     await page.waitForTimeout(500);
 
+    testLogger.info('Opening log source details');
+    await pageManager.unflattenedPage.logSourceColumn.waitFor();
+    await pageManager.unflattenedPage.logSourceColumn.click();
+    await page.waitForTimeout(1500);
+
     // Wait for log details panel to load before checking for timestamp field
     try {
       await pageManager.unflattenedPage.logDetailJsonContent.waitFor({ timeout: 5000 });

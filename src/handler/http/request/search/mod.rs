@@ -215,7 +215,8 @@ async fn can_use_distinct_stream(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Search data with SQL query, you can use `match_all('something')` to search with full text search, also you can use `str_match(field, 'something')` to search in a specific field; start_time, end_time can't be zero, need to valid micro timestamp.", "category": "search"}))
     )
 )]
 #[post("/{org_id}/_search")]
@@ -540,7 +541,8 @@ pub async fn search(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp", "category": "search"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/_around")]
@@ -663,7 +665,8 @@ pub async fn around_v1(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/{stream_name}/_around")]
@@ -769,7 +772,8 @@ pub async fn around_v2(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get distinct values for a field", "category": "search"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/_values")]
@@ -1433,7 +1437,8 @@ async fn values_v1(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get search partitions then you can call _search api by partitions to give the result looks faster", "category": "search"}))
     )
 )]
 #[post("/{org_id}/_search_partition")]
@@ -1619,7 +1624,8 @@ pub async fn search_partition(
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get search history", "category": "search"}))
     )
 )]
 #[post("/{org_id}/_search_history")]
