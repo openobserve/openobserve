@@ -3927,6 +3927,9 @@ export default defineComponent({
 
         // console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
 
+        // Reset pagination visibility when switching back to logs
+        searchObj.meta.resultGrid.showPagination = true;
+
         if (!hasLogs) {
           // No logs data - fetch them
           // console.log("[SearchBar] Fetching logs data");
