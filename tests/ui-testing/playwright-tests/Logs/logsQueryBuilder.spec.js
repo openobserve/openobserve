@@ -9,6 +9,12 @@
  * - Chart type selection and auto-selection
  * - X/Y axis and breakdown field manipulation
  *
+ * Chart type auto-selection logic (from BuildQueryPage.vue):
+ * - Histogram (X+Y axes)  → "bar" (default, not overridden)
+ * - Count-only (Y only)   → "metric" (auto-selected)
+ * - CTE / Subquery         → "table" (custom mode)
+ * - SELECT *               → "table" (custom mode)
+ *
  * @tags @queryBuilder @logs @all
  */
 
@@ -53,7 +59,6 @@ async function ingestTestData(page) {
 }
 
 async function applyQueryButton(page) {
-    // Set up response listener before clicking
     const searchPromise = page.waitForResponse(
         response => response.url().includes('/_search') && response.status() === 200,
         { timeout: 60000 }
@@ -62,15 +67,26 @@ async function applyQueryButton(page) {
     await page.waitForLoadState('networkidle');
     await page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
 
-    // Wait for search response with extended timeout
     try {
         await searchPromise;
         testLogger.info('Search query completed successfully');
     } catch (error) {
         testLogger.warn('Search response wait timed out, continuing test');
-        // Wait for network to settle instead
         await page.waitForLoadState('networkidle', { timeout: 30000 });
     }
+}
+
+/**
+ * Helper: enable SQL mode, set query, run it, switch to Build tab.
+ * Waits for Build tab async initialization to complete (chart/table rendered).
+ */
+async function setupQueryAndSwitchToBuild(pm, page, query) {
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.logsPage.setQueryEditorContent(query);
+    await pm.logsPage.runQueryAndWaitForResults();
+    await pm.logsPage.clickBuildToggle();
+    await pm.logsPage.waitForBuildTabLoaded();
 }
 
 // ============================================================================
@@ -103,102 +119,69 @@ test.describe("Logs Query Builder - P0 Critical Tests", () => {
     }, async ({ page }) => {
         testLogger.info('Testing Build tab opens successfully');
 
-        // Verify Build tab toggle is visible
         await pm.logsPage.expectBuildToggleVisible();
-
-        // Click Build tab
         await pm.logsPage.clickBuildToggle();
 
-        // Wait for Build tab UI to load
         const loaded = await pm.logsPage.waitForBuildTabLoaded();
         expect(loaded).toBeTruthy();
 
         testLogger.info('Build tab opens successfully - PASSED');
     });
 
-    test("Builder mode displays for simple histogram query", {
+    test("Histogram query selects bar chart on Build tab", {
         tag: ['@queryBuilder', '@smoke', '@P0', '@all', '@logs']
     }, async ({ page }) => {
-        testLogger.info('Testing Builder mode displays for histogram query');
-
-        // Enable SQL mode and enter histogram query
-        await pm.logsPage.enableSqlModeIfNeeded();
-        await pm.logsPage.clickQueryEditor();
-        await page.waitForTimeout(500);
-        await pm.logsPage.selectAllText();
-        await pm.logsPage.pressBackspace();
+        testLogger.info('Testing histogram query → bar chart');
 
         const histogramQuery = 'SELECT histogram(_timestamp) as time, count(*) as count FROM "e2e_automate" GROUP BY time';
-        await page.keyboard.type(histogramQuery);
-        await page.waitForTimeout(500);
+        await setupQueryAndSwitchToBuild(pm, page, histogramQuery);
 
-        // Click refresh to apply query
-        await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle');
+        // Histogram: X-axis + Y-axis → "bar" chart (default, not overridden)
+        await pm.logsPage.verifyChartTypeSelected('bar');
 
-        // Switch to Build tab
-        await pm.logsPage.clickBuildToggle();
-        await pm.logsPage.waitForBuildTabLoaded();
-
-        // Verify Builder mode elements are visible (X/Y axis sections)
-        // The query should be parseable, so Builder mode should be active
-        testLogger.info('Builder mode displays for histogram query - PASSED');
+        testLogger.info('Histogram query → bar chart - PASSED');
     });
 
-    test("Custom mode displays for CTE query", {
+    test("CTE query selects table chart on Build tab", {
         tag: ['@queryBuilder', '@smoke', '@P0', '@all', '@logs']
     }, async ({ page }) => {
-        testLogger.info('Testing Custom mode displays for CTE query');
-
-        // Enable SQL mode and enter CTE query
-        await pm.logsPage.enableSqlModeIfNeeded();
-        await pm.logsPage.clickQueryEditor();
-        await page.waitForTimeout(500);
-        await pm.logsPage.selectAllText();
-        await pm.logsPage.pressBackspace();
+        testLogger.info('Testing CTE query → table chart');
 
         const cteQuery = 'WITH recent AS (SELECT * FROM "e2e_automate" LIMIT 10) SELECT * FROM recent';
-        await page.keyboard.type(cteQuery);
-        await page.waitForTimeout(500);
+        await setupQueryAndSwitchToBuild(pm, page, cteQuery);
 
-        // Click refresh
-        await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle');
+        // CTE is unparseable → Custom SQL mode → "table" chart
+        await pm.logsPage.verifyChartTypeSelected('table');
 
-        // Switch to Build tab
-        await pm.logsPage.clickBuildToggle();
-        await pm.logsPage.waitForBuildTabLoaded();
-
-        // CTE queries should trigger Custom SQL mode with Table chart
-        testLogger.info('Custom mode displays for CTE query - PASSED');
+        testLogger.info('CTE query → table chart - PASSED');
     });
 
-    test("Chart renders in Build tab", {
+    test("SELECT star query selects table chart on Build tab", {
         tag: ['@queryBuilder', '@smoke', '@P0', '@all', '@logs']
     }, async ({ page }) => {
-        testLogger.info('Testing chart renders in Build tab');
+        testLogger.info('Testing SELECT * query → table chart');
 
-        // Run a simple query first
-        await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(2000);
+        const selectAllQuery = 'SELECT * FROM "e2e_automate" LIMIT 10';
+        await setupQueryAndSwitchToBuild(pm, page, selectAllQuery);
 
-        // Switch to Build tab
-        await pm.logsPage.clickBuildToggle();
-        await pm.logsPage.waitForBuildTabLoaded();
+        // SELECT * produces empty fields → custom mode → "table" chart
+        await pm.logsPage.verifyChartTypeSelected('table');
 
-        // Wait for chart or table to render
-        await page.waitForTimeout(3000);
+        testLogger.info('SELECT * query → table chart - PASSED');
+    });
 
-        // Verify some form of chart/data visualization is present
-        const chartVisible = await page.locator('[data-test="chart-renderer"]').isVisible().catch(() => false);
-        const tableVisible = await page.locator('[data-test="dashboard-panel-table"]').isVisible().catch(() => false);
-        const noData = await page.locator('[data-test="no-data"]').isVisible().catch(() => false);
+    test("Simple SELECT column query selects table chart on Build tab", {
+        tag: ['@queryBuilder', '@smoke', '@P0', '@all', '@logs']
+    }, async ({ page }) => {
+        testLogger.info('Testing SELECT _timestamp query → table chart');
 
-        // At least one should be true
-        expect(chartVisible || tableVisible || noData).toBeTruthy();
+        const simpleQuery = 'SELECT _timestamp FROM "e2e_automate"';
+        await setupQueryAndSwitchToBuild(pm, page, simpleQuery);
 
-        testLogger.info('Chart renders in Build tab - PASSED');
+        // Simple column select without aggregation → custom mode → "table" chart
+        await pm.logsPage.verifyChartTypeSelected('table');
+
+        testLogger.info('SELECT _timestamp query → table chart - PASSED');
     });
 });
 
@@ -232,14 +215,9 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
     }, async ({ page }) => {
         testLogger.info('Testing switch from Logs to Build tab');
 
-        // Verify we start on Logs tab
         await pm.logsPage.expectBuildToggleVisible();
-
-        // Click Build tab
         await pm.logsPage.clickBuildToggle();
         await pm.logsPage.waitForBuildTabLoaded();
-
-        // Verify Build tab is now active
         await pm.logsPage.expectBuildTabActive();
 
         testLogger.info('Switch from Logs to Build tab - PASSED');
@@ -250,15 +228,10 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
     }, async ({ page }) => {
         testLogger.info('Testing switch from Build to Logs tab');
 
-        // First switch to Build tab
         await pm.logsPage.clickBuildToggle();
         await pm.logsPage.waitForBuildTabLoaded();
-
-        // Now switch back to Logs tab
         await pm.logsPage.clickLogsToggle();
         await page.waitForLoadState('networkidle');
-
-        // Verify logs table is visible (indicating Logs tab is active)
         await pm.logsPage.expectLogsTableVisible();
 
         testLogger.info('Switch from Build to Logs tab - PASSED');
@@ -269,7 +242,6 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
     }, async ({ page }) => {
         testLogger.info('Testing SQL Mode auto-enables on Build tab');
 
-        // First ensure SQL mode is OFF
         const sqlModeToggle = page.getByRole('switch', { name: 'SQL Mode' });
         const isChecked = await sqlModeToggle.getAttribute('aria-checked');
 
@@ -278,15 +250,12 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
             await page.waitForTimeout(500);
         }
 
-        // Verify SQL mode is now OFF
         const isNowOff = await sqlModeToggle.getAttribute('aria-checked');
         expect(isNowOff).toBe('false');
 
-        // Click Build tab
         await pm.logsPage.clickBuildToggle();
         await page.waitForTimeout(1000);
 
-        // Verify SQL Mode is now ON
         const isNowOn = await sqlModeToggle.getAttribute('aria-checked');
         expect(isNowOn).toBe('true');
 
@@ -298,29 +267,19 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
     }, async ({ page }) => {
         testLogger.info('Testing Build tab preserves query state');
 
-        // Enter a specific query
         await pm.logsPage.enableSqlModeIfNeeded();
-        await pm.logsPage.clickQueryEditor();
-        await page.waitForTimeout(500);
-        await pm.logsPage.selectAllText();
-        await pm.logsPage.pressBackspace();
-
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         const testQuery = 'SELECT count(*) as total FROM "e2e_automate"';
-        await page.keyboard.type(testQuery);
+        await pm.logsPage.setQueryEditorContent(testQuery);
 
-        // Switch to Build tab
         await pm.logsPage.clickBuildToggle();
         await pm.logsPage.waitForBuildTabLoaded();
 
-        // Switch back to Logs tab
         await pm.logsPage.clickLogsToggle();
         await page.waitForLoadState('networkidle');
 
-        // Verify query contains essential elements (Build tab may normalize/transform the query)
-        // The query should preserve the stream name and count-related content
         const queryText = await pm.logsPage.getQueryEditorText();
         expect(queryText.toLowerCase()).toContain('e2e_automate');
-        // Query should contain some form of aggregation (count, total, etc.)
         const hasAggregation = queryText.toLowerCase().includes('count') ||
                                queryText.toLowerCase().includes('total');
         expect(hasAggregation).toBe(true);
@@ -330,10 +289,10 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
 });
 
 // ============================================================================
-// Test Suite: P1 - Query Mode Detection Tests
+// Test Suite: P1 - Chart Type Verification on Tab Switch
 // ============================================================================
 
-test.describe("Logs Query Builder - Query Mode Detection", () => {
+test.describe("Logs Query Builder - Chart Type on Tab Switch", () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
 
@@ -351,86 +310,74 @@ test.describe("Logs Query Builder - Query Mode Detection", () => {
         await applyQueryButton(page);
         await page.waitForLoadState('networkidle');
 
-        testLogger.info('Query Mode Detection test setup completed');
+        testLogger.info('Chart Type on Tab Switch test setup completed');
     });
 
-    test("Builder mode for count-only query shows Metric chart", {
+    test("Histogram query selects bar chart type", {
         tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
-        testLogger.info('Testing Builder mode for count-only query');
+        testLogger.info('Testing histogram → bar chart');
 
-        await pm.logsPage.enableSqlModeIfNeeded();
-        await pm.logsPage.clickQueryEditor();
-        await page.waitForTimeout(500);
-        await pm.logsPage.selectAllText();
-        await pm.logsPage.pressBackspace();
+        const histogramQuery = 'SELECT histogram(_timestamp) as time, count(*) as count FROM "e2e_automate" GROUP BY time';
+        await setupQueryAndSwitchToBuild(pm, page, histogramQuery);
+
+        await pm.logsPage.verifyChartTypeSelected('bar');
+
+        testLogger.info('Histogram → bar chart - PASSED');
+    });
+
+    test("Count-only query selects metric chart type", {
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
+    }, async ({ page }) => {
+        testLogger.info('Testing count-only → metric chart');
 
         const countQuery = 'SELECT count(*) as total FROM "e2e_automate"';
-        await page.keyboard.type(countQuery);
+        await setupQueryAndSwitchToBuild(pm, page, countQuery);
 
-        await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle');
+        // Count-only: Y-axis only (count), no X-axis, no breakdown → "metric"
+        await pm.logsPage.verifyChartTypeSelected('metric');
 
-        await pm.logsPage.clickBuildToggle();
-        await pm.logsPage.waitForBuildTabLoaded();
-
-        // Count-only query should auto-select Metric chart
-        // Verify chart selection area is visible
-        await page.waitForTimeout(2000);
-
-        testLogger.info('Builder mode for count-only query - PASSED');
+        testLogger.info('Count-only → metric chart - PASSED');
     });
 
-    test("Custom mode for SELECT * query shows Table chart", {
+    test("CTE query selects table chart type", {
         tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
-        testLogger.info('Testing Custom mode for SELECT * query');
+        testLogger.info('Testing CTE → table chart');
 
-        await pm.logsPage.enableSqlModeIfNeeded();
-        await pm.logsPage.clickQueryEditor();
-        await page.waitForTimeout(500);
-        await pm.logsPage.selectAllText();
-        await pm.logsPage.pressBackspace();
+        const cteQuery = 'WITH recent AS (SELECT * FROM "e2e_automate" LIMIT 10) SELECT * FROM recent';
+        await setupQueryAndSwitchToBuild(pm, page, cteQuery);
+
+        // CTE is unparseable → custom mode → "table"
+        await pm.logsPage.verifyChartTypeSelected('table');
+
+        testLogger.info('CTE → table chart - PASSED');
+    });
+
+    test("SELECT star query selects table chart type", {
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
+    }, async ({ page }) => {
+        testLogger.info('Testing SELECT * → table chart');
 
         const selectAllQuery = 'SELECT * FROM "e2e_automate" LIMIT 10';
-        await page.keyboard.type(selectAllQuery);
+        await setupQueryAndSwitchToBuild(pm, page, selectAllQuery);
 
-        await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle');
+        await pm.logsPage.verifyChartTypeSelected('table');
 
-        await pm.logsPage.clickBuildToggle();
-        await pm.logsPage.waitForBuildTabLoaded();
-
-        // SELECT * should trigger Custom SQL mode with Table chart
-        await page.waitForTimeout(2000);
-
-        testLogger.info('Custom mode for SELECT * query - PASSED');
+        testLogger.info('SELECT * → table chart - PASSED');
     });
 
-    test("Custom mode for subquery", {
+    test("Subquery selects table chart type", {
         tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
-        testLogger.info('Testing Custom mode for subquery');
-
-        await pm.logsPage.enableSqlModeIfNeeded();
-        await pm.logsPage.clickQueryEditor();
-        await page.waitForTimeout(500);
-        await pm.logsPage.selectAllText();
-        await pm.logsPage.pressBackspace();
+        testLogger.info('Testing subquery → table chart');
 
         const subquery = 'SELECT * FROM (SELECT code, count(*) as cnt FROM "e2e_automate" GROUP BY code) subq LIMIT 10';
-        await page.keyboard.type(subquery);
+        await setupQueryAndSwitchToBuild(pm, page, subquery);
 
-        await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle');
+        // Subquery is unparseable → custom mode → "table"
+        await pm.logsPage.verifyChartTypeSelected('table');
 
-        await pm.logsPage.clickBuildToggle();
-        await pm.logsPage.waitForBuildTabLoaded();
-
-        // Subquery should trigger Custom SQL mode
-        await page.waitForTimeout(2000);
-
-        // testLogger.info('Custom mode for subquery - PASSED');
+        testLogger.info('Subquery → table chart - PASSED');
     });
 });
-

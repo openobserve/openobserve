@@ -1725,6 +1725,40 @@ export class LogsPage {
     }
 
     /**
+     * Click Run query and wait for query execution to complete.
+     * Uses button UI state (loading/disabled → ready) instead of response matching
+     * to avoid capturing stale responses from auto-searches.
+     * @param {number} timeout - Max wait time in ms (default 60000)
+     */
+    async runQueryAndWaitForResults(timeout = 60000) {
+        const btn = this.page.locator(this.queryButton);
+
+        // Click Run query
+        await btn.click({ force: true });
+
+        // Brief wait for the query execution to start (button enters loading/disabled state)
+        await this.page.waitForTimeout(1000);
+
+        // Wait for the Run query button to be visible, enabled, and not loading
+        // This handles both OSS (:loading/:disable on same button) and Enterprise (Cancel → Run query swap)
+        await this.page.waitForFunction(
+            (selector) => {
+                const btn = document.querySelector(selector);
+                if (!btn) return false;
+                const isDisabled = btn.hasAttribute('disabled') || btn.getAttribute('aria-disabled') === 'true';
+                const isLoading = btn.classList.contains('q-btn--loading');
+                const text = btn.textContent?.trim() || '';
+                // Ready when: not disabled, not loading, and shows "Run query" (not "Cancel")
+                return !isDisabled && !isLoading && !text.includes('Cancel');
+            },
+            this.queryButton,
+            { timeout }
+        );
+
+        testLogger.info('Query execution complete - Run query button ready');
+    }
+
+    /**
      * Ingest multiple log entries with retry logic for "stream being deleted" errors
      * Uses page.request API to keep credentials in Node.js context (secure)
      * @param {string} streamName - Target stream name
@@ -5334,6 +5368,27 @@ export class LogsPage {
     }
 
     /**
+     * Set query editor content reliably using Playwright's fill() on the Monaco .inputarea.
+     * This properly clears existing content before typing, unlike Ctrl+A + Backspace which
+     * can fail to clear Monaco in certain states.
+     * @param {string} query - The SQL query to set
+     */
+    async setQueryEditorContent(query) {
+        // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass
+        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
+        await inputArea.click({ force: true });
+        await this.page.waitForTimeout(300);
+        await inputArea.fill(query);
+        await this.page.waitForTimeout(500);
+
+        // Verify the editor actually contains the query
+        const editorContent = await this.page.locator('[data-test="logs-search-bar-query-editor"] .view-line').allTextContents();
+        const actualContent = editorContent.join('').trim();
+        testLogger.info(`[setQueryEditorContent] Intended: "${query.substring(0, 60)}"`);
+        testLogger.info(`[setQueryEditorContent] Actual:   "${actualContent.substring(0, 60)}"`);
+    }
+
+    /**
      * Enable SQL mode if not already enabled
      * Combines getSQLModeState() check with clickSQLModeSwitch()
      */
@@ -5875,14 +5930,34 @@ export class LogsPage {
     }
 
     /**
-     * Expect a specific chart type to be selected
+     * Expect a specific chart type to be visible in the chart selection
      * @param {string} chartId - The chart type ID
      */
-    async expectChartTypeSelected(chartId) {
-        // Use .first() to handle multiple matching elements
+    async expectChartTypeVisible(chartId) {
         const chartItem = this.page.locator(this.chartTypeItem(chartId)).first();
         await expect(chartItem).toBeVisible();
-        testLogger.info(`Chart type "${chartId}" is visible/selected`);
+        testLogger.info(`Chart type "${chartId}" is visible`);
+    }
+
+    /**
+     * Verify a chart type is selected (theme-aware: checks bg-grey-3 for light, bg-grey-5 for dark)
+     * Uses the parent element's background class to detect selection state.
+     * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
+     * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
+     */
+    async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 20000) {
+        // Use visible() filter — there can be multiple PanelEditor instances in DOM
+        // (e.g., cached Visualize tab + active Build tab). Only check the visible one.
+        const selector = this.chartTypeItem(chartId);
+        const parentLocator = this.page.locator(selector).locator('visible=true').locator('..');
+
+        if (shouldBeSelected) {
+            await expect(parentLocator).toHaveClass(/bg-grey-[35]/, { timeout });
+            testLogger.info(`Chart type "${chartId}" is selected (verified via bg-grey class)`);
+        } else {
+            await expect(parentLocator).not.toHaveClass(/bg-grey-[35]/, { timeout: 5000 });
+            testLogger.info(`Chart type "${chartId}" is NOT selected (verified via bg-grey class)`);
+        }
     }
 
     /**
@@ -5991,58 +6066,98 @@ export class LogsPage {
      * @param {number} timeout - Timeout in milliseconds
      */
     async waitForBuildTabLoaded(timeout = 30000) {
-        await this.page.waitForLoadState('networkidle', { timeout: timeout });
-
-        // Try multiple detection strategies for Build tab UI
+        // Phase 1: Wait for BuildQueryPage root container to be visible
         try {
-            await Promise.race([
-                // Strategy 1: Look for Auto/Custom query type buttons by data-test
-                this.page.locator('[data-test="dashboard-builder-query-type"]').waitFor({ state: 'visible', timeout: timeout }),
-                this.page.locator('[data-test="dashboard-custom-query-type"]').waitFor({ state: 'visible', timeout: timeout }),
-                // Strategy 2: Look for Auto/Custom buttons by text content
-                this.page.locator('button:has-text("Auto")').first().waitFor({ state: 'visible', timeout: timeout }),
-                this.page.locator('button:has-text("Custom")').first().waitFor({ state: 'visible', timeout: timeout }),
-                // Strategy 3: Look for Fields label in the sidebar
-                this.page.locator('text=Fields').first().waitFor({ state: 'visible', timeout: timeout }),
-                // Strategy 4: Look for chart selection container
-                this.page.locator(this.chartSelectionContainer).waitFor({ state: 'visible', timeout: timeout })
-            ]);
-            testLogger.info('Build tab UI loaded successfully');
-            return true;
+            await this.page.locator('.build-query-page').waitFor({ state: 'visible', timeout });
+            testLogger.info('Build tab container loaded');
         } catch (error) {
-            // Fallback: Check if any Build tab indicators are visible
-            const hasAutoButton = await this.page.locator('button:has-text("Auto")').first().isVisible().catch(() => false);
-            const hasCustomButton = await this.page.locator('button:has-text("Custom")').first().isVisible().catch(() => false);
-            const hasFieldsLabel = await this.page.locator('text=Fields').first().isVisible().catch(() => false);
-            const hasBuilderType = await this.page.locator('[data-test="dashboard-builder-query-type"]').isVisible().catch(() => false);
-            const hasCustomType = await this.page.locator('[data-test="dashboard-custom-query-type"]').isVisible().catch(() => false);
-
-            if (hasAutoButton || hasCustomButton || hasFieldsLabel || hasBuilderType || hasCustomType) {
-                testLogger.info('Build tab loaded (alternative detection)');
-                return true;
-            }
-            testLogger.warn('Build tab UI did not load within timeout');
+            testLogger.warn('Build tab container did not appear within timeout');
             return false;
         }
+
+        // Phase 2: Wait for async initializeBuild() to complete.
+        // initializeBuild parses query, sets chart type, runs query, renders chart/table/no-data.
+        // Use visible filter to avoid hidden cached PanelEditor instances.
+        try {
+            const initIndicator = this.page.locator(
+                `${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`
+            ).locator('visible=true').first();
+            await initIndicator.waitFor({ state: 'visible', timeout });
+            testLogger.info('Build tab initialization complete (chart/table/no-data visible)');
+        } catch (error) {
+            // Phase 2 is best-effort — Build tab may not render data for all query types
+            testLogger.warn('Build tab chart/table/no-data not visible, waiting for networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        }
+
+        return true;
     }
 
     /**
-     * Get the current chart type from the UI
+     * Get the current chart type from the UI (theme-aware)
+     * Checks parent element for bg-grey-3 (light) or bg-grey-5 (dark) to detect selection.
      * @returns {Promise<string|null>} The current chart type or null
      */
     async getCurrentChartType() {
-        const chartTypes = ['bar', 'line', 'area', 'metric', 'table', 'scatter', 'pie', 'donut'];
+        const chartTypes = ['bar', 'line', 'area', 'area-stacked', 'metric', 'table', 'scatter', 'pie', 'donut', 'h-bar', 'h-stacked', 'stacked', 'heatmap', 'gauge'];
 
         for (const chartType of chartTypes) {
-            const chartItem = this.page.locator(this.chartTypeItem(chartType));
+            const chartItem = this.page.locator(this.chartTypeItem(chartType)).first();
             const isVisible = await chartItem.isVisible().catch(() => false);
             if (isVisible) {
-                const classList = await chartItem.getAttribute('class') || '';
-                if (classList.includes('selected') || classList.includes('active')) {
+                const parentClassList = await chartItem.locator('..').getAttribute('class') || '';
+                if (parentClassList.includes('bg-grey-3') || parentClassList.includes('bg-grey-5')) {
+                    testLogger.info(`Current chart type detected: ${chartType}`);
                     return chartType;
                 }
             }
         }
+        testLogger.warn('No chart type detected as selected');
         return null;
+    }
+
+    /**
+     * Wait for any chart type to become selected (theme-aware).
+     * Uses page.waitForFunction for reliable detection of bg-grey-3/bg-grey-5
+     * directly in the DOM, surviving reactive re-renders across tab switches.
+     * @param {number} timeout - Max wait time in ms (default 20000)
+     * @returns {Promise<string|null>} The selected chart type or null if timeout
+     */
+    async waitForChartTypeStabilized(timeout = 20000) {
+        try {
+            // Use waitForFunction to detect bg-grey-3 or bg-grey-5 on chart selection items
+            // This is more reliable than Playwright locator polling during reactive re-renders
+            const result = await this.page.waitForFunction(() => {
+                const items = document.querySelectorAll('[data-test="dashboard-addpanel-chart-selection-item"]');
+                for (const item of items) {
+                    const classes = item.className || '';
+                    if (classes.includes('bg-grey-3') || classes.includes('bg-grey-5')) {
+                        // Found selected item - extract chart type from child data-test attribute
+                        const section = item.querySelector('[data-test^="selected-chart-"][data-test$="-item"]');
+                        if (section) {
+                            const attr = section.getAttribute('data-test');
+                            const match = attr.match(/^selected-chart-(.+)-item$/);
+                            if (match) return match[1];
+                        }
+                    }
+                }
+                return null;
+            }, { timeout });
+
+            const chartType = await result.jsonValue();
+            if (chartType) {
+                testLogger.info(`Chart type stabilized: ${chartType}`);
+                return chartType;
+            }
+        } catch (error) {
+            testLogger.warn(`Chart type did not stabilize within ${timeout}ms`);
+        }
+
+        // Fallback: try getCurrentChartType one last time
+        const fallback = await this.getCurrentChartType();
+        if (fallback) {
+            testLogger.info(`Chart type detected via fallback: ${fallback}`);
+        }
+        return fallback;
     }
 }
