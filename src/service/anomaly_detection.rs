@@ -218,9 +218,16 @@ pub async fn train_model(org_id: &str, config_id: &str) -> Result<serde_json::Va
         // Run training with data fetching (in background)
         let config_id_owned = config_id.to_string();
         let org_id_owned = org_id.to_string();
+        // Training window: now - training_window_days .. now (microseconds)
+        let end_time_us = Utc::now().timestamp_micros();
+        let start_time_us =
+            end_time_us - (anomaly_config.training_window_days as i64 * 86_400 * 1_000_000);
+
         tokio::spawn(async move {
             // Fetch training data via OSS search service
-            match execute_anomaly_query(&org_id_owned, &training_query).await {
+            match execute_anomaly_query(&org_id_owned, &training_query, start_time_us, end_time_us)
+                .await
+            {
                 Ok(data_points) => {
                     // Train with fetched data
                     let start_time = std::time::Instant::now();
@@ -288,8 +295,15 @@ pub async fn detect_anomalies(org_id: &str, config_id: &str) -> Result<serde_jso
         // Build detection query
         let detection_query = query_builder::build_detection_query(&anomaly_config)?;
 
+        // Detection window: last_processed_timestamp .. now (microseconds)
+        let end_time_us = Utc::now().timestamp_micros();
+        let start_time_us = anomaly_config
+            .last_processed_timestamp
+            .unwrap_or(end_time_us - 86_400 * 1_000_000); // default: last 24h
+
         // Fetch detection data via OSS search service
-        let data_points = execute_anomaly_query(org_id, &detection_query).await?;
+        let data_points =
+            execute_anomaly_query(org_id, &detection_query, start_time_us, end_time_us).await?;
 
         // Initialize detector
         let detector = Detector::new(anomaly_config.clone()).await?;
@@ -436,21 +450,26 @@ pub fn config_to_training_config(
 
 /// Execute a SQL query for anomaly detection and return time-series data points
 ///
-/// This is called by enterprise query_executor to fetch training/detection data
+/// `start_time` and `end_time` are microseconds since epoch. The search service uses
+/// these for partition pruning — the SQL itself does not need a WHERE _timestamp clause.
 #[cfg(feature = "enterprise")]
-pub async fn execute_anomaly_query(org_id: &str, query_sql: &str) -> Result<Vec<(i64, f64)>> {
+pub async fn execute_anomaly_query(
+    org_id: &str,
+    query_sql: &str,
+    start_time: i64,
+    end_time: i64,
+) -> Result<Vec<(i64, f64)>> {
     use config::meta::stream::StreamType;
 
     use crate::service::search;
 
-    // Build search request with the SQL query
     let search_req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql.to_string(),
             from: 0,
-            size: 10000, // Get up to 10k data points
-            start_time: 0,
-            end_time: 0,
+            size: 10000,
+            start_time,
+            end_time,
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -467,13 +486,11 @@ pub async fn execute_anomaly_query(org_id: &str, query_sql: &str) -> Result<Vec<
         local_mode: None,
     };
 
-    // Execute the search
     let trace_id = config::ider::generate_trace_id();
     let search_result = search::search(&trace_id, org_id, StreamType::Logs, None, &search_req)
         .await
         .map_err(|e| anyhow::anyhow!("Search failed: {}", e))?;
 
-    // Parse the results into (timestamp, value) tuples
     let data_points = parse_search_results_to_timeseries(&search_result)?;
 
     Ok(data_points)
