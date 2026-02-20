@@ -1426,6 +1426,7 @@ export default defineComponent({
         isLoading.value = false;
         activeToolCall.value = null;
         stopAnalyzingRotation();
+        stopElapsedTimer();
 
         // Immediately show all buffered text (like ChatGPT's "Stop generating")
         displayedStreamingContent.value = currentTextSegment.value;

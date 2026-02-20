@@ -18,9 +18,9 @@
  */
 const stripHtml = (value: string): string => {
   return value
-    .replace(/<[^>]*>/g, "") // Remove HTML tags
-    .replace(/javascript:/gi, "") // Remove javascript: protocol
-    .replace(/on\w+\s*=/gi, ""); // Remove inline event handlers
+    .replace(/<[^>]*>?/gm, "") // Remove HTML tags (including malformed/partial tags)
+    .replace(/\b(javascript|vbscript|data)\s*:/gi, "") // Remove dangerous URL schemes
+    .replace(/\bon\w+\s*=/gi, ""); // Remove inline event handlers (e.g. onclick=, onerror=)
 };
 
 /**
