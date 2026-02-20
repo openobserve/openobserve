@@ -5271,15 +5271,6 @@ export class LogsPage {
         await this.page.waitForTimeout(500);
     }
 
-    /**
-     * Get logs table content as text
-     * @returns {Promise<string>} The table content text
-     */
-    async getLogsTableContent() {
-        const table = this.page.locator(this.logsTable);
-        return await table.textContent().catch(() => '');
-    }
-
     // ========== BUG REGRESSION TEST METHODS ==========
 
     /**
