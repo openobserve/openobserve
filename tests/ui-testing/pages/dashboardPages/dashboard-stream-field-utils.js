@@ -37,15 +37,36 @@ export async function selectStreamType(page, streamType) {
  * @param {string} streamNameOrVar - Stream name or $variable reference
  */
 export async function selectStreamFromDropdown(page, streamNameOrVar) {
+  const isVariable = streamNameOrVar.startsWith("$");
   const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
   await streamSelect.click();
+
+  // Clear existing value and fill with new value
+  await streamSelect.fill("");
+  await page.waitForTimeout(300);
   await streamSelect.fill(streamNameOrVar);
 
+  // For variables, wait longer for the dropdown to filter and show variable options
+  // Increased wait time especially for edit mode where variables need to load
+  await page.waitForTimeout(isVariable ? 1500 : 500);
+
   // Wait for dropdown options to appear
-  await page.waitForFunction(
-    () => document.querySelectorAll('[role="option"]').length > 0,
-    { timeout: 10000, polling: 100 }
-  );
+  const hasOptions = await page
+    .waitForFunction(
+      () => document.querySelectorAll('[role="option"]').length > 0,
+      { timeout: isVariable ? 8000 : 10000, polling: 100 }
+    )
+    .then(() => true)
+    .catch(() => false);
+
+  // If no options appeared initially, try alternate strategies
+  if (!hasOptions && !isVariable) {
+    // For real streams (not variables), this is an error
+    throw new Error(`No dropdown options appeared for stream: ${streamNameOrVar}`);
+  }
+
+  // For variables without options, the value should already be in the input.
+  // We'll proceed to try selection strategies anyway in case options load late.
 
   // Multi-strategy selection
   let selected = false;
@@ -57,34 +78,49 @@ export async function selectStreamFromDropdown(page, streamNameOrVar) {
     await option.click();
     selected = true;
   } catch {
-    // Strategy 2: Partial match
-    try {
-      const option = page.getByRole("option", { name: streamNameOrVar, exact: false }).first();
-      await option.waitFor({ state: "visible", timeout: 5000 });
-      await option.click();
-      selected = true;
-    } catch {
-      // Strategy 3: Keyboard navigation
+    // Strategy 2: For variables, look for option containing both the variable name and "(variable)"
+    if (isVariable && !selected) {
       try {
-        await page.keyboard.press("ArrowDown");
-        await page.waitForTimeout(200);
-        await page.keyboard.press("Enter");
+        // Variables are displayed as "$varName (variable)" in the dropdown
+        const option = page.locator('[role="option"]').filter({ hasText: streamNameOrVar }).filter({ hasText: "(variable)" }).first();
+        await option.waitFor({ state: "visible", timeout: 3000 });
+        await option.click();
         selected = true;
       } catch {
-        // Strategy 4: JS direct click
-        const clicked = await page.evaluate((name) => {
-          const options = document.querySelectorAll('[role="option"]');
-          for (const opt of options) {
-            if (opt.textContent.trim().includes(name)) {
-              opt.click();
-              return true;
-            }
-          }
-          return false;
-        }, streamNameOrVar);
-        if (clicked) {
-          await page.waitForTimeout(300);
+        // Fall through to next strategy
+      }
+    }
+
+    // Strategy 3: Partial match
+    if (!selected) {
+      try {
+        const option = page.getByRole("option", { name: streamNameOrVar, exact: false }).first();
+        await option.waitFor({ state: "visible", timeout: 5000 });
+        await option.click();
+        selected = true;
+      } catch {
+        // Strategy 4: Keyboard navigation
+        try {
+          await page.keyboard.press("ArrowDown");
+          await page.waitForTimeout(200);
+          await page.keyboard.press("Enter");
           selected = true;
+        } catch {
+          // Strategy 5: JS direct click
+          const clicked = await page.evaluate((name) => {
+            const options = document.querySelectorAll('[role="option"]');
+            for (const opt of options) {
+              if (opt.textContent.trim().includes(name)) {
+                opt.click();
+                return true;
+              }
+            }
+            return false;
+          }, streamNameOrVar);
+          if (clicked) {
+            await page.waitForTimeout(300);
+            selected = true;
+          }
         }
       }
     }

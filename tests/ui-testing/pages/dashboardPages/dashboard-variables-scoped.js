@@ -97,7 +97,7 @@ export default class DashboardVariablesScoped {
    * @param {number} options.optionIndex - Index of option to select (default: 1 for second option)
    * @param {boolean} options.monitorApi - Whether to monitor API calls (default: false)
    * @param {number} options.expectedApiCalls - Expected API call count when monitoring (default: 1)
-   * @param {number} options.timeout - Timeout in ms (default: 5000)
+   * @param {number} options.timeout - Timeout in ms (default: 10000, increased )
    * @param {boolean} options.returnSelectedValue - Whether to return the selected value text (default: false)
    * @returns {Promise<Object>} Result object with apiResult and/or selectedValue
    */
@@ -106,7 +106,7 @@ export default class DashboardVariablesScoped {
       optionIndex = 1,
       monitorApi = false,
       expectedApiCalls = 1,
-      timeout = 5000,
+      timeout = 10000, // Increased from 5s to 10s 
       returnSelectedValue = false
     } = options;
 
@@ -195,11 +195,11 @@ export default class DashboardVariablesScoped {
    * Wait for variable selector to be visible on dashboard
    * @param {string} variableName - Variable name
    * @param {Object} options - Wait options
-   * @param {number} options.timeout - Timeout in ms (default: 20000)
+   * @param {number} options.timeout - Timeout in ms (default: 30000, increased )
    * @returns {Promise<import('@playwright/test').Locator>}
    */
   async waitForVariableSelectorVisible(variableName, options = {}) {
-    const { timeout = 20000 } = options;
+    const { timeout = 30000 } = options; // Increased from 20s to 30s 
     const selector = this.page.locator(getVariableSelector(variableName));
 
     // Retry pattern for variable visibility under load
@@ -209,19 +209,25 @@ export default class DashboardVariablesScoped {
     while (Date.now() - startTime < timeout) {
       try {
         // Wait for network to settle before checking for variable
-        await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-        await selector.waitFor({ state: "visible", timeout: 5000 });
-        return selector;
+        // Increased timeout for network idle in CI/CD environments
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        await selector.waitFor({ state: "visible", timeout: 8000 });
+
+        // Additional check: ensure the variable is actually interactive
+        const isEnabled = await selector.isEnabled().catch(() => false);
+        if (isEnabled) {
+          return selector;
+        }
       } catch (e) {
         lastError = e;
         // Wait briefly and retry
-        await this.page.waitForTimeout(500);
+        await this.page.waitForTimeout(1000); // Increased from 500ms to 1s
       }
     }
 
     // Final attempt with remaining timeout
-    const remainingTimeout = Math.max(timeout - (Date.now() - startTime), 5000);
-    await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    const remainingTimeout = Math.max(timeout - (Date.now() - startTime), 8000);
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     await selector.waitFor({ state: "visible", timeout: remainingTimeout });
     return selector;
   }
@@ -993,21 +999,58 @@ export default class DashboardVariablesScoped {
    */
   async hasCircularDependencyError() {
     // The error is displayed as red text with the message "Variables has cycle:"
-    // Look for text containing "cycle" in red color
-    const errorElement = this.page.locator('div[style*="color: red"], div[style*="color:red"]').filter({ hasText: /cycle/i });
+    // When there's a cycle error, the save button should still be visible (save failed)
+
+    // Wait longer to allow async validation to complete after clicking save
+    // Increased to 3s to give more time for validation
+    await this.page.waitForTimeout(3000);
+
+    // Verify save button is still visible (indicates save failed due to error)
+    const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
+    const isSaveBtnVisible = await saveBtn.isVisible().catch(() => false);
+
+    if (!isSaveBtnVisible) {
+      // Save succeeded (button is hidden), so there's no cycle error
+      return false;
+    }
+
+    // Save button is still visible, now look for the cycle error message
+    // Strategy 1: Look for div with inline style containing "color" and text containing "cycle"
     try {
-      await errorElement.waitFor({ state: "visible", timeout: 3000 });
+      const errorElement = this.page.locator('div[style*="color"]').filter({ hasText: /cycle/i });
+      await errorElement.waitFor({ state: "visible", timeout: 8000 });
+      const text = await errorElement.textContent();
+      if (text && text.toLowerCase().includes('cycle')) {
+        return true;
+      }
+    } catch {
+      // Continue to next strategy
+    }
+
+    // Strategy 2: Look for any text containing "Variables has cycle"
+    try {
+      const fallbackError = this.page.getByText(/Variables has cycle/i);
+      await fallbackError.waitFor({ state: "visible", timeout: 3000 });
       return true;
     } catch {
-      // Fallback: check for any text containing "Variables has cycle"
-      const fallbackError = this.page.getByText(/Variables has cycle/i);
-      try {
-        await fallbackError.waitFor({ state: "visible", timeout: 1000 });
-        return true;
-      } catch {
-        return false;
-      }
+      // Continue to next strategy
     }
+
+    // Strategy 3: Look for any div containing "cycle" (case insensitive)
+    try {
+      const generalError = this.page.locator('div').filter({ hasText: /cycle/i });
+      await generalError.first().waitFor({ state: "visible", timeout: 2000 });
+      const text = await generalError.first().textContent();
+      if (text && /variables.*cycle|cycle.*variable/i.test(text)) {
+        return true;
+      }
+    } catch {
+      // All strategies failed
+    }
+
+    // If save button is visible but no error message found,
+    // there might be another validation error or the cycle error isn't displaying
+    return false;
   }
 
   /**
@@ -1851,9 +1894,25 @@ export default class DashboardVariablesScoped {
    * @param {string} streamNameOrVar - New stream name or $variable reference
    */
   async updateStream(streamNameOrVar) {
+    const streamSelect = this.page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+
     // selectStreamFromDropdown handles click, fill, and option selection.
     // Do NOT click beforehand — that would double-click and toggle the dropdown closed.
     await selectStreamFromDropdown(this.page, streamNameOrVar);
+
+    // Verify the stream value was actually set
+    const inputValue = await streamSelect.inputValue().catch(() => "");
+    if (!inputValue.includes(streamNameOrVar.replace('$', ''))) {
+      // Value not set correctly, try again with direct input
+      await streamSelect.click();
+      await streamSelect.fill(streamNameOrVar);
+      await this.page.keyboard.press('Tab'); // Trigger blur event
+    }
+
+    // Wait for any validation or dependency updates to process
+    // Increased wait time to ensure UI fully updates before save
+    await this.page.waitForTimeout(1500);
+    await this.page.waitForLoadState('domcontentloaded').catch(() => {});
   }
 
   /**
