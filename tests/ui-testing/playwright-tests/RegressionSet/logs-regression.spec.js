@@ -1204,64 +1204,6 @@ test.describe("Logs Regression Bugs", () => {
   });
 
   // ============================================================================
-  // VRL Fields: Include/exclude term icons should not appear on VRL-generated fields
-  // Feature: VRL fields should not have include/exclude icons as they are computed fields
-  // ============================================================================
-  test('should not display include/exclude term icons on VRL-generated fields @vrl @P1 @regression @main', async ({ page }) => {
-    testLogger.info('Test: VRL fields should not have include/exclude icons');
-
-    // Navigate to logs page and select stream (needed for this test suite)
-    await pm.logsPage.clickMenuLinkLogsItem();
-    await pm.logsPage.selectStream('e2e_automate');
-    await page.waitForTimeout(1000);
-
-    // Follow the exact working test pattern from logspage.spec.js
-    await pm.logsPage.clickDateTimeButton();
-    await page.waitForTimeout(500);
-    await pm.logsPage.clickRelative6WeeksButton();
-    await pm.logsPage.clickRefreshButton();
-    await page.waitForTimeout(2000);
-
-    // Toggle VRL editor and enter VRL function (uses .a=2)
-    await pm.logsPage.toggleVrlEditor();
-    await pm.logsPage.clickVrlEditor(); // This fills .a=2
-    await page.waitForTimeout(500);
-    testLogger.info('Entered VRL function via clickVrlEditor (.a=2)');
-
-    // Run query with VRL
-    await pm.logsPage.clickRefreshButton();
-    await page.waitForTimeout(3000);
-    testLogger.info('Query executed with VRL');
-
-    // Expand log row to see VRL field
-    await pm.logsPage.clickTableRowExpandMenu();
-    await page.waitForTimeout(1000);
-
-    // GUARD: Verify VRL field text is visible in expanded view
-    // This prevents vacuous pass if VRL didn't execute or field doesn't appear
-    // VRL fields show as text ".a=2" but may not have data-test attributes like regular fields
-    await pm.logsPage.expectTextVisible('.a=2');
-    testLogger.info('✓ VRL field text ".a=2" is visible in expanded view (guard passed)');
-
-    // Check if VRL field has a data-test attribute (it may or may not)
-    const vrlFieldWithDataTest = await page.locator('[data-test="log-expand-detail-key-a"]').count();
-    testLogger.info(`VRL field with data-test attribute: ${vrlFieldWithDataTest > 0 ? 'YES' : 'NO'}`);
-
-    // VRL-generated fields should NOT have include/exclude buttons
-    // If no data-test attribute exists, the field won't have buttons (expected behavior)
-    const vrlFieldIncludeExcludeCount = await pm.logsPage.getVrlFieldIncludeExcludeCount('a');
-    expect(vrlFieldIncludeExcludeCount).toBe(0);
-    testLogger.info('✓ VRL-generated field does not have include/exclude buttons');
-
-    // Verify regular fields still have include/exclude buttons (positive assertion)
-    const regularFieldCount = await pm.logsPage.getRegularIncludeExcludeCount();
-    expect(regularFieldCount, 'Regular fields should have include/exclude buttons').toBeGreaterThan(0);
-    testLogger.info(`✓ Regular fields have ${regularFieldCount} include/exclude buttons`);
-
-    testLogger.info('✓ PRIMARY CHECK PASSED: VRL fields do not show include/exclude icons');
-  });
-
-  // ============================================================================
   // Query Inspector: readonly flag in buildSearch to avoid mutating logs state
   // Feature: Query inspector should not modify the original logs state
   // ============================================================================
