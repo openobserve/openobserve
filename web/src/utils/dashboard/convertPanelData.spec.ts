@@ -545,7 +545,7 @@ describe("convertPanelData", () => {
           mockChartPanelStyle,
           mockAnnotations
         )
-      ).rejects.toThrow("Please select X-Axis or Y-Axis fields to render the chart");
+      ).rejects.toThrow("Please select required fields to render the chart");
     });
 
     it("should throw error when fields exist but x, y, breakdown are empty", async () => {
@@ -567,7 +567,7 @@ describe("convertPanelData", () => {
           mockChartPanelStyle,
           mockAnnotations
         )
-      ).rejects.toThrow("Please select X-Axis or Y-Axis fields to render the chart");
+      ).rejects.toThrow("Please select required fields to render the chart");
     });
 
     it("should proceed when query has x fields", async () => {
