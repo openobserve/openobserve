@@ -1636,4 +1636,8 @@ export class AlertsPage {
         await expect(alertCell).toBeVisible({ timeout });
         testLogger.info('Verified alert cell is visible', { alertName });
     }
+
+    async alertsURLValidation() {
+        await expect(this.page).toHaveURL(/alerts/);
+    }
 } 
