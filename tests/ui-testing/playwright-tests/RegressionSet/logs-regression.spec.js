@@ -1365,15 +1365,16 @@ test.describe("Logs Regression Bugs", () => {
     // Logs with order_by_metadata should maintain proper sort order
     let isDescending = true;
     let validTimestampCount = 0;
+    let nanTimestamps = [];
     for (let i = 1; i < timestamps.length; i++) {
       const prev = new Date(timestamps[i - 1]).getTime();
       const curr = new Date(timestamps[i]).getTime();
-      // GUARD: Fail if timestamp parsing returns NaN (locale-specific format not recognized)
+      // Collect NaN timestamps for assertion after loop (expect throws, so can't use break after)
+      if (isNaN(prev)) nanTimestamps.push({ index: i - 1, value: timestamps[i - 1] });
+      if (isNaN(curr)) nanTimestamps.push({ index: i, value: timestamps[i] });
       if (isNaN(prev) || isNaN(curr)) {
         testLogger.warn(`Timestamp parsing failed: "${timestamps[i-1]}" -> ${prev}, "${timestamps[i]}" -> ${curr}`);
-        expect(prev, `Could not parse timestamp: "${timestamps[i-1]}"`).not.toBeNaN();
-        expect(curr, `Could not parse timestamp: "${timestamps[i]}"`).not.toBeNaN();
-        break;
+        continue; // Skip this comparison but continue checking others
       }
       validTimestampCount++;
       if (prev < curr) {
@@ -1382,6 +1383,9 @@ test.describe("Logs Regression Bugs", () => {
         break;
       }
     }
+
+    // ASSERTION: No timestamps should be unparseable (fail with descriptive message)
+    expect(nanTimestamps.length, `Unparseable timestamps: ${JSON.stringify(nanTimestamps)}`).toBe(0);
 
     // ASSERTION: Must have at least 2 timestamps to verify sorting
     expect(timestamps.length).toBeGreaterThanOrEqual(2);
