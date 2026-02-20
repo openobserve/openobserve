@@ -92,15 +92,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <div
         class="col-auto"
         v-show="store.state.isAiChatEnabled && isLoading"
-        style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10"
-        :class="
-          store.state.theme == 'dark'
-            ? 'dark-mode-chat-container'
-            : 'light-mode-chat-container'
-        "
+        style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: 44px; padding-right: 0.625rem;"
       >
         <O2AIChat
-          :header-height="82.5"
+          :header-height="42.5"
           :is-open="store.state.isAiChatEnabled"
           @close="closeChat"
           :aiChatInputContext="aiChatInputContext"
@@ -112,14 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col-auto"
         v-show="store.state.isSREChatOpen"
         style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10"
-        :class="
-          store.state.theme == 'dark'
-            ? 'dark-mode-chat-container'
-            : 'light-mode-chat-container'
-        "
       >
         <SREChat
-          :header-height="82.5"
+          :header-height="42.5"
           :context-type="store.state.sreChatContext.type"
           :context-data="store.state.sreChatContext.data"
           @close="closeSREChat"
@@ -1598,14 +1588,6 @@ body.ai-chat-open {
   border-radius: 4px;
   padding: 0px 8px;
   color: white;
-}
-.dark-mode-chat-container {
-  border-left: 1.5px solid #232323ff;
-  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
-}
-.light-mode-chat-container {
-  border-left: 1.5px solid #f7f7f7;
-  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
 }
 
 .ai-btn-active {

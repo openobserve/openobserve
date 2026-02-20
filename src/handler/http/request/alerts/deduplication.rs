@@ -94,6 +94,9 @@ pub async fn get_config(_org_id: web::Path<String>) -> Result<HttpResponse, acti
         (status = 403, description = "Forbidden - Enterprise feature"),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[post("/{org_id}/alerts/deduplication/config")]
 pub async fn set_config(
@@ -128,6 +131,9 @@ pub async fn set_config(
     ),
     responses(
         (status = 403, description = "Forbidden - Enterprise feature"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[post("/{org_id}/alerts/deduplication/config")]
@@ -283,6 +289,9 @@ pub async fn get_semantic_groups(
         (status = 400, description = "Bad request - Invalid semantic groups"),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[post("/{org_id}/alerts/deduplication/semantic-groups/preview-diff")]
 pub async fn preview_semantic_groups_diff(
@@ -354,6 +363,9 @@ pub async fn preview_semantic_groups_diff(
     responses(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[post("/{org_id}/alerts/deduplication/semantic-groups/preview-diff")]
 pub async fn preview_semantic_groups_diff(
@@ -383,6 +395,9 @@ pub async fn preview_semantic_groups_diff(
         (status = 200, description = "Success"),
         (status = 400, description = "Bad request - Invalid semantic groups"),
         (status = 500, description = "Internal server error"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[put("/{org_id}/alerts/deduplication/semantic-groups")]
@@ -474,6 +489,9 @@ pub async fn save_semantic_groups(
     ),
     responses(
         (status = 403, description = "Forbidden - Enterprise feature"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[put("/{org_id}/alerts/deduplication/semantic-groups")]

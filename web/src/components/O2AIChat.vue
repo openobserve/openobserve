@@ -9,34 +9,43 @@
             <q-avatar size="24px">
               <img :src="o2AiTitleLogo" />
             </q-avatar>
-            <div class="tw-flex tw-items-center">
-              <span class="tw-mr-[5.5px]">O2 Assistant
-              </span>
-              <span class="o2-ai-beta-text"
-              >Beta</span>
-            </div>
 
-          </div>
-
-          <div>
-            <q-btn flat round dense icon="add" @click="addNewChat" />
-            <q-btn flat round dense icon="history" @click="loadHistory">
+            <q-btn
+              flat
+              dense
+              no-caps
+              class="chat-title-dropdown"
+              @click="loadHistory"
+            >
+              <div class="tw-flex tw-items-center tw-gap-2 tw-max-w-[220px]">
+                <span class="chat-title-text tw-text-[14px] tw-font-medium tw-truncate tw-block">
+                  {{ displayedTitle || 'New Chat' }}
+                  <q-tooltip
+                    v-if="displayedTitle && displayedTitle.length > 25"
+                    :delay="500"
+                    anchor="bottom middle"
+                    self="top middle"
+                    :offset="[0, 8]"
+                  >
+                    {{ displayedTitle }}
+                  </q-tooltip>
+                </span>
+                <q-icon name="arrow_drop_down" size="20px" class="tw-flex-shrink-0" />
+              </div>
               <q-menu>
-                <!-- here we will show the history menu -->
-                 <!-- and also the search functionality to search the history  -->
+                <!-- History menu with search -->
                 <div class="history-menu-container">
                   <div class="search-history-bar-sticky">
                     <q-input
                       v-model="historySearchTerm"
                       placeholder="Search chat history"
                       dense
-                    filled
-                    borderless
-                      class="tw-mb-2"
+                      borderless
+                      class="tw-mt-1"
                     >
-                    <template #prepend>
-                    <q-icon name="search" />
-                  </template>
+                      <template #prepend>
+                        <q-icon name="search" />
+                      </template>
                     </q-input>
                   </div>
                   <div class="history-list-container">
@@ -49,11 +58,25 @@
                         v-close-popup
                         @click="loadChat(chat.id)"
                         dense
+                        class="history-item"
                       >
                         <q-item-section>
-                          <div class="row items-center justify-between">
-                            <div class="col-8 ellipsis">{{ chat.title }}</div>
-                            <div class="col-4 text-right text-grey-7 text-caption">{{ formatTime(chat.timestamp) }}</div>
+                          <div class="tw-flex tw-items-center tw-justify-between tw-w-full">
+                            <div class="tw-flex-1 tw-overflow-hidden">
+                              <div class="tw-text-[13px] tw-truncate">{{ chat.title }}</div>
+                              <div class="tw-text-[11px] tw-text-gray-500">{{ formatTime(chat.timestamp) }}</div>
+                            </div>
+                            <q-btn
+                              flat
+                              round
+                              dense
+                              size="xs"
+                              icon="delete"
+                              class="delete-history-btn"
+                              @click.stop="deleteChat(chat.id)"
+                            >
+                              <q-tooltip :delay="500">Delete chat</q-tooltip>
+                            </q-btn>
                           </div>
                         </q-item-section>
                       </q-item>
@@ -64,15 +87,44 @@
                       </q-item>
                     </q-list>
                   </div>
+
+                  <!-- Clear all conversations button -->
+                  <div v-if="filteredChatHistory.length > 0" class="clear-all-container">
+                    <q-separator />
+                    <q-btn
+                      flat
+                      no-caps
+                      class="clear-all-btn"
+                      icon="delete_sweep"
+                      label="Clear all conversations"
+                      @click.stop="clearAllConversations"
+                    />
+                  </div>
                 </div>
               </q-menu>
             </q-btn>
-            <q-btn flat round dense icon="close" @click="$emit('close')" />
+          </div>
+
+          <div>
+            <!-- Edit title button -->
+            <q-btn
+              v-if="currentChatId"
+              flat
+              round
+              dense
+              size="md"
+              icon="edit"
+              @click.stop="openEditTitleDialog"
+            >
+              <q-tooltip :delay="500">Edit title</q-tooltip>
+            </q-btn>
+            <q-btn flat round dense size="md" icon="add" @click="addNewChat" />
+            <q-btn flat round dense size="md" icon="close" @click="$emit('close')" />
           </div>
         </div>
       </div>
       <q-separator class="tw-bg-[#DBDBDB]" />
-      
+
       <!-- History Panel -->
       <q-dialog v-model="showHistory" position="right">
         <q-card style="width: 350px; max-width: 100vw; height: 100vh;">
@@ -106,12 +158,162 @@
         </q-card>
       </q-dialog>
 
+      <!-- Edit Title Dialog -->
+      <q-dialog v-model="showEditTitleDialog">
+        <q-card style="min-width: 350px">
+          <q-card-section>
+            <div class="text-h6">Edit Chat Title</div>
+          </q-card-section>
+
+          <q-card-section class="q-pt-none">
+            <q-input
+              v-model="editingTitle"
+              dense
+              borderless
+              autofocus
+              @keyup.enter="saveEditedTitle"
+              placeholder="Enter chat title"
+            />
+          </q-card-section>
+
+          <q-card-actions align="right" class="q-px-md q-pb-md">
+            <q-btn
+              label="Cancel"
+              class="o2-secondary-button"
+              no-caps
+              v-close-popup
+            />
+            <q-btn
+              label="Save"
+              class="o2-primary-button q-ml-sm"
+              no-caps
+              @click="saveEditedTitle"
+            />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
+
+      <!-- Delete Chat Confirmation Dialog -->
+      <ConfirmDialog
+        v-model="showDeleteChatConfirmDialog"
+        title="Delete Chat"
+        message="Are you sure you want to delete this chat? This action cannot be undone."
+        @update:ok="confirmDeleteChat"
+        @update:cancel="showDeleteChatConfirmDialog = false"
+      />
+
+      <!-- Clear All Conversations Confirmation Dialog -->
+      <ConfirmDialog
+        v-model="showClearAllConfirmDialog"
+        title="Clear All Conversations"
+        message="Are you sure you want to clear all conversations? This action cannot be undone."
+        @update:ok="confirmClearAllConversations"
+        @update:cancel="showClearAllConfirmDialog = false"
+      />
+
+
+      <!-- Image Preview Dialog -->
+      <q-dialog v-model="showImagePreview" @hide="closeImagePreview">
+        <q-card class="image-preview-dialog" style="max-width: 90vw; max-height: 90vh;">
+          <q-card-section class="row items-center q-pb-none">
+            <div class="text-subtitle1">{{ previewImage?.filename }}</div>
+            <q-space />
+            <q-btn icon="close" flat round dense v-close-popup />
+          </q-card-section>
+          <q-card-section class="q-pa-md tw-flex tw-justify-center">
+            <img
+              v-if="previewImage"
+              :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
+              :alt="previewImage.filename"
+              style="max-width: 100%; max-height: 80vh; object-fit: contain;"
+            />
+          </q-card-section>
+        </q-card>
+      </q-dialog>
+
+      <!-- Edit Title Dialog -->
+      <q-dialog v-model="showEditTitleDialog">
+        <q-card style="min-width: 350px">
+          <q-card-section>
+            <div class="text-h6">Edit Chat Title</div>
+          </q-card-section>
+
+          <q-card-section class="q-pt-none">
+            <q-input
+              v-model="editingTitle"
+              dense
+              borderless
+              autofocus
+              @keyup.enter="saveEditedTitle"
+              placeholder="Enter chat title"
+            />
+          </q-card-section>
+
+          <q-card-actions align="right" class="q-px-md q-pb-md">
+            <q-btn
+              label="Cancel"
+              class="o2-secondary-button"
+              no-caps
+              v-close-popup
+            />
+            <q-btn
+              label="Save"
+              class="o2-primary-button q-ml-sm"
+              no-caps
+              @click="saveEditedTitle"
+            />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
+
+      <!-- Delete Chat Confirmation Dialog -->
+      <ConfirmDialog
+        v-model="showDeleteChatConfirmDialog"
+        title="Delete Chat"
+        message="Are you sure you want to delete this chat? This action cannot be undone."
+        @update:ok="confirmDeleteChat"
+        @update:cancel="showDeleteChatConfirmDialog = false"
+      />
+
+      <!-- Clear All Conversations Confirmation Dialog -->
+      <ConfirmDialog
+        v-model="showClearAllConfirmDialog"
+        title="Clear All Conversations"
+        message="Are you sure you want to clear all conversations? This action cannot be undone."
+        @update:ok="confirmClearAllConversations"
+        @update:cancel="showClearAllConfirmDialog = false"
+      />
+
+
+      <!-- Image Preview Dialog -->
+      <q-dialog v-model="showImagePreview" @hide="closeImagePreview">
+        <q-card class="image-preview-dialog" style="max-width: 90vw; max-height: 90vh;">
+          <q-card-section class="row items-center q-pb-none">
+            <div class="text-subtitle1">{{ previewImage?.filename }}</div>
+            <q-space />
+            <q-btn icon="close" flat round dense v-close-popup />
+          </q-card-section>
+          <q-card-section class="q-pa-md tw-flex tw-justify-center">
+            <img
+              v-if="previewImage"
+              :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
+              :alt="previewImage.filename"
+              style="max-width: 100%; max-height: 80vh; object-fit: contain;"
+            />
+          </q-card-section>
+        </q-card>
+      </q-dialog>
+
+
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
           <div v-if="chatMessages.length === 0" class="welcome-section ">
             <div class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full ">
               <img :src="o2AiTitleLogo" />
-              <span class="tw-text-[14px] tw-font-[600] tw-text-center">AI native  observability</span>
+              <div class="tw-relative tw-inline-block">
+                <span class="tw-text-[14px] tw-font-[600] tw-ml-[30px] tw-text-center">O2 Assistant</span>
+                <span class="o2-ai-beta-text tw-ml-[8px]">BETA</span>
+              </div>
             </div>
           </div>
           <div v-for="(message, index) in processedMessages" 
@@ -137,23 +339,92 @@
                   <div
                     v-if="block.type === 'tool_call'"
                     class="tool-call-item"
-                    :class="[store.state.theme == 'dark' ? 'dark-mode' : 'light-mode', { 'has-details': hasToolCallDetails(block) }]"
-                    @click="hasToolCallDetails(block) && toggleToolCallExpanded(index, blockIndex)"
+                    :class="[
+                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
+                      { 'has-details': hasToolCallDetails(block) },
+                      { 'error': block.success === false && !block.pendingConfirmation },
+                      { 'pending-confirmation': block.pendingConfirmation },
+                    ]"
+                    @click="hasToolCallDetails(block) && !block.pendingConfirmation && toggleToolCallExpanded(index, blockIndex)"
                   >
                     <div class="tool-call-header">
-                      <q-icon name="check_circle" size="14px" color="positive" />
+                      <q-icon
+                        :name="block.pendingConfirmation ? 'help_outline' : (block.success === false ? 'error' : 'check_circle')"
+                        size="14px"
+                        :color="block.pendingConfirmation ? 'warning' : (block.success === false ? 'negative' : 'positive')"
+                      />
                       <span class="tool-call-name">
                         {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
                       </span>
                       <q-icon
-                        v-if="hasToolCallDetails(block)"
+                        v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
                         :name="isToolCallExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
                         size="16px"
                         class="expand-icon"
                       />
                     </div>
+                    <!-- Inline confirmation buttons -->
+                    <div v-if="block.pendingConfirmation" class="tool-confirmation-inline" @click.stop>
+                      <span class="confirmation-message">{{ block.confirmationMessage }}</span>
+                      <div v-if="block.confirmationArgs && Object.keys(block.confirmationArgs).length" class="confirmation-args">
+                        <div v-for="(value, key) in block.confirmationArgs" :key="key" class="confirmation-arg">
+                          <span class="arg-key">{{ key }}:</span>
+                          <code class="arg-value">{{ typeof value === 'object' ? JSON.stringify(value) : value }}</code>
+                        </div>
+                      </div>
+                      <div class="confirmation-buttons">
+                        <q-btn
+                          dense
+                          no-caps
+                          size="sm"
+                          outline
+                          color="grey"
+                          label="Confirm"
+                          icon="check"
+                          class="confirmation-btn"
+                          @click="handleToolConfirm"
+                        />
+                        <q-btn
+                          dense
+                          no-caps
+                          size="sm"
+                          color="negative"
+                          label="Cancel"
+                          icon="close"
+                          class="confirmation-btn"
+                          @click="handleToolCancel"
+                        />
+                      </div>
+                    </div>
                     <!-- Expandable details -->
                     <div v-if="isToolCallExpanded(index, blockIndex)" class="tool-call-details" @click.stop>
+                      <!-- Error details for failed tool calls -->
+                      <template v-if="block.success === false">
+                        <div v-if="block.resultMessage" class="detail-item">
+                          <span class="detail-label">Error</span>
+                          <span class="detail-value tool-error-message">{{ block.resultMessage }}</span>
+                        </div>
+                        <div v-if="block.errorType" class="detail-item">
+                          <span class="detail-label">Type</span>
+                          <code class="detail-value">{{ block.errorType }}</code>
+                        </div>
+                        <div v-if="block.suggestion" class="detail-item">
+                          <span class="detail-label">Suggestion</span>
+                          <span class="detail-value tool-suggestion">{{ block.suggestion }}</span>
+                        </div>
+                      </template>
+                      <!-- Summary details for successful tool calls with summary -->
+                      <template v-if="block.success !== false && block.summary">
+                        <div v-if="block.summary.count !== undefined" class="detail-item">
+                          <span class="detail-label">Results</span>
+                          <span class="detail-value">{{ block.summary.count }} records</span>
+                        </div>
+                        <div v-if="block.summary.took !== undefined" class="detail-item">
+                          <span class="detail-label">Duration</span>
+                          <span class="detail-value">{{ block.summary.took }}ms</span>
+                        </div>
+                      </template>
+                      <!-- Existing context details -->
                       <div v-if="getToolCallDisplayData(block.context)?.query" class="detail-item">
                         <div class="detail-header">
                           <span class="detail-label">Query</span>
@@ -214,6 +485,139 @@
                         </div>
                         <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.vrl }}</code>
                       </div>
+                      <!-- Tool response: SearchSQL hits -->
+                      <template v-if="block.response && block.response.hits">
+                        <div class="detail-item">
+                          <div class="detail-header">
+                            <span class="detail-label">Results</span>
+                            <q-btn
+                              flat
+                              dense
+                              size="xs"
+                              icon="content_copy"
+                              class="copy-btn"
+                              @click.stop="copyToClipboard(JSON.stringify(block.response.hits, null, 2))"
+                            >
+                              <q-tooltip>Copy results</q-tooltip>
+                            </q-btn>
+                          </div>
+                          <div class="tool-response-hits">
+                            <div v-for="(hit, hIdx) in block.response.hits" :key="hIdx" class="tool-response-hit">
+                              <span v-for="(val, key) in hit" :key="key" class="hit-field">
+                                <span class="hit-key">{{ key }}:</span> {{ val }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="tool-response-meta">
+                          <span v-if="block.response.total !== undefined" class="context-tag">Total: {{ block.response.total }}</span>
+                          <span v-if="block.response.took !== undefined" class="context-tag">Took: {{ block.response.took }}ms</span>
+                          <span v-if="block.response.hits_truncated" class="context-tag">Showing first {{ block.response.hits.length }}</span>
+                        </div>
+                      </template>
+                      <!-- Tool response: testFunction input/output -->
+                      <template v-else-if="block.response && (block.response.input || block.response.output)">
+                        <div v-if="block.response.input" class="detail-item">
+                          <span class="detail-label">Input Events</span>
+                          <div class="tool-response-hits">
+                            <div v-for="(evt, eIdx) in block.response.input" :key="eIdx" class="tool-response-hit">
+                              <span v-for="(val, key) in evt" :key="key" class="hit-field">
+                                <span class="hit-key">{{ key }}:</span> {{ typeof val === 'string' && val.length > 120 ? val.substring(0, 120) + '...' : val }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div v-if="block.response.output" class="detail-item">
+                          <span class="detail-label">Output</span>
+                          <div class="tool-response-hits">
+                            <div v-for="(res, rIdx) in block.response.output" :key="rIdx" class="tool-response-hit">
+                              <template v-if="res.event">
+                                <span v-for="(val, key) in res.event" :key="key" class="hit-field">
+                                  <span class="hit-key">{{ key }}:</span> {{ typeof val === 'string' && val.length > 120 ? val.substring(0, 120) + '...' : val }}
+                                </span>
+                              </template>
+                              <span v-if="res.message" class="hit-field hit-error">
+                                <span class="hit-key">error:</span> {{ res.message }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                      <!-- Tool response: generic fallback (string or other) -->
+                      <div v-else-if="block.response" class="detail-item">
+                        <div class="detail-header">
+                          <span class="detail-label">Response</span>
+                          <q-btn
+                            flat
+                            dense
+                            size="xs"
+                            icon="content_copy"
+                            class="copy-btn"
+                            @click.stop="copyToClipboard(typeof block.response === 'string' ? block.response : JSON.stringify(block.response, null, 2))"
+                          >
+                            <q-tooltip>Copy response</q-tooltip>
+                          </q-btn>
+                        </div>
+                        <code class="detail-value query-value">{{ typeof block.response === 'string' ? block.response : JSON.stringify(block.response, null, 2) }}</code>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Log Entry block - expandable -->
+                  <div
+                    v-else-if="block.type === 'log_entry'"
+                    class="log-entry-item"
+                    :class="[
+                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
+                    ]"
+                    @click="toggleLogEntryExpanded(index, blockIndex)"
+                  >
+                    <div class="log-entry-header">
+                      <q-icon
+                        name="description"
+                        size="14px"
+                        color="primary"
+                      />
+                      <span class="log-entry-info">
+                        {{ block.preview }}
+                      </span>
+                      <q-icon
+                        :name="isLogEntryExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
+                        size="16px"
+                        class="expand-icon"
+                      />
+                    </div>
+                    <!-- Expandable details -->
+                    <div v-if="isLogEntryExpanded(index, blockIndex)" class="log-entry-details" @click.stop>
+                      <div class="log-entry-content">
+                        <q-btn
+                          flat
+                          dense
+                          size="xs"
+                          icon="content_copy"
+                          class="copy-btn"
+                          @click.stop="copyToClipboard(block.content)"
+                        >
+                          <q-tooltip>Copy content</q-tooltip>
+                        </q-btn>
+                        <code class="log-entry-code" v-html="formatLogEntryContent(block.content)"></code>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Stream-level error block -->
+                  <div
+                    v-else-if="block.type === 'error'"
+                    class="stream-error-block"
+                    :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+                  >
+                    <div class="stream-error-header">
+                      <q-icon name="warning" size="16px" color="negative" />
+                      <span class="stream-error-message">{{ block.message }}</span>
+                    </div>
+                    <div v-if="block.suggestion" class="stream-error-suggestion">
+                      {{ block.suggestion }}
+                    </div>
+                    <div v-if="block.recoverable" class="stream-error-recoverable">
+                      This error may be temporary. You can try again.
                     </div>
                   </div>
                   <!-- Text block - render with markdown processing -->
@@ -263,6 +667,22 @@
                 </template>
                 <!-- Fallback for messages without contentBlocks (user messages or old assistant messages) -->
                 <template v-if="!message.contentBlocks || message.contentBlocks.length === 0">
+                  <!-- Display images for user messages -->
+                  <div v-if="message.role === 'user' && message.images && message.images.length > 0" class="message-images tw-flex tw-flex-wrap tw-gap-2 tw-mb-2">
+                    <div
+                      v-for="(img, imgIndex) in message.images"
+                      :key="'img-' + imgIndex"
+                      class="message-image-item"
+                    >
+                      <img
+                        :src="'data:' + img.mimeType + ';base64,' + img.data"
+                        :alt="img.filename"
+                        class="tw-max-w-[200px] tw-max-h-[150px] tw-object-contain tw-rounded tw-border tw-border-gray-300 tw-cursor-pointer"
+                        @click="openImagePreview(img)"
+                      />
+                      <q-tooltip>{{ img.filename }}</q-tooltip>
+                    </div>
+                  </div>
                   <template v-for="(block, blockIndex) in message.blocks" :key="'fb-' + blockIndex">
                     <div v-if="block.type === 'code'" class="code-block">
                       <div class="code-block-header code-block-theme">
@@ -303,6 +723,9 @@
                   <div v-if="getToolCallDisplayData(activeToolCall.context)?.query" class="context-item">
                     <code class="context-query">{{ truncateQuery(getToolCallDisplayData(activeToolCall.context)?.query) }}</code>
                   </div>
+                  <div v-if="getToolCallDisplayData(activeToolCall.context)?.vrl && !getToolCallDisplayData(activeToolCall.context)?.query" class="context-item">
+                    <code class="context-query">{{ truncateQuery(getToolCallDisplayData(activeToolCall.context)?.vrl) }}</code>
+                  </div>
                   <span v-if="getToolCallDisplayData(activeToolCall.context)?.stream" class="context-tag">
                     Stream: {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
                   </span>
@@ -314,9 +737,11 @@
             </div>
           </div>
           <!-- Standalone loading indicator - only shown when loading with no tool calls -->
-          <div v-if="isLoading && !activeToolCall" id="loading-indicator" class="tw-flex tw-items-center tw-gap-2 tw-p-4">
-            <q-spinner-dots color="primary" size="2em" />
-            <span>{{ currentAnalyzingMessage }}</span>
+          <div v-if="isLoading && !activeToolCall" class="tool-call-indicator" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
+            <div class="tool-call-content">
+              <q-spinner-dots color="primary" size="1.5em" />
+              <span class="tool-call-message">{{ currentAnalyzingMessage }}</span>
+            </div>
           </div>
         </div>
         
@@ -339,51 +764,128 @@
           </q-btn>
         </div>
       </div>
-      <div class="chat-input-wrapper tw-flex tw-flex-col q-ma-md" @click="focusInput">
-        <q-input
-          ref="chatInput"
-          v-model="inputMessage"
-          placeholder="Write your prompt"
-          dense
-          :disable="isLoading"
-          rows="10"
-          @keydown="handleKeyDown"
-          type="textarea"
-          autogrow
-          :borderless="true"
-          style="max-height: 250px; overflow-y: auto; font-size: 16px;"
-          class="chat-input"
-          flat
-        >
-        </q-input>
-        <div class="tw-flex tw-items-center tw-justify-end tw-mt-2 tw-gap-2" :class="store.state.theme == 'dark' ? 'dark-mode-bottom-bar' : 'light-mode-bottom-bar'">
-          <!-- Debug info - remove this later -->
-          <!-- <div class="tw-text-xs tw-text-gray-500">Loading: {{ isLoading }}, Input: {{ inputMessage.length }}</div> -->
 
-          <!-- Send button - shown when not loading -->
-          <q-btn
-            v-if="!isLoading"
-            :disable="!inputMessage.trim()"
-            @click="sendMessage"
-            round
-            dense
-            flat
-            class="tw-ml-1 send-button"
-          >
-            <q-icon name="send" size="16px" color="white" />
-          </q-btn>
-          
-          <!-- Stop button - shown when loading/streaming -->
-          <q-btn
-            v-if="isLoading"
-            @click="cancelCurrentRequest"
-            round
-            dense
-            flat
-            class="tw-ml-1 stop-button"
-          >
-            <q-icon name="stop" size="16px" color="white" />
-          </q-btn>
+      <!-- Fixed loading indicator above input - only shown when scrolled up -->
+      <div
+        v-if="(isLoading || activeToolCall) && showScrollToBottom"
+        class="fixed-analyzing-indicator"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+      >
+        <!-- Show tool call if active -->
+        <div v-if="activeToolCall" class="analyzing-content">
+          <q-spinner-dots color="primary" size="1.5em" />
+          <span class="analyzing-message">{{ activeToolCall.message }}</span>
+        </div>
+        <!-- Show analyzing message if loading but no active tool call -->
+        <div v-else-if="isLoading" class="analyzing-content">
+          <q-spinner-dots color="primary" size="1.5em" />
+          <span class="analyzing-message">{{ currentAnalyzingMessage }}</span>
+        </div>
+      </div>
+
+      <div class="chat-input-container q-ma-md">
+        <!-- Hidden file input for image upload -->
+        <input
+          ref="imageInputRef"
+          type="file"
+          accept="image/png,image/jpeg"
+          multiple
+          style="display: none;"
+          @change="handleImageSelect"
+        />
+
+        <div
+          class="unified-input-box"
+          :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+          @dragover="handleDragOver"
+          @drop="handleDrop"
+          @paste="handlePaste"
+        >
+          <!-- Image preview strip -->
+          <div v-if="pendingImages.length > 0" class="image-preview-strip">
+            <div
+              v-for="(img, index) in pendingImages"
+              :key="index"
+              class="image-preview-item"
+            >
+              <img
+                :src="'data:' + img.mimeType + ';base64,' + img.data"
+                :alt="img.filename"
+                class="preview-image"
+              />
+              <q-btn
+                round
+                dense
+                flat
+                size="xs"
+                class="image-remove-btn"
+                @click.stop="removeImage(index)"
+              >
+                <q-icon name="close" size="12px" color="white" />
+              </q-btn>
+              <q-tooltip>{{ img.filename }} ({{ (img.size / 1024).toFixed(0) }}KB)</q-tooltip>
+            </div>
+          </div>
+
+          <RichTextInput
+            ref="chatInput"
+            v-model="inputMessage"
+            :placeholder="'Write your prompt'"
+            :disabled="isLoading"
+            :theme="store.state.theme"
+            :references="contextReferences"
+            :borderless="true"
+            @keydown="handleKeyDown"
+            @submit="sendMessage"
+            @update:references="handleReferencesUpdate"
+          />
+
+          <!-- Bottom bar with buttons -->
+          <div class="input-bottom-bar">
+            <!-- Image upload button -->
+            <q-btn
+              v-if="!isLoading"
+              @click.stop="triggerImageUpload"
+              round
+              dense
+              flat
+              size="sm"
+              class="image-upload-btn"
+            >
+              <q-icon name="image" size="18px" :color="store.state.theme == 'dark' ? 'white' : 'grey-7'" />
+              <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
+            </q-btn>
+            <div v-else class="tw-w-8"></div>
+
+            <div class="tw-flex tw-items-center tw-gap-2">
+              <!-- Send button - shown when not loading -->
+              <q-btn
+                v-if="!isLoading"
+                :disable="!inputMessage.trim() && pendingImages.length === 0"
+                @click="sendMessage"
+                round
+                dense
+                flat
+                size="sm"
+                class="send-button"
+              >
+                <q-icon name="send" size="16px" color="white" />
+              </q-btn>
+
+              <!-- Stop button - shown when loading/streaming -->
+              <q-btn
+                v-if="isLoading"
+                @click="cancelCurrentRequest"
+                round
+                dense
+                flat
+                size="sm"
+                class="stop-button"
+              >
+                <q-icon name="stop" size="16px" color="white" />
+              </q-btn>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -403,7 +905,9 @@ import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
-import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock } from '@/types/chat';
+import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 
 // Add IndexedDB setup
 const DB_NAME = 'o2ChatDB';
@@ -466,6 +970,10 @@ function renderMarkdown(content: any) {
 
 export default defineComponent({
   name: 'O2AIChat',
+  components: {
+    ConfirmDialog,
+    RichTextInput,
+  },
   props: {
     isOpen: {
       type: Boolean,
@@ -491,7 +999,7 @@ export default defineComponent({
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
-    const chatInput = ref<HTMLElement | null>(null);
+    const chatInput = ref<any>(null); // RichTextInput component instance
     const scrollTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null);
     const currentStreamingMessage = ref('');
     const currentTextSegment = ref(''); // Track current text segment (resets after each tool call)
@@ -508,8 +1016,31 @@ export default defineComponent({
     const shouldAutoScroll = ref(true);
     const showScrollToBottom = ref(false);
 
+    // Edit title state
+    const showEditTitleDialog = ref(false);
+    const editingTitle = ref('');
+
+    // Clear all confirmation state
+    const showClearAllConfirmDialog = ref(false);
+
+    // Delete individual chat confirmation state
+    const showDeleteChatConfirmDialog = ref(false);
+    const chatToDelete = ref<number | null>(null);
+
+    // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
+    const pendingConfirmation = ref<{ tool: string; args: Record<string, any>; message: string } | null>(null);
+
+    // AI-generated chat title state
+    const aiGeneratedTitle = ref<string | null>(null);
+    const displayedTitle = ref<string>('');
+    const isTypingTitle = ref(false);
+    const titleAnimationId = ref<number>(0); // Used to cancel stale animations
+
     // Track expanded tool calls by message index and block index
     const expandedToolCalls = ref<Set<string>>(new Set());
+
+    // Track expanded log entries by message index and block index
+    const expandedLogEntries = ref<Set<string>>(new Set());
 
     // Active tool call state - for showing tool progress outside message box
     const activeToolCall = ref<{ tool: string; message: string; context: Record<string, any> } | null>(null);
@@ -520,9 +1051,28 @@ export default defineComponent({
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
 
+    // Typewriter animation state for LLM responses
+    const displayedStreamingContent = ref('');
+    const typewriterAnimationId = ref<number | null>(null);
+    const TYPEWRITER_SPEED = 8; // ms per character - fast like ChatGPT (5-10ms range)
+
     // Throttle save during streaming to prevent data loss on page reload
     const lastStreamingSaveTime = ref<number>(0);
     const STREAMING_SAVE_INTERVAL = 3000; // Save at most every 3 seconds during streaming
+
+    // Pending images for current message
+    const pendingImages = ref<ImageAttachment[]>([]);
+    const imageInputRef = ref<HTMLInputElement | null>(null);
+    // Image preview dialog state
+    const showImagePreview = ref(false);
+    const previewImage = ref<ImageAttachment | null>(null);
+
+    // Context references for rich text input chips
+    const contextReferences = ref<ReferenceChip[]>([]);
+
+    // Component readiness tracking
+    const componentReady = ref(false);
+    const pendingChips = ref<ReferenceChip[]>([]);
 
     // Analyzing messages for loading indicator
     const ANALYZING_MESSAGES = [
@@ -568,6 +1118,120 @@ export default defineComponent({
         clearInterval(analyzingRotationInterval.value);
         analyzingRotationInterval.value = null;
       }
+    };
+
+    // Interval ID for title animation
+    let titleIntervalId: ReturnType<typeof setInterval> | null = null;
+
+    /**
+     * Animate title with typewriter effect
+     * Characters appear one by one from left to right
+     * Uses setInterval for reliable timing with Vue reactivity
+     */
+    const animateTitle = (title: string) => {
+      // Clear any existing animation
+      if (titleIntervalId) {
+        clearInterval(titleIntervalId);
+        titleIntervalId = null;
+      }
+
+      // Increment animation ID to track this animation
+      const currentAnimationId = ++titleAnimationId.value;
+
+      isTypingTitle.value = true;
+      displayedTitle.value = '';
+      let charIndex = 0;
+
+      titleIntervalId = setInterval(() => {
+        // Check if this animation was superseded
+        if (titleAnimationId.value !== currentAnimationId) {
+          if (titleIntervalId) {
+            clearInterval(titleIntervalId);
+            titleIntervalId = null;
+          }
+          return;
+        }
+
+        if (charIndex < title.length) {
+          displayedTitle.value = title.slice(0, charIndex + 1);
+          charIndex++;
+        } else {
+          // Animation complete
+          if (titleIntervalId) {
+            clearInterval(titleIntervalId);
+            titleIntervalId = null;
+          }
+          isTypingTitle.value = false;
+        }
+      }, 30); // 30ms per character
+    };
+
+    /**
+     * Reset title state for new chat
+     */
+    const resetTitleState = () => {
+      // Cancel any ongoing animation
+      titleAnimationId.value++;
+      if (titleIntervalId) {
+        clearInterval(titleIntervalId);
+        titleIntervalId = null;
+      }
+      aiGeneratedTitle.value = null;
+      displayedTitle.value = '';
+      isTypingTitle.value = false;
+    };
+
+    /**
+     * Reset typewriter animation state
+     */
+    const resetTypewriterState = () => {
+      displayedStreamingContent.value = '';
+      if (typewriterAnimationId.value) {
+        cancelAnimationFrame(typewriterAnimationId.value);
+        typewriterAnimationId.value = null;
+      }
+    };
+
+    /**
+     * Animate text reveal with typewriter effect
+     * Skips animation for code blocks (reveals them instantly)
+     */
+    const animateStreamingText = () => {
+      const target = currentTextSegment.value;
+      const current = displayedStreamingContent.value;
+
+      if (current.length >= target.length) {
+        // Caught up, stop animation
+        if (typewriterAnimationId.value) {
+          cancelAnimationFrame(typewriterAnimationId.value);
+          typewriterAnimationId.value = null;
+        }
+        return;
+      }
+
+      // Check if we're at the start of a code block - if so, skip to end of code block
+      const remaining = target.slice(current.length);
+      const codeBlockStart = remaining.match(/^```[\w]*/);
+
+      if (codeBlockStart) {
+        // Find the closing ``` and reveal entire code block instantly
+        const codeBlockEnd = remaining.indexOf('```', codeBlockStart[0].length);
+        if (codeBlockEnd !== -1) {
+          const endPos = codeBlockEnd + 3;
+          displayedStreamingContent.value = target.slice(0, current.length + endPos);
+        } else {
+          // Code block not complete yet, reveal opening and wait
+          displayedStreamingContent.value = target.slice(0, current.length + codeBlockStart[0].length);
+        }
+      } else {
+        // Regular text - reveal one character
+        displayedStreamingContent.value = target.slice(0, current.length + 1);
+      }
+
+      // Schedule next frame
+      typewriterAnimationId.value = requestAnimationFrame(() => {
+        setTimeout(animateStreamingText, TYPEWRITER_SPEED);
+      });
     };
 
     // Query history functionality
@@ -690,6 +1354,13 @@ export default defineComponent({
         activeToolCall.value = null;
         stopAnalyzingRotation();
 
+        // Immediately show all buffered text (like ChatGPT's "Stop generating")
+        displayedStreamingContent.value = currentTextSegment.value;
+        if (typewriterAnimationId.value) {
+          cancelAnimationFrame(typewriterAnimationId.value);
+          typewriterAnimationId.value = null;
+        }
+
         // Handle partial message cleanup
         if (chatMessages.value.length > 0) {
           const lastMessage = chatMessages.value[chatMessages.value.length - 1];
@@ -698,15 +1369,23 @@ export default defineComponent({
               // Remove empty assistant message that was added for streaming
               chatMessages.value.pop();
             } else if (currentStreamingMessage.value) {
+              // Update final text in contentBlocks to show all buffered content
+              if (lastMessage.contentBlocks) {
+                const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+                if (lastBlock && lastBlock.type === 'text') {
+                  lastBlock.text = currentTextSegment.value;
+                }
+              }
               // Keep partial content but indicate it was cancelled
               lastMessage.content += '\n\n_[Response stopped by user]_';
             }
           }
         }
-        
+
         // Reset streaming state
         currentStreamingMessage.value = '';
         currentTextSegment.value = '';
+        displayedStreamingContent.value = '';
 
         // Save the current state including cancellation
         await saveToHistory();
@@ -716,22 +1395,106 @@ export default defineComponent({
       }
     };
 
+    // Process any pending chips that were queued before component was ready
+    const processPendingChips = () => {
+      if (pendingChips.value.length > 0) {
+        nextTick(() => {
+          if (chatInput.value && typeof chatInput.value.insertChip === 'function') {
+            // Focus input first to ensure cursor is positioned correctly
+            focusInput();
+
+            // Only clear if appendMode is false and there are no existing chips
+            // Check DOM directly for existing chips instead of relying on reactive state
+            const inputElement = chatInput.value.$el || chatInput.value;
+            const editableDiv = inputElement?.querySelector('.rich-text-input') || inputElement?.querySelector('[contenteditable]');
+            const hasExistingChips = editableDiv?.querySelector('.reference-chip') !== null;
+            const hasExistingText = editableDiv?.textContent?.trim().length > 0;
+
+            // Only clear if:
+            // 1. appendMode is false (user wants to replace content)
+            // 2. AND there are no existing chips
+            // 3. AND there is no existing text
+            if (!props.appendMode && !hasExistingChips && !hasExistingText) {
+              if (chatInput.value && typeof chatInput.value.clear === 'function') {
+                chatInput.value.clear();
+              }
+              inputMessage.value = '';
+            }
+
+            // Insert all pending chips at the cursor position
+            pendingChips.value.forEach(chip => {
+              chatInput.value.insertChip(chip);
+            });
+            pendingChips.value = [];
+          }
+        });
+      }
+    };
+
+    // Helper to create a better preview of content
+    const createPreview = (content: string, maxLength: number = 40): string => {
+      // Clean up content
+      let preview = content.trim();
+
+      // Try to detect JSON and create a meaningful preview
+      try {
+        const parsed = JSON.parse(content);
+        if (typeof parsed === 'object' && parsed !== null) {
+          // For objects, show first few keys
+          const keys = Object.keys(parsed);
+          if (keys.length > 0) {
+            const firstKeys = keys.slice(0, 3).map(k => {
+              const val = parsed[k];
+              if (typeof val === 'string') {
+                const truncatedVal = val.length > 8 ? val.substring(0, 8) + '...' : val;
+                return k + ': "' + truncatedVal + '"';
+              }
+              return k + ': ' + String(val).substring(0, 8);
+            }).join(', ');
+            const moreKeys = keys.length > 3 ? ', ...' : '';
+            preview = '{' + firstKeys + moreKeys + '}';
+          }
+        }
+      } catch {
+        // Not JSON, use plain text preview
+        // Replace newlines and multiple spaces with single space
+        preview = preview.replace(/\s+/g, ' ');
+      }
+
+      // Truncate if still too long
+      if (preview.length > maxLength) {
+        preview = preview.substring(0, maxLength) + '...';
+      }
+
+      return preview;
+    };
+
     watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
       if(newAiChatInputContext) {
-        if (props.appendMode) {
-          // Append mode: add to existing input with separator if needed
-          const currentValue = inputMessage.value?.trim();
-          if (currentValue) {
-            inputMessage.value = currentValue + "\n\n" + newAiChatInputContext;
-          } else {
-            inputMessage.value = newAiChatInputContext;
-          }
-          // Scroll to show the newly appended content
-          scrollInputToBottom();
-        } else {
-          // Replace mode: replace the input
-          inputMessage.value = newAiChatInputContext;
+        // Create a reference chip from the context
+        const contextChip: ReferenceChip = {
+          id: `context-${Date.now()}`,
+          filename: 'Log Entry',
+          preview: createPreview(newAiChatInputContext, 10),
+          fullContent: newAiChatInputContext,
+          charCount: newAiChatInputContext.length,
+          type: 'context'
+        };
+
+        // Always queue the chip first for consistent behavior
+        pendingChips.value.push(contextChip);
+
+        // If component is ready, process immediately with proper timing
+        if (componentReady.value && chatInput.value && typeof chatInput.value.insertChip === 'function') {
+          // Use a small delay to ensure input is focused and ready
+          nextTick(() => {
+            setTimeout(() => {
+              processPendingChips();
+            }, 50);
+          });
         }
+        // If component not ready, chips will be processed when componentReady becomes true
+        // No fallback text needed - avoids flickering when chat opens
       }
     });
 
@@ -784,6 +1547,48 @@ export default defineComponent({
                 try {
                   const data = JSON.parse(jsonStr);
 
+                  // Handle title events - AI-generated chat title from first message
+                  if (data && data.type === 'title') {
+                    aiGeneratedTitle.value = data.title;
+                    animateTitle(data.title);
+                    continue;
+                  }
+
+                  // Handle confirmation_required events - add inline confirmation block in chat
+                  if (data && data.type === 'confirmation_required') {
+                    // Complete any active tool call indicator and turn it into a pending-confirmation block
+                    const confirmBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value?.tool || data.tool,
+                      message: activeToolCall.value?.message || `Execute ${data.tool}`,
+                      context: activeToolCall.value?.context || {},
+                      pendingConfirmation: true,
+                      confirmationMessage: data.message || `Confirm execution of ${data.tool}?`,
+                      confirmationArgs: data.args || {},
+                    };
+                    activeToolCall.value = null;
+
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(confirmBlock);
+                    } else {
+                      chatMessages.value.push({
+                        role: 'assistant',
+                        content: '',
+                        contentBlocks: [...pendingToolCalls.value, confirmBlock],
+                      });
+                      pendingToolCalls.value = [];
+                    }
+                    pendingConfirmation.value = {
+                      tool: data.tool,
+                      args: data.args || {},
+                      message: data.message || `Confirm execution of ${data.tool}?`,
+                    };
+                    await scrollToBottom();
+                    continue;
+                  }
+
                   // Handle tool_call events - show spinner indicator, don't add to chat yet
                   if (data && data.type === 'tool_call') {
                     // If there's already an active tool call, complete it first
@@ -810,8 +1615,24 @@ export default defineComponent({
                       context: data.context || {}
                     };
 
-                    // Reset text segment - next text will start a new block
+                    // Finalize any in-progress text block before resetting
+                    // (typewriter animation may not have caught up yet)
+                    if (currentTextSegment.value) {
+                      const lm = chatMessages.value[chatMessages.value.length - 1];
+                      if (lm && lm.role === 'assistant' && lm.contentBlocks) {
+                        const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
+                        if (lb && lb.type === 'text') {
+                          lb.text = currentTextSegment.value;
+                        }
+                      }
+                    }
+                    // Stop typewriter and reset for next segment
+                    if (typewriterAnimationId.value) {
+                      cancelAnimationFrame(typewriterAnimationId.value);
+                      typewriterAnimationId.value = null;
+                    }
                     currentTextSegment.value = '';
+                    displayedStreamingContent.value = '';
                     await scrollToBottom();
                     continue;
                   }
@@ -902,6 +1723,109 @@ export default defineComponent({
                     continue;
                   }
 
+                  // Handle tool_result events - enrich tool call with result data
+                  if (data && data.type === 'tool_result') {
+                    const resultData = {
+                      success: data.success !== false,
+                      resultMessage: data.message || '',
+                      summary: data.summary || undefined,
+                      errorType: data.error_type || undefined,
+                      suggestion: data.suggestion || undefined,
+                      details: data.details || undefined,
+                      response: data.response || undefined,
+                    };
+
+                    // If active tool call matches, complete it with result data
+                    if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
+                      const completedToolBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context,
+                        ...resultData
+                      };
+                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(completedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(completedToolBlock);
+                      }
+                      activeToolCall.value = null;
+                    } else {
+                      // Tool was already completed — retroactively enrich the matching block
+                      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.contentBlocks) {
+                        for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
+                          const block = lastMessage.contentBlocks[i];
+                          if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                            Object.assign(block, resultData);
+                            break;
+                          }
+                        }
+                      }
+                      // Also check pending tool calls
+                      for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
+                        const block = pendingToolCalls.value[i];
+                        if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                          Object.assign(block, resultData);
+                          break;
+                        }
+                      }
+                    }
+                    await scrollToBottom();
+                    continue;
+                  }
+
+                  // Handle error events - stream-level errors
+                  if (data && data.type === 'error') {
+                    // Complete any active tool call as failed
+                    if (activeToolCall.value) {
+                      const failedToolBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context,
+                        success: false,
+                        resultMessage: data.message || 'Tool execution failed',
+                        errorType: data.error_type || undefined,
+                        suggestion: data.suggestion || undefined,
+                      };
+                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(failedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(failedToolBlock);
+                      }
+                      activeToolCall.value = null;
+                    }
+
+                    // Add inline error block
+                    const errorBlock: ContentBlock = {
+                      type: 'error',
+                      message: data.message || 'An error occurred',
+                      errorType: data.error_type || undefined,
+                      suggestion: data.suggestion || undefined,
+                      recoverable: data.recoverable ?? undefined,
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(errorBlock);
+                    } else {
+                      chatMessages.value.push({
+                        role: 'assistant',
+                        content: '',
+                        contentBlocks: [...pendingToolCalls.value, errorBlock]
+                      });
+                      pendingToolCalls.value = [];
+                    }
+                    messageComplete = true;
+                    await scrollToBottom();
+                    continue;
+                  }
+
                   // Handle message content (type === 'message' or legacy format with just content)
                   if (data && typeof data.content === 'string') {
                     // Complete any active tool call first (add green checkmark to chat)
@@ -943,6 +1867,11 @@ export default defineComponent({
                     // Accumulate to both total content and current segment
                     currentStreamingMessage.value += content;
                     currentTextSegment.value += content;
+
+                    // Start typewriter animation if not already running
+                    if (!typewriterAnimationId.value) {
+                      animateStreamingText();
+                    }
 
                     // Get or create assistant message
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
@@ -1003,6 +1932,13 @@ export default defineComponent({
 
                 const data = JSON.parse(jsonStr);
 
+                // Handle title events - AI-generated chat title from first message
+                if (data && data.type === 'title') {
+                  aiGeneratedTitle.value = data.title;
+                  animateTitle(data.title);
+                  continue;
+                }
+
                 // Handle tool_call events - show spinner, don't add to chat yet
                 if (data && data.type === 'tool_call') {
                   // If there's already an active tool call, complete it first
@@ -1029,8 +1965,22 @@ export default defineComponent({
                     context: data.context || {}
                   };
 
-                  // Reset text segment for next text block
+                  // Finalize any in-progress text block before resetting
+                  if (currentTextSegment.value) {
+                    const lm = chatMessages.value[chatMessages.value.length - 1];
+                    if (lm && lm.role === 'assistant' && lm.contentBlocks) {
+                      const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
+                      if (lb && lb.type === 'text') {
+                        lb.text = currentTextSegment.value;
+                      }
+                    }
+                  }
+                  if (typewriterAnimationId.value) {
+                    cancelAnimationFrame(typewriterAnimationId.value);
+                    typewriterAnimationId.value = null;
+                  }
                   currentTextSegment.value = '';
+                  displayedStreamingContent.value = '';
                   continue;
                 }
 
@@ -1120,6 +2070,101 @@ export default defineComponent({
                   continue;
                 }
 
+                // Handle tool_result events - enrich tool call with result data
+                if (data && data.type === 'tool_result') {
+                  const resultData = {
+                    success: data.success !== false,
+                    resultMessage: data.message || '',
+                    summary: data.summary || undefined,
+                    errorType: data.error_type || undefined,
+                    suggestion: data.suggestion || undefined,
+                    details: data.details || undefined,
+                  };
+
+                  if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context,
+                      ...resultData
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                    activeToolCall.value = null;
+                  } else {
+                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.contentBlocks) {
+                      for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
+                        const block = lastMessage.contentBlocks[i];
+                        if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                          Object.assign(block, resultData);
+                          break;
+                        }
+                      }
+                    }
+                    for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
+                      const block = pendingToolCalls.value[i];
+                      if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                        Object.assign(block, resultData);
+                        break;
+                      }
+                    }
+                  }
+                  continue;
+                }
+
+                // Handle error events - stream-level errors
+                if (data && data.type === 'error') {
+                  if (activeToolCall.value) {
+                    const failedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context,
+                      success: false,
+                      resultMessage: data.message || 'Tool execution failed',
+                      errorType: data.error_type || undefined,
+                      suggestion: data.suggestion || undefined,
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(failedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(failedToolBlock);
+                    }
+                    activeToolCall.value = null;
+                  }
+
+                  const errorBlock: ContentBlock = {
+                    type: 'error',
+                    message: data.message || 'An error occurred',
+                    errorType: data.error_type || undefined,
+                    suggestion: data.suggestion || undefined,
+                    recoverable: data.recoverable ?? undefined,
+                  };
+                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  if (lastMessage && lastMessage.role === 'assistant') {
+                    if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                    lastMessage.contentBlocks.push(errorBlock);
+                  } else {
+                    chatMessages.value.push({
+                      role: 'assistant',
+                      content: '',
+                      contentBlocks: [...pendingToolCalls.value, errorBlock]
+                    });
+                    pendingToolCalls.value = [];
+                  }
+                  messageComplete = true;
+                  continue;
+                }
+
                 // Handle message content
                 if (data && typeof data.content === 'string') {
                   // Complete any active tool call first (add green checkmark to chat)
@@ -1159,16 +2204,19 @@ export default defineComponent({
                   currentStreamingMessage.value += content;
                   currentTextSegment.value += content;
 
+                  // Start typewriter animation if not already running
+                  if (!typewriterAnimationId.value) {
+                    animateStreamingText();
+                  }
+
                   let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                   if (!lastMessage || lastMessage.role !== 'assistant') {
-                    // Create new assistant message with pending tool calls + text
                     chatMessages.value.push({
                       role: 'assistant',
                       content: currentStreamingMessage.value,
                       contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
                     });
-                    pendingToolCalls.value = []; // Clear pending
-                    // Save immediately when assistant message is first created
+                    pendingToolCalls.value = [];
                     await throttledStreamingSave(true);
                   } else {
                     lastMessage.content = currentStreamingMessage.value;
@@ -1182,7 +2230,6 @@ export default defineComponent({
                     } else {
                       lastMessage.contentBlocks.push({ type: 'text', text: currentTextSegment.value });
                     }
-                    // Throttled save during streaming
                     await throttledStreamingSave();
                   }
                   messageComplete = true;
@@ -1198,6 +2245,20 @@ export default defineComponent({
 
         // If we completed a message, save to history
         if (messageComplete) {
+          // Immediately show all remaining text and stop typewriter animation
+          displayedStreamingContent.value = currentTextSegment.value;
+          if (typewriterAnimationId.value) {
+            cancelAnimationFrame(typewriterAnimationId.value);
+            typewriterAnimationId.value = null;
+          }
+          // Update final text in contentBlocks
+          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+          if (lastMessage && lastMessage.role === 'assistant' && lastMessage.contentBlocks) {
+            const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+            if (lastBlock && lastBlock.type === 'text') {
+              lastBlock.text = currentTextSegment.value;
+            }
+          }
           await saveToHistory();
         }
       } catch (error) {
@@ -1221,15 +2282,15 @@ export default defineComponent({
         const transaction = db.transaction(STORE_NAME, 'readwrite');
         const DbIndexStore = transaction.objectStore(STORE_NAME);
 
-        // Generate a title from the first user message
+        // Prefer AI-generated title, fallback to truncated first user message
         const firstUserMessage = chatMessages.value.find(msg => msg.role === 'user');
-        const title = firstUserMessage ? 
-          (firstUserMessage.content.length > 40 ? 
-            firstUserMessage.content.substring(0, 40) + '...' : 
-            firstUserMessage.content) : 
-          'New Chat';
+        const title = aiGeneratedTitle.value || (firstUserMessage ?
+          (firstUserMessage.content.length > 40 ?
+            firstUserMessage.content.substring(0, 40) + '...' :
+            firstUserMessage.content) :
+          'New Chat');
 
-        // Create a serializable version of the messages (including contentBlocks)
+        // Create a serializable version of the messages (including contentBlocks and images)
         // Use JSON parse/stringify to strip Vue reactive proxies
         const serializableMessages = chatMessages.value.map(msg => {
           const serialized: any = {
@@ -1239,6 +2300,10 @@ export default defineComponent({
           if (msg.contentBlocks && msg.contentBlocks.length > 0) {
             // Deep clone to remove Vue reactivity
             serialized.contentBlocks = JSON.parse(JSON.stringify(msg.contentBlocks));
+          }
+          if (msg.images && msg.images.length > 0) {
+            // Deep clone images to remove Vue reactivity
+            serialized.images = JSON.parse(JSON.stringify(msg.images));
           }
           return serialized;
         });
@@ -1356,6 +2421,8 @@ export default defineComponent({
       showHistory.value = false;
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
+      resetTitleState(); // Clear AI-generated title for new chat
+      resetTypewriterState(); // Clear typewriter animation state for new chat
       store.dispatch('setCurrentChatTimestamp', null);
       store.dispatch('setChatUpdated', true);
     };
@@ -1363,6 +2430,189 @@ export default defineComponent({
     const openHistory = async () => {
       showHistory.value = true;
       await loadHistory();
+    };
+
+    const openEditTitleDialog = () => {
+      editingTitle.value = displayedTitle.value || '';
+      showEditTitleDialog.value = true;
+    };
+
+    const saveEditedTitle = async () => {
+      if (!currentChatId.value || !editingTitle.value.trim()) {
+        showEditTitleDialog.value = false;
+        return;
+      }
+
+      try {
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(currentChatId.value);
+
+        request.onsuccess = () => {
+          const chat = request.result;
+          if (chat) {
+            // Update the title
+            chat.title = editingTitle.value.trim();
+            const updateRequest = store.put(chat);
+
+            updateRequest.onsuccess = () => {
+              // Update the displayed title
+              displayedTitle.value = editingTitle.value.trim();
+              aiGeneratedTitle.value = editingTitle.value.trim();
+
+              // Reload history to reflect changes
+              loadHistory();
+
+              showEditTitleDialog.value = false;
+            };
+
+            updateRequest.onerror = () => {
+              console.error('Error updating chat title:', updateRequest.error);
+              showEditTitleDialog.value = false;
+            };
+          }
+        };
+
+        request.onerror = () => {
+          console.error('Error retrieving chat for edit:', request.error);
+          showEditTitleDialog.value = false;
+        };
+      } catch (error) {
+        console.error('Error updating chat title:', error);
+        showEditTitleDialog.value = false;
+      }
+    };
+
+    const deleteChat = (chatId: number) => {
+      chatToDelete.value = chatId;
+      showDeleteChatConfirmDialog.value = true;
+    };
+
+    const confirmDeleteChat = async () => {
+      if (!chatToDelete.value) return;
+
+      try {
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const deleteRequest = store.delete(chatToDelete.value);
+
+        deleteRequest.onsuccess = () => {
+          // If the deleted chat is the current one, reset to new chat
+          if (currentChatId.value === chatToDelete.value) {
+            addNewChat();
+          }
+
+          // Reload history to reflect changes
+          loadHistory();
+
+          // Reset state
+          chatToDelete.value = null;
+          showDeleteChatConfirmDialog.value = false;
+        };
+
+        deleteRequest.onerror = () => {
+          console.error('Error deleting chat:', deleteRequest.error);
+          chatToDelete.value = null;
+          showDeleteChatConfirmDialog.value = false;
+        };
+      } catch (error) {
+        console.error('Error deleting chat:', error);
+        chatToDelete.value = null;
+        showDeleteChatConfirmDialog.value = false;
+      }
+    };
+
+    const clearAllConversations = () => {
+      showClearAllConfirmDialog.value = true;
+    };
+
+    /** Resolve the pendingConfirmation block — mark as success or failure */
+    const resolveConfirmationBlock = (approved: boolean) => {
+      for (const msg of chatMessages.value) {
+        if (msg.contentBlocks) {
+          for (const block of msg.contentBlocks) {
+            if (block.pendingConfirmation) {
+              block.pendingConfirmation = false;
+              if (!approved) {
+                block.success = false;
+                block.resultMessage = 'Action cancelled by user';
+              }
+              return;
+            }
+          }
+        }
+      }
+    };
+
+    const handleToolConfirm = async () => {
+      resolveConfirmationBlock(true);
+      if (!currentSessionId.value) return;
+
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ approved: true }),
+          }
+        );
+      } catch (error) {
+        console.error('Error confirming action:', error);
+      }
+      pendingConfirmation.value = null;
+    };
+
+    const handleToolCancel = async () => {
+      resolveConfirmationBlock(false);
+      if (!currentSessionId.value) return;
+
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ approved: false }),
+          }
+        );
+      } catch (error) {
+        console.error('Error cancelling action:', error);
+      }
+      pendingConfirmation.value = null;
+    };
+
+    const confirmClearAllConversations = async () => {
+      try {
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const clearRequest = store.clear();
+
+        clearRequest.onsuccess = () => {
+          // Reset to new chat
+          addNewChat();
+
+          // Clear the chat history array
+          chatHistory.value = [];
+
+          showClearAllConfirmDialog.value = false;
+        };
+
+        clearRequest.onerror = () => {
+          console.error('Error clearing all conversations:', clearRequest.error);
+          showClearAllConfirmDialog.value = false;
+        };
+      } catch (error) {
+        console.error('Error clearing all conversations:', error);
+        showClearAllConfirmDialog.value = false;
+      }
     };
 
     const loadChat = async (chatId: number) => {
@@ -1380,11 +2630,12 @@ export default defineComponent({
         request.onsuccess = async () => {
           const chat = request.result;
           if (chat) {
-            // Ensure messages are properly formatted (including contentBlocks)
+            // Ensure messages are properly formatted (including contentBlocks and images)
             const formattedMessages = chat.messages.map((msg: any) => ({
               role: msg.role,
               content: msg.content,
-              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {})
+              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
+              ...(msg.images ? { images: msg.images } : {})
             }));
             
             // Check if the last message is a user message without an assistant response
@@ -1395,13 +2646,18 @@ export default defineComponent({
             currentSessionId.value = chat.sessionId || null; // Restore session ID from history
             showHistory.value = false;
             shouldAutoScroll.value = true; // Reset auto-scroll when loading chat
-            
+
+            // Load title from history (no animation for existing chats)
+            displayedTitle.value = chat.title || '';
+            aiGeneratedTitle.value = chat.title || null;
+            isTypingTitle.value = false;
+
             if(chatId !== store.state.currentChatTimestamp) {
               store.dispatch('setCurrentChatTimestamp', chatId);
               store.dispatch('setChatUpdated', true);
             }
-            
-            
+
+
             // Scroll to bottom after loading chat
             await nextTick(() => {
               scrollToBottom();
@@ -1419,18 +2675,39 @@ export default defineComponent({
      * Manages the complete request lifecycle from user input to streaming response
      */
     const sendMessage = async () => {
-      if (!inputMessage.value.trim() || isLoading.value) return;
+      // Allow sending with text or images (or both)
+      const hasText = inputMessage.value.trim().length > 0;
+      const hasImages = pendingImages.value.length > 0;
+      if ((!hasText && !hasImages) || isLoading.value) return;
 
+      // Get the message for backend (with unwrapped chips)
+      let backendMessage = inputMessage.value;
+      if (chatInput.value && typeof chatInput.value.getMessageForBackend === 'function') {
+        backendMessage = chatInput.value.getMessageForBackend();
+      }
+
+      // Use the plain text message for display
       const userMessage = inputMessage.value;
-      
+      const messagesToSend = [...pendingImages.value]; // Capture images before clearing
+
       // Add to query history before clearing input
-      addToHistory(userMessage);
-      
+      if (hasText) {
+        addToHistory(userMessage);
+      }
+
+      // Push user message with images for display
+      // But we'll use backendMessage for the API call
       chatMessages.value.push({
         role: 'user',
-        content: userMessage
+        content: backendMessage, // Use backend message with full context
+        ...(hasImages && { images: messagesToSend })
       });
       inputMessage.value = '';
+      contextReferences.value = []; // Clear reference chips
+      if (chatInput.value && typeof chatInput.value.clear === 'function') {
+        chatInput.value.clear(); // Clear the rich text input
+      }
+      clearPendingImages(); // Clear pending images after capturing
       shouldAutoScroll.value = true; // Reset auto-scroll for new message
       await scrollToBottom(); // Scroll after user message
       await saveToHistory(); // Save after user message
@@ -1438,15 +2715,16 @@ export default defineComponent({
       isLoading.value = true;
       currentStreamingMessage.value = '';
       currentTextSegment.value = '';
+      resetTypewriterState(); // Reset typewriter animation for new message
       startAnalyzingRotation(); // Start rotating analyzing messages
 
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
-      
+
       try {
         // Don't add empty assistant message here - wait for actual content
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
-        
+
         let response: any;
         try {
           // Ensure session ID exists for tracking this chat session
@@ -1454,14 +2732,15 @@ export default defineComponent({
             currentSessionId.value = getUUIDv7();
           }
 
-          // Pass abort signal and session ID to enable request cancellation and session tracking
+          // Pass abort signal, session ID, and images to enable request cancellation and multimodal support
           response = await fetchAiChat(
             chatMessages.value,
             "",
             store.state.selectedOrganization.identifier,
             currentAbortController.value.signal,
             undefined, // explicitContext
-            currentSessionId.value // sessionId for x-o2-session-id header
+            currentSessionId.value, // sessionId for x-o2-session-id header
+            hasImages ? messagesToSend : undefined // images for multimodal queries
           );
         } catch (error) {
           console.error('Error fetching AI chat:', error);
@@ -1529,9 +2808,99 @@ export default defineComponent({
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault(); // Prevent the default enter behavior
         sendMessage();
-      } else if (e.key === 'ArrowUp' && isOnFirstLine(e.target as HTMLTextAreaElement)) {
-        e.preventDefault();
-        navigateHistory('up');
+      } else if (e.key === 'Backspace') {
+        // Handle backspace for RichTextInput (contenteditable)
+        const target = e.target as HTMLElement;
+        const contenteditable = target.closest('[contenteditable="true"]') || target.querySelector('[contenteditable="true"]');
+
+        if (contenteditable) {
+          // Check if cursor is right after an image reference span
+          const selection = window.getSelection();
+          if (!selection || selection.rangeCount === 0) return;
+
+          const range = selection.getRangeAt(0);
+          const cursorNode = range.startContainer;
+          let imageRefSpan: Element | null = null;
+
+          // Case 1: Cursor is in a text node at position 0, check previous sibling
+          if (cursorNode.nodeType === Node.TEXT_NODE && range.startOffset === 0) {
+            const prevSibling = cursorNode.previousSibling;
+            if (prevSibling && (prevSibling as Element).classList?.contains('image-reference')) {
+              imageRefSpan = prevSibling as Element;
+            }
+          }
+          // Case 2: Cursor is in an element node, check the child before cursor
+          else if (cursorNode.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
+            const element = cursorNode as Element;
+            const prevChild = element.childNodes[range.startOffset - 1];
+            if (prevChild && (prevChild as Element).classList?.contains('image-reference')) {
+              imageRefSpan = prevChild as Element;
+            }
+          }
+
+          // If we found an image reference to delete
+          if (imageRefSpan) {
+            e.preventDefault();
+
+            // Extract filename from the span text
+            const refText = imageRefSpan.textContent || '';
+            const match = refText.match(/@\[([^\]]+)\]/);
+
+            if (match) {
+              const filename = match[1];
+
+              // Remove the associated image from pendingImages
+              const imageIndex = pendingImages.value.findIndex(img => img.filename === filename);
+              if (imageIndex !== -1) {
+                pendingImages.value.splice(imageIndex, 1);
+              }
+            }
+
+            // Remove the span element
+            imageRefSpan.remove();
+
+            // Trigger input event to update model
+            if (contenteditable) {
+              contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }
+        } else {
+          // Legacy textarea handling
+          const textarea = e.target as HTMLTextAreaElement;
+          const cursorPos = textarea.selectionStart;
+          const text = inputMessage.value;
+
+          // Find if cursor is at the end of a @[filename] pattern
+          const textBeforeCursor = text.substring(0, cursorPos);
+          const match = textBeforeCursor.match(/@\[([^\]]+)\]$/);
+
+          if (match) {
+            e.preventDefault();
+            const filename = match[1];
+            const refStart = cursorPos - match[0].length;
+
+            // Remove the entire @[filename] reference from text
+            inputMessage.value = text.substring(0, refStart) + text.substring(cursorPos);
+
+            // Remove the associated image from pendingImages
+            const imageIndex = pendingImages.value.findIndex(img => img.filename === filename);
+            if (imageIndex !== -1) {
+              pendingImages.value.splice(imageIndex, 1);
+            }
+
+            // Set cursor position after the deletion
+            nextTick(() => {
+              textarea.selectionStart = textarea.selectionEnd = refStart;
+            });
+          }
+        }
+      } else if (e.key === 'ArrowUp') {
+        const target = e.target as HTMLElement;
+        const textarea = target.tagName === 'TEXTAREA' ? target as HTMLTextAreaElement : null;
+        if (textarea && isOnFirstLine(textarea)) {
+          e.preventDefault();
+          navigateHistory('up');
+        }
       } else if (e.key === 'ArrowDown' && historyIndex.value > -1) {
         e.preventDefault();
         navigateHistory('down');
@@ -1571,14 +2940,307 @@ export default defineComponent({
 
     const focusInput = () => {
       if (chatInput.value) {
-        // For Quasar components, we need to call the focus method on the component
-        chatInput.value.focus();
-        // Alternative: directly focus the native textarea element
-        const textarea = chatInput.value.$el?.querySelector('textarea');
-        if (textarea) {
-          textarea.focus();
+        // For RichTextInput component, call its focusInput method
+        if (typeof chatInput.value.focusInput === 'function') {
+          chatInput.value.focusInput();
+        } else {
+          // Fallback for other input types
+          chatInput.value.focus();
         }
       }
+    };
+
+    // Handle reference chip updates from RichTextInput
+    const handleReferencesUpdate = (refs: ReferenceChip[]) => {
+      contextReferences.value = refs;
+    };
+
+    // Image handling functions
+    const triggerImageUpload = () => {
+      imageInputRef.value?.click();
+    };
+
+    const handleImageSelect = async (event: Event) => {
+      const input = event.target as HTMLInputElement;
+      const files = input.files;
+      if (!files) return;
+
+      for (const file of Array.from(files)) {
+        await addImage(file);
+      }
+      // Reset input so the same file can be selected again
+      input.value = '';
+    };
+
+    const addImage = async (file: File): Promise<boolean> => {
+      // Validate file size first (before reading)
+      if (file.size > MAX_IMAGE_SIZE_BYTES) {
+        $q.notify({
+          type: 'negative',
+          message: `Image exceeds 2MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
+          position: 'top'
+        });
+        return false;
+      }
+
+      // Basic file type check for immediate feedback (backend will detect actual type)
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
+        $q.notify({
+          type: 'negative',
+          message: 'Only PNG and JPEG images are supported',
+          position: 'top'
+        });
+        return false;
+      }
+
+      // Convert to base64
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64 = (e.target?.result as string).split(',')[1]; // Remove data:image/...;base64, prefix
+          const imageRef = `@[${file.name}]`;
+
+          // Use file.type for display - backend will detect and correct actual mime type
+          pendingImages.value.push({
+            data: base64,
+            mimeType: file.type as 'image/png' | 'image/jpeg',
+            filename: file.name,
+            size: file.size
+          });
+
+          // Insert image reference at cursor position
+          // Check if we're using RichTextInput (contenteditable)
+          const contenteditable = chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
+                                   chatInput.value?.$el?.querySelector('.rich-text-input');
+
+          if (contenteditable) {
+            // RichTextInput - insert at cursor position in contenteditable
+            const selection = window.getSelection();
+            const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+            // Create a non-editable span for the image reference
+            const imageRefSpan = document.createElement('span');
+            imageRefSpan.contentEditable = 'false';
+            imageRefSpan.className = 'image-reference';
+            imageRefSpan.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; font-size: 13px; color: #2e7d32; user-select: none;';
+
+            // Add image icon
+            const imageIcon = document.createElement('span');
+            imageIcon.textContent = '🖼️';
+            imageIcon.style.cssText = 'font-size: 12px;';
+
+            // Add filename text
+            const filenameText = document.createElement('span');
+            filenameText.textContent = file.name;
+
+            // Add remove button
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = '×';
+            removeBtn.style.cssText = 'display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: 16px; line-height: 1; cursor: pointer; color: #2e7d32; transition: all 0.15s ease;';
+            removeBtn.onmouseover = () => {
+              removeBtn.style.background = '#c62828';
+              removeBtn.style.color = 'white';
+            };
+            removeBtn.onmouseout = () => {
+              removeBtn.style.background = 'transparent';
+              removeBtn.style.color = '#2e7d32';
+            };
+            removeBtn.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+
+              // Find and remove the image from pendingImages
+              const imageIndex = pendingImages.value.findIndex(img => img.filename === file.name);
+              if (imageIndex !== -1) {
+                pendingImages.value.splice(imageIndex, 1);
+              }
+
+              // Remove the span
+              imageRefSpan.remove();
+
+              // Trigger input event
+              contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
+            };
+
+            imageRefSpan.appendChild(imageIcon);
+            imageRefSpan.appendChild(filenameText);
+            imageRefSpan.appendChild(removeBtn);
+
+            if (range && contenteditable.contains(range.startContainer)) {
+              // Insert at cursor position
+              range.deleteContents();
+
+              // Add space before if needed
+              const textBefore = range.startContainer.textContent || '';
+              if (textBefore.length > 0 && !textBefore.endsWith(' ') && !textBefore.endsWith('\n')) {
+                range.insertNode(document.createTextNode(' '));
+              }
+
+              range.insertNode(imageRefSpan);
+
+              // Add space after for cursor positioning
+              const spaceAfter = document.createTextNode(' ');
+              range.setStartAfter(imageRefSpan);
+              range.insertNode(spaceAfter);
+
+              // Move cursor after the space
+              range.setStartAfter(spaceAfter);
+              range.collapse(true);
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            } else {
+              // No selection or selection outside - append to end
+              const spaceNeeded = contenteditable.textContent &&
+                                 !contenteditable.textContent.endsWith(' ') &&
+                                 !contenteditable.textContent.endsWith('\n');
+              if (spaceNeeded) {
+                contenteditable.appendChild(document.createTextNode(' '));
+              }
+              contenteditable.appendChild(imageRefSpan);
+              const spaceAfter = document.createTextNode(' ');
+              contenteditable.appendChild(spaceAfter);
+
+              // Move cursor to end
+              const newRange = document.createRange();
+              newRange.setStartAfter(spaceAfter);
+              newRange.collapse(true);
+              selection?.removeAllRanges();
+              selection?.addRange(newRange);
+            }
+
+            // Trigger input event to update model
+            contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
+            focusInput();
+          } else {
+            // Legacy textarea fallback
+            const textarea = chatInput.value?.$el?.querySelector('textarea') as HTMLTextAreaElement | null;
+            if (textarea) {
+              const start = textarea.selectionStart || 0;
+              const end = textarea.selectionEnd || 0;
+              const text = inputMessage.value;
+              const before = text.substring(0, start);
+              const after = text.substring(end);
+
+              // Add space before if needed
+              const needsSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
+              const needsSpaceAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith('\n');
+
+              const insertion = (needsSpaceBefore ? ' ' : '') + imageRef + (needsSpaceAfter ? ' ' : '');
+              inputMessage.value = before + insertion + after;
+
+              // Set cursor position after the inserted reference
+              nextTick(() => {
+                const newPos = start + insertion.length;
+                textarea.setSelectionRange(newPos, newPos);
+                textarea.focus();
+              });
+            } else {
+              // Final fallback: append to end
+              const currentText = inputMessage.value;
+              const separator = currentText && !currentText.endsWith(' ') && !currentText.endsWith('\n') ? ' ' : '';
+              inputMessage.value = currentText + separator + imageRef + ' ';
+            }
+          }
+
+          resolve(true);
+        };
+        reader.onerror = () => {
+          $q.notify({
+            type: 'negative',
+            message: `Failed to read image: ${file.name}`,
+            position: 'top'
+          });
+          resolve(false);
+        };
+        reader.readAsDataURL(file);
+      });
+    };
+
+    const removeImage = (index: number) => {
+      // Get the filename before removing
+      const image = pendingImages.value[index];
+      if (image) {
+        const imageRef = `@[${image.filename}]`;
+
+        // Check if we're using RichTextInput (contenteditable)
+        const contenteditable = chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
+                                 chatInput.value?.$el?.querySelector('.rich-text-input');
+
+        if (contenteditable) {
+          // Find and remove all image reference spans with this filename
+          const imageRefSpans = contenteditable.querySelectorAll('.image-reference');
+          imageRefSpans.forEach((span: Element) => {
+            if (span.textContent === imageRef) {
+              span.remove();
+            }
+          });
+
+          // Trigger input event to update model
+          contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
+        } else {
+          // Legacy textarea - remove from text
+          inputMessage.value = inputMessage.value
+            .replace(new RegExp(`\\s*${escapeRegExp(imageRef)}\\s*`, 'g'), ' ')
+            .trim();
+        }
+      }
+      pendingImages.value.splice(index, 1);
+    };
+
+    // Helper to escape special regex characters
+    const escapeRegExp = (str: string) => {
+      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+
+    const clearPendingImages = () => {
+      pendingImages.value = [];
+    };
+
+    // Handle drag and drop for images
+    const handleDragOver = (event: DragEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const handleDrop = async (event: DragEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const files = event.dataTransfer?.files;
+      if (!files) return;
+
+      for (const file of Array.from(files)) {
+        if (file.type.startsWith('image/')) {
+          await addImage(file);
+        }
+      }
+    };
+
+    // Handle paste for images
+    const handlePaste = async (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            event.preventDefault();
+            await addImage(file);
+          }
+        }
+      }
+    };
+
+    // Open image preview dialog
+    const openImagePreview = (img: ImageAttachment) => {
+      previewImage.value = img;
+      showImagePreview.value = true;
+    };
+
+    const closeImagePreview = () => {
+      showImagePreview.value = false;
+      previewImage.value = null;
     };
 
     // Scroll input textarea to bottom to show latest appended content
@@ -1661,6 +3323,15 @@ export default defineComponent({
           fetchInitialMessage();
         }
         loadHistory(); // Load history when chat is opened
+
+        // Mark component as ready and process any pending chips
+        // Use a slight delay to ensure RichTextInput is fully mounted
+        nextTick(() => {
+          setTimeout(() => {
+            componentReady.value = true;
+            processPendingChips();
+          }, 100);
+        });
       }
     });
 
@@ -1670,8 +3341,17 @@ export default defineComponent({
         fetchInitialMessage();
         loadHistory(); // Load history on mount if chat is open
         loadChat(store.state.currentChatTimestamp);
+
+        // Mark component as ready and process any pending chips
+        // Use a slight delay to ensure RichTextInput is fully mounted
+        nextTick(() => {
+          setTimeout(() => {
+            componentReady.value = true;
+            processPendingChips();
+          }, 100);
+        });
       }
-      
+
       // Load query history from localStorage
       loadQueryHistory();
     });
@@ -1682,7 +3362,19 @@ export default defineComponent({
         currentAbortController.value.abort();
         currentAbortController.value = null;
       }
-      
+
+      // Clean up typewriter animation to prevent memory leaks
+      if (typewriterAnimationId.value) {
+        cancelAnimationFrame(typewriterAnimationId.value);
+        typewriterAnimationId.value = null;
+      }
+
+      // Clean up title animation interval
+      if (titleIntervalId) {
+        clearInterval(titleIntervalId);
+        titleIntervalId = null;
+      }
+
       //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
       //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
       //so we need to make sure that the currentChatTimestamp is set to the correct chatId
@@ -1695,7 +3387,7 @@ export default defineComponent({
         addNewChat();
       }
     })
-    //this watch is added to make sure that the chat gets updated 
+    //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
       watch(chatUpdated, (newChatUpdated: boolean) => {
         if (newChatUpdated && store.state.currentChatTimestamp) {
@@ -1706,6 +3398,23 @@ export default defineComponent({
         }
         store.dispatch('setChatUpdated', false);
       });
+
+    // Watch for typewriter animation updates to refresh the displayed text
+    watch(displayedStreamingContent, (newContent) => {
+      if (!isLoading.value) return;
+      // Don't overwrite existing text with empty string when displayedStreamingContent
+      // is reset (e.g., on tool_call). The reset signals "new segment starts" not
+      // "clear previous content".
+      if (!newContent) return;
+
+      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.contentBlocks) {
+        const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+        if (lastBlock && lastBlock.type === 'text') {
+          lastBlock.text = newContent;
+        }
+      }
+    });
 
     const copyToClipboard = async (text: string) => {
       try {
@@ -1810,12 +3519,117 @@ export default defineComponent({
       return blocks;
     };
 
+    // Helper to format JSON with syntax highlighting
+    const formatLogEntryContent = (content: string): string => {
+      try {
+        const parsed = JSON.parse(content);
+        const formatted = JSON.stringify(parsed, null, 2);
+        // Apply syntax highlighting
+        return formatted
+          .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+            let cls = 'json-number';
+            if (/^"/.test(match)) {
+              if (/:$/.test(match)) {
+                cls = 'json-key';
+              } else {
+                cls = 'json-string';
+              }
+            } else if (/true|false/.test(match)) {
+              cls = 'json-boolean';
+            } else if (/null/.test(match)) {
+              cls = 'json-null';
+            }
+            return `<span class="${cls}">${match}</span>`;
+          });
+      } catch {
+        // Not JSON, return plain text with HTML escaping
+        return content
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;')
+          .replace(/\n/g, '<br>');
+      }
+    };
+
+    // Parse log entries from message content and maintain order
+    const parseLogEntries = (content: string) => {
+      const logEntryPattern = /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
+      const orderedBlocks: any[] = [];
+      let lastIndex = 0;
+      let match;
+
+      // Reset regex state
+      logEntryPattern.lastIndex = 0;
+
+      while ((match = logEntryPattern.exec(content)) !== null) {
+        const [fullMatch, filename, lineStart, lineEnd, logContent] = match;
+        const matchIndex = match.index;
+
+        // Add text before this log entry (if any)
+        if (matchIndex > lastIndex) {
+          const textBefore = content.substring(lastIndex, matchIndex).trim();
+          if (textBefore) {
+            orderedBlocks.push({
+              type: 'text',
+              text: textBefore
+            });
+          }
+        }
+
+        // Add the log entry
+        orderedBlocks.push({
+          type: 'log_entry',
+          filename,
+          lineStart: lineStart ? parseInt(lineStart) : undefined,
+          lineEnd: lineEnd ? parseInt(lineEnd) : undefined,
+          content: logContent.trim(),
+          preview: createPreview(logContent.trim(), 60)
+        });
+
+        lastIndex = matchIndex + fullMatch.length;
+      }
+
+      // Add any remaining text after the last log entry
+      if (lastIndex < content.length) {
+        const textAfter = content.substring(lastIndex).trim();
+        if (textAfter) {
+          orderedBlocks.push({
+            type: 'text',
+            text: textAfter
+          });
+        }
+      }
+
+      return orderedBlocks;
+    };
+
     const processedMessages = computed(() => {
-      return chatMessages.value.map(message => ({
-        ...message,
-        blocks: processMessageContent(message.content),
-        contentBlocks: message.contentBlocks || []
-      }));
+      return chatMessages.value.map(message => {
+        // For user messages, check for log entries
+        if (message.role === 'user') {
+          const orderedBlocks = parseLogEntries(message.content);
+
+          // If we have ordered blocks from parsing, combine them with existing contentBlocks
+          const combinedContentBlocks = orderedBlocks.length > 0
+            ? [...orderedBlocks, ...(message.contentBlocks || [])]
+            : message.contentBlocks || [];
+
+          return {
+            ...message,
+            blocks: orderedBlocks.length > 0 ? [] : processMessageContent(message.content),
+            contentBlocks: combinedContentBlocks
+          };
+        }
+
+        // For assistant messages, keep as is
+        return {
+          ...message,
+          blocks: processMessageContent(message.content),
+          contentBlocks: message.contentBlocks || []
+        };
+      });
     });
 
     // Check if there's an assistant message in progress (for loading indicator positioning)
@@ -1919,6 +3733,20 @@ export default defineComponent({
       return expandedToolCalls.value.has(`${messageIndex}-${blockIndex}`);
     };
 
+    // Log entry expansion helpers
+    const toggleLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
+      const key = `${messageIndex}-${blockIndex}`;
+      if (expandedLogEntries.value.has(key)) {
+        expandedLogEntries.value.delete(key);
+      } else {
+        expandedLogEntries.value.add(key);
+      }
+    };
+
+    const isLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
+      return expandedLogEntries.value.has(`${messageIndex}-${blockIndex}`);
+    };
+
     // Extract display fields from tool call context (handles different tool schemas)
     const getToolCallDisplayData = (context: any) => {
       if (!context) return null;
@@ -1937,6 +3765,13 @@ export default defineComponent({
         if (q.vrl) data.vrl = q.vrl;
       }
 
+      // Handle testFunction context (VRL validation)
+      if (context.vrl) data.vrl = context.vrl;
+      if (context.request_body?.function) data.vrl = context.request_body.function;
+
+      // Handle flat SQL from SearchSQL enriched context
+      if (context.sql) data.query = context.sql;
+
       // Handle flat structure (StreamSchema, etc.)
       if (context.stream_name) data.stream = context.stream_name;
       if (context.type) data.type = context.type;
@@ -1945,12 +3780,30 @@ export default defineComponent({
     };
 
     const hasToolCallDetails = (block: ContentBlock) => {
+      // Show details for failed tools, successful tools with summary, tools with context data, or tools with response
+      if (block.success === false) return true;
+      if (block.success !== false && block.summary) return true;
+      if (block.response) return true;
       return getToolCallDisplayData(block.context) !== null;
     };
 
     const formatToolCallMessage = (block: ContentBlock) => {
-      // Interpolate context into message for certain tools
-      // Returns object with text and optional highlight for bold rendering
+      // Show error message for failed tools
+      // Tool-specific messages (both success and error)
+      if (block.tool === 'testFunction') {
+        if (block.success === false) {
+          return { text: 'VRL validation failed', highlight: null, suffix: '' };
+        }
+        return { text: 'Validated VRL', highlight: null, suffix: '' };
+      }
+      if (block.tool === 'SearchSQL') {
+        if (block.success === false) {
+          return { text: 'Query failed', highlight: null, suffix: '' };
+        }
+        if (block.response?.total !== undefined) {
+          return { text: 'Queried logs ', highlight: `(${block.response.total} results)`, suffix: '' };
+        }
+      }
       if (block.tool === 'StreamSchema' && block.context?.stream_name) {
         return { text: 'Fetched ', highlight: block.context.stream_name, suffix: ' stream schema' };
       }
@@ -1962,6 +3815,18 @@ export default defineComponent({
       }
       if (block.tool === 'GetDashboard' && block.context?.dashboard_id) {
         return { text: 'Fetched dashboard ', highlight: block.context.dashboard_id, suffix: '' };
+      }
+      // Generic fallback
+      if (block.success === false && block.resultMessage) {
+        // Truncate long error messages for the header
+        const msg = block.resultMessage.length > 60
+          ? block.resultMessage.substring(0, 60) + '...'
+          : block.resultMessage;
+        return { text: msg, highlight: null, suffix: '' };
+      }
+      if (block.success !== false && block.summary?.count !== undefined) {
+        const base = block.message || block.tool || 'Tool';
+        return { text: base + ' ', highlight: `(${block.summary.count} results)`, suffix: '' };
       }
       return { text: block.message, highlight: null, suffix: '' };
     };
@@ -2013,9 +3878,25 @@ export default defineComponent({
       selectCapability,
       showHistory,
       chatHistory,
+      currentChatId,
       addNewChat,
       openHistory,
       loadChat,
+      showEditTitleDialog,
+      editingTitle,
+      openEditTitleDialog,
+      saveEditedTitle,
+      deleteChat,
+      confirmDeleteChat,
+      showDeleteChatConfirmDialog,
+      chatToDelete,
+      clearAllConversations,
+      showClearAllConfirmDialog,
+      confirmClearAllConversations,
+      // Tool confirmation
+      pendingConfirmation,
+      handleToolConfirm,
+      handleToolCancel,
       processedMessages,
       pendingToolCalls,
       processTextBlock,
@@ -2055,6 +3936,46 @@ export default defineComponent({
       formatToolCallMessage,
       formatTimestamp,
       formatContextValue,
+      expandedLogEntries,
+      toggleLogEntryExpanded,
+      isLogEntryExpanded,
+      formatLogEntryContent,
+      // AI-generated title
+      aiGeneratedTitle,
+      displayedTitle,
+      isTypingTitle,
+      // Image handling
+      pendingImages,
+      imageInputRef,
+      triggerImageUpload,
+      handleImageSelect,
+      removeImage,
+      handleDragOver,
+      handleDrop,
+      handlePaste,
+      // Image preview
+      showImagePreview,
+      previewImage,
+      openImagePreview,
+      closeImagePreview,
+      // AI-generated title
+      aiGeneratedTitle,
+      displayedTitle,
+      isTypingTitle,
+      // Image handling
+      pendingImages,
+      imageInputRef,
+      triggerImageUpload,
+      handleImageSelect,
+      removeImage,
+      handleDragOver,
+      handleDrop,
+      handlePaste,
+      // Image preview
+      showImagePreview,
+      previewImage,
+      openImagePreview,
+      closeImagePreview,
     }
   }
 });
@@ -2063,44 +3984,20 @@ export default defineComponent({
 <style lang="scss" scoped>
 .chat-container {
   width: 100%;
-  height: 100vh;
+  height: calc(100vh - 50px);
   color: var(--q-primary-text);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  
-  // Light mode gradient - more sophisticated
-  &.light-mode {
-    background: rgba(255,255,255,0.7);
-    background-size: 400% 400%;
-    animation: subtleShift 20s ease-in-out infinite;
-  }
-  
-  // Dark mode gradient - more sophisticated
-  &.dark-mode {
-    background: rgba(0,0,0,0.7);
-    background-size: 400% 400%;
-    animation: subtleShift 25s ease-in-out infinite;
-  }
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
 
   .chat-content-wrapper {
     display: flex;
     flex-direction: column;
     height: 100%;
-    
-    // Light mode gradient - more sophisticated
-    &.light-mode {
-      background: transparent;
-      background-size: 400% 400%;
-      animation: subtleShift 20s ease-in-out infinite;
-    }
-    
-    // Dark mode gradient - more sophisticated
-    &.dark-mode {
-      background: transparent;
-      background-size: 400% 400%;
-      animation: subtleShift 25s ease-in-out infinite;
-    }
+    background: transparent;
   }
 
 
@@ -2118,6 +4015,69 @@ export default defineComponent({
     .chat-title {
       font-weight: bold;
     }
+
+    .chat-title-dropdown {
+      padding: 6px 12px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+      max-width: 210px;
+      height: 32px;
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+
+      &:hover {
+        background-color: var(--q-hover-color);
+      }
+
+      span {
+        color: var(--q-primary-text);
+      }
+
+      .chat-title-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 180px;
+      }
+    }
+  }
+
+  // Chat session title with typewriter animation
+  .chat-session-title {
+    padding: 8px 16px;
+    font-size: 14px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--q-separator-color);
+
+    &.light-mode {
+      color: #1a202c;
+      background: linear-gradient(to right, rgba(99, 102, 241, 0.08), transparent);
+    }
+
+    &.dark-mode {
+      color: #e2e8f0;
+      background: linear-gradient(to right, rgba(99, 102, 241, 0.15), transparent);
+    }
+
+    .title-text {
+      font-weight: 600;
+    }
+
+    .typing-cursor {
+      animation: blink 0.7s infinite;
+      margin-left: 2px;
+      font-weight: 400;
+    }
+  }
+
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
   }
 
   .chat-content {
@@ -2153,36 +4113,139 @@ export default defineComponent({
     justify-content: center;
   }
 
-  .chat-input-wrapper {
-    padding: 4px 8px 8px 8px;
-    flex-shrink: 0;
+  // Fixed analyzing indicator above input
+  .fixed-analyzing-indicator {
+    padding: 12px 16px;
+    margin: 0 16px 8px 16px;
+    border-radius: 12px;
     display: flex;
+    align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
+    animation: fadeInSlide 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 
-    :deep(.q-field) {
+    &.light-mode {
+      background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+      border: 1px solid #d0d8e8;
+    }
+
+    &.dark-mode {
+      background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
+      border: 1px solid #3a3f55;
+    }
+
+    .analyzing-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
       max-width: 900px;
       width: 100%;
     }
-  
-  }
-  .light-mode .chat-input-wrapper{
-    background:#ffffff;
-    border: 1px solid #e4e7ec;
-    border-radius: 12px;
-    &:focus-within {
-      border: 1px solid transparent;
-      box-shadow: 0 0 0 2px #667eea
+
+    .analyzing-message {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--q-primary);
+    }
+
+    .tool-call-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .tool-call-context-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .context-query-inline {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.05);
+      max-width: 500px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .context-tag-inline {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(var(--q-primary-rgb), 0.1);
+      color: var(--q-primary);
+      font-weight: 500;
     }
   }
-  .dark-mode .chat-input-wrapper{
-    background:#191919;
-    border: 1px solid #323232;
-    border-radius: 12px;
-     &:focus-within {
-      border: 1px solid transparent;
-      box-shadow: 0 0 0 2px #5a6ec3
+
+  @keyframes fadeInSlide {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
     }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .chat-input-container {
+    flex-shrink: 0;
+    max-width: 900px;
+    width: calc(100% - 0px);
+    margin: 8px auto;
+    padding: 0 8px;
+  }
+
+  .unified-input-box {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 8px;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    gap: 12px;
+
+    &.light-mode {
+      background: #ffffff;
+      border: 1px solid #e4e7ec;
+
+      &:focus-within {
+        border: 1px solid transparent;
+        box-shadow: 0 0 0 2px #667eea;
+      }
+    }
+
+    &.dark-mode {
+      background: #191919;
+      border: 1px solid #323232;
+
+      &:focus-within {
+        border: 1px solid transparent;
+        box-shadow: 0 0 0 2px #5a6ec3;
+      }
+    }
+
+    :deep(.rich-text-input-wrapper) {
+      width: 100%;
+      min-height: 40px;
+    }
+
+    :deep(.rich-text-input) {
+      padding: 4px 0;
+    }
+  }
+
+  .input-bottom-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 8px;
   }
 
 
@@ -2489,16 +4552,94 @@ export default defineComponent({
   background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%) !important;
   transition: all 0.3s ease !important;
   box-shadow: 0 4px 15px 0 rgba(245, 101, 101, 0.3) !important;
-  
+
   &:hover {
     background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%) !important;
     box-shadow: 0 6px 20px 0 rgba(245, 101, 101, 0.4) !important;
     transform: translateY(-1px) !important;
   }
-  
+
   &:active {
     transform: translateY(0) !important;
     box-shadow: 0 2px 10px 0 rgba(245, 101, 101, 0.3) !important;
+  }
+}
+
+// Image upload button styling
+.image-upload-btn {
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+// Image preview strip in input area
+.image-preview-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  margin-bottom: 8px;
+
+  .image-preview-item {
+    position: relative;
+    display: inline-block;
+
+    .preview-image {
+      width: 64px;
+      height: 64px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      transition: transform 0.2s ease;
+
+      &:hover {
+        transform: scale(1.05);
+      }
+    }
+
+    .image-remove-btn {
+      position: absolute !important;
+      top: -6px !important;
+      right: -6px !important;
+      width: 20px !important;
+      height: 20px !important;
+      min-width: 20px !important;
+      min-height: 20px !important;
+      padding: 0 !important;
+      background-color: #ef4444 !important;
+      z-index: 10;
+
+      &:hover {
+        background-color: #dc2626 !important;
+      }
+    }
+  }
+}
+
+// Images in chat messages
+.message-images {
+  .message-image-item {
+    img {
+      border-radius: 8px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+      &:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+    }
+  }
+}
+
+// Image preview dialog
+.image-preview-dialog {
+  background: var(--q-dark) !important;
+
+  .q-card__section {
+    background: transparent;
   }
 }
 
@@ -2551,9 +4692,10 @@ export default defineComponent({
 
 .history-menu-container {
   position: relative;
-  max-height: 400px;
+  max-height: 450px;
   display: flex;
   flex-direction: column;
+  width: 300px;
 }
 
 .search-history-bar-sticky {
@@ -2563,11 +4705,44 @@ export default defineComponent({
   background: var(--q-page-background);
   padding: 8px;
   border-bottom: 1px solid var(--q-separator-color);
+  flex-shrink: 0;
 }
 
 .history-list-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 350px;
+}
+
+.history-item {
+  position: relative;
+
+  .delete-history-btn {
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  &:hover .delete-history-btn {
+    opacity: 1;
+  }
+}
+
+.clear-all-container {
+  background: var(--q-page-background);
+  padding: 8px;
+  border-top: 1px solid var(--q-separator-color);
+  flex-shrink: 0;
+
+  .clear-all-btn {
+    width: 100%;
+    color: var(--q-negative);
+    font-size: 13px;
+
+    &:hover {
+      background-color: rgba(var(--q-negative-rgb), 0.1);
+    }
+  }
 }
 
 // Scroll to bottom button styling
@@ -2653,24 +4828,6 @@ export default defineComponent({
   }
 }
 
-// Subtle gradient animation
-@keyframes subtleShift {
-  0% {
-    background-position: 0% 50%;
-  }
-  25% {
-    background-position: 100% 50%;
-  }
-  50% {
-    background-position: 100% 100%;
-  }
-  75% {
-    background-position: 0% 100%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
 
 // Tool call indicator styling
 .tool-call-indicator {
@@ -2693,7 +4850,7 @@ export default defineComponent({
 
   .tool-call-content {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
     width: 100%;
   }
@@ -2850,6 +5007,15 @@ export default defineComponent({
     &.dark-mode {
       background: rgba(244, 67, 54, 0.12);
     }
+
+    &.has-details:hover {
+      &.light-mode {
+        background: rgba(244, 67, 54, 0.15);
+      }
+      &.dark-mode {
+        background: rgba(244, 67, 54, 0.22);
+      }
+    }
   }
 
   // Timeout state styling
@@ -2859,6 +5025,106 @@ export default defineComponent({
     }
     &.dark-mode {
       background: rgba(255, 152, 0, 0.12);
+    }
+
+    &.has-details:hover {
+      &.light-mode {
+        background: rgba(255, 152, 0, 0.15);
+      }
+      &.dark-mode {
+        background: rgba(255, 152, 0, 0.22);
+      }
+    }
+  }
+
+  // Pending confirmation state styling (yellow/amber)
+  &.pending-confirmation {
+    cursor: default;
+
+    &.light-mode {
+      background: rgba(255, 193, 7, 0.12);
+      border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+    &.dark-mode {
+      background: rgba(255, 193, 7, 0.15);
+      border: 1px solid rgba(255, 193, 7, 0.25);
+    }
+  }
+
+  .tool-confirmation-inline {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 193, 7, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    .confirmation-message {
+      font-size: 13px;
+      font-weight: 500;
+
+      .light-mode & {
+        color: #6d5800;
+      }
+      .dark-mode & {
+        color: #ffd54f;
+      }
+    }
+
+    .confirmation-args {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px 10px;
+      border-radius: 4px;
+
+      .light-mode & {
+        background: rgba(255, 193, 7, 0.08);
+      }
+      .dark-mode & {
+        background: rgba(255, 193, 7, 0.06);
+      }
+
+      .confirmation-arg {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        font-size: 12px;
+
+        .arg-key {
+          font-weight: 600;
+          white-space: nowrap;
+
+          .light-mode & {
+            color: #6d5800;
+          }
+          .dark-mode & {
+            color: #ffd54f;
+          }
+        }
+
+        .arg-value {
+          font-family: 'Fira Code', 'Consolas', monospace;
+          word-break: break-all;
+
+          .light-mode & {
+            color: #4a5568;
+          }
+          .dark-mode & {
+            color: #e2e8f0;
+          }
+        }
+      }
+    }
+
+    .confirmation-buttons {
+      display: flex;
+      gap: 8px;
+
+      .confirmation-btn {
+        font-size: 12px;
+        padding: 2px 12px;
+      }
     }
   }
 
@@ -2948,6 +5214,227 @@ export default defineComponent({
       }
     }
   }
+}
+
+// Log entry item - expandable log content display
+.log-entry-item {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-bottom: 4px;
+  cursor: pointer;
+
+  &.light-mode {
+    background: rgba(33, 150, 243, 0.08);
+    color: #4a5568;
+  }
+
+  &.dark-mode {
+    background: #252a31;
+    border: 1px solid #3a4149;
+    color: #e2e8f0;
+  }
+
+  &:hover {
+    &.light-mode {
+      background: rgba(33, 150, 243, 0.12);
+    }
+    &.dark-mode {
+      background: #20242e;
+      border-color: #4a5568;
+    }
+  }
+
+  .log-entry-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .log-entry-info {
+    flex: 1;
+    font-weight: 500;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .expand-icon {
+    opacity: 0.6;
+    transition: transform 0.2s;
+  }
+
+  .log-entry-details {
+    margin-top: 10px;
+  }
+
+  .log-entry-content {
+    position: relative;
+    border-radius: 6px;
+    border: 1px solid;
+    overflow: hidden;
+
+    .light-mode & {
+      background: #ffffff;
+      border-color: #e4e7ec;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    .dark-mode & {
+      background: #1e293b;
+      border-color: #475569;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      opacity: 0.6;
+      z-index: 1;
+      background: rgba(128, 128, 128, 0.1);
+      border-radius: 4px;
+      padding: 4px 8px;
+
+      &:hover {
+        opacity: 1;
+        .light-mode & {
+          background: rgba(0, 0, 0, 0.08);
+        }
+        .dark-mode & {
+          background: rgba(255, 255, 255, 0.15);
+        }
+      }
+    }
+
+    .log-entry-code {
+      display: block;
+      font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      padding: 12px;
+      padding-right: 40px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      user-select: text;
+      cursor: text;
+      max-height: 300px;
+      overflow-y: auto;
+
+      .light-mode & {
+        background: #f8fafc;
+        color: #1a202c;
+      }
+      .dark-mode & {
+        background: #0d1017;
+        color: #e2e8f0;
+      }
+
+      // JSON syntax highlighting - use :deep() for v-html content
+      :deep(.json-key) {
+        color: #0066cc;
+        font-weight: 600;
+      }
+
+      :deep(.json-string) {
+        color: #22863a;
+      }
+
+      :deep(.json-number) {
+        color: #005cc5;
+      }
+
+      :deep(.json-boolean) {
+        color: #d73a49;
+        font-weight: 600;
+      }
+
+      :deep(.json-null) {
+        color: #6f42c1;
+        font-weight: 600;
+      }
+    }
+  }
+}
+
+// Dark mode JSON syntax highlighting for log entries
+.dark-mode .log-entry-code {
+  :deep(.json-key) {
+    color: #60a5fa;
+  }
+
+  :deep(.json-string) {
+    color: #86efac;
+  }
+
+  :deep(.json-number) {
+    color: #7dd3fc;
+  }
+
+  :deep(.json-boolean) {
+    color: #fca5a5;
+  }
+
+  :deep(.json-null) {
+    color: #c4b5fd;
+  }
+}
+
+.tool-call-item {
+  .tool-response-hits {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    padding: 6px 8px;
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+
+    .light-mode & {
+      background: rgba(0, 0, 0, 0.04);
+    }
+    .dark-mode & {
+      background: rgba(255, 255, 255, 0.06);
+    }
+  }
+
+  .tool-response-hit {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    padding: 2px 0;
+
+    &:not(:last-child) {
+      border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+      padding-bottom: 4px;
+    }
+  }
+
+  .hit-field {
+    word-break: break-all;
+    user-select: text;
+    cursor: text;
+  }
+
+  .hit-key {
+    opacity: 0.6;
+    font-weight: 600;
+  }
+
+  .hit-error {
+    color: #f44336;
+  }
+
+  .tool-response-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+  }
 
   .tool-call-error {
     font-size: 11px;
@@ -2988,6 +5475,62 @@ export default defineComponent({
       background: rgba(255, 255, 255, 0.08);
       color: #888;
     }
+  }
+
+  .tool-error-message {
+    color: #f44336;
+  }
+
+  .tool-suggestion {
+    font-style: italic;
+    opacity: 0.85;
+  }
+}
+
+// Stream-level error block - inline in chat flow
+.stream-error-block {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border-left: 3px solid #f44336;
+  margin-bottom: 8px;
+  font-size: 13px;
+
+  &.light-mode {
+    background: rgba(244, 67, 54, 0.06);
+    color: #4a5568;
+  }
+
+  &.dark-mode {
+    background: rgba(244, 67, 54, 0.10);
+    color: #a0aec0;
+  }
+
+  .stream-error-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .stream-error-message {
+    font-weight: 500;
+    color: #f44336;
+  }
+
+  .stream-error-suggestion {
+    margin-top: 6px;
+    padding-left: 24px;
+    font-style: italic;
+    font-size: 12px;
+    opacity: 0.85;
+  }
+
+  .stream-error-recoverable {
+    margin-top: 4px;
+    padding-left: 24px;
+    font-size: 11px;
+    opacity: 0.7;
   }
 }
 
