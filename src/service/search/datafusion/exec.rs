@@ -17,7 +17,7 @@ use std::{cmp::max, num::NonZero, str::FromStr, sync::Arc};
 
 use arrow_schema::Field;
 use config::{
-    FileFormat, PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, get_config,
+    FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
         search::{Session as SearchSession, StorageType},
         stream::FileKey,
@@ -81,7 +81,7 @@ pub fn create_session_config(
         max(cfg.limit.datafusion_min_partition_num, target_partitions),
     );
     let mut config = SessionConfig::from_env()?
-        .with_batch_size(PARQUET_BATCH_SIZE)
+        .with_batch_size(get_batch_size())
         .with_target_partitions(target_partitions)
         .with_information_schema(true);
     config
@@ -629,7 +629,7 @@ mod tests {
                 .max(DATAFUSION_MIN_PARTITION)
                 .max(get_config().limit.datafusion_min_partition_num)
         );
-        assert_eq!(config.options().execution.batch_size, PARQUET_BATCH_SIZE);
+        assert_eq!(config.options().execution.batch_size, get_batch_size());
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
