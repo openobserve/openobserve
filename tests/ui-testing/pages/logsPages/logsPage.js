@@ -248,6 +248,8 @@ export class LogsPage {
         this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
         // Selector for include/exclude button associated with a specific field
         // Uses adjacent sibling combinator (+) to match only the immediately following button
+        // Trade-off: + is stricter (may miss if DOM has wrappers), ~ is looser (may match wrong elements)
+        // Chose + because ~ was matching buttons from other fields in the same container
         this.vrlFieldIncludeExcludeBtn = (fieldName) => `[data-test="log-expand-detail-key-${fieldName}"] + [data-test="log-details-include-exclude-field-btn"]`;
     }
 
