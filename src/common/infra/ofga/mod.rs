@@ -31,7 +31,9 @@ use o2_openfga::{
         add_tuple_for_pipeline, get_add_user_to_org_tuples, get_org_creation_tuples,
         get_ownership_all_org_tuple, get_ownership_tuple, update_tuples,
     },
-    meta::mapping::{LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, NON_OWNING_ORG, OFGA_MODELS},
+    meta::mapping::{
+        LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, NON_OWNING_ORG, OFGA_MODELS, RESULT_LOGS_CACHE_KEY,
+    },
 };
 
 use crate::{
@@ -188,7 +190,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
 
         if existing_model_version < v0_0_24 {
-            log::info!("[OFGA:Local] license permissions migration needed");
+            log::info!(
+                "[OFGA:Local] logs patterns, insights, cache delete permissions migration needed"
+            );
             need_logs_pattern_insights_migration = true;
         }
     }
@@ -314,6 +318,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     if need_logs_pattern_insights_migration {
                         get_ownership_all_org_tuple(org_name, LOGS_INSIGHTS_KEY, &mut tuples);
                         get_ownership_all_org_tuple(org_name, LOGS_PATTERN_KEY, &mut tuples);
+                        get_ownership_all_org_tuple(org_name, RESULT_LOGS_CACHE_KEY, &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {

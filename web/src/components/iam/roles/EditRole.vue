@@ -630,6 +630,12 @@ const modifyResourcePermissions = (resource: Resource) => {
     resource.permission.AllowPost.show = false;
     resource.permission.AllowPut.show = false;
   }
+  if (resource.resourceName === "logs_cache") {
+    resource.permission.AllowList.show = false;
+    resource.permission.AllowGet.show = false;
+    resource.permission.AllowPost.show = false;
+    resource.permission.AllowPut.show = false;
+  }
 };
 
 const getResourcePermissions = () => {
@@ -1385,6 +1391,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     re_patterns: getRePatterns,
     logs_pattern: getLogsPatternStreams,
     logs_insights: getLogsInsightsStreams,
+    logs_cache: getLogsCacheStreams,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1650,6 +1657,16 @@ const getLogsInsightsStreams = async (resource: Resource | Entity) => {
   const logs: any = await getStreams("logs", false);
 
   updateResourceEntities("logs_insights", ["name"], logs.list);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getLogsCacheStreams = async (resource: Resource | Entity) => {
+  const logs: any = await getStreams("logs", false);
+
+  updateResourceEntities("logs_cache", ["name"], logs.list);
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1989,6 +2006,14 @@ const updateResourceEntities = (
       const entity = resource.entities[resource.entities.length - 1];
       entity.permission.AllowList.show = false;
       entity.permission.AllowDelete.show = false;
+      entity.permission.AllowPost.show = false;
+      entity.permission.AllowPut.show = false;
+    }
+    // Hide non-applicable permissions for logs_cache entities (only All and Delete)
+    if (resourceName === "logs_cache") {
+      const entity = resource.entities[resource.entities.length - 1];
+      entity.permission.AllowList.show = false;
+      entity.permission.AllowGet.show = false;
       entity.permission.AllowPost.show = false;
       entity.permission.AllowPut.show = false;
     }
