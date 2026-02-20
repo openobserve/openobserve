@@ -1290,7 +1290,7 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Opened query inspector');
 
     // Interact with query inspector - view the query
-    await pm.logsPage.waitForQueryEditor(5000);
+    await pm.logsPage.waitForQueryEditorVisible(5000);
 
     // Click on query editor (readonly interaction)
     await pm.logsPage.clickQueryEditor();
@@ -1357,9 +1357,18 @@ test.describe("Logs Regression Bugs", () => {
     // PRIMARY ASSERTION: Timestamps should be in descending order (newest first) by default
     // Logs with order_by_metadata should maintain proper sort order
     let isDescending = true;
+    let validTimestampCount = 0;
     for (let i = 1; i < timestamps.length; i++) {
       const prev = new Date(timestamps[i - 1]).getTime();
       const curr = new Date(timestamps[i]).getTime();
+      // GUARD: Fail if timestamp parsing returns NaN (locale-specific format not recognized)
+      if (isNaN(prev) || isNaN(curr)) {
+        testLogger.warn(`Timestamp parsing failed: "${timestamps[i-1]}" -> ${prev}, "${timestamps[i]}" -> ${curr}`);
+        expect(isNaN(prev)).toBe(false);
+        expect(isNaN(curr)).toBe(false);
+        break;
+      }
+      validTimestampCount++;
       if (prev < curr) {
         isDescending = false;
         testLogger.warn(`Sort order broken at index ${i}: ${timestamps[i-1]} > ${timestamps[i]}`);
@@ -1369,10 +1378,12 @@ test.describe("Logs Regression Bugs", () => {
 
     // ASSERTION: Must have at least 2 timestamps to verify sorting
     expect(timestamps.length).toBeGreaterThanOrEqual(2);
+    // ASSERTION: At least one valid timestamp comparison must have been made
+    expect(validTimestampCount).toBeGreaterThanOrEqual(1);
 
     // PRIMARY ASSERTION: Logs must be sorted in descending order (newest first)
     expect(isDescending).toBe(true);
-    testLogger.info(`✓ Logs are correctly sorted in descending order`);
+    testLogger.info(`✓ Logs are correctly sorted in descending order (${validTimestampCount} comparisons made)`);
 
     // PRIMARY ASSERTION: Results should be displayed
     const resultText = await pm.logsPage.getSearchResultText();
