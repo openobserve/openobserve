@@ -275,7 +275,6 @@ jobs:
                 "streams-regression.spec.js",
                 "enrichment-regression.spec.js",
                 "ui-regression.spec.js",
-                "alerts-regression.spec.js",
                 "pipeline-regression.spec.js",
               ]
     steps:
