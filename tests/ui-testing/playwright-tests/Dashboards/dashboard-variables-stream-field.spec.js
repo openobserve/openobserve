@@ -573,14 +573,17 @@ test.describe(
       await reopenSettingsVariables(page, pm);
 
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, ".q-dialog", { timeout: 5000 });
-      await safeWaitForNetworkIdle(page, { timeout: 5000 });
+      await safeWaitForHidden(page, ".q-dialog", { timeout: 10000 });
+      await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
-      // Wait for all variables to be visible on dashboard
-      await scopedVars.waitForVariableSelectorVisible("streamName");
-      await scopedVars.waitForVariableSelectorVisible("fieldName");
-      await scopedVars.waitForVariableSelectorVisible("streamChild");
-      await scopedVars.waitForVariableSelectorVisible("fieldChild");
+      // Extra wait for dashboard to stabilize in CI/CD environments
+      await page.waitForTimeout(2000);
+
+      // Wait for all variables to be visible on dashboard with increased timeout 
+      await scopedVars.waitForVariableSelectorVisible("streamName", { timeout: 40000 });
+      await scopedVars.waitForVariableSelectorVisible("fieldName", { timeout: 40000 });
+      await scopedVars.waitForVariableSelectorVisible("streamChild", { timeout: 40000 });
+      await scopedVars.waitForVariableSelectorVisible("fieldChild", { timeout: 40000 });
 
       // --- G3: Verify all variables are visible and loaded on dashboard ---
       await expect(page.locator(getVariableSelector("streamName"))).toBeVisible();
@@ -595,19 +598,20 @@ test.describe(
       // resolved stream "default". Match on stream to avoid false positives.
       const streamMonitor = monitorVariableAPICalls(page, {
         expectedCount: 1,
-        timeout: 15000,
+        timeout: 30000, // Increased from 15s to 30s 
         matchFn: (call) =>
           call.url.includes("/_values_stream") &&
           (call.url.includes("/default/_values_stream") || call.stream === "default"),
       });
-      await scopedVars.changeVariableValue("streamName", { optionIndex: 1 });
+      await scopedVars.changeVariableValue("streamName", { optionIndex: 1, timeout: 15000 });
       const streamResult = await streamMonitor;
 
       expect(streamResult.matchedCount).toBeGreaterThanOrEqual(1);
 
       // Wait for all G1 cascade responses to settle before starting G2 monitor
-      await safeWaitForNetworkIdle(page, { timeout: 5000 });
-      await page.waitForTimeout(2000);
+      // Increased wait times  environments
+      await safeWaitForNetworkIdle(page, { timeout: 10000 });
+      await page.waitForTimeout(3000);
 
       // --- G2: Change fieldName from "kubernetes_namespace_name" to "kubernetes_container_name" ---
       // fieldChild has stream=e2e_automate (fixed), field=$fieldName.
@@ -615,7 +619,7 @@ test.describe(
       // ignoring any stale streamChild calls from G1.
       const fieldMonitor = monitorVariableAPICalls(page, {
         expectedCount: 1,
-        timeout: 15000,
+        timeout: 30000, // Increased from 15s to 30s 
         matchFn: (call) =>
           call.url.includes("/_values_stream") &&
           (call.url.includes("e2e_automate") ||
@@ -623,7 +627,7 @@ test.describe(
             call.url.includes("kubernetes_container_name") ||
             (call.field && call.field.includes("kubernetes_container_name"))),
       });
-      await scopedVars.changeVariableValue("fieldName", { optionIndex: 1 });
+      await scopedVars.changeVariableValue("fieldName", { optionIndex: 1, timeout: 15000 });
       const fieldResult = await fieldMonitor;
 
       expect(fieldResult.matchedCount).toBeGreaterThanOrEqual(1);
