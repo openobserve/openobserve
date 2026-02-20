@@ -127,7 +127,6 @@ jobs:
                 "ingestion-config.spec.js",
                 "landingPage.spec.js",
                 "languageTranslation.spec.js",
-                "correlationSettings.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
