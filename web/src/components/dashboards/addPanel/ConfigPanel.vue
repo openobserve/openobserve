@@ -93,6 +93,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
+    <!-- Panel Default Time Configuration -->
+    <div class="q-mb-sm">
+      <!-- Toggle with tooltip -->
+      <div class="row items-center">
+        <q-toggle
+          v-model="useDefaultTime"
+          :label="t('dashboard.panelTimeEnabled')"
+          data-test="dashboard-config-allow-panel-time"
+          @update:model-value="onToggleDefaultTime"
+          class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        />
+        <q-btn
+          no-caps
+          padding="xs"
+          size="sm"
+          flat
+          icon="info_outline"
+          class="q-mt-xs"
+        >
+          <q-tooltip
+            anchor="bottom middle"
+            self="top middle"
+            style="font-size: 10px"
+            max-width="250px"
+          >
+            <span>
+              {{ t("dashboard.useDefaultTimeTooltip") }}
+            </span>
+          </q-tooltip>
+        </q-btn>
+      </div>
+
+      <!-- Show content when toggle ON -->
+      <div v-if="useDefaultTime" class="q-mt-sm">
+        <div class="text-bold q-mb-xs">
+          {{ t("dashboard.defaultDuration") }}
+        </div>
+
+        <!-- Picker visible (time set or "+Set" was clicked) -->
+        <div
+          v-if="showTimePicker || (panelTimeRange !== null && panelTimeRange !== undefined)"
+          class="flex items-center"
+        >
+          <DateTimePickerDashboard
+            ref="panelTimePickerRef"
+            v-model="pickerValue"
+            :auto-apply-dashboard="true"
+            data-test="dashboard-config-panel-time-picker"
+          />
+          <q-icon
+            class="q-mr-xs q-ml-sm"
+            size="15px"
+            name="close"
+            style="cursor: pointer"
+            data-test="dashboard-config-cancel-panel-time"
+            @click="onCancelPanelTime"
+          />
+        </div>
+
+        <!-- No time set → show "+Set" button -->
+        <div v-else>
+          <q-btn
+            @click="showTimePicker = true"
+            style="cursor: pointer; padding: 0px 5px"
+            :label="t('common.set')"
+            class="el-border"
+            no-caps
+            data-test="dashboard-config-set-panel-time"
+          />
+        </div>
+
+        <q-separator class="q-my-sm" />
+      </div>
+    </div>
+
+    <div class="space"></div>
+
     <!-- PromQL Chart-Specific Configuration -->
     <PromQLChartConfig
       v-if="promqlMode"
@@ -334,7 +417,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dashboardPanelData.data.type == 'table' &&
         dashboardPanelData.data.config.table_pagination
       "
-      v-model.number="dashboardPanelData.data.config.table_pagination_rows_per_page"
+      v-model.number="
+        dashboardPanelData.data.config.table_pagination_rows_per_page
+      "
       color="input-border"
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"
@@ -350,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
-          {{ t('dashboard.rowsPerPage') }}
+          {{ t("dashboard.rowsPerPage") }}
           <div>
             <q-icon
               class="q-ml-xs"
@@ -364,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="bottom middle"
               max-width="250px"
             >
-              {{ t('dashboard.rowsPerPageTooltip') }}
+              {{ t("dashboard.rowsPerPageTooltip") }}
             </q-tooltip>
           </div>
         </div>
@@ -826,7 +911,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label dense label-slot borderless hide-bottom-space> -->
       <div
         v-if="
-          promqlMode && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'maps'
+          promqlMode &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'maps'
         "
         class="q-py-md showLabelOnTop"
         style="font-weight: 600"
@@ -1026,7 +1113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <CommonAutoComplete
-        v-if="promqlMode && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'maps'"
+        v-if="
+          promqlMode &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'maps'
+        "
         :label="t('common.legend')"
         v-model="
           dashboardPanelData.data.queries[
@@ -1535,12 +1626,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-axis-label-rotate"
         >
           <template v-slot:label>
-            <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 4px">
               <span>Label Rotate</span>
               <q-icon
                 name="info"
                 size="20px"
-                style="cursor: pointer;"
+                style="cursor: pointer"
                 data-test="dashboard-config-axis-label-rotate-info"
               >
                 <q-tooltip
@@ -1550,9 +1641,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="bg-grey-8"
                 >
                   <div>
-                    Rotate the x-axis label text by a chosen angle (in degrees) to improve readability when labels are long or crowded.
+                    Rotate the x-axis label text by a chosen angle (in degrees)
+                    to improve readability when labels are long or crowded.
                     <br /><br />
-                    <strong>Note:</strong> This option is not supported for time-series x-axis fields.
+                    <strong>Note:</strong> This option is not supported for
+                    time-series x-axis fields.
                   </div>
                 </q-tooltip>
               </q-icon>
@@ -1560,7 +1653,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
         <q-input
-          v-model.number="dashboardPanelData.data.config.axis_label_truncate_width"
+          v-model.number="
+            dashboardPanelData.data.config.axis_label_truncate_width
+          "
           color="input-border"
           bg-color="input-bg"
           style="width: 50%"
@@ -1579,12 +1674,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-axis-label-truncate-width"
         >
           <template v-slot:label>
-            <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 4px">
               <span>Label Truncate</span>
               <q-icon
                 name="info"
                 size="20px"
-                style="cursor: pointer;"
+                style="cursor: pointer"
                 data-test="dashboard-config-axis-label-truncate-info"
               >
                 <q-tooltip
@@ -1596,7 +1691,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div>
                     Truncate x-axis labels to the specified width (in pixels).
                     <br /><br />
-                    <strong>Note:</strong> This option is not supported for time-series x-axis fields.
+                    <strong>Note:</strong> This option is not supported for
+                    time-series x-axis fields.
                   </div>
                 </q-tooltip>
               </q-icon>
@@ -1851,7 +1947,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount } from "vue";
+import { computed, defineComponent, inject, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1859,6 +1955,7 @@ import ColorBySeries from "./ColorBySeries.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
+import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import OverrideConfig from "./OverrideConfig.vue";
@@ -1871,7 +1968,11 @@ import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
 import PromQLChartConfig from "./PromQLChartConfig.vue";
 import { useStore } from "vuex";
 
-import { markRaw, watchEffect } from "vue";
+import { markRaw, watchEffect, watch } from "vue";
+import {
+  convertPanelTimeRangeToPicker,
+  buildPanelTimeRange,
+} from "@/utils/dashboard/panelTimeUtils";
 import {
   shouldShowLegendsToggle,
   shouldShowLegendPosition,
@@ -1892,6 +1993,7 @@ export default defineComponent({
     CommonAutoComplete,
     MarkLineConfig,
     CustomDateTimePicker,
+    DateTimePickerDashboard,
     ColorPaletteDropDown,
     BackGroundColorConfig,
     OverrideConfig,
@@ -2522,6 +2624,67 @@ export default defineComponent({
       );
     });
 
+    // Panel default time configuration (v4.0)
+    const useDefaultTime = ref(
+      !!dashboardPanelData.data.config?.panel_time_enabled,
+    );
+
+    // Current panel time range (null = not set)
+    const panelTimeRange = ref(
+      dashboardPanelData.data.config?.panel_time_range ?? null,
+    );
+
+    // Picker value - initialize from existing config or default
+    const existingRange = dashboardPanelData.data.config?.panel_time_range;
+    const pickerValue = ref(
+      existingRange
+        ? convertPanelTimeRangeToPicker(existingRange) ?? {
+            type: "relative",
+            valueType: "relative",
+            relativeTimePeriod: "15m",
+          }
+        : {
+            type: "relative",
+            valueType: "relative",
+            relativeTimePeriod: "15m",
+          },
+    );
+
+    // Whether the picker is open (after clicking "+Set")
+    const showTimePicker = ref(false);
+
+    // Toggle on/off
+    const onToggleDefaultTime = (enabled: boolean) => {
+      dashboardPanelData.data.config.panel_time_enabled = enabled;
+
+      if (!enabled) {
+        // Clear everything when turning off
+        dashboardPanelData.data.config.panel_time_range = null;
+        panelTimeRange.value = null;
+        showTimePicker.value = false;
+      }
+    };
+
+    // Auto-save: watch picker value changes and sync to config
+    watch(
+      pickerValue,
+      (newValue) => {
+        if (newValue && useDefaultTime.value) {
+          const timeRange = buildPanelTimeRange(newValue as any);
+          dashboardPanelData.data.config.panel_time_range = timeRange;
+          panelTimeRange.value = timeRange;
+        }
+      },
+      { deep: true },
+    );
+
+    // Cancel (remove set time via X icon) → back to "+Set" button
+    const onCancelPanelTime = () => {
+      dashboardPanelData.data.config.panel_time_range = null;
+      panelTimeRange.value = null;
+      showTimePicker.value = false;
+    };
+
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {
       if (
@@ -2590,6 +2753,13 @@ export default defineComponent({
       shouldShowLegendHeightUnitContainer,
       shouldApplyChartAlign,
       shouldShowGridlines,
+      // Panel default time configuration (v4.0)
+      useDefaultTime,
+      panelTimeRange,
+      pickerValue,
+      showTimePicker,
+      onToggleDefaultTime,
+      onCancelPanelTime,
     };
   },
 });
@@ -2621,7 +2791,7 @@ export default defineComponent({
 // Ensure label icons are always interactive
 :deep(.q-field__label) {
   pointer-events: auto !important;
-  
+
   .q-icon {
     pointer-events: auto !important;
   }

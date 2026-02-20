@@ -86,7 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabId="selectedTabId"
             :variablesConfig="{ list: getPanelVariables(panels[0].id) }"
             :variablesManager="variablesManager"
-            :selectedTimeDate="currentTimeObj['__global']"
+            :selectedTimeDate="
+              currentTimeObj?.[panels[0].id] || currentTimeObj['__global'] || {}
+            "
             :initialVariableValues="initialVariableValues"
             data-test="panel-variables-selector"
           />
@@ -202,6 +204,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="panel-variables-container q-px-xs q-py-xs"
                       :data-test="`dashboard-panel-${item.id}-variables`"
                     >
+                      <!-- Panel Time Picker (NEW) -->
+                      <div
+                        v-if="hasPanelTime(item) && panelTimeValues[item.id]"
+                        class="panel-time-picker-wrapper q-mb-sm"
+                        :data-test="`dashboard-panel-${item.id}-time-picker`"
+                      >
+                        <DateTimePickerDashboard
+                          v-model="panelTimeValues[item.id]"
+                          :auto-apply-dashboard="false"
+                          size="sm"
+                          class="panel-time-picker-widget"
+                          @update:modelValue="onPanelTimeApply(item.id)"
+                          :data-test="`panel-time-picker-${item.id}`"
+                          :ref="
+                            (el) => {
+                              if (el) panelDateTimePickerRefs.set(item.id, el);
+                            }
+                          "
+                        />
+                      </div>
+
                       <VariablesValueSelector
                         v-if="
                           variablesManager &&
@@ -212,7 +235,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :tabId="selectedTabId"
                         :variablesConfig="{ list: getPanelVariables(item.id) }"
                         :variablesManager="variablesManager"
-                        :selectedTimeDate="currentTimeObj['__global']"
+                        :selectedTimeDate="
+                          currentTimeObj?.[item.id] ||
+                          currentTimeObj['__global'] ||
+                          {}
+                        "
                         :initialVariableValues="initialVariableValues"
                         :style="{ marginBottom: '8px' }"
                         data-test="panel-variables-selector"
@@ -238,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :folderId="folderId"
             :dashboardId="dashboardData.dashboardId"
             :panelId="viewPanelId"
-            :selectedDateForViewPanel="selectedDateForViewPanel"
+            :selectedDateForViewPanel="viewPanelSelectedDate"
             :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
             :searchType="searchType"
             @close-panel="() => (showViewPanel = false)"
@@ -274,6 +301,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
+import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
 import { useRoute } from "vue-router";
 import {
   checkIfVariablesAreLoaded,
@@ -289,6 +317,13 @@ import { useVariablesManager } from "@/composables/dashboard/useVariablesManager
 import type { useVariablesManager as UseVariablesManagerType } from "@/composables/dashboard/useVariablesManager";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
+import {
+  getPanelTimeFromURL,
+  convertPanelTimeRangeToPicker,
+  convertTimeObjToPickerFormat,
+  convertGlobalTimeToPickerFormat,
+  resolvePanelTimeValue,
+} from "@/utils/dashboard/panelTimeUtils";
 import "gridstack/dist/gridstack.min.css";
 
 const ViewPanel = defineAsyncComponent(() => {
@@ -360,6 +395,7 @@ export default defineComponent({
 
   components: {
     PanelContainer,
+    DateTimePickerDashboard,
     NoPanel,
     VariablesValueSelector,
     ViewPanel,
@@ -740,14 +776,26 @@ export default defineComponent({
           cellHeight: "17px", // Base cell height
           margin: 2, // Minimal margin between panels
           draggable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value && !props.simplifiedPanelView, // Enable dragging unless view-only or saving
+            enable:
+              !props.viewOnly &&
+              !saveDashboardData.isLoading.value &&
+              !props.simplifiedPanelView, // Enable dragging unless view-only or saving
             handle: ".drag-allow", // Only allow dragging from specific handle
           },
           resizable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value && !props.simplifiedPanelView, // Enable resizing unless view-only or saving
+            enable:
+              !props.viewOnly &&
+              !saveDashboardData.isLoading.value &&
+              !props.simplifiedPanelView, // Enable resizing unless view-only or saving
           },
-          disableResize: props.viewOnly || saveDashboardData.isLoading.value || props.simplifiedPanelView, // Disable resize in view-only
-          disableDrag: props.viewOnly || saveDashboardData.isLoading.value || props.simplifiedPanelView, // Disable drag in view-only
+          disableResize:
+            props.viewOnly ||
+            saveDashboardData.isLoading.value ||
+            props.simplifiedPanelView, // Disable resize in view-only
+          disableDrag:
+            props.viewOnly ||
+            saveDashboardData.isLoading.value ||
+            props.simplifiedPanelView, // Disable drag in view-only
           acceptWidgets: false, // Don't accept external widgets
           removable: false, // Don't allow removal by dragging out
           animate: false, // Disable animations for better performance
@@ -1032,15 +1080,17 @@ export default defineComponent({
       (newData) => {
         // Helper to find variable in committed state
         const findInCommitted = (v: any) => {
-          if (v.scope === 'global') {
+          if (v.scope === "global") {
             return variablesManager.committedVariablesData.global.find(
-              (cv: any) => cv.name === v.name
+              (cv: any) => cv.name === v.name,
             );
-          } else if (v.scope === 'tabs' && v.tabId) {
-            const tabVars = variablesManager.committedVariablesData.tabs[v.tabId] || [];
+          } else if (v.scope === "tabs" && v.tabId) {
+            const tabVars =
+              variablesManager.committedVariablesData.tabs[v.tabId] || [];
             return tabVars.find((cv: any) => cv.name === v.name);
-          } else if (v.scope === 'panels' && v.panelId) {
-            const panelVars = variablesManager.committedVariablesData.panels[v.panelId] || [];
+          } else if (v.scope === "panels" && v.panelId) {
+            const panelVars =
+              variablesManager.committedVariablesData.panels[v.panelId] || [];
             return panelVars.find((cv: any) => cv.name === v.name);
           }
           return null;
@@ -1057,7 +1107,7 @@ export default defineComponent({
 
         for (const variable of allVariables) {
           // Only check query_values variables that just finished loading
-          if (variable.type !== 'query_values') continue;
+          if (variable.type !== "query_values") continue;
           if (!variable.isVariablePartialLoaded) continue;
 
           // Find this variable in committed state
@@ -1080,7 +1130,7 @@ export default defineComponent({
           variablesManager.commitAll();
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Watch for tab visibility changes
@@ -1153,10 +1203,72 @@ export default defineComponent({
       };
     };
 
-    const refreshPanelRequest = (
+    // Track which panels are currently being synced to prevent infinite loops
+    const panelsSyncingDateTime = ref(new Set<string>());
+
+    const syncPanelDateTimePickerState = (panelId: string) => {
+      const pickerRef = panelDateTimePickerRefs.get(panelId);
+
+      if (!pickerRef?.dateTimePicker) {
+        return;
+      }
+
+      // Mark this panel as currently syncing
+      panelsSyncingDateTime.value.add(panelId);
+
+      try {
+        // Call refresh() to commit uncommitted changes
+        pickerRef.refresh();
+
+        // Get the committed value
+        const innerDateTimePicker = pickerRef.dateTimePicker;
+        const currentDateTime = innerDateTimePicker.getConsumableDateTime();
+
+        if (currentDateTime) {
+          panelTimeValues.value[panelId] = currentDateTime;
+        }
+      } finally {
+        // Unmark after a short delay to allow events to settle
+        setTimeout(() => {
+          panelsSyncingDateTime.value.delete(panelId);
+        }, 100);
+      }
+    };
+
+    // Sync all panel datetime pickers (called during global refresh)
+    const syncAllPanelDateTimePickers = async () => {
+      // Get all panels that have panel-level time
+      const panelsWithTime: string[] = [];
+      panels.value?.forEach((panel: any) => {
+        if (hasPanelTime(panel)) {
+          panelsWithTime.push(panel.id);
+        }
+      });
+
+      // Sync each panel's datetime picker and update URL if needed
+      for (const panelId of panelsWithTime) {
+        syncPanelDateTimePickerState(panelId);
+
+        const timeValue = panelTimeValues.value[panelId];
+        if (timeValue) {
+          await updateURLWithPanelTime(panelId, timeValue);
+        }
+      }
+    };
+
+    const refreshPanelRequest = async (
       panelId,
       shouldRefreshWithoutCache = false,
     ) => {
+      // Sync panel datetime picker state before refreshing
+      syncPanelDateTimePickerState(panelId);
+
+      // Update URL with panel time if panel has a time value set
+      const timeValue = panelTimeValues.value[panelId];
+      if (timeValue) {
+        await updateURLWithPanelTime(panelId, timeValue);
+      }
+
       emit("refreshPanelRequest", panelId, shouldRefreshWithoutCache);
 
       // Panel-specific refresh: creates a snapshot for this panel only
@@ -1201,6 +1313,214 @@ export default defineComponent({
       return variablesManager;
     };
 
+    // ===== Panel Time Configuration (NEW FEATURE) =====
+    // Panel time values for all panels (map: panelId -> time value)
+    const panelTimeValues = ref<Record<string, any>>({});
+
+    // Store refs to panel datetime picker components using a Map (not reactive)
+    const panelDateTimePickerRefs = new Map<string, any>();
+
+    // Track panels that are initializing (to prevent spurious change events)
+    const panelsInitializing = ref<Set<string>>(new Set());
+
+    // Check if a specific panel has time enabled
+    const hasPanelTime = (panel: any) => {
+      return !!panel?.config?.panel_time_enabled;
+    };
+
+    // Computed property to get the correct time for view panel
+    // Returns panel-specific time if available, otherwise returns global time
+    const viewPanelSelectedDate = computed(() => {
+      if (!viewPanelId.value) {
+        return props.selectedDateForViewPanel;
+      }
+
+      // Check if this panel has a custom time value
+      const panelTimeValue = panelTimeValues.value[viewPanelId.value];
+      if (panelTimeValue) {
+        // Return the panel-specific time
+        return panelTimeValue;
+      }
+
+      // Fall back to global time
+      return props.selectedDateForViewPanel;
+    });
+
+    // Initialize panel time values for panels with panel-level time enabled
+    const initializePanelTimes = () => {
+      panels.value?.forEach((panel: any) => {
+        // Only initialize picker for panels that have panel_time_enabled enabled
+        if (hasPanelTime(panel)) {
+          const panelId = panel.id;
+
+          // Mark this panel as initializing to prevent change events
+          panelsInitializing.value.add(panelId);
+
+          // Helper to check if two picker values represent the same time
+          // DateTimePickerDashboard normalizes values (adds startTime/endTime, may drop "type"),
+          // so we compare semantically: for relative, only compare the period string
+          const arePickerValuesEqual = (v1: any, v2: any) => {
+            if (!v1 || !v2) return v1 === v2;
+
+            const type1 = v1.valueType || v1.type;
+            const type2 = v2.valueType || v2.type;
+            if (type1 !== type2) return false;
+
+            // For relative: only the period matters (startTime/endTime are computed & change over time)
+            if (type1 === "relative") {
+              return v1.relativeTimePeriod === v2.relativeTimePeriod;
+            }
+
+            // For absolute: compare start and end times
+            return v1.startTime === v2.startTime && v1.endTime === v2.endTime;
+          };
+
+          // When panel has no custom time (panel_time_range is null) and no URL panel params,
+          // use local convertGlobalTimeToPickerFormat which preserves relative/absolute type
+          // from route.query. The imported resolvePanelTimeValue always converts global to absolute.
+          const hasUrlPanelTime = !!(
+            route.query[`pt-period.${panelId}`] ||
+            route.query[`pt-from.${panelId}`]
+          );
+          const hasPanelConfigTime = !!panel.config?.panel_time_range;
+
+          let pickerValue: any = null;
+
+          if (hasUrlPanelTime || hasPanelConfigTime) {
+            // Panel has its own time (URL or config) → use priority-based resolver
+            pickerValue = resolvePanelTimeValue(
+              panel,
+              panelId,
+              route.query,
+              props.currentTimeObj,
+            );
+          } else {
+            // Panel uses global time → use local converter that preserves relative type
+            pickerValue = convertGlobalTimeToPickerFormat(
+              props.currentTimeObj?.["__global"],
+            );
+          }
+
+          if (pickerValue && !arePickerValuesEqual(panelTimeValues.value[panelId], pickerValue)) {
+            panelTimeValues.value[panelId] = pickerValue;
+          }
+
+          // Cleanup initialization flag
+          setTimeout(() => panelsInitializing.value.delete(panelId), 500);
+        }
+      });
+    };
+
+    // Convert global time object to picker format (with route fallback)
+    // CRITICAL: Check route.query FIRST to preserve relative/absolute type
+    // The time object (globalTime) always has Date objects, losing the "relative" info
+    const convertGlobalTimeToPickerFormat = (globalTime: any) => {
+      // Check route first to preserve the original relative/absolute type
+      if (route.query.period) {
+        return {
+          type: "relative",
+          valueType: "relative",
+          relativeTimePeriod: route.query.period,
+        };
+      } else if (route.query.from && route.query.to) {
+        return {
+          type: "absolute",
+          valueType: "absolute",
+          startTime: parseInt(route.query.from as string),
+          endTime: parseInt(route.query.to as string),
+        };
+      }
+
+      // Fall back to converting from time object (will be absolute)
+      const fromTimeObj = convertTimeObjToPickerFormat(globalTime);
+      if (fromTimeObj) {
+        return fromTimeObj;
+      }
+
+      // Default
+      return {
+        type: "relative",
+        valueType: "relative",
+        relativeTimePeriod: "15m",
+      };
+    };
+
+    // Handle Apply button click on panel time picker
+    const onPanelTimeApply = async (panelId: string) => {
+      // Guard against infinite recursion during state synchronization
+      if (panelsSyncingDateTime.value.has(panelId)) {
+        return;
+      }
+
+      // Guard against firing during initialization (when initializePanelTimes sets values)
+      // This prevents null-config panels from creating spurious URL params
+      if (panelsInitializing.value.has(panelId)) {
+        return;
+      }
+
+      // Use the local helper which handles state syncing, URL update and variable freeze for this panel
+      await refreshPanelRequest(panelId, false);
+    };
+
+    // Update URL with panel time params
+    const updateURLWithPanelTime = async (panelId: string, timeValue: any) => {
+      // Get the latest live variable params to ensure we don't lose uncommitted changes
+      const variableParams = variablesManager.getUrlParams({ useLive: true });
+
+      const query = {
+        ...route.query,
+        ...variableParams, // Include live variables
+        tab: selectedTabId.value, // Ensure we use the current tab ref
+      };
+
+      // Remove existing panel time params
+      delete query[`pt-period.${panelId}`];
+      delete query[`pt-from.${panelId}`];
+      delete query[`pt-to.${panelId}`];
+
+      // Add new params based on type
+      if (
+        timeValue.relativeTimePeriod ||
+        timeValue.type === "relative" ||
+        timeValue.valueType === "relative"
+      ) {
+        query[`pt-period.${panelId}`] = timeValue.relativeTimePeriod;
+      } else if (
+        timeValue.type === "absolute" ||
+        timeValue.valueType === "absolute" ||
+        (timeValue.startTime && timeValue.endTime)
+      ) {
+        query[`pt-from.${panelId}`] = timeValue.startTime.toString();
+        query[`pt-to.${panelId}`] = timeValue.endTime.toString();
+      }
+
+      // CRITICAL: Only update URL if query has actually changed
+      // This prevents unnecessary route updates when panel refreshes without time changes
+      const hasQueryChanged = Object.keys(query).some(
+        key => query[key] !== route.query[key]
+      ) || Object.keys(route.query).some(
+        key => !query.hasOwnProperty(key)
+      );
+
+      if (hasQueryChanged) {
+        await router.replace({ query });
+      }
+    };
+
+    // Initialize panel times when component is mounted
+    onMounted(() => {
+      initializePanelTimes();
+    });
+
+    // Re-initialize panel times when panels change or when global time changes
+    watch(
+      [panels, () => props.currentTimeObj],
+      () => {
+        initializePanelTimes();
+      },
+      { deep: true, immediate: true },
+    );
+
     return {
       store,
       addPanelData,
@@ -1238,6 +1558,13 @@ export default defineComponent({
       commitAllVariables,
       getUrlParams,
       getVariablesManager,
+      syncAllPanelDateTimePickers,
+      // Panel time configuration (NEW)
+      panelTimeValues,
+      hasPanelTime,
+      onPanelTimeApply,
+      panelDateTimePickerRefs,
+      viewPanelSelectedDate,
     };
   },
   methods: {
