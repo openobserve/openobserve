@@ -244,13 +244,7 @@ export class LogsPage {
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
         this.searchResultText = '[data-test="logs-search-search-result"]';
-        this.vrlEditorMonaco = '#fnEditor .monaco-editor';
         this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
-        // Selector for include/exclude button associated with a specific field
-        // Uses :has() to scope to the row containing the field key, then find button within that row
-        // This is more robust than sibling combinators (+ or ~) which break if DOM structure changes
-        // NOTE: No fallback selector - if .log-detail-row doesn't exist, test should fail loudly
-        this.vrlFieldIncludeExcludeBtn = (fieldName) => `.log-detail-row:has([data-test="log-expand-detail-key-${fieldName}"]) [data-test="log-details-include-exclude-field-btn"]`;
     }
 
 
@@ -5999,34 +5993,6 @@ export class LogsPage {
     // ============================================================================
 
     /**
-     * Click the show query toggle to expand/collapse VRL editor
-     */
-    async clickShowQueryToggle() {
-        await this.page.locator(this.showQueryToggle).click();
-        testLogger.info('Clicked show query toggle');
-    }
-
-    /**
-     * Wait for VRL editor to be visible and click it
-     */
-    async waitForVrlEditorAndClick() {
-        await this.page.locator(this.vrlEditorMonaco).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(this.vrlEditorMonaco).click();
-        testLogger.info('Clicked VRL editor');
-    }
-
-    /**
-     * Enter VRL function in the editor
-     * @param {string} vrlCode - The VRL code to enter
-     */
-    async enterVrlFunction(vrlCode) {
-        await this.page.locator(this.vrlEditorMonaco).click();
-        await this.page.keyboard.press('Control+a');
-        await this.page.keyboard.type(vrlCode);
-        testLogger.info(`Entered VRL function: ${vrlCode}`);
-    }
-
-    /**
      * Get the logs table element
      * @returns {Locator} - The logs table locator
      */
@@ -6088,28 +6054,6 @@ export class LogsPage {
         const expandMenus = this.page.locator(this.tableRowExpandMenu);
         const count = await expandMenus.count();
         return count > 0;
-    }
-
-    /**
-     * Get count of include/exclude buttons on a VRL-generated field
-     * @param {string} fieldName - The VRL field name
-     * @returns {Promise<number>} - Count of buttons found
-     */
-    async getVrlFieldIncludeExcludeCount(fieldName) {
-        const selector = this.vrlFieldIncludeExcludeBtn(fieldName);
-        const count = await this.page.locator(selector).count();
-        testLogger.info(`VRL field '${fieldName}' include/exclude button count: ${count}`);
-        return count;
-    }
-
-    /**
-     * Get count of include/exclude buttons on regular fields
-     * @returns {Promise<number>} - Count of buttons found
-     */
-    async getRegularIncludeExcludeCount() {
-        const count = await this.page.locator(this.logDetailsIncludeExcludeBtn).count();
-        testLogger.info(`Regular include/exclude button count: ${count}`);
-        return count;
     }
 
     /**
