@@ -56,7 +56,7 @@ test.describe("Schema testcases", () => {
         // Navigate to base URL with authentication 
         await navigateToBase(page);
         pm = new PageManager(page);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Perform ingestion for this test
         await ingestion(page, testStreamName);
@@ -92,7 +92,7 @@ test.describe("Schema testcases", () => {
         // Navigate to base URL with authentication
         await navigateToBase(page);
         pm = new PageManager(page);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Perform ingestion for this test
         await ingestion(page, testStreamName);
@@ -121,7 +121,7 @@ test.describe("Schema testcases", () => {
         // Navigate to base URL with authentication
         await navigateToBase(page);
         pm = new PageManager(page);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Perform ingestion for this test
         await ingestion(page, testStreamName);

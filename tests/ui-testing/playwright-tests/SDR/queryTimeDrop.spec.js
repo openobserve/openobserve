@@ -16,7 +16,7 @@ async function closeStreamDetailSidebar(page) {
 async function navigateToLogsQuick(page) {
   // Quick navigation to logs without VRL editor wait
   await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   testLogger.info('Navigated to Logs (fast - no VRL wait)');
 }
 
@@ -140,7 +140,7 @@ test.describe("Query Time Drop - Combined Test", { tag: '@enterprise' }, () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Combined query time drop test setup completed');
   });
 

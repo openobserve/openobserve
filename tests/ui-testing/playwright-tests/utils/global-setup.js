@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const logsdata = require("../../../test-data/logs_data.json");
 const testLogger = require('./test-logger.js');
+const metricsIngestion = require('./metrics-ingestion.js');
+const { ingestTraces } = require('./trace-ingestion.js');
 
 /**
  * Global setup for all tests - handles authentication and test data ingestion
@@ -79,7 +81,7 @@ async function globalSetup() {
     testLogger.debug('Login credentials submitted');
 
     // Wait for login to complete - look for navigation or success indicators
-    await page.waitForLoadState('networkidle', { timeout: 15000 });
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     
     // Verify login success by checking for a known element
     await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ 
@@ -93,10 +95,27 @@ async function globalSetup() {
     await context.storageState({ path: authFile });
     testLogger.info('Authentication state saved successfully', { authFile });
     
-    // Perform global test data ingestion
-    testLogger.info('Starting global test data ingestion');
-    await performGlobalIngestion(page);
-    testLogger.info('Global test data ingestion completed');
+    // Skip data ingestion for cleanup-only runs
+    // Use precise regex to match only cleanup.spec.js (not some-cleanup.spec.js or cleanup.spec-backup.js)
+    const isCleanupOnly = process.argv.some(arg => /cleanup\.spec\.(js|ts)$/.test(arg));
+    if (isCleanupOnly || process.env.SKIP_INGESTION === 'true') {
+      testLogger.info('Skipping data ingestion (cleanup-only run or SKIP_INGESTION=true)');
+    } else {
+      // Perform global test data ingestion
+      testLogger.info('Starting global test data ingestion');
+      await performGlobalIngestion(page);
+      testLogger.info('Global test data ingestion completed');
+
+      // Skip global metrics ingestion - it's now handled in test-specific beforeAll hooks
+      // This avoids 404 errors when OpenObserve metrics endpoint isn't ready during global setup
+      // await performMetricsIngestion();
+      testLogger.debug('Metrics ingestion skipped in global setup - will be handled in test beforeAll hooks');
+
+      // Perform trace data ingestion
+      testLogger.info('Starting trace data ingestion');
+      await ingestTraces(page, 20); // Ingest 20 test traces
+      testLogger.info('Trace data ingestion completed');
+    }
     
   } catch (error) {
     testLogger.error('Global setup failed', { error: error.message, stack: error.stack });
@@ -185,6 +204,45 @@ async function performGlobalIngestion(page) {
     streamName,
     responseData: response.data
   });
+}
+
+/**
+ * Performs global metrics data ingestion
+ */
+async function performMetricsIngestion() {
+  try {
+    // Ingest test metrics data
+    const result = await metricsIngestion.ingestTestMetrics({
+      iterations: 20,  // Send 20 batches of metrics for better test coverage
+      delay: 100,      // 100ms between batches
+      useExternal: false  // Use local OpenObserve instance
+    });
+
+    if (result.success) {
+      testLogger.info('Metrics ingestion successful', {
+        totalBatches: result.totalBatches,
+        successfulBatches: result.successfulBatches
+      });
+    } else {
+      testLogger.warn('Metrics ingestion completed with some failures', {
+        totalBatches: result.totalBatches,
+        successfulBatches: result.successfulBatches
+      });
+    }
+
+    // Also start continuous ingestion that will run during tests
+    // This runs in the background and doesn't block
+    metricsIngestion.ingestContinuously(120000, 10000).then(result => {
+      testLogger.debug('Background metrics ingestion completed', result);
+    }).catch(error => {
+      testLogger.error('Background metrics ingestion failed', { error: error.message });
+    });
+
+  } catch (error) {
+    testLogger.error('Metrics ingestion failed', { error: error.message });
+    // Don't fail the entire setup if metrics ingestion fails
+    // Tests can still run without metrics data
+  }
 }
 
 module.exports = globalSetup;
