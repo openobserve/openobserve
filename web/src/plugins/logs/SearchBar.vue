@@ -1265,6 +1265,7 @@ class="q-pr-sm q-pt-xs" />
                 :show-ai-icon="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
                 :disable-ai="!searchObj.data.stream.selectedStream.length || isSqlModeDisabled"
                 :disable-ai-reason="!searchObj.data.stream.selectedStream.length ? t('search.selectStreamForAI') : t('search.nlpModeDisabledForVisualization')"
+                data-test="logs-search-bar-query-editor"
                 data-test-prefix="logs-search-bar"
                 editor-height="100%"
                 @toggle-nlp-mode="handleToggleNlpMode"
