@@ -59,7 +59,10 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[post("/{org_id}/cipher_keys")]
 pub async fn save(
@@ -125,7 +128,10 @@ pub async fn save(
     responses(
         (status = 403, description = "Feature not supported", content_type = "application/json")
     ),
-    tag = "Keys"
+    tag = "Keys",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[post("/{org_id}/cipher_keys")]
 pub async fn save(
@@ -158,7 +164,10 @@ pub async fn save(
         ),
         (status = 404, description = "Key not found", content_type = "text/plain")
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[get("/{org_id}/cipher_keys/{key_name}")]
 pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -216,7 +225,10 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
             content_type = "application/json",
         ),
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[get("/{org_id}/cipher_keys")]
 pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
@@ -276,7 +288,10 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
             content_type = "application/json",
         ),
     ),
-    tag = "Keys"
+    tag = "Keys",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[delete("/{org_id}/cipher_keys/{key_name}")]
 pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -336,7 +351,10 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[put("/{org_id}/cipher_keys/{key_name}")]
 pub async fn update(
@@ -429,7 +447,10 @@ pub async fn update(
     responses(
         (status = 403, description = "Feature not supported", content_type = "application/json")
     ),
-    tag = "Keys"
+    tag = "Keys",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[put("/{org_id}/cipher_keys/{key_name}")]
 pub async fn update(

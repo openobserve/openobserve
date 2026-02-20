@@ -76,7 +76,8 @@ pub mod service_accounts;
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all users", "category": "users"}))
     )
 )]
 #[get("/{org_id}/users")]
@@ -141,7 +142,8 @@ pub async fn list(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a new user", "category": "users"}))
     )
 )]
 #[post("/{org_id}/users")]
@@ -202,7 +204,8 @@ pub async fn save(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update user details", "category": "users"}))
     )
 )]
 #[put("/{org_id}/users/{email_id}")]
@@ -275,7 +278,8 @@ pub async fn update(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Add user to organization", "category": "users"}))
     )
 )]
 #[post("/{org_id}/users/{email_id}")]
@@ -331,7 +335,8 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Remove user from organization", "category": "users", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/users/{email_id}")]
@@ -359,7 +364,8 @@ context_path = "/auth",
         (status = 200, description = "Success", content_type = "application/json", body = inline(SignInResponse)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/login")]
