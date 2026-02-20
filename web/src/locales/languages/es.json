@@ -232,8 +232,10 @@
     "patternColumnHeader": "Patrón",
     "occurrenceColumnHeader": "Ocurrencia",
     "percentageColumnHeader": "Porcentaje",
+    "anomalyColumnHeader": "Anomalía",
     "actionsColumnHeader": "Acciones",
     "anomalyLabel": "ANOMALÍA",
+    "anomalyDetected": "Anomalía detectada",
     "includePatternInSearch": "Incluir patrón en la búsqueda",
     "excludePatternFromSearch": "Excluir patrón de la búsqueda",
     "showPatternDetails": "Mostrar detalles ({variables} variables, {ejemplos} ejemplos)",
@@ -2036,7 +2038,10 @@
     "customWebhook": "Personalizado (Webhook)",
     "customEmail": "Personalizado (correo electrónico)",
     "customAction": "Personalizado (acción)",
-    "custom": "Personalizado"
+    "custom": "Personalizado",
+    "separator": "Separador",
+    "separator_placeholder": "Introduzca un separador (p. ej., |,\\n,\\ t, espacio)",
+    "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)"
   },
   "metrics": {
     "searchMetric": "Buscar una métrica",
@@ -2846,7 +2851,12 @@
     },
     "viewInTraces": "Ver en Traces",
     "viewInTracesTooltip": "Abra la página de seguimientos con el panel de métricas RED y todos los seguimientos correlacionados",
-    "exportToJson": "Exportar a JSON"
+    "exportToJson": "Exportar a JSON",
+    "noLogsDescription": "No se han encontrado registros para esta correlación en el intervalo de tiempo seleccionado.",
+    "tracesErrorDetails": "Se ha producido un error al obtener los datos de seguimiento. Vuelva a intentarlo.",
+    "metricsError": "No se pueden cargar las métricas",
+    "metricsErrorDetails": "Se ha producido un error al obtener los datos de las métricas. Por favor, inténtalo de nuevo.",
+    "noMetricsDescription": "No se han encontrado métricas para esta correlación en el intervalo de tiempo seleccionado."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",

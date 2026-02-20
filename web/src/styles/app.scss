@@ -561,6 +561,11 @@ body {
       height: 36px !important;
     }
   }
+  &.o2-row-sm{
+    th, td {
+      height: 20px !important;
+    }
+  }
   th,td {
     padding: 0px 5px !important;
     height: 36px;

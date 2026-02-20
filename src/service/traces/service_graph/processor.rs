@@ -143,7 +143,6 @@ async fn process_stream(
         r#"SELECT
             client.service_name AS client,
             server.service_name AS server,
-            'standard' AS connection_type,
             COUNT(*) AS total_requests,
             COUNT(*) FILTER (WHERE server.span_status = 'ERROR') AS errors,
             CAST(COUNT(*) FILTER (WHERE server.span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) AS error_rate,
@@ -154,11 +153,14 @@ async fn process_stream(
         LEFT JOIN "{stream_name}" AS client
             ON server.reference_parent_span_id = client.span_id
             AND server.trace_id = client.trace_id
-        WHERE client.service_name IS NOT NULL
-            AND server._timestamp >= {start_time} AND server._timestamp < {end_time}
-            AND CAST(server.span_kind AS VARCHAR) IN {server_span_kinds}
             AND CAST(client.span_kind AS VARCHAR) IN {client_span_kinds}
-            AND client.service_name != server.service_name
+        WHERE
+            server._timestamp >= {start_time} AND server._timestamp < {end_time}
+            AND CAST(server.span_kind AS VARCHAR) IN {server_span_kinds}
+            AND (
+                client.service_name IS NULL
+                OR client.service_name != server.service_name
+            )
         GROUP BY client.service_name, server.service_name"#,
     );
     let req = config::meta::search::Request {

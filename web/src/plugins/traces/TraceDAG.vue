@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <Controls />
 
         <template #node-custom="{ data }">
-          <Handle type="target" :position="Position.Top" class="dag-handle" />
+          <Handle v-if="data.hasIncoming" type="target" :position="Position.Top" class="dag-handle" />
           <div
             class="custom-node"
             :class="[
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ERR
             </q-chip>
           </div>
-          <Handle type="source" :position="Position.Bottom" class="dag-handle" />
+          <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom" class="dag-handle" />
         </template>
       </VueFlow>
     </div>
@@ -158,10 +158,10 @@ export default defineComponent({
 
     // Top-down tree layout algorithm
     const calculateLayout = (nodesData: SpanNode[], edgesData: SpanEdge[]) => {
-      const nodeWidth = 140;
-      const nodeHeight = 28;
-      const horizontalGap = 16;
-      const verticalGap = 36;
+      const nodeWidth = 180;
+      const nodeHeight = 32;
+      const horizontalGap = 32;
+      const verticalGap = 48;
 
       // Build adjacency list and find root nodes
       const children: Map<string, string[]> = new Map();
@@ -174,13 +174,6 @@ export default defineComponent({
       });
 
       edgesData.forEach((edge) => {
-        // Only process edges whose parent node exists in the data set.
-        // If the parent span_id isn't in our nodes (e.g., browser/frontend span
-        // that wasn't exported to the trace backend), skip this edge so the
-        // child is correctly treated as a root node instead of being orphaned
-        // at position {0,0}.
-        if (!nodeMap.has(edge.from)) return;
-
         const parentChildren = children.get(edge.from) || [];
         parentChildren.push(edge.to);
         children.set(edge.from, parentChildren);
@@ -314,16 +307,42 @@ export default defineComponent({
       return positions;
     };
 
+    // Filter valid edges first (must be computed before nodes)
+    const validEdges = computed(() => {
+      if (!dagData.value || !dagData.value.nodes) return [];
+
+      // Create a set of valid node IDs
+      const validNodeIds = new Set(dagData.value.nodes.map(n => n.span_id));
+
+      // Filter out edges that reference non-existent nodes
+      return dagData.value.edges.filter(edge => {
+        const isValid = validNodeIds.has(edge.from) && validNodeIds.has(edge.to);
+        if (!isValid) {
+          console.warn(`[TraceDAG] Skipping invalid edge: ${edge.from} → ${edge.to}`);
+        }
+        return isValid;
+      });
+    });
+
     const nodes = computed(() => {
       if (!dagData.value || !dagData.value.nodes) return [];
 
-      const positions = calculateLayout(dagData.value.nodes, dagData.value.edges || []);
+      // Calculate layout using only valid edges
+      const positions = calculateLayout(dagData.value.nodes, validEdges.value);
+
+      // Determine which nodes have incoming/outgoing edges
+      const nodesWithIncoming = new Set(validEdges.value.map(e => e.to));
+      const nodesWithOutgoing = new Set(validEdges.value.map(e => e.from));
 
       return dagData.value.nodes.map((node) => ({
         id: node.span_id,
         type: "custom",
         position: positions.get(node.span_id) || { x: 0, y: 0 },
-        data: node,
+        data: {
+          ...node,
+          hasIncoming: nodesWithIncoming.has(node.span_id),
+          hasOutgoing: nodesWithOutgoing.has(node.span_id),
+        },
         sourcePosition: Position.Bottom,
         targetPosition: Position.Top,
       }));
@@ -332,24 +351,18 @@ export default defineComponent({
     const edges = computed(() => {
       if (!dagData.value) return [];
 
-      // Build a set of valid node IDs so we only render edges where both
-      // source and target nodes exist (prevents VueFlow rendering errors)
-      const nodeIds = new Set(dagData.value.nodes.map((n) => n.span_id));
-
-      return dagData.value.edges
-        .filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to))
-        .map((edge) => ({
-          id: `${edge.from}-${edge.to}`,
-          source: edge.from,
-          target: edge.to,
-          type: "default",
-          animated: false,
-          markerEnd: MarkerType.ArrowClosed,
-          style: {
-            strokeWidth: 1,
-            stroke: "#888",
-          },
-        }));
+      return validEdges.value.map((edge) => ({
+        id: `${edge.from}-${edge.to}`,
+        source: edge.from,
+        target: edge.to,
+        type: "default",
+        animated: false,
+        markerEnd: MarkerType.ArrowClosed,
+        style: {
+          strokeWidth: 2,
+          stroke: "#94a3b8",
+        },
+      }));
     });
 
     const fetchDAG = async () => {
@@ -479,15 +492,15 @@ export default defineComponent({
 
   .vue-flow__node-custom {
     .custom-node {
-      padding: 4px 8px;
-      border-radius: 4px;
+      padding: 6px 12px;
+      border-radius: 6px;
       background: white;
-      border: 1.5px solid #1976d2;
-      min-width: 60px;
-      max-width: 140px;
-      min-height: 22px;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-      transition: all 0.15s ease;
+      border: 2px solid #1976d2;
+      min-width: 80px;
+      max-width: 180px;
+      min-height: 28px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
       cursor: pointer;
       text-align: center;
       display: flex;
@@ -496,8 +509,8 @@ export default defineComponent({
       justify-content: center;
 
       &:hover {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
       }
 
       &.node-error {
@@ -527,13 +540,13 @@ export default defineComponent({
     }
 
     .node-operation {
-      font-size: 12px;
+      font-size: 13px;
       color: #1976d2;
-      font-weight: 500;
+      font-weight: 600;
       word-wrap: break-word;
       overflow-wrap: break-word;
-      max-width: 124px;
-      line-height: 1.2;
+      max-width: 160px;
+      line-height: 1.3;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -555,17 +568,19 @@ export default defineComponent({
     }
 
     .dag-handle {
-      width: 5px;
-      height: 5px;
+      width: 8px;
+      height: 8px;
       background: #1976d2;
-      border: 1px solid white;
+      border: 2px solid white;
       border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
     }
 
     .error-chip {
-      font-size: 9px;
-      height: 12px;
-      margin-top: 1px;
+      font-size: 10px;
+      height: 14px;
+      margin-top: 2px;
+      padding: 0 4px;
     }
   }
 }
@@ -591,8 +606,8 @@ export default defineComponent({
         background: #2a2a2a;
         border-color: #64b5f6;
         color: #e0e0e0;
-        border-width: 1.5px;
-        max-width: 140px;
+        border-width: 2px;
+        max-width: 180px;
 
         &.node-error {
           border-color: #ef5350;
@@ -622,8 +637,8 @@ export default defineComponent({
 
       .node-operation {
         color: #90caf9;
-        font-size: 12px;
-        max-width: 124px;
+        font-size: 13px;
+        max-width: 160px;
 
         &.node-llm-text-generation { color: #81c784; }  // green-light
         &.node-llm-text-embedding  { color: #90caf9; }  // blue-light

@@ -232,8 +232,10 @@
     "patternColumnHeader": "Muster",
     "occurrenceColumnHeader": "Vorkommen",
     "percentageColumnHeader": "Prozentsatz",
+    "anomalyColumnHeader": "Anomalie",
     "actionsColumnHeader": "Aktionen",
     "anomalyLabel": "ANOMALIE",
+    "anomalyDetected": "Anomalie erkannt",
     "includePatternInSearch": "Muster in die Suche einbeziehen",
     "excludePatternFromSearch": "Muster von der Suche ausschließen",
     "showPatternDetails": "Details anzeigen ({Variablen} Variablen, {Beispiele} Beispiele)",
@@ -2036,7 +2038,10 @@
     "customWebhook": "Benutzerdefiniert (Webhook)",
     "customEmail": "Benutzerdefiniert (E-Mail)",
     "customAction": "Benutzerdefiniert (Aktion)",
-    "custom": "Benutzerdefiniert"
+    "custom": "Benutzerdefiniert",
+    "separator": "Trennzeichen",
+    "separator_placeholder": "Geben Sie ein Trennzeichen ein (z. B. |,\\n,\\ t, Leerzeichen)",
+    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)"
   },
   "metrics": {
     "searchMetric": "Suchen Sie nach einer Metrik",
@@ -2848,7 +2853,12 @@
     },
     "viewInTraces": "In Traces ansehen",
     "viewInTracesTooltip": "Öffnen Sie die Traces-Seite mit dem RED-Metriken-Dashboard und allen korrelierten Traces",
-    "exportToJson": "Export nach JSON"
+    "exportToJson": "Export nach JSON",
+    "noLogsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Protokolle gefunden.",
+    "tracesErrorDetails": "Beim Abrufen der Trace-Daten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+    "metricsError": "Metriken können nicht geladen werden",
+    "metricsErrorDetails": "Beim Abrufen der Metrikdaten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+    "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden."
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

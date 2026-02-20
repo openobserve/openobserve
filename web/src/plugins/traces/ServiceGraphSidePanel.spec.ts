@@ -594,14 +594,13 @@ describe("ServiceGraphSidePanel.vue", () => {
     });
   });
 
-  describe("Event Handlers - handleViewTraces", () => {
-    it("should emit view-traces event when button is clicked", async () => {
+  describe("Event Handlers - handleShowTelemetry", () => {
+    it("should have Show telemetry button", () => {
       wrapper = createWrapper();
-      const viewTracesBtn = wrapper.find('[data-test="service-graph-side-panel-view-traces-btn"]');
+      const showTelemetryBtn = wrapper.find('[data-test="service-graph-side-panel-show-telemetry-btn"]');
 
-      await viewTracesBtn.trigger("click");
-
-      expect(wrapper.emitted("view-traces")).toBeTruthy();
+      expect(showTelemetryBtn.exists()).toBe(true);
+      expect(showTelemetryBtn.text()).toContain("Show telemetry");
     });
 
     it("should disable view traces button when all streams selected", () => {
@@ -1184,7 +1183,7 @@ describe("ServiceGraphSidePanel.vue", () => {
       expect(wrapper.find('[data-test="service-graph-side-panel-header"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="service-graph-side-panel-service-name"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="service-graph-side-panel-close-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-graph-side-panel-view-traces-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-side-panel-show-telemetry-btn"]').exists()).toBe(true);
     });
   });
 });

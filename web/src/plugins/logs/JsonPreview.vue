@@ -293,8 +293,15 @@ size="lg" color="primary" />
           :data-test="`log-expand-detail-key-${key}`"
           :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
-          <LogsHighLighting
-            :data="{ [key]: value[key] }"
+          <span class="log-key">"{{ key }}"</span><span class="log-separator">: </span><ChunkedContent
+            v-if="getContentSize(value[key]) > 50000"
+            :data="value[key]"
+            :field-key="`json_preview_${key}`"
+            :query-string="highlightQuery"
+            :simple-mode="false"
+          /><LogsHighLighting
+            v-else
+            :data="value[key]"
             :show-braces="false"
             :query-string="highlightQuery"
           /><span v-if="index < Object.keys(value).length - 1">,</span>
@@ -407,6 +414,7 @@ import { defineAsyncComponent } from "vue";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
@@ -450,6 +458,7 @@ export default {
     EqualIcon,
     AppTabs,
     LogsHighLighting,
+    ChunkedContent,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -880,6 +889,19 @@ export default {
       }
     };
 
+    const getContentSize = (data: any): number => {
+      if (data === null || data === undefined) return 0;
+      if (typeof data === "string") return data.length;
+      if (typeof data === "object") {
+        try {
+          return JSON.stringify(data).length;
+        } catch {
+          return 0;
+        }
+      }
+      return String(data).length;
+    };
+
     return {
       t,
       copyLogToClipboard,
@@ -926,6 +948,7 @@ export default {
       typeOfRegexPattern,
       regexPatternType,
       confirmRegexPatternType,
+      getContentSize,
     };
   },
 };
