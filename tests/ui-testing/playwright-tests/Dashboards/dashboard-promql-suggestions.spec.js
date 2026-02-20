@@ -32,7 +32,7 @@ const cleanupDashboard = async (page, pm, dashboardName) => {
   // Replace editor content with a simple valid PromQL query
   // (tests leave invalid/partial queries like 'cpu_usage{service_name=a}')
   const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
-  const monacoEditor = queryEditor.locator('.monaco-editor');
+  const monacoEditor = queryEditor.getByRole('code');
   await monacoEditor.click();
   await page.keyboard.press('Control+a');
   await page.keyboard.type('up');
@@ -134,7 +134,7 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
     await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
     // Focus on the Monaco editor
-    const monacoEditor = queryEditor.locator('.monaco-editor');
+    const monacoEditor = queryEditor.getByRole('code');
     await monacoEditor.click();
 
     // Type 'cpu_usage{}' and position cursor inside to trigger label NAME suggestions
@@ -228,7 +228,7 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
     await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
     // Focus on the Monaco editor
-    const monacoEditor = queryEditor.locator('.monaco-editor');
+    const monacoEditor = queryEditor.getByRole('code');
     await monacoEditor.click();
 
     // Type query step by step: metric_name{} then type inside curly braces
@@ -326,7 +326,7 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
     await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
     // Focus on the Monaco editor
-    const monacoEditor = queryEditor.locator('.monaco-editor');
+    const monacoEditor = queryEditor.getByRole('code');
     await monacoEditor.click();
 
     // Type query step by step: metric_name{} then type inside curly braces
@@ -428,7 +428,7 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
     await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
     // Focus on the Monaco editor
-    const monacoEditor = queryEditor.locator('.monaco-editor');
+    const monacoEditor = queryEditor.getByRole('code');
     await monacoEditor.click();
 
     // Step 1: Type 'cpu_usage{}' and position cursor inside to get label NAME suggestions

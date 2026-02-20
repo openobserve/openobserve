@@ -123,13 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :debounceTime="300"
                   v-model:query="jsonStr"
                   language="json"
-                  :class="
-                    jsonStr == '' && queryEditorPlaceholderFlag
-                      ? 'empty-query'
-                      : ''
-                  "
-                  @focus="queryEditorPlaceholderFlag = false"
-                  @blur="queryEditorPlaceholderFlag = true"
                 />
               </q-form>
             </div>
@@ -200,13 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :debounceTime="300"
                   v-model:query="jsonStr"
                   language="json"
-                  :class="
-                    jsonStr == '' && queryEditorPlaceholderFlag
-                      ? 'empty-query'
-                      : ''
-                  "
-                  @focus="queryEditorPlaceholderFlag = false"
-                  @blur="queryEditorPlaceholderFlag = true"
                 />
 
                 <div></div>
@@ -892,38 +878,27 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.empty-query .monaco-editor-background {
-  background-image: url("../../assets/images/common/query-editor.png");
-  background-repeat: no-repeat;
-  background-size: 115px;
-}
-
-.empty-function .monaco-editor-background {
-  background-image: url("../../assets/images/common/vrl-function.png");
-  background-repeat: no-repeat;
-  background-size: 170px;
-}
 .editor-container {
   height: calc(80vh - 20px) !important;
 }
 .editor-container-url {
-  .monaco-editor {
-    height: calc(100vh - 310px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
+  :deep(.monaco-editor) {
+    height: calc(100vh - 310px) !important;
+    overflow: hidden;
+    resize: none;
   }
 }
 .dashboard-import-json-container {
-  .monaco-editor {
-    height: calc(100vh - 310px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
+  :deep(.monaco-editor) {
+    height: calc(100vh - 310px) !important;
+    overflow: hidden;
+    resize: none;
   }
 }
-.monaco-editor {
-  height: calc(81vh - 14px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
-  resize: none; /* Remove resize behavior */
+:deep(.monaco-editor) {
+  height: calc(81vh - 14px) !important;
+  overflow: hidden;
+  resize: none;
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
 }
