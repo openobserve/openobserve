@@ -36,7 +36,7 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     pageManager = new PageManager(page);
 
     // Post-authentication stabilization wait
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
     // Ingest data to worker-specific unique streams to avoid conflicts in parallel execution
