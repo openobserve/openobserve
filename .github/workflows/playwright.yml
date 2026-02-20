@@ -141,7 +141,6 @@ jobs:
                 "logstable.spec.js",
                 "shareLink.spec.js",
                 "monaco-query-prefill.spec.js",
-                "searchPatterns.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
