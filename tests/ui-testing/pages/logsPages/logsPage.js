@@ -246,9 +246,9 @@ export class LogsPage {
         this.searchResultText = '[data-test="logs-search-search-result"]';
         this.vrlEditorMonaco = '#fnEditor .monaco-editor';
         this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
-        // First selector uses exact match, second uses suffix match as fallback
-        // Note: suffix match may match partial field names (e.g., "field" matches "other_field")
-        this.vrlFieldIncludeExcludeBtn = (fieldName) => `[data-test="log-expand-detail-key-${fieldName}"] ~ [data-test="log-details-include-exclude-field-btn"], [data-test$="-${fieldName}"] [data-test="log-details-include-exclude-field-btn"]`;
+        // Selector for include/exclude button associated with a specific field
+        // Uses parent container approach to ensure we only match the button for this field
+        this.vrlFieldIncludeExcludeBtn = (fieldName) => `[data-test="log-expand-detail-key-${fieldName}"] + [data-test="log-details-include-exclude-field-btn"]`;
     }
 
 

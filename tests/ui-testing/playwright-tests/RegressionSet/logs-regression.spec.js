@@ -1311,9 +1311,10 @@ test.describe("Logs Regression Bugs", () => {
 
     // PRIMARY ASSERTION 3: Table content should exist (not empty/cleared by query inspector)
     const finalLogsContent = await pm.logsPage.getLogsTableContent();
-    expect(finalLogsContent).toBeTruthy();
-    expect(finalLogsContent.length).toBeGreaterThanOrEqual(initialLogsContent?.length || 0);
-    testLogger.info('✓ Logs content exists and was not truncated after query inspector interaction');
+    expect(finalLogsContent, 'Logs table content should not be empty after query inspector interaction').toBeTruthy();
+    const initialLength = initialLogsContent?.length || 0;
+    expect(finalLogsContent.length, `Logs content was truncated: final=${finalLogsContent.length}, initial=${initialLength}`).toBeGreaterThanOrEqual(initialLength);
+    testLogger.info(`✓ Logs content preserved: initial=${initialLength}, final=${finalLogsContent.length}`);
 
     testLogger.info('✓ PRIMARY CHECK PASSED: Query inspector does not mutate logs state (readonly flag working)');
   });
@@ -1364,8 +1365,8 @@ test.describe("Logs Regression Bugs", () => {
       // GUARD: Fail if timestamp parsing returns NaN (locale-specific format not recognized)
       if (isNaN(prev) || isNaN(curr)) {
         testLogger.warn(`Timestamp parsing failed: "${timestamps[i-1]}" -> ${prev}, "${timestamps[i]}" -> ${curr}`);
-        expect(isNaN(prev)).toBe(false);
-        expect(isNaN(curr)).toBe(false);
+        expect(prev, `Could not parse timestamp: "${timestamps[i-1]}"`).not.toBeNaN();
+        expect(curr, `Could not parse timestamp: "${timestamps[i]}"`).not.toBeNaN();
         break;
       }
       validTimestampCount++;
@@ -1475,18 +1476,22 @@ test.describe("Logs Regression Bugs", () => {
     // PRIMARY ASSERTION 2: Last row should retain its original styling classes
     // Compare that the classes from before expansion are still present
     expect(lastRowFinalClasses).toBeTruthy();
-    // The row's classes should be preserved - filter out generic table classes for meaningful comparison
-    const originalClassSet = new Set(lastRowClasses.split(/\s+/).filter(c => c && c !== 'table-row'));
-    const finalClassSet = new Set(lastRowFinalClasses.split(/\s+/).filter(c => c && c !== 'table-row'));
-    // Check for highlight-specific classes (e.g., 'highlighted', 'selected', 'active', 'bg-highlight')
-    const highlightClasses = [...finalClassSet].filter(cls =>
-      cls.includes('highlight') || cls.includes('selected') || cls.includes('active') || cls.includes('bg-')
-    );
-    // Either original classes are preserved OR the row has highlight-specific styling
-    const classesPreserved = [...originalClassSet].every(cls => finalClassSet.has(cls)) ||
-                             highlightClasses.length > 0;
-    expect(classesPreserved).toBe(true);
-    testLogger.info(`✓ Last row preserved styling: original had ${originalClassSet.size} classes, final has ${finalClassSet.size}, highlight classes: ${highlightClasses.join(', ') || 'none'}`);
+    // Filter out generic/transient table classes that don't indicate highlighting state
+    const ignoredClasses = new Set(['table-row', 'q-tr', 'cursor-pointer']);
+    const originalClassSet = new Set(lastRowClasses.split(/\s+/).filter(c => c && !ignoredClasses.has(c)));
+    const finalClassSet = new Set(lastRowFinalClasses.split(/\s+/).filter(c => c && !ignoredClasses.has(c)));
+
+    // Log class differences for debugging
+    const missingClasses = [...originalClassSet].filter(cls => !finalClassSet.has(cls));
+    const addedClasses = [...finalClassSet].filter(cls => !originalClassSet.has(cls));
+    testLogger.info(`Class comparison: original=${originalClassSet.size}, final=${finalClassSet.size}`);
+    if (missingClasses.length > 0) testLogger.info(`Missing classes: ${missingClasses.join(', ')}`);
+    if (addedClasses.length > 0) testLogger.info(`Added classes: ${addedClasses.join(', ')}`);
+
+    // The original classes should be preserved in the final state
+    const classesPreserved = [...originalClassSet].every(cls => finalClassSet.has(cls));
+    expect(classesPreserved, `Last row lost classes after expanding different row. Missing: ${missingClasses.join(', ')}`).toBe(true);
+    testLogger.info(`✓ Last row preserved all ${originalClassSet.size} original styling classes`);
 
     // Close the expanded row
     await pm.logsPage.pressEscapeToCloseDialog();
