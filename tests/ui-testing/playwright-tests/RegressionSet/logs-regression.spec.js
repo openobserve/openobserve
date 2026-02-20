@@ -1237,19 +1237,26 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickTableRowExpandMenu();
     await page.waitForTimeout(1000);
 
-    // Verify VRL text is visible (the .a=2 creates field "a" with value "2")
+    // GUARD: Verify VRL field text is visible in expanded view
+    // This prevents vacuous pass if VRL didn't execute or field doesn't appear
+    // VRL fields show as text ".a=2" but may not have data-test attributes like regular fields
     await pm.logsPage.expectTextVisible('.a=2');
-    testLogger.info('✓ VRL field text ".a=2" is visible in expanded view');
+    testLogger.info('✓ VRL field text ".a=2" is visible in expanded view (guard passed)');
+
+    // Check if VRL field has a data-test attribute (it may or may not)
+    const vrlFieldWithDataTest = await page.locator('[data-test="log-expand-detail-key-a"]').count();
+    testLogger.info(`VRL field with data-test attribute: ${vrlFieldWithDataTest > 0 ? 'YES' : 'NO'}`);
 
     // VRL-generated fields should NOT have include/exclude buttons
-    // Check for include/exclude button on the VRL field "a"
+    // If no data-test attribute exists, the field won't have buttons (expected behavior)
     const vrlFieldIncludeExcludeCount = await pm.logsPage.getVrlFieldIncludeExcludeCount('a');
     expect(vrlFieldIncludeExcludeCount).toBe(0);
     testLogger.info('✓ VRL-generated field does not have include/exclude buttons');
 
-    // Verify regular fields still have include/exclude buttons
+    // Verify regular fields still have include/exclude buttons (positive assertion)
     const regularFieldCount = await pm.logsPage.getRegularIncludeExcludeCount();
-    testLogger.info(`Regular fields with include/exclude buttons: ${regularFieldCount}`);
+    expect(regularFieldCount, 'Regular fields should have include/exclude buttons').toBeGreaterThan(0);
+    testLogger.info(`✓ Regular fields have ${regularFieldCount} include/exclude buttons`);
 
     testLogger.info('✓ PRIMARY CHECK PASSED: VRL fields do not show include/exclude icons');
   });
