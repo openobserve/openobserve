@@ -235,8 +235,10 @@
     "patternColumnHeader": "Motivo",
     "occurrenceColumnHeader": "Evento",
     "percentageColumnHeader": "Percentuale",
+    "anomalyColumnHeader": "Anomalia",
     "actionsColumnHeader": "Azioni",
     "anomalyLabel": "ANOMALIA",
+    "anomalyDetected": "Anomalia rilevata",
     "includePatternInSearch": "Includi modello nella ricerca",
     "excludePatternFromSearch": "Escludi il pattern dalla ricerca",
     "showPatternDetails": "Mostra dettagli ({variabili}, {esempi} esempi)",
@@ -2046,7 +2048,10 @@
     "customWebhook": "Personalizzato (Webhook)",
     "customEmail": "Personalizzato (email)",
     "customAction": "Personalizzato (azione)",
-    "custom": "Personalizzato"
+    "custom": "Personalizzato",
+    "separator": "Separatore",
+    "separator_placeholder": "Inserisci un separatore (ad esempio, |,\\n,\\ t, spazio)",
+    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)"
   },
   "metrics": {
     "searchMetric": "Cerca una metrica",

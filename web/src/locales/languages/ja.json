@@ -235,8 +235,10 @@
     "patternColumnHeader": "パターン",
     "occurrenceColumnHeader": "発生",
     "percentageColumnHeader": "パーセンテージ",
+    "anomalyColumnHeader": "異常",
     "actionsColumnHeader": "[アクション]",
     "anomalyLabel": "異常",
+    "anomalyDetected": "異常を検出",
     "includePatternInSearch": "検索にパターンを含める",
     "excludePatternFromSearch": "検索からパターンを除外",
     "showPatternDetails": "詳細を表示 ({変数} 変数、{例} 例)",
@@ -2063,7 +2065,10 @@
     "customWebhook": "カスタム (ウェブフック)",
     "customEmail": "カスタム (電子メール)",
     "customAction": "カスタム (アクション)",
-    "custom": "カスタム"
+    "custom": "カスタム",
+    "separator": "セパレーター",
+    "separator_placeholder": "セパレータを入力してください (例:|、\\n、\\ t、スペース)",
+    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)"
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",

@@ -2860,7 +2860,7 @@ export class PipelinesPage {
         const backBtn = this.page.locator('[data-test="backfill-jobs-back-btn"], [data-test*="back-btn"], button:has-text("Back")').first();
         if (await backBtn.isVisible().catch(() => false)) {
             await backBtn.click();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             testLogger.info('Clicked backfill back button');
         } else {
             await this.page.goBack();

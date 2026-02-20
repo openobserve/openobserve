@@ -235,8 +235,10 @@
     "patternColumnHeader": "Desen",
     "occurrenceColumnHeader": "Oluşum",
     "percentageColumnHeader": "Yüzde",
+    "anomalyColumnHeader": "Anomali",
     "actionsColumnHeader": "Eylemler",
     "anomalyLabel": "ANOMALİ",
+    "anomalyDetected": "Anomali tespit edildi",
     "includePatternInSearch": "Aramaya desen dahil et",
     "excludePatternFromSearch": "Deseni aramadan hariç tut",
     "showPatternDetails": "Ayrıntıları göster ({değişkenler} değişkenler, {örnekler} örnekler)",
@@ -2046,7 +2048,10 @@
     "customWebhook": "Özel (Webhook)",
     "customEmail": "Özel (E-posta)",
     "customAction": "Özel (Eylem)",
-    "custom": "Özel"
+    "custom": "Özel",
+    "separator": "Ayırıcı",
+    "separator_placeholder": "Ayırıcı girin (örn. |,\\ n,\\ t, boşluk)",
+    "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)"
   },
   "metrics": {
     "searchMetric": "Bir Metrik Ara",

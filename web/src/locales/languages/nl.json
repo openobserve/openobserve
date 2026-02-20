@@ -235,8 +235,10 @@
     "patternColumnHeader": "Patroon",
     "occurrenceColumnHeader": "Voorkomen",
     "percentageColumnHeader": "Percentage",
+    "anomalyColumnHeader": "Anomalie",
     "actionsColumnHeader": "Acties",
     "anomalyLabel": "ANOMALIE",
+    "anomalyDetected": "Anomalie gedetecteerd",
     "includePatternInSearch": "Patroon opnemen in de zoekopdracht",
     "excludePatternFromSearch": "Patroon uitsluiten van de zoekopdracht",
     "showPatternDetails": "Details weergeven ({variabelen} variabelen, {voorbeelden} voorbeelden)",
@@ -2046,7 +2048,10 @@
     "customWebhook": "Op maat (Webhook)",
     "customEmail": "Aangepast (e-mail)",
     "customAction": "Aangepast (actie)",
-    "custom": "Op maat"
+    "custom": "Op maat",
+    "separator": "Separator",
+    "separator_placeholder": "Voer een scheidingsteken in (bijvoorbeeld |,\\n,\\ t, spatie)",
+    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)"
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",

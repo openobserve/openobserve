@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="sessions_page">
     <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
       <div class="card-container">
-        <div class="text-right tw:p-[0.375rem] flex align-center justify-between">
+        <div
+          class="text-right tw:p-[0.375rem] flex align-center justify-between"
+        >
           <syntax-guide />
           <div class="flex align-center justify-end metrics-date-time">
             <date-time
@@ -58,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-splitter
-      class="logs-horizontal-splitter tw:pl-[0.625rem]! tw:h-[calc(100%-80px)]!"
+      class="logs-horizontal-splitter tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]!"
       v-model="splitterModel"
       unit="px"
       vertical
@@ -309,11 +311,6 @@ const getErrorLogs = () => {
   let errorFields = "";
   let errorWhereClause = "";
 
-  if (schemaMapping.value["error_id"]) {
-    errorFields += "error_id, ";
-    errorWhereClause += "error_id, ";
-  }
-
   if (schemaMapping.value["error_message"]) {
     errorFields += "error_message, ";
     errorWhereClause += "error_message, ";
@@ -322,6 +319,16 @@ const getErrorLogs = () => {
     errorFields += "error_handling, ";
     errorWhereClause += "error_handling, ";
   }
+
+  if (schemaMapping.value["error_type"]) {
+    errorFields += "error_type, ";
+    errorWhereClause += "error_type, ";
+  }
+
+  if (schemaMapping.value["error_id"]) {
+    errorWhereClause += `FIRST_VALUE(error_id ORDER BY ${store.state.zoConfig.timestamp_column} DESC) as latest_error_id, `;
+  }
+
   schemaMapping.value["error_stack"] = false;
   schemaMapping.value["error_handling_stack"] = false;
 
@@ -344,11 +351,11 @@ const getErrorLogs = () => {
 
   req.query.sql = `select max(${
     store.state.zoConfig.timestamp_column
-  }) as zo_sql_timestamp, type, service, COUNT(*) as events, ${errorWhereClause} max(view_url) as view_url, max(session_id) as session_id from "_rumdata" where type='error'${
+  }) as zo_sql_timestamp, service, COUNT(*) as events, ${errorWhereClause} max(view_url) as view_url, max(session_id) as session_id from "_rumdata" where type='error'${
     errorTrackingState.data.editorValue.length
       ? " and " + errorTrackingState.data.editorValue
       : ""
-  } GROUP BY ${errorFields} type, service order by zo_sql_timestamp DESC`;
+  } GROUP BY ${errorFields} service order by zo_sql_timestamp DESC`;
 
   req.query.sql.replaceAll("\n", " ");
   delete req.aggs;
@@ -411,7 +418,7 @@ const handleErrorTypeClick = async (payload: any) => {
   await nextTick();
   router.push({
     name: "ErrorViewer",
-    params: { id: payload.row.error_id },
+    params: { id: payload.row.latest_error_id },
     query: {
       timestamp: payload.row.zo_sql_timestamp,
     },
@@ -468,8 +475,7 @@ function updateUrlQueryParams() {
 }
 </script>
 
-<style scoped lang="scss">
-</style>
+<style scoped lang="scss"></style>
 <style lang="scss">
 .sessions_page {
   .index-menu .field_list .field_overlay .field_label,
