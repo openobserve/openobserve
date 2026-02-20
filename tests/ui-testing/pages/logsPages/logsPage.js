@@ -249,7 +249,8 @@ export class LogsPage {
         // Selector for include/exclude button associated with a specific field
         // Uses :has() to scope to the row containing the field key, then find button within that row
         // This is more robust than sibling combinators (+ or ~) which break if DOM structure changes
-        this.vrlFieldIncludeExcludeBtn = (fieldName) => `.log-detail-row:has([data-test="log-expand-detail-key-${fieldName}"]) [data-test="log-details-include-exclude-field-btn"], [data-test="log-expand-detail-key-${fieldName}"] + [data-test="log-details-include-exclude-field-btn"]`;
+        // NOTE: No fallback selector - if .log-detail-row doesn't exist, test should fail loudly
+        this.vrlFieldIncludeExcludeBtn = (fieldName) => `.log-detail-row:has([data-test="log-expand-detail-key-${fieldName}"]) [data-test="log-details-include-exclude-field-btn"]`;
     }
 
 

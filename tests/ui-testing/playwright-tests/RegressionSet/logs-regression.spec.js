@@ -1363,12 +1363,41 @@ test.describe("Logs Regression Bugs", () => {
 
     // PRIMARY ASSERTION: Timestamps should be in descending order (newest first) by default
     // Logs with order_by_metadata should maintain proper sort order
+
+    // Helper to parse timestamps in OpenObserve's format "MMM DD, YYYY HH:mm:ss.SSS Z" or similar
+    // Falls back to native Date.parse if the format doesn't match
+    const MONTH_MAP = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+    const parseTimestamp = (str) => {
+      if (!str || typeof str !== 'string') return NaN;
+      // Try native Date.parse first (handles ISO 8601 and common formats)
+      const native = new Date(str).getTime();
+      if (!isNaN(native)) return native;
+      // Try to parse "MMM DD, YYYY HH:mm:ss[.SSS] [+/-]ZZZZ" format
+      // Example: "Jan 15, 2024 10:30:45.123 +0000" or "Jan 15, 2024 10:30:45 +0000"
+      const match = str.match(/^(\w{3})\s+(\d{1,2}),\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?\s*([+-]\d{4})?/);
+      if (match) {
+        const [, mon, day, year, hour, min, sec, ms, tz] = match;
+        const month = MONTH_MAP[mon];
+        if (month !== undefined) {
+          const date = new Date(Date.UTC(+year, month, +day, +hour, +min, +sec, ms ? +ms.slice(0, 3) : 0));
+          // Adjust for timezone offset if present (e.g., +0000, -0500)
+          if (tz) {
+            const tzHours = parseInt(tz.slice(0, 3), 10);
+            const tzMins = parseInt(tz.slice(0, 1) + tz.slice(3), 10);
+            date.setUTCMinutes(date.getUTCMinutes() - tzHours * 60 - tzMins);
+          }
+          return date.getTime();
+        }
+      }
+      return NaN;
+    };
+
     let isDescending = true;
     let validTimestampCount = 0;
     let nanTimestamps = [];
     for (let i = 1; i < timestamps.length; i++) {
-      const prev = new Date(timestamps[i - 1]).getTime();
-      const curr = new Date(timestamps[i]).getTime();
+      const prev = parseTimestamp(timestamps[i - 1]);
+      const curr = parseTimestamp(timestamps[i]);
       // Collect NaN timestamps for assertion after loop (expect throws, so can't use break after)
       if (isNaN(prev)) nanTimestamps.push({ index: i - 1, value: timestamps[i - 1] });
       if (isNaN(curr)) nanTimestamps.push({ index: i, value: timestamps[i] });
