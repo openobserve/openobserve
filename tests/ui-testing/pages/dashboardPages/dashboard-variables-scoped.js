@@ -377,6 +377,7 @@ export default class DashboardVariablesScoped {
    * @param {boolean} options.customValueSearch - Enable custom value search
    * @param {string} options.dependsOn - Variable name this depends on
    * @param {string} options.dependsOnField - Field name of the variable this depends on (used in filter)
+   * @param {string} options.dependsOnOperator - Operator to use in dependency filter (default: "=", use "IN" for multi-select dependencies)
    * @param {string[]} options.dependsOnMultiple - Array of variable names for multi-dependency
    * @param {Object} options.dependencyFieldMap - Map of {variableName: fieldName} for multi-dependency
    * @param {string} options.defaultValue - Default value for the variable
@@ -392,6 +393,7 @@ export default class DashboardVariablesScoped {
       customValueSearch = false,
       dependsOn = null,
       dependsOnField = null,
+      dependsOnOperator = "=",
       dependsOnMultiple = [],
       dependencyFieldMap = {},
       defaultValue = null,
@@ -509,7 +511,7 @@ export default class DashboardVariablesScoped {
 
     // Add dependency if specified
     if (dependsOn) {
-      await this.addDependency(dependsOn, dependsOnField);
+      await this.addDependency(dependsOn, dependsOnField, dependsOnOperator);
     }
 
     // Add multiple dependencies if specified
