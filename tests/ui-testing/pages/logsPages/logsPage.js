@@ -171,6 +171,16 @@ export class LogsPage {
         // Note: Narrowed from [class*="error"] to avoid false positives like "error-free"
         this.errorIndicators = '.q-notification--negative, .q-notification__message--error, .text-negative, [class^="error-"], [class$="-error"]';
         this.timestampInDetail = '[data-test*="timestamp"], .timestamp';
+
+        // ===== V0.40 REGRESSION TEST LOCATORS =====
+        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr';
+        this.tableRowExpandMenu = '[data-test="table-row-expand-menu"]';
+        this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
+        this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
+        this.searchResultText = '[data-test="logs-search-search-result"]';
+        this.vrlEditorMonaco = '#fnEditor .monaco-editor';
+        this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
+        this.vrlFieldIncludeExcludeBtn = (fieldName) => `[data-test*="${fieldName}"] [data-test="log-details-include-exclude-field-btn"]`;
     }
 
 
@@ -3873,5 +3883,194 @@ export class LogsPage {
         } else {
             testLogger.info('SQL mode already enabled');
         }
+    }
+
+    // ===== V0.40 REGRESSION TEST METHODS =====
+
+    /**
+     * Click the show query toggle button (VRL/Query Inspector toggle)
+     */
+    async clickShowQueryToggle() {
+        await this.page.locator(this.showQueryToggle).click();
+    }
+
+    /**
+     * Wait for VRL editor to be visible and click it
+     */
+    async waitForVrlEditorAndClick() {
+        const vrlEditor = this.page.locator(this.vrlEditorMonaco);
+        await vrlEditor.waitFor({ state: 'visible', timeout: 10000 });
+        await vrlEditor.click();
+    }
+
+    /**
+     * Enter VRL function text
+     * @param {string} vrlText - The VRL function text to enter
+     */
+    async enterVrlFunction(vrlText) {
+        await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await this.page.keyboard.press('Backspace');
+        await this.page.keyboard.type(vrlText);
+    }
+
+    /**
+     * Get the logs table locator
+     */
+    getLogsTable() {
+        return this.page.locator(this.logsSearchResultLogsTable);
+    }
+
+    /**
+     * Wait for logs table to be visible
+     * @param {number} timeout - Timeout in ms (default: 15000)
+     */
+    async waitForLogsTable(timeout = 15000) {
+        await this.page.locator(this.logsSearchResultLogsTable).waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Get the count of log rows in the table
+     */
+    async getLogRowCount() {
+        return await this.page.locator(this.logsSearchResultTableRows).count();
+    }
+
+    /**
+     * Get all log rows locator
+     */
+    getLogRows() {
+        return this.page.locator(this.logsSearchResultTableRows);
+    }
+
+    /**
+     * Click the first expand menu button
+     */
+    async clickFirstExpandMenu() {
+        const expandMenu = this.page.locator(this.tableRowExpandMenu).first();
+        await expandMenu.waitFor({ state: 'visible', timeout: 10000 });
+        await expandMenu.click();
+    }
+
+    /**
+     * Click the last expand menu button
+     */
+    async clickLastExpandMenu() {
+        await this.page.locator(this.tableRowExpandMenu).last().click();
+    }
+
+    /**
+     * Check if first expand menu is visible
+     */
+    async isFirstExpandMenuVisible() {
+        return await this.page.locator(this.tableRowExpandMenu).first().isVisible();
+    }
+
+    /**
+     * Get the count of include/exclude buttons for a VRL field
+     * @param {string} fieldName - The VRL field name
+     */
+    async getVrlFieldIncludeExcludeCount(fieldName) {
+        return await this.page.locator(this.vrlFieldIncludeExcludeBtn(fieldName)).count();
+    }
+
+    /**
+     * Get the count of regular include/exclude buttons
+     */
+    async getRegularIncludeExcludeCount() {
+        return await this.page.locator(this.logDetailsIncludeExcludeBtn).count();
+    }
+
+    /**
+     * Wait for query editor to be visible
+     * @param {number} timeout - Timeout in ms (default: 5000)
+     */
+    async waitForQueryEditor(timeout = 5000) {
+        await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Click on the query editor
+     */
+    async clickQueryEditor() {
+        await this.page.locator(this.queryEditor).click();
+    }
+
+    /**
+     * Get timestamp cell values
+     * @param {number} count - Number of timestamps to get (default: 5)
+     */
+    async getTimestampCellValues(count = 5) {
+        const timestampCells = this.page.locator(this.timestampCells);
+        const timestampCount = await timestampCells.count();
+        const timestamps = [];
+        for (let i = 0; i < Math.min(timestampCount, count); i++) {
+            const cellText = await timestampCells.nth(i).textContent();
+            timestamps.push(cellText);
+        }
+        return timestamps;
+    }
+
+    /**
+     * Get the count of timestamp cells
+     */
+    async getTimestampCellCount() {
+        return await this.page.locator(this.timestampCells).count();
+    }
+
+    /**
+     * Get the search result text
+     */
+    async getSearchResultText() {
+        return await this.page.locator(this.searchResultText).textContent();
+    }
+
+    /**
+     * Check if log detail panel is visible
+     */
+    async isLogDetailPanelVisible() {
+        return await this.page.locator(this.logDetailPanel).first().isVisible().catch(() => false);
+    }
+
+    /**
+     * Get the last row locator
+     */
+    getLastRow() {
+        return this.page.locator(this.logsSearchResultTableRows).last();
+    }
+
+    /**
+     * Get the first row expand menu locator
+     */
+    getFirstRowExpandMenu() {
+        return this.page.locator(this.tableRowExpandMenu).first();
+    }
+
+    /**
+     * Close dialogs by pressing Escape
+     */
+    async pressEscapeToCloseDialog() {
+        await this.page.keyboard.press('Escape');
+    }
+
+    /**
+     * Get logs table content
+     */
+    async getLogsTableContent() {
+        return await this.page.locator(this.logsSearchResultLogsTable).textContent();
+    }
+
+    /**
+     * Expect logs table to be visible
+     */
+    async expectLogsTableVisible() {
+        await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible();
+    }
+
+    /**
+     * Expect element to be visible
+     * @param {import('@playwright/test').Locator} locator - The locator to check
+     */
+    async expectVisible(locator) {
+        await expect(locator).toBeVisible();
     }
 }
