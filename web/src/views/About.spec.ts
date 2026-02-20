@@ -179,7 +179,7 @@ describe("About", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("about.os_libraries");
+    expect(wrapper.text()).toContain("Open Source Libraries");
   });
 
   it("should have links to Cargo.toml and package.json", () => {
@@ -200,7 +200,7 @@ describe("About", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("about.license_info");
+    expect(wrapper.text()).toContain("License Information");
   });
 
   it("should apply dark mode styles when theme is dark", () => {

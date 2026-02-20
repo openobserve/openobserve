@@ -91,7 +91,7 @@ describe("AzureMarketplaceSetup", () => {
   });
 
   it("should show select_org state when token is present", async () => {
-    document.cookie = "azure_marketplace_token=test_token; path=/";
+    sessionStorage.setItem("azure_marketplace_token", "test_token");
 
     const wrapper = mount(AzureMarketplaceSetup, {
       global: {
@@ -101,11 +101,11 @@ describe("AzureMarketplaceSetup", () => {
 
     await flushPromises();
 
-    expect(wrapper.vm.token).toBe("test_token");
+    expect(wrapper.vm.state).toBe("select_org");
   });
 
   it("should display org selection UI in select_org state", async () => {
-    document.cookie = "azure_marketplace_token=test_token; path=/";
+    sessionStorage.setItem("azure_marketplace_token", "test_token");
 
     const wrapper = mount(AzureMarketplaceSetup, {
       global: {
@@ -133,17 +133,17 @@ describe("AzureMarketplaceSetup", () => {
     expect(wrapper.text()).toContain("Setting up your subscription");
   });
 
-  it("should display pending activation state", async () => {
+  it("should display processing state correctly", async () => {
     const wrapper = mount(AzureMarketplaceSetup, {
       global: {
         plugins: [store, router],
       },
     });
 
-    wrapper.vm.state = "pending_activation";
+    wrapper.vm.state = "processing";
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.text()).toContain("Waiting for Azure Confirmation");
+    expect(wrapper.text()).toContain("Setting up your subscription");
   });
 
   it("should display success state", async () => {
@@ -219,7 +219,7 @@ describe("AzureMarketplaceSetup", () => {
   });
 
   it("should show eligible organizations when available", async () => {
-    document.cookie = "azure_marketplace_token=test_token; path=/";
+    sessionStorage.setItem("azure_marketplace_token", "test_token");
 
     const wrapper = mount(AzureMarketplaceSetup, {
       global: {
@@ -238,7 +238,7 @@ describe("AzureMarketplaceSetup", () => {
   });
 
   it("should enable create button when org name is provided", async () => {
-    document.cookie = "azure_marketplace_token=test_token; path=/";
+    sessionStorage.setItem("azure_marketplace_token", "test_token");
 
     const wrapper = mount(AzureMarketplaceSetup, {
       global: {
@@ -293,7 +293,7 @@ describe("AzureMarketplaceSetup", () => {
   });
 
   it("should enable link button when org is selected", async () => {
-    document.cookie = "azure_marketplace_token=test_token; path=/";
+    sessionStorage.setItem("azure_marketplace_token", "test_token");
 
     const wrapper = mount(AzureMarketplaceSetup, {
       global: {

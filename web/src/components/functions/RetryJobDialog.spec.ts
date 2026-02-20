@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import RetryJobDialog from "./RetryJobDialog.vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
@@ -51,7 +51,7 @@ describe("RetryJobDialog", () => {
     wrapper.unmount();
   });
 
-  it("should display table name and URL", () => {
+  it("should display table name and URL", async () => {
     const wrapper = mount(RetryJobDialog, {
       props: {
         modelValue: true,
@@ -65,12 +65,16 @@ describe("RetryJobDialog", () => {
       attachTo: document.body,
     });
 
-    expect(wrapper.text()).toContain("my_enrichment_table");
-    expect(wrapper.text()).toContain("https://cdn.example.com/enrichment.csv");
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    const bodyText = document.body.textContent || "";
+    expect(bodyText).toContain("my_enrichment_table");
+    expect(bodyText).toContain("https://cdn.example.com/enrichment.csv");
     wrapper.unmount();
   });
 
-  it("should show warning when range is not supported", () => {
+  it("should show warning when range is not supported", async () => {
     const wrapper = mount(RetryJobDialog, {
       props: {
         modelValue: true,
@@ -84,11 +88,15 @@ describe("RetryJobDialog", () => {
       attachTo: document.body,
     });
 
-    expect(wrapper.text()).toContain("Range requests not supported");
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    const bodyText = document.body.textContent || "";
+    expect(bodyText).toContain("Range requests not supported");
     wrapper.unmount();
   });
 
-  it("should show retry options when range is supported", () => {
+  it("should show retry options when range is supported", async () => {
     const wrapper = mount(RetryJobDialog, {
       props: {
         modelValue: true,
@@ -102,8 +110,12 @@ describe("RetryJobDialog", () => {
       attachTo: document.body,
     });
 
-    expect(wrapper.text()).toContain("Start from Beginning");
-    expect(wrapper.text()).toContain("Resume from Last Position");
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    const bodyText = document.body.textContent || "";
+    expect(bodyText).toContain("Start from Beginning");
+    expect(bodyText).toContain("Resume from Last Position");
     wrapper.unmount();
   });
 
@@ -138,8 +150,10 @@ describe("RetryJobDialog", () => {
       attachTo: document.body,
     });
 
-    const cancelButtons = wrapper.findAll("button");
-    const cancelButton = cancelButtons.find(btn => btn.text() === "Cancel");
+    await wrapper.vm.$nextTick();
+
+    const buttons = wrapper.findAllComponents({ name: "QBtn" });
+    const cancelButton = buttons.find(btn => btn.text() === "Cancel");
     await cancelButton?.trigger("click");
 
     expect(wrapper.emitted("cancel")).toBeTruthy();
@@ -161,8 +175,10 @@ describe("RetryJobDialog", () => {
       attachTo: document.body,
     });
 
-    const retryButtons = wrapper.findAll("button");
-    const retryButton = retryButtons.find(btn => btn.text() === "Retry");
+    await wrapper.vm.$nextTick();
+
+    const buttons = wrapper.findAllComponents({ name: "QBtn" });
+    const retryButton = buttons.find(btn => btn.text() === "Retry");
     await retryButton?.trigger("click");
 
     expect(wrapper.emitted("confirm")).toBeTruthy();
@@ -190,7 +206,7 @@ describe("RetryJobDialog", () => {
     wrapper.unmount();
   });
 
-  it("should display formatted last byte position", () => {
+  it("should display formatted last byte position", async () => {
     const wrapper = mount(RetryJobDialog, {
       props: {
         modelValue: true,
@@ -205,11 +221,15 @@ describe("RetryJobDialog", () => {
       attachTo: document.body,
     });
 
-    expect(wrapper.text()).toContain("5 MB");
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    const bodyText = document.body.textContent || "";
+    expect(bodyText).toContain("5 MB");
     wrapper.unmount();
   });
 
-  it("should apply dark theme when theme is dark", () => {
+  it("should apply dark theme when theme is dark", async () => {
     const darkStore = createStore({
       state: {
         theme: "dark",
@@ -228,8 +248,11 @@ describe("RetryJobDialog", () => {
       attachTo: document.body,
     });
 
-    const dialog = wrapper.find(".retry-dialog");
-    expect(dialog.classes()).toContain("dark-theme");
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    const dialog = document.body.querySelector(".retry-dialog");
+    expect(dialog?.classList.contains("dark-theme")).toBe(true);
     wrapper.unmount();
   });
 
@@ -247,19 +270,24 @@ describe("RetryJobDialog", () => {
       attachTo: document.body,
     });
 
-    const radios = wrapper.findAll('input[type="radio"]');
-    expect(radios).toHaveLength(2);
+    await wrapper.vm.$nextTick();
+    await flushPromises();
 
-    await radios[0].setValue(true);
+    const radios = document.body.querySelectorAll('input[type="radio"]');
+    expect(radios.length).toBe(2);
+
+    (radios[0] as HTMLInputElement).click();
+    await wrapper.vm.$nextTick();
     expect(wrapper.vm.resumeFromLast).toBe(false);
 
-    await radios[1].setValue(true);
+    (radios[1] as HTMLInputElement).click();
+    await wrapper.vm.$nextTick();
     expect(wrapper.vm.resumeFromLast).toBe(true);
 
     wrapper.unmount();
   });
 
-  it("should show recommended badge on resume option", () => {
+  it("should show recommended badge on resume option", async () => {
     const wrapper = mount(RetryJobDialog, {
       props: {
         modelValue: true,
@@ -273,11 +301,15 @@ describe("RetryJobDialog", () => {
       attachTo: document.body,
     });
 
-    expect(wrapper.text()).toContain("Recommended");
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    const bodyText = document.body.textContent || "";
+    expect(bodyText).toContain("Recommended");
     wrapper.unmount();
   });
 
-  it("should show dialog title", () => {
+  it("should show dialog title", async () => {
     const wrapper = mount(RetryJobDialog, {
       props: {
         modelValue: true,
@@ -290,7 +322,11 @@ describe("RetryJobDialog", () => {
       attachTo: document.body,
     });
 
-    expect(wrapper.text()).toContain("Retry Enrichment Table Job");
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    const bodyText = document.body.textContent || "";
+    expect(bodyText).toContain("Retry Enrichment Table Job");
     wrapper.unmount();
   });
 });

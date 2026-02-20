@@ -20,6 +20,7 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 import InvitationList from "@/components/iam/users/InvitationList.vue";
+import i18n from "@/locales";
 
 installQuasar();
 
@@ -91,7 +92,7 @@ describe("Invitations", () => {
 
     const wrapper = mount(Invitations, {
       global: {
-        plugins: [store, router],
+        plugins: [i18n, store, router],
       },
     });
 
@@ -120,7 +121,7 @@ describe("Invitations", () => {
 
     const wrapper = mount(Invitations, {
       global: {
-        plugins: [store, router],
+        plugins: [i18n, store, router],
       },
     });
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import LoadingProgress from "./LoadingProgress.vue";
 import { createStore } from "vuex";
@@ -144,7 +144,7 @@ describe("LoadingProgress", () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.vm.isFadingOut).toBe(false);
-    expect(wrapper.vm.internalPercentage).toBe(0);
+    expect(wrapper.vm.displayPercentage).toBe(0);
   });
 
   it("should validate percentage is between 0 and 100", () => {

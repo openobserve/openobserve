@@ -81,7 +81,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("about.feature_comparision_os_msg");
+    expect(wrapper.text()).toContain("You're currently using OpenObserve Open Source Edition");
   });
 
   it("should display enterprise message when build type is enterprise", () => {
@@ -100,7 +100,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("about.feature_comparision_ent_msg");
+    expect(wrapper.text()).toContain("You're using OpenObserve Enterprise Edition");
   });
 
   it("should have three columns: opensource, enterprise, cloud", () => {
@@ -196,7 +196,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("about.feature_comparison_lbl");
+    expect(wrapper.text()).toContain("Feature Comparison");
   });
 
   it("should have correct table styling classes", () => {
@@ -228,7 +228,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("about.feature_comparision_good_news");
+    expect(wrapper.text()).toContain("Good news");
   });
 
   it("should have pagination disabled", () => {

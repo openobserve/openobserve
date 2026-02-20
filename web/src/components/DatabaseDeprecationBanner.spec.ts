@@ -34,7 +34,7 @@ describe("DatabaseDeprecationBanner", () => {
     localStorage.clear();
   });
 
-  it("should render when MySQL deprecation warning is enabled", () => {
+  it("should render when MySQL deprecation warning is enabled", async () => {
     store = createStore({
       state: {
         theme: "light",
@@ -49,6 +49,8 @@ describe("DatabaseDeprecationBanner", () => {
         plugins: [store],
       },
     });
+
+    await wrapper.vm.$nextTick();
 
     expect(wrapper.find(".deprecation-message").exists()).toBe(true);
   });
@@ -72,7 +74,7 @@ describe("DatabaseDeprecationBanner", () => {
     expect(wrapper.find(".deprecation-message").exists()).toBe(false);
   });
 
-  it("should display deprecation message text", () => {
+  it("should display deprecation message text", async () => {
     store = createStore({
       state: {
         theme: "light",
@@ -87,12 +89,14 @@ describe("DatabaseDeprecationBanner", () => {
         plugins: [store],
       },
     });
+
+    await wrapper.vm.$nextTick();
 
     const message = wrapper.find(".deprecation-message");
     expect(message.text()).toContain("MySQL support is DEPRECATED");
   });
 
-  it("should display migration subtitle", () => {
+  it("should display migration subtitle", async () => {
     store = createStore({
       state: {
         theme: "light",
@@ -107,12 +111,14 @@ describe("DatabaseDeprecationBanner", () => {
         plugins: [store],
       },
     });
+
+    await wrapper.vm.$nextTick();
 
     const subtitle = wrapper.find(".deprecation-subtitle");
     expect(subtitle.text()).toContain("Please migrate to PostgreSQL");
   });
 
-  it("should render close button", () => {
+  it("should render close button", async () => {
     store = createStore({
       state: {
         theme: "light",
@@ -127,6 +133,8 @@ describe("DatabaseDeprecationBanner", () => {
         plugins: [store],
       },
     });
+
+    await wrapper.vm.$nextTick();
 
     const closeButton = wrapper.findComponent({ name: "QBtn" });
     expect(closeButton.exists()).toBe(true);
@@ -148,6 +156,8 @@ describe("DatabaseDeprecationBanner", () => {
         plugins: [store],
       },
     });
+
+    await wrapper.vm.$nextTick();
 
     expect(wrapper.find(".deprecation-message").exists()).toBe(true);
 
@@ -173,6 +183,8 @@ describe("DatabaseDeprecationBanner", () => {
       },
     });
 
+    await wrapper.vm.$nextTick();
+
     const closeButton = wrapper.findComponent({ name: "QBtn" });
     await closeButton.trigger("click");
 
@@ -183,7 +195,7 @@ describe("DatabaseDeprecationBanner", () => {
     expect(parsedData).toHaveProperty("timestamp");
   });
 
-  it("should not show banner if dismissed within 7 days", () => {
+  it("should not show banner if dismissed within 7 days", async () => {
     const recentDate = new Date();
     recentDate.setDate(recentDate.getDate() - 3); // 3 days ago
 
@@ -207,10 +219,12 @@ describe("DatabaseDeprecationBanner", () => {
       },
     });
 
+    await wrapper.vm.$nextTick();
+
     expect(wrapper.vm.showDeprecationWarning).toBe(false);
   });
 
-  it("should show banner again after 7 days", () => {
+  it("should show banner again after 7 days", async () => {
     const oldDate = new Date();
     oldDate.setDate(oldDate.getDate() - 10); // 10 days ago
 
@@ -234,10 +248,12 @@ describe("DatabaseDeprecationBanner", () => {
       },
     });
 
+    await wrapper.vm.$nextTick();
+
     expect(wrapper.vm.showDeprecationWarning).toBe(true);
   });
 
-  it("should apply light theme class", () => {
+  it("should apply light theme class", async () => {
     store = createStore({
       state: {
         theme: "light",
@@ -253,10 +269,12 @@ describe("DatabaseDeprecationBanner", () => {
       },
     });
 
+    await wrapper.vm.$nextTick();
+
     expect(wrapper.find(".light-stream-container").exists()).toBe(true);
   });
 
-  it("should apply dark theme class", () => {
+  it("should apply dark theme class", async () => {
     store = createStore({
       state: {
         theme: "dark",
@@ -272,10 +290,12 @@ describe("DatabaseDeprecationBanner", () => {
       },
     });
 
+    await wrapper.vm.$nextTick();
+
     expect(wrapper.find(".dark-stream-container").exists()).toBe(true);
   });
 
-  it("should handle invalid localStorage data gracefully", () => {
+  it("should handle invalid localStorage data gracefully", async () => {
     localStorage.setItem(DISMISS_KEY, "invalid json");
 
     store = createStore({
@@ -293,11 +313,13 @@ describe("DatabaseDeprecationBanner", () => {
       },
     });
 
+    await wrapper.vm.$nextTick();
+
     // Should show warning when localStorage data is invalid
     expect(wrapper.vm.showDeprecationWarning).toBe(true);
   });
 
-  it("should have correct accessibility attributes", () => {
+  it("should have correct accessibility attributes", async () => {
     store = createStore({
       state: {
         theme: "light",
@@ -312,6 +334,8 @@ describe("DatabaseDeprecationBanner", () => {
         plugins: [store],
       },
     });
+
+    await wrapper.vm.$nextTick();
 
     const banner = wrapper.find('[role="region"]');
     expect(banner.exists()).toBe(true);

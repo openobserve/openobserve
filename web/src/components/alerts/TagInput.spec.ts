@@ -170,8 +170,9 @@ describe("TagInput", () => {
       },
     });
 
-    const firstChip = wrapper.find('[data-test="tag-chip-0"]');
-    await firstChip.trigger("remove");
+    // Find the first QChip component and trigger its remove event
+    const chips = wrapper.findAllComponents({ name: "QChip" });
+    await chips[0].vm.$emit("remove");
 
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
     const emittedValue = wrapper.emitted("update:modelValue")?.[0]?.[0];

@@ -66,7 +66,7 @@ describe("Error404", () => {
       },
     });
 
-    const button = wrapper.find('button');
+    const button = wrapper.findComponent({ name: "QBtn" });
     expect(button.exists()).toBe(true);
     expect(button.text()).toContain("Go Home");
   });

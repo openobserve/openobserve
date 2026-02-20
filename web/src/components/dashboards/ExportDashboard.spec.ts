@@ -38,7 +38,7 @@ describe("ExportDashboard", () => {
   let store: any;
   let router: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     store = createStore({
       state: {
         selectedOrganization: {
@@ -58,7 +58,7 @@ describe("ExportDashboard", () => {
       ],
     });
 
-    router.push({ path: "/dashboards", query: { folder: "default" } });
+    await router.push({ path: "/dashboards", query: { folder: "default" } });
 
     vi.clearAllMocks();
   });
@@ -100,8 +100,8 @@ describe("ExportDashboard", () => {
       },
     });
 
-    const exportButton = wrapper.find('[data-test="export-dashboard"]');
-    expect(exportButton.attributes("icon")).toBe("download");
+    const exportButton = wrapper.findComponent({ name: "QBtn" });
+    expect(exportButton.props("icon")).toBe("download");
   });
 
   it("should call downloadDashboard when button is clicked", async () => {
@@ -128,7 +128,13 @@ describe("ExportDashboard", () => {
       setAttribute: vi.fn(),
       click: vi.fn(),
     };
-    const createElementSpy = vi.spyOn(document, "createElement").mockReturnValue(mockAnchor as any);
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi.spyOn(document, "createElement").mockImplementation((tagName: string) => {
+      if (tagName === "a") {
+        return mockAnchor as any;
+      }
+      return originalCreateElement(tagName);
+    });
 
     const wrapper = mount(ExportDashboard, {
       props: {
@@ -155,7 +161,13 @@ describe("ExportDashboard", () => {
       setAttribute: vi.fn(),
       click: vi.fn(),
     };
-    vi.spyOn(document, "createElement").mockReturnValue(mockAnchor as any);
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi.spyOn(document, "createElement").mockImplementation((tagName: string) => {
+      if (tagName === "a") {
+        return mockAnchor as any;
+      }
+      return originalCreateElement(tagName);
+    });
 
     const wrapper = mount(ExportDashboard, {
       props: {
@@ -173,10 +185,24 @@ describe("ExportDashboard", () => {
       "download",
       "Test Dashboard.dashboard.json"
     );
+
+    createElementSpy.mockRestore();
   });
 
   it("should remove owner from exported dashboard data", async () => {
     const { getDashboard } = await import("@/utils/commons");
+
+    const mockAnchor = {
+      setAttribute: vi.fn(),
+      click: vi.fn(),
+    };
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi.spyOn(document, "createElement").mockImplementation((tagName: string) => {
+      if (tagName === "a") {
+        return mockAnchor as any;
+      }
+      return originalCreateElement(tagName);
+    });
 
     const wrapper = mount(ExportDashboard, {
       props: {
@@ -195,6 +221,8 @@ describe("ExportDashboard", () => {
       "dash123",
       "default"
     );
+
+    createElementSpy.mockRestore();
   });
 
   it("should accept dashboardId prop", () => {

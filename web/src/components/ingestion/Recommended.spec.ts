@@ -110,7 +110,7 @@ describe("Recommended", () => {
     });
 
     const tabs = wrapper.findComponent({ name: "QTabs" });
-    expect(tabs.attributes("vertical")).toBeDefined();
+    expect(tabs.props("vertical")).toBe(true);
   });
 
   it("should render router-view for content", () => {

@@ -86,7 +86,7 @@ describe("AddFolder", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("dashboard.newFolder");
+    expect(wrapper.text()).toContain("New Folder");
   });
 
   it("should display update folder title when in edit mode", () => {
@@ -100,7 +100,7 @@ describe("AddFolder", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("dashboard.updateFolder");
+    expect(wrapper.text()).toContain("Update Folder");
   });
 
   it("should render name input field", () => {
@@ -158,7 +158,8 @@ describe("AddFolder", () => {
     await wrapper.vm.$nextTick();
 
     const saveButton = wrapper.find('[data-test="dashboard-folder-add-save"]');
-    expect(saveButton.attributes("disable")).toBeDefined();
+    const qBtn = saveButton.findComponent({ name: "QBtn" });
+    expect(qBtn.props("disable")).toBe(true);
   });
 
   it("should enable save button when name is provided", async () => {

@@ -370,10 +370,9 @@ describe("DestinationPreview", () => {
       },
     });
 
-    const dialog = wrapper.find('[data-test="destination-preview-dialog"]');
-    expect(dialog.exists()).toBe(true);
-    // Dialog exists but should not be visible
-    expect(wrapper.vm.isOpen).toBe(false);
+    // When modelValue is false, q-dialog doesn't render content
+    const card = wrapper.find('[data-test="destination-preview-card"]');
+    expect(card.exists()).toBe(false);
   });
 
   it("should update isOpen when modelValue changes", async () => {

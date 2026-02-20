@@ -51,7 +51,7 @@ describe("RelativeTime", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-  it("should display relative time for recent timestamp", () => {
+  it("should display relative time for recent timestamp", async () => {
     const timestamp = Date.now() - 30000; // 30 seconds ago
     const wrapper = mount(RelativeTime, {
       props: {
@@ -61,6 +61,8 @@ describe("RelativeTime", () => {
         plugins: [store],
       },
     });
+
+    await wrapper.vm.$nextTick();
 
     expect(wrapper.text()).toBeTruthy();
   });
@@ -120,7 +122,7 @@ describe("RelativeTime", () => {
     expect(title).toContain("Last Updated:");
   });
 
-  it("should format timestamp as relative time in seconds", () => {
+  it("should format timestamp as relative time in seconds", async () => {
     const timestamp = Date.now() - 5000; // 5 seconds ago
     const wrapper = mount(RelativeTime, {
       props: {
@@ -131,11 +133,13 @@ describe("RelativeTime", () => {
       },
     });
 
+    await wrapper.vm.$nextTick();
+
     // Should show something like "5 sec ago"
     expect(wrapper.text()).toBeTruthy();
   });
 
-  it("should format timestamp as relative time in minutes", () => {
+  it("should format timestamp as relative time in minutes", async () => {
     const timestamp = Date.now() - 120000; // 2 minutes ago
     const wrapper = mount(RelativeTime, {
       props: {
@@ -146,10 +150,12 @@ describe("RelativeTime", () => {
       },
     });
 
+    await wrapper.vm.$nextTick();
+
     expect(wrapper.text()).toBeTruthy();
   });
 
-  it("should format timestamp as relative time in hours", () => {
+  it("should format timestamp as relative time in hours", async () => {
     const timestamp = Date.now() - 7200000; // 2 hours ago
     const wrapper = mount(RelativeTime, {
       props: {
@@ -159,6 +165,8 @@ describe("RelativeTime", () => {
         plugins: [store],
       },
     });
+
+    await wrapper.vm.$nextTick();
 
     expect(wrapper.text()).toBeTruthy();
   });
@@ -199,7 +207,7 @@ describe("RelativeTime", () => {
     expect(title).toContain("UTC");
   });
 
-  it("should accept timestamp as number", () => {
+  it("should accept timestamp as number", async () => {
     const timestamp = 1704067200000; // Specific timestamp
     const wrapper = mount(RelativeTime, {
       props: {
@@ -209,6 +217,8 @@ describe("RelativeTime", () => {
         plugins: [store],
       },
     });
+
+    await wrapper.vm.$nextTick();
 
     expect(wrapper.exists()).toBe(true);
     expect(wrapper.text()).toBeTruthy();
