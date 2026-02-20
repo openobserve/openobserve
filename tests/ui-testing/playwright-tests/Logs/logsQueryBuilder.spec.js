@@ -247,17 +247,15 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
 
         if (isChecked === 'true') {
             await sqlModeToggle.click();
-            await page.waitForTimeout(500);
+            await expect(sqlModeToggle).toHaveAttribute('aria-checked', 'false', { timeout: 5000 });
         }
 
-        const isNowOff = await sqlModeToggle.getAttribute('aria-checked');
-        expect(isNowOff).toBe('false');
+        expect(await sqlModeToggle.getAttribute('aria-checked')).toBe('false');
 
         await pm.logsPage.clickBuildToggle();
-        await page.waitForTimeout(1000);
+        await pm.logsPage.waitForBuildTabLoaded();
 
-        const isNowOn = await sqlModeToggle.getAttribute('aria-checked');
-        expect(isNowOn).toBe('true');
+        await expect(sqlModeToggle).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
 
         testLogger.info('SQL Mode auto-enables on Build tab - PASSED');
     });

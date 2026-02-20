@@ -1748,11 +1748,20 @@ export class LogsPage {
         // Click Run query
         await btn.click({ force: true });
 
-        // Brief wait for the query execution to start (button enters loading/disabled state)
-        await this.page.waitForTimeout(1000);
+        // Wait for the button to enter loading/disabled state (query started)
+        await this.page.waitForFunction(
+            (selector) => {
+                const btn = document.querySelector(selector);
+                if (!btn) return false;
+                return btn.hasAttribute('disabled') || btn.classList.contains('q-btn--loading') || btn.textContent?.trim()?.includes('Cancel');
+            },
+            this.queryButton,
+            { timeout: 5000 }
+        ).catch(() => {
+            // Query may have completed instantly — that's OK
+        });
 
-        // Wait for the Run query button to be visible, enabled, and not loading
-        // This handles both OSS (:loading/:disable on same button) and Enterprise (Cancel → Run query swap)
+        // Wait for the button to exit loading/disabled state (query completed)
         await this.page.waitForFunction(
             (selector) => {
                 const btn = document.querySelector(selector);
@@ -1760,7 +1769,6 @@ export class LogsPage {
                 const isDisabled = btn.hasAttribute('disabled') || btn.getAttribute('aria-disabled') === 'true';
                 const isLoading = btn.classList.contains('q-btn--loading');
                 const text = btn.textContent?.trim() || '';
-                // Ready when: not disabled, not loading, and shows "Run query" (not "Cancel")
                 return !isDisabled && !isLoading && !text.includes('Cancel');
             },
             this.queryButton,
@@ -5602,15 +5610,10 @@ export class LogsPage {
         // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass
         const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
         await inputArea.click({ force: true });
-        await this.page.waitForTimeout(300);
         await inputArea.fill(query);
-        await this.page.waitForTimeout(500);
-
-        // Verify the editor actually contains the query
-        const editorContent = await this.page.locator('[data-test="logs-search-bar-query-editor"] .view-line').allTextContents();
-        const actualContent = editorContent.join('').trim();
-        testLogger.info(`[setQueryEditorContent] Intended: "${query.substring(0, 60)}"`);
-        testLogger.info(`[setQueryEditorContent] Actual:   "${actualContent.substring(0, 60)}"`);
+        // Wait for Monaco to render the new content in the view-line
+        await this.page.locator('[data-test="logs-search-bar-query-editor"] .view-line').first().waitFor({ state: 'visible', timeout: 5000 });
+        testLogger.info(`Query editor set to: "${query.substring(0, 60)}"`);
     }
 
     /**
@@ -5622,7 +5625,8 @@ export class LogsPage {
         const isChecked = await sqlModeToggle.getAttribute('aria-checked');
         if (isChecked !== 'true') {
             await sqlModeToggle.click();
-            await this.page.waitForTimeout(1000);
+            // Wait for the toggle to actually switch ON
+            await expect(sqlModeToggle).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
             testLogger.info('SQL mode enabled');
         } else {
             testLogger.info('SQL mode already enabled');
@@ -5976,7 +5980,6 @@ export class LogsPage {
      */
     async clickBuildToggle() {
         await this.page.locator(this.buildToggle).click();
-        await this.page.waitForTimeout(500);
         testLogger.info('Clicked Build tab toggle');
     }
 
