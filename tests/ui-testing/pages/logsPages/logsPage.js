@@ -6131,8 +6131,12 @@ export class LogsPage {
         const count = Math.min(await cells.count(), limit);
         const values = [];
         for (let i = 0; i < count; i++) {
-            const text = await cells.nth(i).textContent();
-            values.push(text?.trim() || '');
+            let text = await cells.nth(i).textContent();
+            text = text?.trim() || '';
+            // Strip expand button icon text that appears before the timestamp
+            // The cell contains both the expand icon ("chevron_right" or "expand_more") and the timestamp
+            text = text.replace(/^(chevron_right|expand_more|chevron_left|expand_less)/, '').trim();
+            values.push(text);
         }
         testLogger.info(`Got ${values.length} timestamp values`);
         return values;
