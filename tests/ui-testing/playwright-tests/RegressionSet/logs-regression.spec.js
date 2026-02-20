@@ -1348,30 +1348,31 @@ test.describe("Logs Regression Bugs", () => {
     const timestampCount = await pm.logsPage.getTimestampCellCount();
     testLogger.info(`Found ${timestampCount} timestamp cells`);
 
-    if (timestampCount >= 2) {
-      const timestamps = await pm.logsPage.getTimestampCellValues(5);
-      testLogger.info(`First ${timestamps.length} timestamps: ${JSON.stringify(timestamps)}`);
+    // GUARD ASSERTION: Must have at least 2 timestamps to verify sorting - fail fast if not enough data
+    expect(timestampCount).toBeGreaterThanOrEqual(2);
 
-      // PRIMARY ASSERTION: Timestamps should be in descending order (newest first) by default
-      // Logs with order_by_metadata should maintain proper sort order
-      let isDescending = true;
-      for (let i = 1; i < timestamps.length; i++) {
-        const prev = new Date(timestamps[i - 1]).getTime();
-        const curr = new Date(timestamps[i]).getTime();
-        if (prev < curr) {
-          isDescending = false;
-          testLogger.warn(`Sort order broken at index ${i}: ${timestamps[i-1]} > ${timestamps[i]}`);
-          break;
-        }
+    const timestamps = await pm.logsPage.getTimestampCellValues(5);
+    testLogger.info(`First ${timestamps.length} timestamps: ${JSON.stringify(timestamps)}`);
+
+    // PRIMARY ASSERTION: Timestamps should be in descending order (newest first) by default
+    // Logs with order_by_metadata should maintain proper sort order
+    let isDescending = true;
+    for (let i = 1; i < timestamps.length; i++) {
+      const prev = new Date(timestamps[i - 1]).getTime();
+      const curr = new Date(timestamps[i]).getTime();
+      if (prev < curr) {
+        isDescending = false;
+        testLogger.warn(`Sort order broken at index ${i}: ${timestamps[i-1]} > ${timestamps[i]}`);
+        break;
       }
-
-      // ASSERTION: Must have at least 2 timestamps to verify sorting
-      expect(timestamps.length).toBeGreaterThanOrEqual(2);
-
-      // PRIMARY ASSERTION: Logs must be sorted in descending order (newest first)
-      expect(isDescending).toBe(true);
-      testLogger.info(`✓ Logs are correctly sorted in descending order`);
     }
+
+    // ASSERTION: Must have at least 2 timestamps to verify sorting
+    expect(timestamps.length).toBeGreaterThanOrEqual(2);
+
+    // PRIMARY ASSERTION: Logs must be sorted in descending order (newest first)
+    expect(isDescending).toBe(true);
+    testLogger.info(`✓ Logs are correctly sorted in descending order`);
 
     // PRIMARY ASSERTION: Results should be displayed
     const resultText = await pm.logsPage.getSearchResultText();
@@ -1463,14 +1464,18 @@ test.describe("Logs Regression Bugs", () => {
     // PRIMARY ASSERTION 2: Last row should retain its original styling classes
     // Compare that the classes from before expansion are still present
     expect(lastRowFinalClasses).toBeTruthy();
-    // The row's classes should be preserved (either same or contain original classes)
-    const originalClassSet = new Set(lastRowClasses.split(/\s+/).filter(c => c));
-    const finalClassSet = new Set(lastRowFinalClasses.split(/\s+/).filter(c => c));
+    // The row's classes should be preserved - filter out generic table classes for meaningful comparison
+    const originalClassSet = new Set(lastRowClasses.split(/\s+/).filter(c => c && c !== 'table-row'));
+    const finalClassSet = new Set(lastRowFinalClasses.split(/\s+/).filter(c => c && c !== 'table-row'));
+    // Check for highlight-specific classes (e.g., 'highlighted', 'selected', 'active', 'bg-highlight')
+    const highlightClasses = [...finalClassSet].filter(cls =>
+      cls.includes('highlight') || cls.includes('selected') || cls.includes('active') || cls.includes('bg-')
+    );
+    // Either original classes are preserved OR the row has highlight-specific styling
     const classesPreserved = [...originalClassSet].every(cls => finalClassSet.has(cls)) ||
-                             lastRowFinalClasses.includes('table-row') ||
-                             lastRowFinalClasses.includes('hover');
+                             highlightClasses.length > 0;
     expect(classesPreserved).toBe(true);
-    testLogger.info(`✓ Last row preserved styling: original had ${originalClassSet.size} classes, final has ${finalClassSet.size}`);
+    testLogger.info(`✓ Last row preserved styling: original had ${originalClassSet.size} classes, final has ${finalClassSet.size}, highlight classes: ${highlightClasses.join(', ') || 'none'}`);
 
     // Close the expanded row
     await pm.logsPage.pressEscapeToCloseDialog();

@@ -246,8 +246,8 @@ export class LogsPage {
         this.searchResultText = '[data-test="logs-search-search-result"]';
         this.vrlEditorMonaco = '#fnEditor .monaco-editor';
         this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
-        // Use exact match with word boundaries to avoid matching partial field names
-        // e.g., "vrl_test_field" should not match "vrl_test_field_extra"
+        // First selector uses exact match, second uses suffix match as fallback
+        // Note: suffix match may match partial field names (e.g., "field" matches "other_field")
         this.vrlFieldIncludeExcludeBtn = (fieldName) => `[data-test="log-expand-detail-key-${fieldName}"] ~ [data-test="log-details-include-exclude-field-btn"], [data-test$="-${fieldName}"] [data-test="log-details-include-exclude-field-btn"]`;
     }
 
