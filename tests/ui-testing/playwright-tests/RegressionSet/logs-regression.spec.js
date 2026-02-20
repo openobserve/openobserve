@@ -1394,13 +1394,13 @@ test.describe("Logs Regression Bugs", () => {
 
     let isDescending = true;
     let validTimestampCount = 0;
-    let nanTimestamps = [];
+    const nanIndices = new Set(); // Track indices to avoid duplicates
     for (let i = 1; i < timestamps.length; i++) {
       const prev = parseTimestamp(timestamps[i - 1]);
       const curr = parseTimestamp(timestamps[i]);
-      // Collect NaN timestamps for assertion after loop (expect throws, so can't use break after)
-      if (isNaN(prev)) nanTimestamps.push({ index: i - 1, value: timestamps[i - 1] });
-      if (isNaN(curr)) nanTimestamps.push({ index: i, value: timestamps[i] });
+      // Collect NaN timestamp indices (use Set to avoid duplicates when same index is prev and curr)
+      if (isNaN(prev)) nanIndices.add(i - 1);
+      if (isNaN(curr)) nanIndices.add(i);
       if (isNaN(prev) || isNaN(curr)) {
         testLogger.warn(`Timestamp parsing failed: "${timestamps[i-1]}" -> ${prev}, "${timestamps[i]}" -> ${curr}`);
         continue; // Skip this comparison but continue checking others
@@ -1412,6 +1412,8 @@ test.describe("Logs Regression Bugs", () => {
         break;
       }
     }
+    // Convert to array with values for error message
+    const nanTimestamps = [...nanIndices].map(idx => ({ index: idx, value: timestamps[idx] }));
 
     // ASSERTION: No timestamps should be unparseable (fail with descriptive message)
     expect(nanTimestamps.length, `Unparseable timestamps: ${JSON.stringify(nanTimestamps)}`).toBe(0);
@@ -1486,19 +1488,18 @@ test.describe("Logs Regression Bugs", () => {
     await page.waitForTimeout(1000);
     testLogger.info('Expanded last log row');
 
+    // Capture the last row's visual state IMMEDIATELY after clicking (while expanded/selected)
+    // This captures the "selected" state before any close action might remove highlighting
+    const lastRowClasses = await lastRow.getAttribute('class') || '';
+    testLogger.info(`Last row baseline state (selected/expanded) - classes: ${lastRowClasses}`);
+
     // Check if the log detail panel shows for last row
     const isPanelVisible = await pm.logsPage.isLogDetailPanelVisible();
     testLogger.info(`Log detail panel visible: ${isPanelVisible}`);
 
-    // Close the detail panel first, THEN capture the "highlighted but not expanded" state
-    // This is the baseline state we want to preserve when expanding a different row
+    // Close the detail panel
     await pm.logsPage.pressEscapeToCloseDialog();
     await page.waitForTimeout(500);
-
-    // Capture the last row's visual state AFTER closing (highlighted but not expanded)
-    // This is the state we expect to be preserved when expanding another row
-    const lastRowClasses = await lastRow.getAttribute('class') || '';
-    testLogger.info(`Last row baseline state (highlighted, closed) - classes: ${lastRowClasses}`);
 
     // Now expand first row again - this is when the bug would cause last row to lose highlighting
     const firstRowExpandMenu = pm.logsPage.getFirstRowExpandMenu();
