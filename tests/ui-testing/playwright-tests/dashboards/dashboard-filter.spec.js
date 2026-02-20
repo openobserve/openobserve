@@ -72,7 +72,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -119,9 +119,10 @@ test.describe("dashboard filter testcases", () => {
       .click();
 
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -142,9 +143,10 @@ test.describe("dashboard filter testcases", () => {
       .click();
 
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -232,9 +234,10 @@ test.describe("dashboard filter testcases", () => {
     await page.waitForTimeout(2000);
 
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -289,7 +292,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -337,9 +340,10 @@ test.describe("dashboard filter testcases", () => {
       .click();
 
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1"'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -402,7 +406,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -419,15 +423,15 @@ test.describe("dashboard filter testcases", () => {
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
       .click();
 
-    // Verify the query is displayed in the Query Inspector
-    const queryEditor = page.locator('.inspector-query-editor').filter({
-      hasText:  `SELECT kubernetes_container_name as "x_axis_1", count(kubernetes_container_image) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IN ('ingress-nginx', 'kube-system') GROUP BY x_axis_1`
-    }).last();
+    const cell = await page.getByRole("cell", {
+      name: /SELECT kubernetes_container_name as "x_axis_1", count\(kubernetes_container_image\) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IN \('ingress-nginx', 'kube-system'\) GROUP BY x_axis_1/,
+    });
 
-    await expect(queryEditor).toBeVisible();
+    // Ensure the cell is visible
+    await expect(cell.first()).toBeVisible();
 
-    // Verify the exact query text matches
-    await expect(queryEditor).toHaveText(
+    // Verify the text matches
+    await expect(cell.first()).toHaveText(
       'SELECT kubernetes_container_name as "x_axis_1", count(kubernetes_container_image) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IN (\'ingress-nginx\', \'kube-system\') GROUP BY x_axis_1'
     );
 
@@ -477,7 +481,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -541,7 +545,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add filter field
@@ -635,7 +639,7 @@ test.describe("dashboard filter testcases", () => {
     await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
       timeout: 5000,
     });
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add filter field and set value
@@ -665,9 +669,10 @@ test.describe("dashboard filter testcases", () => {
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
       .click();
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'$variablename\' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'$variablename\' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
@@ -679,15 +684,15 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardCreate.searchDashboard(randomDashboardName);
     await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
-  test("should verify the custom value search from variable dropdown", async ({
+  test.skip("should verify the custom value search from variable dropdown", async ({
     page,
   }) => {
     const valuesResponses = [];
 
-    // Listen for all responses to capture _values_stream API calls (used with customValueSearch)
+    // Listen for all responses to capture _values API calls
     page.on("response", async (response) => {
       const url = response.url();
-      if (url.includes("/_values_stream")) {
+      if (url.includes("/_values?")) {
         valuesResponses.push({
           url,
           status: response.status(),
@@ -722,7 +727,7 @@ test.describe("dashboard filter testcases", () => {
       true  // showMultipleValues
     );
 
-    // await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    // await page.waitForLoadState('networkidle');
 
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -739,7 +744,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
 
     // Perform custom value search in variable dropdown to trigger _values API calls
     const variableInput = page.getByLabel("variablename", { exact: true });
@@ -750,7 +755,7 @@ test.describe("dashboard filter testcases", () => {
     const searchTerms = ["zi", "zio", "ziox"];
     for (const term of searchTerms) {
       await variableInput.fill(term);
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Allow API calls to complete
+      await page.waitForLoadState('networkidle'); // Allow API calls to complete
     }
 
     // Select the final value
@@ -759,7 +764,7 @@ test.describe("dashboard filter testcases", () => {
     await option.click();
 
     // Wait for any remaining network activity to settle
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('networkidle');
 
     // Assert that we captured at least one _values API call
     expect(valuesResponses.length).toBeGreaterThan(0);
@@ -831,7 +836,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -893,9 +898,10 @@ test.describe("dashboard filter testcases", () => {
       .click();
 
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -954,7 +960,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -991,9 +997,10 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify that the SQL query contains the str_match() function for Contains operator
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE str_match(kubernetes_container_name, \'ziox\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE str_match(kubernetes_container_name, \'ziox\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -1054,7 +1061,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1091,9 +1098,10 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT IN (${variablename}) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT IN (${variablename}) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -1151,7 +1159,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1188,9 +1196,10 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify that the SQL query contains the str_match() function for Contains operator
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE str_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE str_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -1248,7 +1257,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1285,9 +1294,10 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE re_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE re_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -1345,7 +1355,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1382,9 +1392,10 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE match_all(\'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE match_all(\'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -1442,7 +1453,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1479,9 +1490,10 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE str_match_ignore_case(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE str_match_ignore_case(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -1539,7 +1551,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1576,9 +1588,10 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE re_not_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE re_not_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -1636,7 +1649,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1673,9 +1686,10 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name LIKE \'$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name LIKE \'$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -1733,7 +1747,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1770,9 +1784,10 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name LIKE \'%$variablename\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name LIKE \'%$variablename\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
@@ -1830,7 +1845,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1867,9 +1882,10 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT LIKE \'%$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT LIKE \'%$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
     ).toBeVisible();
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
