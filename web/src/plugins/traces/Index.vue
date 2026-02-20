@@ -780,6 +780,9 @@ async function getQueryData() {
               };
             }
             searchObj.data.queryResults.hits.push(...formattedHits);
+            // Keep queryResults.from in sync so SearchResult.vue's onScroll gate
+            // (currentPage <= queryResults.from / rowsPerPage) allows further pages.
+            searchObj.data.queryResults.from = queryReq.query.from;
             // Use backend total when available (cumulative across partitions);
             // fall back to hits.length only if not provided.
             const backendTotal = response.content?.results?.total;

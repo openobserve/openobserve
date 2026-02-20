@@ -1083,19 +1083,60 @@ async fn process_latest_traces_stream(
             continue;
         }
 
-        // ---------- Query 2: fetch span details for these trace IDs ----------
+        // Sort Q1 hits by trace_start_time descending (same order as the final result).
+        // Q1 returns traces ordered by zo_sql_timestamp DESC, but we need start_time order.
+        let mut sorted_hits = deduped_hits;
+        sorted_hits.sort_by(|a, b| {
+            let a_t = json::get_int_value(a.get("trace_start_time").unwrap_or_default());
+            let b_t = json::get_int_value(b.get("trace_start_time").unwrap_or_default());
+            b_t.cmp(&a_t)
+        });
+
+        // Register ALL trace IDs from this partition into seen_trace_ids now, before slicing.
+        // This prevents a trace that is skipped (before `from`) or not yet delivered from
+        // appearing again in a later partition's Q1 result and inflating counts or being
+        // delivered twice when it finally falls in a deliverable window.
+        for item in &sorted_hits {
+            if let Some(tid) = item.get("trace_id").and_then(|v| v.as_str())
+                && !tid.is_empty()
+            {
+                seen_trace_ids.insert(tid.to_string());
+            }
+        }
+
+        // Apply global offset up-front on the Q1 result so Q2 only runs on traces we will deliver.
+        // This avoids sending hundreds of already-delivered trace IDs back to the storage layer.
+        let hits_seen_before = hits_seen - partition_total;
+        let skip_in_partition = (hits_to_skip - hits_seen_before)
+            .max(0)
+            .min(sorted_hits.len() as i64);
+        let need = (hits_to_deliver - hits_delivered) as usize;
+        let deliverable_q1: Vec<_> = sorted_hits
+            .into_iter()
+            .skip(skip_in_partition as usize)
+            .take(need)
+            .collect();
+
+        if deliverable_q1.is_empty() {
+            let progress = ((idx + 1) * 100) / total_partitions;
+            let _ = sender
+                .send(Ok(StreamResponses::Progress { percent: progress }))
+                .await;
+            continue;
+        }
+
+        // ---------- Query 2: fetch span details only for the traces we will deliver ----------
         let mut traces_data: HashMap<String, TraceResponseItem> =
-            HashMap::with_capacity(deduped_hits.len());
+            HashMap::with_capacity(deliverable_q1.len());
         let mut p_start_actual = p_start;
         let mut p_end_actual = p_end;
 
-        for item in &deduped_hits {
+        for item in &deliverable_q1 {
             let tid = item
                 .get("trace_id")
                 .and_then(|v| v.as_str())
                 .unwrap_or_default()
                 .to_string();
-            seen_trace_ids.insert(tid.clone());
             let trace_start_time = json::get_int_value(
                 item.get("trace_start_time")
                     .unwrap_or(&serde_json::Value::Null),
@@ -1252,35 +1293,16 @@ async fn process_latest_traces_stream(
             }
         }
 
-        // Sort by start_time descending and stream hits for this partition
+        // Sort by start_time descending (Q2 may have refined start_time from actual span data).
         let mut partition_hits: Vec<&TraceResponseItem> = traces_data.values().collect();
         partition_hits.sort_by(|a, b| b.start_time.cmp(&a.start_time));
 
-        // Apply global offset: hits_seen already includes this partition's total (set above).
-        // Compute how many of this partition's hits to skip based on cumulative offset.
-        // hits_seen = sum of partition_total for partitions processed so far (including current).
-        // Hits seen *before* this partition = hits_seen - partition_total.
-        let hits_seen_before = hits_seen - partition_total;
-        let skip_in_partition = (hits_to_skip - hits_seen_before)
-            .max(0)
-            .min(partition_hits.len() as i64);
-
         let deliverable: Vec<serde_json::Value> = partition_hits
             .iter()
-            .skip(skip_in_partition as usize)
-            .take((hits_to_deliver - hits_delivered) as usize)
             .map(|t| serde_json::to_value(t).unwrap_or(serde_json::Value::Null))
             .collect();
 
         hits_delivered += deliverable.len() as i64;
-
-        if deliverable.is_empty() {
-            let progress = ((idx + 1) * 100) / total_partitions;
-            let _ = sender
-                .send(Ok(StreamResponses::Progress { percent: progress }))
-                .await;
-            continue;
-        }
 
         let mut results = config::meta::search::Response::default();
         for h in deliverable {
