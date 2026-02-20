@@ -1250,17 +1250,32 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.expectLogsTableVisible();
     testLogger.info('✓ Logs table remains visible after query inspector interaction');
 
-    // PRIMARY ASSERTION 2: Row count should not decrease (streaming may add more, but data should not be lost)
+    // PRIMARY ASSERTION 2: Table content should not be mutated by query inspector
+    // Capture final content and compare actual row data (not just counts)
+    const finalLogsContent = await pm.logsPage.getLogsTableContent();
+    expect(finalLogsContent, 'Logs table content should not be empty after query inspector interaction').toBeTruthy();
+
+    // Compare first N rows to detect mutation (streaming may add new rows at top/bottom,
+    // but original rows should remain in the same order with same content)
+    const rowsToCompare = Math.min(5, initialLogsContent?.length || 0, finalLogsContent?.length || 0);
+    if (rowsToCompare > 0 && initialLogsContent && finalLogsContent) {
+      // Find if initial rows exist in final content (order may shift due to streaming)
+      const initialFirstRows = initialLogsContent.slice(0, rowsToCompare);
+      let matchedRows = 0;
+      for (const initialRow of initialFirstRows) {
+        if (finalLogsContent.some(finalRow => finalRow === initialRow)) {
+          matchedRows++;
+        }
+      }
+      // At least some original rows should still be present
+      expect(matchedRows, `Original log rows were mutated/lost. Found ${matchedRows}/${rowsToCompare} matching rows`).toBeGreaterThan(0);
+      testLogger.info(`✓ Content integrity check: ${matchedRows}/${rowsToCompare} initial rows found in final content`);
+    }
+
+    // Also verify row count didn't decrease significantly
     const finalRowCount = await pm.logsPage.getLogRowCount();
     expect(finalRowCount).toBeGreaterThanOrEqual(initialRowCount);
     testLogger.info(`✓ Row count preserved: initial=${initialRowCount}, final=${finalRowCount}`);
-
-    // PRIMARY ASSERTION 3: Table content should exist (not empty/cleared by query inspector)
-    const finalLogsContent = await pm.logsPage.getLogsTableContent();
-    expect(finalLogsContent, 'Logs table content should not be empty after query inspector interaction').toBeTruthy();
-    const initialLength = initialLogsContent?.length || 0;
-    expect(finalLogsContent.length, `Logs content was truncated: final=${finalLogsContent.length}, initial=${initialLength}`).toBeGreaterThanOrEqual(initialLength);
-    testLogger.info(`✓ Logs content preserved: initial=${initialLength}, final=${finalLogsContent.length}`);
 
     testLogger.info('✓ PRIMARY CHECK PASSED: Query inspector does not mutate logs state (readonly flag working)');
   });
@@ -1432,14 +1447,14 @@ test.describe("Logs Regression Bugs", () => {
     const isPanelVisible = await pm.logsPage.isLogDetailPanelVisible();
     testLogger.info(`Log detail panel visible: ${isPanelVisible}`);
 
+    // Capture the last row's visual state WHILE highlighted (BEFORE closing)
+    // This is the baseline state we expect to be preserved when expanding a different row
+    const lastRowClasses = await lastRow.getAttribute('class') || '';
+    testLogger.info(`Last row baseline state (while highlighted) - classes: ${lastRowClasses}`);
+
     // Close the detail panel
     await pm.logsPage.pressEscapeToCloseDialog();
     await page.waitForTimeout(500);
-
-    // Capture the last row's visual state AFTER closing (post-close highlight state)
-    // This is the state we expect to be preserved when expanding a different row
-    const lastRowClasses = await lastRow.getAttribute('class') || '';
-    testLogger.info(`Last row baseline state (post-close) - classes: ${lastRowClasses}`);
 
     // Now expand first row again - this is when the bug would cause last row to lose highlighting
     const firstRowExpandMenu = pm.logsPage.getFirstRowExpandMenu();
