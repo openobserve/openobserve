@@ -4062,13 +4062,6 @@ export class LogsPage {
     }
 
     /**
-     * Expect logs table to be visible
-     */
-    async expectLogsTableVisible() {
-        await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible();
-    }
-
-    /**
      * Expect element to be visible
      * @param {import('@playwright/test').Locator} locator - The locator to check
      */
