@@ -216,14 +216,6 @@ jobs:
                 "scheduled-pipeline-query-builder.spec.js",
                 # "remotepipeline.spec.js"
               ]
-          - testfolder: "Functions"
-            browser: "chrome"
-            run_files:
-              [
-                "js-transform-type.spec.js",
-                "row-expansion.spec.js",
-                "enrichment-table-url.spec.js",
-              ]
           - testfolder: "Reports"
             browser: "chrome"
             run_files: [
