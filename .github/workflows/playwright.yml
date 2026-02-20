@@ -144,7 +144,7 @@ jobs:
           #       "shareLink.spec.js",
           #       "monaco-query-prefill.spec.js",
           #       "logsAnalyzeDimensions.spec.js",
-                "logsAnalyzeDimensions.spec.js",
+                # "logsAnalyzeDimensions.spec.js",
           #     ]
           # - testfolder: "Logs-Queries"
           #   browser: "chrome"
@@ -219,10 +219,10 @@ jobs:
           #       "pipeline-metrics.spec.js",
           #       "pipeline-backfill.spec.js",
           #       "pipeline-history.spec.js",
-                "pipeline-traces.spec.js",
-                "pipeline-metrics.spec.js",
-                "pipeline-backfill.spec.js",
-                "pipeline-history.spec.js",
+                # "pipeline-traces.spec.js",
+                # "pipeline-metrics.spec.js",
+                # "pipeline-backfill.spec.js",
+                # "pipeline-history.spec.js",
           #       "scheduled-pipeline-query-builder.spec.js",
           #       # "remotepipeline.spec.js"
           #     ]
@@ -258,7 +258,7 @@ jobs:
           #       "traceDetails.spec.js",
           #       "traceAdvancedFiltering.spec.js",
           #       "tracesAnalyzeDimensions.spec.js",
-                "tracesAnalyzeDimensions.spec.js",
+                # "tracesAnalyzeDimensions.spec.js",
           #     ]
 
           # - testfolder: "RegressionSet"
