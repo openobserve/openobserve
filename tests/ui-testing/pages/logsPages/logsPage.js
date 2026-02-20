@@ -237,6 +237,16 @@ export class LogsPage {
         this.patternLoadingSpinner = '.q-spinner-hourglass';
         this.patternLoadingText = 'text=Extracting patterns from logs...';
         this.patternEmptyState = 'text=No patterns found';
+
+        // ===== V0.40 REGRESSION TEST LOCATORS =====
+        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr';
+        this.tableRowExpandMenu = '[data-test="table-row-expand-menu"]';
+        this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
+        this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
+        this.searchResultText = '[data-test="logs-search-search-result"]';
+        this.vrlEditorMonaco = '#fnEditor .monaco-editor';
+        this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
+        this.vrlFieldIncludeExcludeBtn = (fieldName) => `[data-test*="${fieldName}"] [data-test="log-details-include-exclude-field-btn"]`;
     }
 
 
@@ -5986,5 +5996,213 @@ export class LogsPage {
         // Pattern detail shows "Pattern X of Y" in the header
         await this.page.getByText(`Pattern ${expectedIndex} of`).waitFor({ state: 'visible', timeout: 5000 });
         testLogger.info(`Pattern details showing pattern ${expectedIndex}`);
+    }
+
+    // ============================================================================
+    // V0.40 REGRESSION TEST METHODS
+    // VRL fields, Query Inspector, Sorting, and Highlight tests
+    // ============================================================================
+
+    /**
+     * Click the show query toggle to expand/collapse VRL editor
+     */
+    async clickShowQueryToggle() {
+        await this.page.locator('[data-test="logs-search-bar-show-query-toggle"]').click();
+        testLogger.info('Clicked show query toggle');
+    }
+
+    /**
+     * Wait for VRL editor to be visible and click it
+     */
+    async waitForVrlEditorAndClick() {
+        await this.page.locator(this.vrlEditorMonaco).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.vrlEditorMonaco).click();
+        testLogger.info('Clicked VRL editor');
+    }
+
+    /**
+     * Enter VRL function in the editor
+     * @param {string} vrlCode - The VRL code to enter
+     */
+    async enterVrlFunction(vrlCode) {
+        await this.page.locator(this.vrlEditorMonaco).click();
+        await this.page.keyboard.press('Control+a');
+        await this.page.keyboard.type(vrlCode);
+        testLogger.info(`Entered VRL function: ${vrlCode}`);
+    }
+
+    /**
+     * Get the logs table element
+     * @returns {Locator} - The logs table locator
+     */
+    getLogsTable() {
+        return this.page.locator(this.logsSearchResultLogsTable);
+    }
+
+    /**
+     * Wait for logs table to be visible
+     * @param {number} timeout - Timeout in milliseconds
+     */
+    async waitForLogsTable(timeout = 30000) {
+        await this.page.locator(this.logsSearchResultLogsTable).waitFor({ state: 'visible', timeout });
+        testLogger.info('Logs table is visible');
+    }
+
+    /**
+     * Get the count of log rows in the table
+     * @returns {Promise<number>} - Number of log rows
+     */
+    async getLogRowCount() {
+        const rows = this.page.locator(this.logsSearchResultTableRows);
+        const count = await rows.count();
+        testLogger.info(`Log row count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get all log rows as locators
+     * @returns {Locator} - All log row locators
+     */
+    getLogRows() {
+        return this.page.locator(this.logsSearchResultTableRows);
+    }
+
+    /**
+     * Click the first expand menu in the logs table
+     */
+    async clickFirstExpandMenu() {
+        const expandMenus = this.page.locator(this.tableRowExpandMenu);
+        await expandMenus.first().click();
+        testLogger.info('Clicked first expand menu');
+    }
+
+    /**
+     * Click the last expand menu in the logs table
+     */
+    async clickLastExpandMenu() {
+        const expandMenus = this.page.locator(this.tableRowExpandMenu);
+        await expandMenus.last().click();
+        testLogger.info('Clicked last expand menu');
+    }
+
+    /**
+     * Check if the first expand menu is visible
+     * @returns {Promise<boolean>} - Whether the first expand menu is visible
+     */
+    async isFirstExpandMenuVisible() {
+        const expandMenus = this.page.locator(this.tableRowExpandMenu);
+        const count = await expandMenus.count();
+        return count > 0;
+    }
+
+    /**
+     * Get count of include/exclude buttons on a VRL-generated field
+     * @param {string} fieldName - The VRL field name
+     * @returns {Promise<number>} - Count of buttons found
+     */
+    async getVrlFieldIncludeExcludeCount(fieldName) {
+        const selector = this.vrlFieldIncludeExcludeBtn(fieldName);
+        const count = await this.page.locator(selector).count();
+        testLogger.info(`VRL field '${fieldName}' include/exclude button count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get count of include/exclude buttons on regular fields
+     * @returns {Promise<number>} - Count of buttons found
+     */
+    async getRegularIncludeExcludeCount() {
+        const count = await this.page.locator(this.logDetailsIncludeExcludeBtn).count();
+        testLogger.info(`Regular include/exclude button count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get timestamp cell values from the logs table
+     * @param {number} limit - Maximum number of timestamps to return
+     * @returns {Promise<string[]>} - Array of timestamp values
+     */
+    async getTimestampCellValues(limit = 5) {
+        const cells = this.page.locator(this.timestampCells);
+        const count = Math.min(await cells.count(), limit);
+        const values = [];
+        for (let i = 0; i < count; i++) {
+            const text = await cells.nth(i).textContent();
+            values.push(text?.trim() || '');
+        }
+        testLogger.info(`Got ${values.length} timestamp values`);
+        return values;
+    }
+
+    /**
+     * Get count of timestamp cells in the logs table
+     * @returns {Promise<number>} - Count of timestamp cells
+     */
+    async getTimestampCellCount() {
+        const count = await this.page.locator(this.timestampCells).count();
+        testLogger.info(`Timestamp cell count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get search result text
+     * @returns {Promise<string>} - Search result text
+     */
+    async getSearchResultText() {
+        const text = await this.page.locator(this.searchResultText).textContent().catch(() => '');
+        testLogger.info(`Search result text: ${text?.substring(0, 50)}`);
+        return text;
+    }
+
+    /**
+     * Press Escape key to close any open dialog
+     */
+    async pressEscapeToCloseDialog() {
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
+        testLogger.info('Pressed Escape to close dialog');
+    }
+
+    /**
+     * Get the last row in the logs table
+     * @returns {Locator} - The last row locator
+     */
+    getLastRow() {
+        return this.page.locator(this.logsSearchResultTableRows).last();
+    }
+
+    /**
+     * Get the first row expand menu
+     * @returns {Locator} - The first expand menu locator
+     */
+    getFirstRowExpandMenu() {
+        return this.page.locator(this.tableRowExpandMenu).first();
+    }
+
+    /**
+     * Check if log detail panel is visible
+     * @returns {Promise<boolean>} - Whether panel is visible
+     */
+    async isLogDetailPanelVisible() {
+        const visible = await this.page.locator(this.logDetailPanel).isVisible().catch(() => false);
+        testLogger.info(`Log detail panel visible: ${visible}`);
+        return visible;
+    }
+
+    /**
+     * Assert that logs table is visible
+     */
+    async expectLogsTableVisible() {
+        await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible();
+        testLogger.info('Logs table is visible');
+    }
+
+    /**
+     * Assert that a locator is visible
+     * @param {Locator} locator - The locator to check
+     */
+    async expectVisible(locator) {
+        await expect(locator).toBeVisible();
+        testLogger.info('Element is visible');
     }
 }
