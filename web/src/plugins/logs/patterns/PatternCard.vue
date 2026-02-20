@@ -23,19 +23,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Pattern Column -->
     <div class="tw:flex-1 tw:min-w-0 tw:px-2">
       <div
-        class="tw:truncate pattern-template-text"
-        :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'"
+        class="pattern-template-text"
+        :class="[
+          wrap ? 'tw:break-all' : 'tw:truncate',
+          store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'
+        ]"
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
       >
-        {{ pattern.template }}
+        <LogsHighLighting
+          :data="pattern.template"
+          :show-braces="false"
+          :show-quotes="false"
+          :query-string="''"
+          :simple-mode="false"
+        />
       </div>
-      <span
-        v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw:text-[0.625rem]"
-        :data-test="`pattern-card-${index}-anomaly-badge`"
-        >⚠️ {{ t("search.anomalyLabel") }}</span
-      >
     </div>
 
     <!-- Occurrence Column -->
@@ -55,6 +58,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`pattern-card-${index}-percentage`"
         >{{ pattern.percentage.toFixed(2) }}%</span
       >
+    </div>
+
+    <!-- Anomaly Column -->
+    <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:text-center">
+      <span
+        v-if="pattern.is_anomaly"
+        class="text-negative text-weight-bold tw:text-[1rem]"
+        :data-test="`pattern-card-${index}-anomaly-badge`"
+      >
+        ⚠️
+        <q-tooltip :delay="500">{{ t("search.anomalyDetected") }}</q-tooltip>
+      </span>
+      <span
+        v-else
+        class="text-grey-6 tw:text-[0.75rem]"
+        :data-test="`pattern-card-${index}-no-anomaly`"
+      >
+        --
+      </span>
     </div>
 
     <!-- Actions Column -->
@@ -83,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-btn>
       <q-btn
         size="6px"
-        class="cursor-pointer"
+        class="cursor-pointer pattern-details-btn"
         round
         :data-test="`pattern-card-${index}-details-icon`"
         @click.stop="$emit('click', pattern, index)"
@@ -108,10 +130,12 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 
 defineProps<{
   pattern: any;
   index: number;
+  wrap?: boolean;
 }>();
 
 defineEmits<{
@@ -130,5 +154,21 @@ const { t } = useI18n();
 .pattern-template-text {
   font-family: monospace;
   font-size: 12px;
+}
+
+// Add explicit hover styles
+.table-row-hover {
+  transition: background-color 0.15s ease-in-out;
+
+  &:hover {
+    background-color: var(--o2-hover-gray) !important;
+  }
+}
+</style>
+
+<style lang="scss">
+@import "@/assets/styles/log-highlighting.css";
+.pattern-details-btn > span.q-btn__content {
+  display: block !important;
 }
 </style>

@@ -53,6 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
 
+        <!-- Anomaly Column Header -->
+        <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-center">
+          <span
+            class="tw:font-bold"
+            :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
+          >
+            {{ t("search.anomalyColumnHeader") }}
+          </span>
+        </div>
+
         <!-- Actions Column - No Header -->
         <div class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:relative table-head">
         </div>
@@ -68,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <PatternCard
           :pattern="pattern"
           :index="index"
+          :wrap="wrap"
           @click="$emit('open-details', pattern, index)"
           @include="$emit('add-to-search', pattern, 'include')"
           @exclude="$emit('add-to-search', pattern, 'exclude')"
@@ -127,6 +138,7 @@ defineProps<{
   patterns: any[];
   loading: boolean;
   totalLogsAnalyzed?: number;
+  wrap?: boolean;
 }>();
 
 defineEmits<{

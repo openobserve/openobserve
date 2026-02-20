@@ -322,6 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :totalLogsAnalyzed="
             patternsState?.patterns?.statistics?.total_logs_analyzed
           "
+          :wrap="searchObj.meta.toggleSourceWrap"
           @open-details="openPatternDetails"
           @add-to-search="addPatternToSearch"
         />

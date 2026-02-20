@@ -1090,4 +1090,13 @@ defineExpose({
 </style>
 <style scoped lang="scss">
 @import "@/styles/logs/tenstack-table.scss";
+
+// Add explicit hover styles for log rows
+.table-row-hover {
+  transition: background-color 0.15s ease-in-out;
+
+  &:hover {
+    background-color: var(--o2-hover-gray) !important;
+  }
+}
 </style>
