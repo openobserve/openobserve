@@ -678,7 +678,7 @@ async function getQueryData() {
       searchObj.data.resultGrid.currentPage *
       searchObj.meta.resultGrid.rowsPerPage;
 
-    let dismiss: any = null;
+    let dismiss = null;
     if (searchObj.data.resultGrid.currentPage) {
       dismiss = $q.notify({
         type: "positive",
@@ -806,8 +806,13 @@ async function getQueryData() {
               searchObj.data.errorMsg = t(customMessage);
             }
           }
-          if (errData?.error_detail) {
+          if (errData?.code && errData?.message) {
+            searchObj.data.errorMsg = errData.message;
+            searchObj.data.errorCode = errData.code;
+          }
+          if (errData?.code && errData?.error_detail) {
             searchObj.data.errorDetail = errData.error_detail;
+            searchObj.data.errorCode = errData.code;
           }
           currentSearchTraceId = null;
         },

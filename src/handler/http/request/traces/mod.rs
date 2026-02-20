@@ -947,7 +947,7 @@ async fn process_latest_traces_stream(
         regions: vec![],
         clusters: vec![],
         query_fn: None,
-        streaming_output: true,
+        streaming_output: false,
         histogram_interval: 0,
         sampling_ratio: None,
     };
@@ -982,29 +982,35 @@ async fn process_latest_traces_stream(
     // Process partitions newest-first (partitions from search_partition are ordered oldest-first)
     let partitions_desc: Vec<[i64; 2]> = partitions.into_iter().rev().collect();
 
-    // Track how many hits we've already delivered (for `from` pagination)
-    let mut hits_delivered: i64 = 0;
-    let hits_needed = size; // total hits the caller wants
+    // `from` is a global offset: skip the first `from` hits across all partitions,
+    // then deliver `size` hits. We track how many we've seen and delivered so far.
+    let mut hits_seen: i64 = 0; // total hits seen across all partitions so far
+    let hits_to_skip = from; // global offset
+    let hits_to_deliver = size; // how many the caller wants after the offset
+    let mut hits_delivered: i64 = 0; // how many we've actually sent
 
     for (idx, partition) in partitions_desc.iter().enumerate() {
         if sender.is_closed() {
             break;
         }
-        if hits_delivered >= hits_needed {
+        if hits_delivered >= hits_to_deliver {
             break;
         }
 
         let p_start = partition[0];
         let p_end = partition[1];
 
-        let remaining = hits_needed - hits_delivered;
+        // Ask for enough rows to cover remaining offset + remaining needed
+        let remaining_to_skip = (hits_to_skip - hits_seen).max(0);
+        let remaining_needed = hits_to_deliver - hits_delivered;
+        let fetch_size = remaining_to_skip + remaining_needed;
 
         // ---------- Query 1: aggregate over this partition ----------
         let mut req1 = base_req.clone();
         req1.query.start_time = p_start;
         req1.query.end_time = p_end;
         req1.query.from = 0;
-        req1.query.size = remaining;
+        req1.query.size = fetch_size;
 
         let agg_res = match SearchService::cache::search(
             &trace_id,
@@ -1198,15 +1204,31 @@ async fn process_latest_traces_stream(
         let mut partition_hits: Vec<&TraceResponseItem> = traces_data.values().collect();
         partition_hits.sort_by(|a, b| b.start_time.cmp(&a.start_time));
 
-        let hit_values: Vec<serde_json::Value> = partition_hits
+        // Apply global offset: skip hits until we've seen `hits_to_skip` total,
+        // then deliver up to `hits_to_deliver` hits.
+        let partition_count = partition_hits.len() as i64;
+        let skip_in_partition = (hits_to_skip - hits_seen).max(0).min(partition_count);
+        hits_seen += partition_count;
+
+        let deliverable: Vec<serde_json::Value> = partition_hits
             .iter()
+            .skip(skip_in_partition as usize)
+            .take((hits_to_deliver - hits_delivered) as usize)
             .map(|t| serde_json::to_value(t).unwrap_or(serde_json::Value::Null))
             .collect();
 
-        hits_delivered += hit_values.len() as i64;
+        hits_delivered += deliverable.len() as i64;
+
+        if deliverable.is_empty() {
+            let progress = ((idx + 1) * 100) / total_partitions;
+            let _ = sender
+                .send(Ok(StreamResponses::Progress { percent: progress }))
+                .await;
+            continue;
+        }
 
         let mut results = config::meta::search::Response::default();
-        for h in hit_values {
+        for h in deliverable {
             results.add_hit(&h);
         }
         if !range_error.is_empty() {
