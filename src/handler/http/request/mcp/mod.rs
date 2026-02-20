@@ -49,7 +49,8 @@ fn mcp_only_in_enterprise() -> actix_web::Result<HttpResponse> {
         (status = 500, description = "Internal Server Error"),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "mcp", "operation": "post"}))
+        ("x-o2-ratelimit" = json!({"module": "mcp", "operation": "post"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[post("/{org_id}/mcp")]
@@ -125,7 +126,8 @@ pub async fn handle_mcp_post(
         (status = 500, description = "Internal Server Error"),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "mcp", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "mcp", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[get("/{org_id}/mcp")]
@@ -193,7 +195,8 @@ pub async fn handle_mcp_get(
         (status = 404, description = "Not Found - MCP server is only available in enterprise edition", content_type = "application/json"),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "mcp", "operation": "post"}))
+        ("x-o2-ratelimit" = json!({"module": "mcp", "operation": "post"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[post("/{org_id}/mcp")]
@@ -220,7 +223,8 @@ pub async fn handle_mcp_post(
         (status = 404, description = "Not Found - MCP server is only available in enterprise edition", content_type = "application/json"),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "mcp", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "mcp", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[get("/{org_id}/mcp")]
@@ -242,6 +246,9 @@ pub async fn handle_mcp_get(
     operation_id = "OAuthServerMetadata",
     responses(
         (status = 200, description = "Success", content_type = "application/json"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[get("/.well-known/oauth-authorization-server")]
@@ -268,6 +275,9 @@ pub async fn oauth_authorization_server_metadata() -> actix_web::Result<HttpResp
     operation_id = "OAuthServerMetadata",
     responses(
         (status = 404, description = "Not Found - MCP server is only available in enterprise edition", content_type = "application/json"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[get("/.well-known/oauth-authorization-server")]

@@ -1,6 +1,7 @@
 import store from "@/stores";
 import { contextRegistry, createDefaultContextProvider } from "@/composables/contextProviders";
 import { generateTraceContext } from "@/utils/zincutils";
+import type { ImageAttachment } from "@/types/chat";
 
 let contextHandler : any;
 
@@ -54,6 +55,7 @@ const useAiChat = () => {
      * @param abortSignal - Optional AbortController signal for request cancellation
      * @param explicitContext - Optional explicit context to use (takes precedence over registered context)
      * @param sessionId - Optional UUID v7 session ID for tracking all API calls in a chat session
+     * @param images - Optional array of image attachments for multimodal queries
      * @returns Promise<Response> - Fetch response object with streaming capabilities
      *
      * Example usage:
@@ -65,7 +67,15 @@ const useAiChat = () => {
      * abortController.abort();
      * ```
      */
-    const fetchAiChat = async (messages: any[], model: string, org_id: string, abortSignal?: AbortSignal, explicitContext?: any, sessionId?: string) => {
+    const fetchAiChat = async (
+        messages: any[],
+        model: string,
+        org_id: string,
+        abortSignal?: AbortSignal,
+        explicitContext?: any,
+        sessionId?: string,
+        images?: ImageAttachment[]
+    ) => {
         let url  = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chat_stream`;
 
         // Try explicit context first, then structured context, then fallback to legacy context
@@ -75,15 +85,29 @@ const useAiChat = () => {
         // Clone the messages array to avoid mutating the original array, as it saves it in the indexDB
         const _messages = JSON.parse(JSON.stringify(messages));
 
+        // Convert images to backend format (mimeType -> mime_type)
+        const backendImages = images?.map(img => ({
+            data: img.data,
+            mime_type: img.mimeType,
+            filename: img.filename
+        }));
+
         let body = '';
         if (contextToUse) {
             // Extract agent_type from context if present (for SRE agent routing)
             const { agent_type, ...contextWithoutAgentType } = contextToUse;
 
+            // Add user's timezone to context for time display formatting
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
             // Build payload with agent_type at root level if present
             const payload: any = {
                 messages: _messages,
-                context: contextWithoutAgentType
+                context: {
+                    ...contextWithoutAgentType,
+                    user_timezone: userTimezone,
+                },
+                ...(backendImages?.length && { images: backendImages })
             };
 
             body = JSON.stringify(payload);
@@ -91,14 +115,25 @@ const useAiChat = () => {
             // Fallback to legacy approach - inject context into message content
             const currentMessage = _messages[_messages.length - 1];
             currentMessage.content = getFormattedContext(currentMessage, legacyContext);
-            body = model.length > 0 
-                ? JSON.stringify({ model, messages: _messages }) 
-                : JSON.stringify({ messages: _messages });
+            // Add user's timezone to context
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const payload: any = {
+                messages: _messages,
+                ...(model.length > 0 && { model }),
+                context: { user_timezone: userTimezone },
+                ...(backendImages?.length && { images: backendImages })
+            };
+            body = JSON.stringify(payload);
         } else {
-            // No context available
-            body = model.length > 0 
-                ? JSON.stringify({ model, messages: _messages }) 
-                : JSON.stringify({ messages: _messages });
+            // No context available - still include timezone
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const payload: any = {
+                messages: _messages,
+                ...(model.length > 0 && { model }),
+                context: { user_timezone: userTimezone },
+                ...(backendImages?.length && { images: backendImages })
+            };
+            body = JSON.stringify(payload);
         }
 
         try {
@@ -114,7 +149,6 @@ const useAiChat = () => {
             // Add session ID header if provided for linking API calls within a chat session
             if (sessionId) {
                 headers['x-o2-assistant-session-id'] = sessionId;
-                console.log('[O2 Assistant] Session ID:', sessionId);
             }
 
             // Configure fetch options with abort signal for request cancellation
