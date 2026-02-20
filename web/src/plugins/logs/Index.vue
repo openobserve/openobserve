@@ -2479,15 +2479,12 @@ export default defineComponent({
         let logsPageQuery = "";
 
         // handle sql mode
-        // Prioritize searchObj.data.query when it has content (e.g., synced from build page)
-        // This ensures queries from the build tab are preserved when switching to visualize
-        if (searchObj.meta.sqlMode || searchObj.data.query?.trim()) {
-          logsPageQuery = searchObj.data.query;
-        } else {
+        if (!searchObj.meta.sqlMode) {
           const queryBuild = buildSearch();
           logsPageQuery = queryBuild?.query?.sql ?? "";
+        } else {
+          logsPageQuery = searchObj.data.query;
         }
-
         // return if query is empty and stream is not selected
         if (
           logsPageQuery === "" &&
