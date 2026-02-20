@@ -6192,14 +6192,6 @@ export class LogsPage {
     }
 
     /**
-     * Assert that logs table is visible
-     */
-    async expectLogsTableVisible() {
-        await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible();
-        testLogger.info('Logs table is visible');
-    }
-
-    /**
      * Assert that a locator is visible
      * @param {Locator} locator - The locator to check
      */
