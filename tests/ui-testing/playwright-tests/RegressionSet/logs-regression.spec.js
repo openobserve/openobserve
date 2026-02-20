@@ -1241,6 +1241,12 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickFirstExpandMenu();
     await page.waitForTimeout(1000);
 
+    // GUARD: First verify the VRL field actually exists in the expanded detail view
+    // This prevents vacuous pass if VRL didn't execute or field name is wrong
+    const vrlFieldExists = await page.locator('[data-test="log-expand-detail-key-vrl_test_field"]').count();
+    expect(vrlFieldExists, 'VRL field "vrl_test_field" should exist in expanded log detail').toBeGreaterThan(0);
+    testLogger.info('✓ VRL field exists in expanded log detail');
+
     // Look for include/exclude buttons on VRL fields
     // VRL-generated fields should NOT have these buttons
     const vrlFieldIncludeExcludeCount = await pm.logsPage.getVrlFieldIncludeExcludeCount('vrl_test_field');
@@ -1451,15 +1457,17 @@ test.describe("Logs Regression Bugs", () => {
     const isPanelVisible = await pm.logsPage.isLogDetailPanelVisible();
     testLogger.info(`Log detail panel visible: ${isPanelVisible}`);
 
-    // Store the last row's visual state while expanded
-    const lastRowClasses = await lastRow.getAttribute('class') || '';
-    testLogger.info(`Last row state while expanded - classes: ${lastRowClasses}`);
-
-    // Close the detail panel
+    // Close the detail panel first, THEN capture the "highlighted but not expanded" state
+    // This is the baseline state we want to preserve when expanding a different row
     await pm.logsPage.pressEscapeToCloseDialog();
     await page.waitForTimeout(500);
 
-    // Now expand first row again
+    // Capture the last row's visual state AFTER closing (highlighted but not expanded)
+    // This is the state we expect to be preserved when expanding another row
+    const lastRowClasses = await lastRow.getAttribute('class') || '';
+    testLogger.info(`Last row baseline state (highlighted, closed) - classes: ${lastRowClasses}`);
+
+    // Now expand first row again - this is when the bug would cause last row to lose highlighting
     const firstRowExpandMenu = pm.logsPage.getFirstRowExpandMenu();
     await firstRowExpandMenu.click();
     await page.waitForTimeout(1000);
