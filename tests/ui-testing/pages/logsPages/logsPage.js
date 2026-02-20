@@ -6011,7 +6011,7 @@ export class LogsPage {
      * Click the show query toggle to expand/collapse VRL editor
      */
     async clickShowQueryToggle() {
-        await this.page.locator('[data-test="logs-search-bar-show-query-toggle"]').click();
+        await this.page.locator(this.showQueryToggle).click();
         testLogger.info('Clicked show query toggle');
     }
 

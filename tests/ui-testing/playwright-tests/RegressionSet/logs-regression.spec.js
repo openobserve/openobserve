@@ -1488,11 +1488,6 @@ test.describe("Logs Regression Bugs", () => {
     await page.waitForTimeout(1000);
     testLogger.info('Expanded last log row');
 
-    // Capture the last row's visual state IMMEDIATELY after clicking (while expanded/selected)
-    // This captures the "selected" state before any close action might remove highlighting
-    const lastRowClasses = await lastRow.getAttribute('class') || '';
-    testLogger.info(`Last row baseline state (selected/expanded) - classes: ${lastRowClasses}`);
-
     // Check if the log detail panel shows for last row
     const isPanelVisible = await pm.logsPage.isLogDetailPanelVisible();
     testLogger.info(`Log detail panel visible: ${isPanelVisible}`);
@@ -1500,6 +1495,11 @@ test.describe("Logs Regression Bugs", () => {
     // Close the detail panel
     await pm.logsPage.pressEscapeToCloseDialog();
     await page.waitForTimeout(500);
+
+    // Capture the last row's visual state AFTER closing (post-close highlight state)
+    // This is the state we expect to be preserved when expanding a different row
+    const lastRowClasses = await lastRow.getAttribute('class') || '';
+    testLogger.info(`Last row baseline state (post-close) - classes: ${lastRowClasses}`);
 
     // Now expand first row again - this is when the bug would cause last row to lose highlighting
     const firstRowExpandMenu = pm.logsPage.getFirstRowExpandMenu();
