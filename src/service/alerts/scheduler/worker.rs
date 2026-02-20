@@ -337,8 +337,8 @@ impl SchedulerJobPuller {
             }
 
             // Send all jobs to be processed
-            let mut retry_ttl = 1;
             for job in jobs {
+                let mut retry_ttl = 1;
                 loop {
                     match self.tx.try_send(job.clone()) {
                         Ok(()) => {
@@ -395,7 +395,7 @@ impl Scheduler {
         let max_workers = config.alert_schedule_concurrency as usize;
 
         // Create a channel for work distribution with capacity for max workers
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(max_workers);
 
         // Share receiver between workers
         let rx = Arc::new(Mutex::new(rx));
