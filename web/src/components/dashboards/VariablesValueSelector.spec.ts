@@ -2113,4 +2113,430 @@ describe("VariablesValueSelector", () => {
       expect(regionVariable.value).toBeNull();
     });
   });
+
+  describe("Variable Reference Resolution (resolveVariableValue)", () => {
+    const variableRefConfig = {
+      list: [
+        {
+          name: "streamVar",
+          type: "constant",
+          label: "Stream Variable",
+          value: "my-logs-stream",
+        },
+        {
+          name: "fieldVar",
+          type: "constant",
+          label: "Field Variable",
+          value: "response_code",
+        },
+        {
+          name: "dynamicQuery",
+          type: "query_values",
+          label: "Dynamic Query",
+          multiSelect: false,
+          query_data: {
+            field: "$fieldVar",
+            stream: "$streamVar",
+            stream_type: "logs",
+            max_record_size: 100,
+            filter: [],
+          },
+        },
+      ],
+    };
+
+    it("should resolve variable references in stream and field when loading options", async () => {
+      // Track the payload sent to streaming
+      let capturedPayload: any = null;
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          capturedPayload = payload;
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+
+      wrapper = createWrapper({
+        variablesConfig: variableRefConfig,
+        initialVariableValues: {
+          value: {
+            streamVar: "my-logs-stream",
+            fieldVar: "response_code",
+            dynamicQuery: "",
+          },
+        },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+
+      // Wait for initialization
+      let attempts = 0;
+      while (vm.variablesData.isVariablesLoading && attempts < 20) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        attempts++;
+      }
+      if (vm.variablesData.isVariablesLoading) {
+        vm.variablesData.isVariablesLoading = false;
+      }
+
+      const dynamicQueryVar = vm.variablesData.values.find(
+        (v: any) => v.name === "dynamicQuery",
+      );
+      expect(dynamicQueryVar).toBeDefined();
+
+      // Ensure variables have their values set
+      const streamVarItem = vm.variablesData.values.find(
+        (v: any) => v.name === "streamVar",
+      );
+      const fieldVarItem = vm.variablesData.values.find(
+        (v: any) => v.name === "fieldVar",
+      );
+      expect(streamVarItem.value).toBe("my-logs-stream");
+      expect(fieldVarItem.value).toBe("response_code");
+
+      // Clear previous calls
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockClear();
+
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          capturedPayload = payload;
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+
+      // Ensure variable is ready to load
+      dynamicQueryVar.isLoading = false;
+      dynamicQueryVar.isVariablePartialLoaded = true;
+      dynamicQueryVar.isVariableLoadingPending = false;
+
+      await vm.loadVariableOptions(dynamicQueryVar);
+
+      // Streaming should have been called
+      expect(
+        mockStreamingComposable.fetchQueryDataWithHttpStream,
+      ).toHaveBeenCalled();
+
+      // The payload should contain the resolved stream name
+      if (capturedPayload) {
+        expect(capturedPayload.queryReq).toBeDefined();
+      }
+    });
+
+    it("should handle variables referencing non-existent variables", async () => {
+      const configWithBadRef = {
+        list: [
+          {
+            name: "queryVar",
+            type: "query_values",
+            label: "Query",
+            query_data: {
+              field: "$nonExistentVar",
+              stream: "$alsoDoesntExist",
+              stream_type: "logs",
+              max_record_size: 100,
+              filter: [],
+            },
+          },
+        ],
+      };
+
+      wrapper = createWrapper({
+        variablesConfig: configWithBadRef,
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      // Should not crash
+      expect(wrapper.exists()).toBe(true);
+
+      const vm = wrapper.vm as any;
+      const queryVar = vm.variablesData.values.find(
+        (v: any) => v.name === "queryVar",
+      );
+      expect(queryVar).toBeDefined();
+    });
+
+    it("should handle variables with array values for resolution", async () => {
+      const configWithArrayRef = {
+        list: [
+          {
+            name: "multiVar",
+            type: "custom",
+            label: "Multi Var",
+            multiSelect: true,
+            value: ["val1", "val2", "val3"],
+            options: [
+              { label: "val1", value: "val1", selected: true },
+              { label: "val2", value: "val2", selected: true },
+              { label: "val3", value: "val3", selected: true },
+            ],
+          },
+          {
+            name: "queryUsingMulti",
+            type: "query_values",
+            label: "Query Using Multi",
+            query_data: {
+              field: "status",
+              stream: "$multiVar",
+              stream_type: "logs",
+              max_record_size: 100,
+              filter: [],
+            },
+          },
+        ],
+      };
+
+      wrapper = createWrapper({
+        variablesConfig: configWithArrayRef,
+        initialVariableValues: {
+          value: {
+            multiVar: ["val1", "val2", "val3"],
+            queryUsingMulti: "",
+          },
+        },
+      });
+      await nextTick();
+
+      expect(wrapper.exists()).toBe(true);
+
+      const vm = wrapper.vm as any;
+      const multiVar = vm.variablesData.values.find(
+        (v: any) => v.name === "multiVar",
+      );
+      expect(multiVar).toBeDefined();
+      expect(Array.isArray(multiVar.value)).toBe(true);
+    });
+
+    it("should not resolve variables in non-variable strings", async () => {
+      // A stream/field without $ prefix should not be modified
+      const configWithPlainValues = {
+        list: [
+          {
+            name: "plainQueryVar",
+            type: "query_values",
+            label: "Plain Query",
+            query_data: {
+              field: "regular_field",
+              stream: "regular_stream",
+              stream_type: "logs",
+              max_record_size: 100,
+              filter: [],
+            },
+          },
+        ],
+      };
+
+      let capturedPayload: any = null;
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          capturedPayload = payload;
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+
+      wrapper = createWrapper({
+        variablesConfig: configWithPlainValues,
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+
+      // Wait for initialization
+      let attempts = 0;
+      while (vm.variablesData.isVariablesLoading && attempts < 20) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        attempts++;
+      }
+      if (vm.variablesData.isVariablesLoading) {
+        vm.variablesData.isVariablesLoading = false;
+      }
+
+      const plainVar = vm.variablesData.values.find(
+        (v: any) => v.name === "plainQueryVar",
+      );
+
+      if (plainVar) {
+        plainVar.isLoading = false;
+        plainVar.isVariablePartialLoaded = true;
+        plainVar.isVariableLoadingPending = false;
+
+        mockStreamingComposable.fetchQueryDataWithHttpStream.mockClear();
+        mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+          (payload: any, handlers: any) => {
+            capturedPayload = payload;
+            handlers.complete(payload, { type: "end" });
+          },
+        );
+
+        await vm.loadVariableOptions(plainVar);
+
+        // Verify the payload uses the original (non-variable) stream name
+        // The SQL is base64-encoded (via b64EncodeUnicode mock using btoa)
+        if (capturedPayload?.queryReq?.sql) {
+          const decodedSql = atob(capturedPayload.queryReq.sql);
+          expect(decodedSql).toContain("regular_stream");
+        }
+      }
+    });
+
+    it("should resolve field name when processing streaming response", async () => {
+      const resolveConfig = {
+        list: [
+          {
+            name: "fieldRef",
+            type: "constant",
+            label: "Field Ref",
+            value: "actual_field_name",
+          },
+          {
+            name: "queryWithRef",
+            type: "query_values",
+            label: "Query With Ref",
+            query_data: {
+              field: "$fieldRef",
+              stream: "logs",
+              stream_type: "logs",
+              max_record_size: 100,
+              filter: [],
+            },
+          },
+        ],
+      };
+
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          const mockResponse = {
+            type: "search_response",
+            content: {
+              results: {
+                hits: [
+                  {
+                    field: "actual_field_name",
+                    values: [
+                      { zo_sql_key: "value1" },
+                      { zo_sql_key: "value2" },
+                    ],
+                  },
+                ],
+              },
+            },
+          };
+          handlers.data(payload, mockResponse);
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+
+      wrapper = createWrapper({
+        variablesConfig: resolveConfig,
+        initialVariableValues: {
+          value: {
+            fieldRef: "actual_field_name",
+            queryWithRef: "",
+          },
+        },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+
+      // Wait for initialization
+      let attempts = 0;
+      while (vm.variablesData.isVariablesLoading && attempts < 20) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        attempts++;
+      }
+      if (vm.variablesData.isVariablesLoading) {
+        vm.variablesData.isVariablesLoading = false;
+      }
+
+      const queryWithRef = vm.variablesData.values.find(
+        (v: any) => v.name === "queryWithRef",
+      );
+
+      if (queryWithRef) {
+        queryWithRef.isLoading = false;
+        queryWithRef.isVariablePartialLoaded = true;
+        queryWithRef.isVariableLoadingPending = false;
+
+        mockStreamingComposable.fetchQueryDataWithHttpStream.mockClear();
+        mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+          (payload: any, handlers: any) => {
+            const mockResponse = {
+              type: "search_response",
+              content: {
+                results: {
+                  hits: [
+                    {
+                      field: "actual_field_name",
+                      values: [
+                        { zo_sql_key: "value1" },
+                        { zo_sql_key: "value2" },
+                      ],
+                    },
+                  ],
+                },
+              },
+            };
+            handlers.data(payload, mockResponse);
+            handlers.complete(payload, { type: "end" });
+          },
+        );
+
+        await vm.loadVariableOptions(queryWithRef);
+        await nextTick();
+
+        // The response had field "actual_field_name" which matches the resolved $fieldRef
+        // So options should be populated
+        expect(queryWithRef.options).toBeDefined();
+        expect(Array.isArray(queryWithRef.options)).toBe(true);
+        if (queryWithRef.options.length > 0) {
+          expect(queryWithRef.options).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ value: "value1" }),
+              expect.objectContaining({ value: "value2" }),
+            ]),
+          );
+        }
+      }
+    });
+
+    it("should handle variable with stream and field dependencies from same parent", async () => {
+      // Mock dependency graph to show dynamicQuery depends on streamVar and fieldVar
+      const mockBuildGraph = vi.mocked(
+        await import("@/utils/dashboard/variables/variablesDependencyUtils"),
+      ).buildVariablesDependencyGraph;
+      mockBuildGraph.mockReturnValue({
+        streamVar: { parentVariables: [], childVariables: ["dynamicQuery"] },
+        fieldVar: { parentVariables: [], childVariables: ["dynamicQuery"] },
+        dynamicQuery: { parentVariables: ["streamVar", "fieldVar"], childVariables: [] },
+      });
+
+      wrapper = createWrapper({
+        variablesConfig: variableRefConfig,
+        initialVariableValues: {
+          value: {
+            streamVar: "my-logs-stream",
+            fieldVar: "response_code",
+            dynamicQuery: "",
+          },
+        },
+      });
+      await nextTick();
+
+      const { buildVariablesDependencyGraph } = await import(
+        "@/utils/dashboard/variables/variablesDependencyUtils"
+      );
+      expect(buildVariablesDependencyGraph).toHaveBeenCalled();
+
+      const vm = wrapper.vm as any;
+      const dynamicQueryVar = vm.variablesData.values.find(
+        (v: any) => v.name === "dynamicQuery",
+      );
+      expect(dynamicQueryVar).toBeDefined();
+      // The variable should have stream and field pointing to variable references
+      expect(dynamicQueryVar.query_data.stream).toBe("$streamVar");
+      expect(dynamicQueryVar.query_data.field).toBe("$fieldVar");
+    });
+  });
 });

@@ -593,4 +593,68 @@ describe("CommonAutoComplete", () => {
       expect(mockFilterFn).toHaveBeenCalledWith("");
     });
   });
+
+  describe("Select Event Emission", () => {
+    it("should emit select event when option is selected", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.showOptions = true;
+      await wrapper.vm.$nextTick();
+
+      const option = wrapper.find(".option");
+      await option.trigger("mousedown");
+
+      expect(wrapper.emitted("select")).toBeTruthy();
+      expect(wrapper.emitted("select")[0]).toEqual([mockFilteredOptions[0].value]);
+    });
+
+    it("should emit both update:modelValue and select events on selection", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.showOptions = true;
+      await wrapper.vm.$nextTick();
+
+      const option = wrapper.find(".option");
+      await option.trigger("mousedown");
+
+      // Both events should be emitted
+      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+      expect(wrapper.emitted("select")).toBeTruthy();
+
+      // Both should have the same value
+      expect(wrapper.emitted("update:modelValue")[0]).toEqual(wrapper.emitted("select")[0]);
+    });
+
+    it("should emit select event with valueReplaceFn applied", async () => {
+      const customFn = vi.fn((value) => `processed_${value}`);
+      wrapper = createWrapper({ valueReplaceFn: customFn });
+      wrapper.vm.showOptions = true;
+      await wrapper.vm.$nextTick();
+
+      const option = wrapper.find(".option");
+      await option.trigger("mousedown");
+
+      expect(wrapper.emitted("select")).toBeTruthy();
+      expect(wrapper.emitted("select")[0]).toEqual([`processed_${mockFilteredOptions[0].value}`]);
+    });
+
+    it("should emit select event when selectOption is called directly", () => {
+      wrapper = createWrapper();
+      const testOption = { label: "Test", value: "test-value" };
+
+      wrapper.vm.selectOption(testOption);
+
+      expect(wrapper.emitted("select")).toBeTruthy();
+      expect(wrapper.emitted("select")[0]).toEqual(["test-value"]);
+    });
+
+    it("should emit select event with undefined when option has no value", () => {
+      wrapper = createWrapper();
+      const optionWithUndefined = { label: "Test", value: undefined };
+
+      wrapper.vm.selectOption(optionWithUndefined);
+
+      expect(wrapper.emitted("select")).toBeTruthy();
+      // The valueReplaceFn default is identity, so undefined passes through
+      expect(wrapper.emitted("select")[0]).toEqual([undefined]);
+    });
+  });
 });

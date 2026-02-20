@@ -14,9 +14,10 @@ import testLogger from './test-logger.js';
  * @returns {Promise<Object>} - {success, actualCount, calls, timedOut}
  */
 export async function monitorVariableAPICalls(page, options = {}) {
-  const { expectedCount = 1, timeout = 15000 } = options;
+  const { expectedCount = 1, timeout = 15000, matchFn = null } = options;
   const startTime = Date.now();
   const apiCalls = [];
+  let matchedCount = 0;
 
   return new Promise((resolve) => {
     const responseHandler = async (response) => {
@@ -27,9 +28,36 @@ export async function monitorVariableAPICalls(page, options = {}) {
           const body = await response.text();
           const status = response.status();
 
+          // Extract stream and field from URL:
+          // /api/{org}/{stream_name}/_values_stream?fields={field}&type={type}
+          const streamMatch = url.match(/\/api\/[^/]+\/([^/]+)\/_values_stream/);
+          const fieldsMatch = url.match(/[?&]fields=([^&]+)/);
+          let stream = streamMatch ? decodeURIComponent(streamMatch[1]) : null;
+          let field = fieldsMatch ? decodeURIComponent(fieldsMatch[1]) : null;
+
+          // Also try to extract stream and field from POST request body
+          let requestBody = null;
+          try {
+            const postData = response.request().postData();
+            if (postData) {
+              requestBody = JSON.parse(postData);
+              if (!stream && requestBody.stream_name) {
+                stream = requestBody.stream_name;
+              }
+              if (!field && requestBody.fields && requestBody.fields.length > 0) {
+                field = requestBody.fields.join(',');
+              }
+            }
+          } catch (_e) {
+            // POST body might not be JSON, ignore
+          }
+
           const callInfo = {
             url,
             status,
+            stream,
+            field,
+            requestBody,
             timestamp: Date.now(),
             duration: Date.now() - startTime,
             completed: body.includes('[[DONE]]') || body.includes('"type":"end"'),
@@ -38,17 +66,24 @@ export async function monitorVariableAPICalls(page, options = {}) {
 
           apiCalls.push(callInfo);
 
-          testLogger.info(`Variable API call ${apiCalls.length}/${expectedCount}: ${status} - ${callInfo.completed ? 'Completed' : 'Incomplete'}`);
+          // If a matchFn is provided, only count calls that match
+          const matches = matchFn ? matchFn(callInfo) : true;
 
-          if (callInfo.completed && apiCalls.length >= expectedCount) {
-            page.off('response', responseHandler);
-            resolve({
-              success: true,
-              actualCount: apiCalls.length,
-              calls: apiCalls,
-              timedOut: false,
-              totalDuration: Date.now() - startTime
-            });
+          testLogger.info(`Variable API call ${apiCalls.length} (matched=${matchedCount}/${expectedCount}): ${status} stream=${stream} field=${field} matches=${matches} - ${callInfo.completed ? 'Completed' : 'Incomplete'}`);
+
+          if (callInfo.completed && matches) {
+            matchedCount++;
+            if (matchedCount >= expectedCount) {
+              page.off('response', responseHandler);
+              resolve({
+                success: true,
+                actualCount: apiCalls.length,
+                matchedCount,
+                calls: apiCalls,
+                timedOut: false,
+                totalDuration: Date.now() - startTime
+              });
+            }
           }
         } catch (error) {
           testLogger.debug(`Error reading response body: ${error.message}`);
@@ -60,10 +95,11 @@ export async function monitorVariableAPICalls(page, options = {}) {
 
     setTimeout(() => {
       page.off('response', responseHandler);
-      testLogger.warn(`Variable API monitoring timed out: ${apiCalls.length}/${expectedCount} calls completed`);
+      testLogger.warn(`Variable API monitoring timed out: ${apiCalls.length} calls, ${matchedCount}/${expectedCount} matched`);
       resolve({
-        success: apiCalls.length >= expectedCount,
+        success: matchedCount >= expectedCount,
         actualCount: apiCalls.length,
+        matchedCount,
         calls: apiCalls,
         timedOut: true,
         totalDuration: timeout

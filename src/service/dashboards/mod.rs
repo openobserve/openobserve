@@ -253,6 +253,12 @@ macro_rules! _get_variables {
         if let Some(vars) = &$dash.variables {
             for v in vars.list.iter() {
                 if let Some(ref qd) = v.query_data {
+                    // FE uses $ to reference variables,
+                    // stream name itself can come from variable
+                    // so we skip it if it starts with $
+                    if qd.stream.starts_with("$") {
+                        continue;
+                    }
                     $map.entry((qd.stream.clone(), qd.stream_type))
                         .or_default()
                         .push(qd.field.clone());

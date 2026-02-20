@@ -6,6 +6,7 @@ const {
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-variables-scoped";
+import { selectStreamFromDropdown, selectFieldFromDropdown, selectStreamType } from "../../pages/dashboardPages/dashboard-stream-field-utils.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 const { safeWaitForHidden, safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
 const {
@@ -130,21 +131,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
     await page.getByRole("option", { name: "Selected Tabs", exact: true }).click();
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
-    await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
-
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
-    await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_container_name");
-    // Wait for options to load
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
+    // Select stream and field using shared utilities
+    await selectStreamType(page, "logs");
+    await selectStreamFromDropdown(page, "e2e_automate");
+    await selectFieldFromDropdown(page, "kubernetes_container_name");
 
     // Check dependency dropdown via filter - should NOT show panel variables
     // Add filter to check available dependency options
@@ -244,21 +234,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab2$/ }).waitFor({ state: "visible" });
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab2$/ }).click();
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
-    await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
-
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
-    await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_container_name");
-    // Wait for options to load
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
+    // Select stream and field using shared utilities
+    await selectStreamType(page, "logs");
+    await selectStreamFromDropdown(page, "e2e_automate");
+    await selectFieldFromDropdown(page, "kubernetes_container_name");
 
     // Check dependency dropdown via filter - should NOT show Tab1's variable
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();
@@ -412,21 +391,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel1$/ }).waitFor({ state: "visible" });
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel1$/ }).click();
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
-    await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
-
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
-    await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_pod_name");
-    // Wait for options to load
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
+    // Select stream and field using shared utilities
+    await selectStreamType(page, "logs");
+    await selectStreamFromDropdown(page, "e2e_automate");
+    await selectFieldFromDropdown(page, "kubernetes_pod_name");
 
     // Check dependency dropdown via filter - should show both global and tab variables
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();
@@ -532,21 +500,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel2$/ }).waitFor({ state: "visible" });
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel2$/ }).click();
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
-    await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
-
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
-    await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_pod_name");
-    // Wait for options to load
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
+    // Select stream and field using shared utilities
+    await selectStreamType(page, "logs");
+    await selectStreamFromDropdown(page, "e2e_automate");
+    await selectFieldFromDropdown(page, "kubernetes_pod_name");
 
     // Check dependency dropdown via filter - should NOT show Panel1's variable
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();
