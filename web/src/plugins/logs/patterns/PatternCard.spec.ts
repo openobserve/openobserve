@@ -114,7 +114,8 @@ describe("PatternCard", () => {
         '[data-test="pattern-card-0-anomaly-badge"]',
       );
       expect(anomalyBadge.exists()).toBe(true);
-      expect(anomalyBadge.text()).toContain("ANOMALY");
+      // The badge now shows only the warning icon, not the text
+      expect(anomalyBadge.text()).toContain("⚠️");
     });
 
     it("should not display anomaly badge when pattern is not an anomaly", () => {
@@ -122,6 +123,12 @@ describe("PatternCard", () => {
         '[data-test="pattern-card-0-anomaly-badge"]',
       );
       expect(anomalyBadge.exists()).toBe(false);
+    });
+
+    it("should display -- indicator for non-anomaly patterns", () => {
+      const noAnomaly = wrapper.find('[data-test="pattern-card-0-no-anomaly"]');
+      expect(noAnomaly.exists()).toBe(true);
+      expect(noAnomaly.text()).toBe("--");
     });
   });
 
