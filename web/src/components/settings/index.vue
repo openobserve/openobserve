@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </q-route-tab>
                 <q-route-tab
-                  v-if="config.isEnterprise == 'true'"
+                  v-if="config.isEnterprise == 'true' && store.state.zoConfig.service_streams_enabled !== false"
                   data-test="correlation-settings-tab"
                   name="correlation_settings"
                   :to="{
