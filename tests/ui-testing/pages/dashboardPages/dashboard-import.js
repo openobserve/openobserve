@@ -12,10 +12,7 @@ export default class DashboardImport {
   async clickImportDashboard() {
     await this.importButton.waitFor({ state: "visible", timeout: 15000 });
     await this.importButton.click();
-    // Import button is now a dropdown — click the "Custom" option
-    const customOption = this.page.locator('[data-test="dashboard-import-custom"]');
-    await customOption.waitFor({ state: "visible", timeout: 10000 });
-    await customOption.click();
+    // In v0.40.0, import button navigates directly to import page (no dropdown)
     await this.page.locator('[data-test="tab-import_json_file"]').waitFor({ state: "visible", timeout: 10000 });
     await this.inputFile.waitFor({ state: "attached", timeout: 10000 });
   }
