@@ -490,7 +490,9 @@ mod meta_table_reports {
         pub created_at: DateTime<FixedOffset>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub updated_at: Option<DateTime<FixedOffset>>,
+        #[serde(default)]
         pub owner: String,
+        #[serde(default)]
         pub last_edited_by: String,
     }
 

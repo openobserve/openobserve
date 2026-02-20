@@ -31,6 +31,7 @@ use config::meta::{cluster::Node, self_reporting::usage};
 pub struct Organization {
     #[serde(default)]
     pub identifier: String,
+    #[serde(alias = "label")]
     pub name: String,
     #[serde(default)]
     pub org_type: String,
