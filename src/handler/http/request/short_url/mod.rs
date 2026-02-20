@@ -52,7 +52,8 @@ use crate::{
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "ShortUrl", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "ShortUrl", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
     tag = "Short Url"
 )]
@@ -101,7 +102,8 @@ pub struct RetrieveQuery {
         (status = 404, description = "Short URL not found", content_type = "text/plain")
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "ShortUrl", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "ShortUrl", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
     tag = "Short Url"
 )]

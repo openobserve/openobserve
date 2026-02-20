@@ -67,6 +67,7 @@ pub fn get_cors() -> Rc<Cors> {
             header::ACCEPT,
             header::CONTENT_TYPE,
             header::HeaderName::from_lowercase(b"traceparent").unwrap(),
+            header::HeaderName::from_lowercase(b"x-o2-assistant-session-id").unwrap(),
         ])
         .allow_any_origin()
         .supports_credentials()
