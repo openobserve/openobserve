@@ -65,6 +65,9 @@ const mockStore = createStore({
       name: 'Test Organization',
     },
     theme: 'light',
+    zoConfig: {
+      service_streams_enabled: true,
+    },
   },
   mutations: {
     updateState(state, newState) {
@@ -112,7 +115,7 @@ describe('SettingsIndex.vue', () => {
     globalMockNotify.mockClear();
     mockPush.mockClear();
     mockRouter.currentRoute.value.name = 'settings';
-    
+
     // Reset store state using replaceState
     mockStore.replaceState({
       selectedOrganization: {
@@ -120,6 +123,9 @@ describe('SettingsIndex.vue', () => {
         name: 'Test Organization',
       },
       theme: 'light',
+      zoConfig: {
+        service_streams_enabled: true,
+      },
     });
   });
 
@@ -137,9 +143,12 @@ describe('SettingsIndex.vue', () => {
         name: 'Test Organization',
       },
       theme: 'light',
+      zoConfig: {
+        service_streams_enabled: true,
+      },
       ...storeOverrides,
     };
-    
+
     mockStore.replaceState(storeState);
 
     const component = mount(SettingsIndex, {
@@ -153,6 +162,18 @@ describe('SettingsIndex.vue', () => {
           'q-route-tab': {
             template: '<div>{{ label }}</div>',
             props: ['to', 'name', 'icon', 'label'],
+          },
+          'q-splitter': {
+            template: '<div><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
+            props: ['modelValue', 'limits', 'unit'],
+          },
+          'q-tabs': {
+            template: '<div><slot></slot></div>',
+            props: ['modelValue'],
+          },
+          'q-btn': {
+            template: '<button @click="$emit(\'click\')"><slot></slot></button>',
+            props: ['icon', 'title', 'class', 'color', 'size', 'dense', 'round'],
           },
         },
       },
