@@ -990,17 +990,13 @@ class="q-pr-sm q-pt-xs" />
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
-                :class="
-                  config.isEnterprise == 'true'
-                    ? 'search-button-enterprise-border-radius'
-                    : 'search-button-normal-border-radius'
-                "
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
               <!-- Main action button: "Ask AI" when NL detected + AI bar not open, otherwise "Run Query" -->
               <q-btn
+                  v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
                   dense
                   flat
@@ -1020,8 +1016,9 @@ class="q-pr-sm q-pt-xs" />
                   {{ (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t("search.generateQuery") : t("search.runQuery") }}
                 </q-btn
                 >
-              <q-separator class="tw:h-[29px] tw:w-[1px]" />
+              <q-separator v-if="visualizeSearchRequestTraceIds.length === 0" class="tw:h-[29px] tw:w-[1px]" />
               <q-btn-dropdown
+                v-if="visualizeSearchRequestTraceIds.length === 0"
                 flat
                 class="tw:h-[29px] search-button-dropdown"
                 :class="[
