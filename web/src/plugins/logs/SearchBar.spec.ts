@@ -3580,11 +3580,17 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           tempFunctionContent: ".parsed = parse_json!(.message)",
           transformType: "function",
           query: "SELECT * FROM logs",
+          queryResults: {
+            hits: [],
+          },
         },
         meta: {
           logsVisualizeToggle: "logs",
           functionEditorPlaceholderFlag: true,
           showTransformEditor: true,
+          resultGrid: {
+            showPagination: true,
+          },
         },
       },
       dashboardPanelData: {
