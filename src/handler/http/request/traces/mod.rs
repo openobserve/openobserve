@@ -754,7 +754,7 @@ pub async fn get_latest_traces_stream(
             .nth(1)
             .and_then(|s| s.split('&').next())
             .and_then(|s| s.split(' ').next())
-            .map(|s| s.replace('\'', "").replace('"', ""))
+            .map(|s| s.replace(['\'', '"'], ""))
             .filter(|s| !s.is_empty());
         if let Some(tid) = tid {
             config::ider::get_start_time_from_trace_id(&tid).unwrap_or(0)
