@@ -3781,6 +3781,22 @@ export class LogsPage {
         return await this.page.locator(`${this.logsTable} tbody tr`).count();
     }
 
+    /**
+     * Get log table row texts as an array (one string per row)
+     * @param {number} limit - Maximum number of rows to return
+     * @returns {Promise<string[]>} Array of row text content
+     */
+    async getLogsTableRowTexts(limit = 10) {
+        const rows = this.page.locator(`${this.logsTable} tbody tr`);
+        const count = Math.min(await rows.count(), limit);
+        const texts = [];
+        for (let i = 0; i < count; i++) {
+            const text = await rows.nth(i).textContent();
+            if (text) texts.push(text.trim());
+        }
+        return texts;
+    }
+
     // ============================================================================
     // Stream display methods for multi-stream scenarios
     // ============================================================================

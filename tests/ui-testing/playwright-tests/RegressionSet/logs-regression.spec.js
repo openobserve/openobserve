@@ -1221,10 +1221,10 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(3000);
 
-    // Capture initial logs state (first few log entries)
+    // Capture initial logs state (first N row texts as array)
     await pm.logsPage.waitForLogsTable(10000);
-    const initialLogsContent = await pm.logsPage.getLogsTableContent();
-    testLogger.info(`Initial logs content length: ${initialLogsContent?.length || 0}`);
+    const initialRowTexts = await pm.logsPage.getLogsTableRowTexts(5);
+    testLogger.info(`Initial rows captured: ${initialRowTexts.length}`);
 
     // Store initial row count
     const initialRowCount = await pm.logsPage.getLogRowCount();
@@ -1250,29 +1250,24 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.expectLogsTableVisible();
     testLogger.info('✓ Logs table remains visible after query inspector interaction');
 
-    // PRIMARY ASSERTION 2: Table content should not be mutated by query inspector
-    // Capture final content and compare actual row data (not just counts)
-    const finalLogsContent = await pm.logsPage.getLogsTableContent();
-    expect(finalLogsContent, 'Logs table content should not be empty after query inspector interaction').toBeTruthy();
+    // PRIMARY ASSERTION 2: Compare same-index rows to detect mutation
+    const finalRowTexts = await pm.logsPage.getLogsTableRowTexts(5);
+    expect(finalRowTexts.length, 'Logs table should have rows after query inspector').toBeGreaterThan(0);
 
-    // Compare first N rows to detect mutation (streaming may add new rows at top/bottom,
-    // but original rows should remain in the same order with same content)
-    const rowsToCompare = Math.min(5, initialLogsContent?.length || 0, finalLogsContent?.length || 0);
-    if (rowsToCompare > 0 && initialLogsContent && finalLogsContent) {
-      // Find if initial rows exist in final content (order may shift due to streaming)
-      const initialFirstRows = initialLogsContent.slice(0, rowsToCompare);
-      let matchedRows = 0;
-      for (const initialRow of initialFirstRows) {
-        if (finalLogsContent.some(finalRow => finalRow === initialRow)) {
-          matchedRows++;
-        }
+    // Compare same-index rows to detect reordering or content mutation
+    const rowsToCompare = Math.min(initialRowTexts.length, finalRowTexts.length);
+    let sameIndexMatches = 0;
+    for (let i = 0; i < rowsToCompare; i++) {
+      if (initialRowTexts[i] === finalRowTexts[i]) {
+        sameIndexMatches++;
       }
-      // At least some original rows should still be present
-      expect(matchedRows, `Original log rows were mutated/lost. Found ${matchedRows}/${rowsToCompare} matching rows`).toBeGreaterThan(0);
-      testLogger.info(`✓ Content integrity check: ${matchedRows}/${rowsToCompare} initial rows found in final content`);
     }
+    // Most rows at same index should match (some tolerance for streaming)
+    const matchRatio = sameIndexMatches / rowsToCompare;
+    expect(matchRatio, `Row content was mutated. Only ${sameIndexMatches}/${rowsToCompare} rows match at same index`).toBeGreaterThanOrEqual(0.5);
+    testLogger.info(`✓ Content integrity: ${sameIndexMatches}/${rowsToCompare} rows match at same index (${Math.round(matchRatio * 100)}%)`);
 
-    // Also verify row count didn't decrease significantly
+    // Also verify row count didn't decrease
     const finalRowCount = await pm.logsPage.getLogRowCount();
     expect(finalRowCount).toBeGreaterThanOrEqual(initialRowCount);
     testLogger.info(`✓ Row count preserved: initial=${initialRowCount}, final=${finalRowCount}`);
@@ -1447,14 +1442,14 @@ test.describe("Logs Regression Bugs", () => {
     const isPanelVisible = await pm.logsPage.isLogDetailPanelVisible();
     testLogger.info(`Log detail panel visible: ${isPanelVisible}`);
 
-    // Capture the last row's visual state WHILE highlighted (BEFORE closing)
-    // This is the baseline state we expect to be preserved when expanding a different row
-    const lastRowClasses = await lastRow.getAttribute('class') || '';
-    testLogger.info(`Last row baseline state (while highlighted) - classes: ${lastRowClasses}`);
-
     // Close the detail panel
     await pm.logsPage.pressEscapeToCloseDialog();
     await page.waitForTimeout(500);
+
+    // Capture the last row's visual state AFTER closing (closed-but-still-highlighted state)
+    // This is the persistent highlight state we expect to survive when expanding a different row
+    const lastRowClasses = await lastRow.getAttribute('class') || '';
+    testLogger.info(`Last row baseline state (closed but highlighted) - classes: ${lastRowClasses}`);
 
     // Now expand first row again - this is when the bug would cause last row to lose highlighting
     const firstRowExpandMenu = pm.logsPage.getFirstRowExpandMenu();
