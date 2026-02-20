@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 
 use axum::{
     Router,
@@ -941,6 +941,15 @@ pub fn other_service_routes() -> Router {
         .nest("/rum", rum_routes)
 }
 
+#[inline]
+fn wrap_into_base_uri(base_uri: &str, router: Router) -> Router {
+    if base_uri.is_empty() || base_uri == "/" {
+        router
+    } else {
+        Router::new().nest(base_uri, router)
+    }
+}
+
 /// Create the full application router
 pub fn create_app_router() -> Router {
     let cfg = get_config();
@@ -965,17 +974,7 @@ pub fn create_app_router() -> Router {
             );
         }
 
-        let router_routes = router_routes;
-
-        // Apply base_uri if configured
-        let router_routes = if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
-            router_routes
-        } else {
-            Router::new().nest(&cfg.common.base_uri, router_routes)
-        };
-
-        // basic_routes are at root level (not under base_uri)
-        Router::new().merge(basic_routes()).merge(router_routes)
+        router_routes
     } else {
         // Non-router node: use direct service routes
         Router::new()
@@ -988,17 +987,29 @@ pub fn create_app_router() -> Router {
 
     // Add UI routes at app level (outside basic_routes to avoid any middleware conflicts)
     if cfg.common.ui_enabled {
+        // If you want absolute path, then prepend it with base_uri
+        let base_uri = cfg.common.base_uri.trim_matches('/');
+        let web_path = if base_uri.is_empty() {
+            Cow::Borrowed("/web/")
+        } else {
+            format!("/{}/web/", base_uri).into()
+        };
         app = app
             .route(
                 "/",
-                get(|| async { axum::response::Redirect::permanent("/web/") }),
+                get(move || core::future::ready(axum::response::Redirect::permanent(&web_path))),
             )
             .nest_service("/web", ui::ui_routes());
     }
 
-    // Set request body size limit (equivalent to actix-web's PayloadConfig)
-    app = app
+    // Apply base_uri if configured (should be last step after we configured all routes)
+    app = Router::new()
+        // We ensure basic routes like auth and health check are always available under root path
+        // too in case user need access behind proxy
+        .merge(basic_routes())
+        .merge(wrap_into_base_uri(&cfg.common.base_uri, app))
         .layer(cors_layer())
+        // Set request body size limit (equivalent to actix-web's PayloadConfig)
         .layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
 
     app
@@ -1029,5 +1040,33 @@ mod tests {
             response.status() == StatusCode::INTERNAL_SERVER_ERROR
                 || response.status() == StatusCode::NOT_FOUND
         );
+    }
+
+    #[tokio::test]
+    async fn test_wrap_empty_base_uri() {
+        let app = wrap_into_base_uri("/", basic_routes());
+
+        let req = Request::builder()
+            .method(http::Method::GET)
+            .uri("/healthz")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert!(response.status() == StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_wrap_with_base_uri() {
+        let app = wrap_into_base_uri("/base", basic_routes());
+
+        let req = Request::builder()
+            .method(http::Method::GET)
+            .uri("/base/healthz")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert!(response.status() == StatusCode::OK);
     }
 }
