@@ -44,7 +44,16 @@ describe("SelectDashboardDropdown", () => {
           identifier: "org123",
         },
         organizationData: {
-          folders: [],
+          folders: [
+            {
+              folderId: "folder1",
+              name: "Test Folder",
+            },
+            {
+              folderId: "default",
+              name: "Default Folder",
+            },
+          ],
         },
       },
     });

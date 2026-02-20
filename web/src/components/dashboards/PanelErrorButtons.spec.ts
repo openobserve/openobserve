@@ -13,21 +13,43 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import PanelErrorButtons from "./PanelErrorButtons.vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
+import { createStore } from "vuex";
 
 installQuasar();
 
+// Create a mock Vuex store with timezone state
+const mockStore = createStore({
+  state: {
+    timezone: "UTC",
+  },
+  mutations: {},
+  actions: {},
+});
+
 describe("PanelErrorButtons", () => {
+  // Helper function to mount component with store
+  const mountComponent = (options = {}) => {
+    return mount(PanelErrorButtons, {
+      global: {
+        provide: {
+          store: mockStore,
+        },
+      },
+      ...options,
+    });
+  };
+
   it("should render the component", () => {
-    const wrapper = mount(PanelErrorButtons);
+    const wrapper = mountComponent();
     expect(wrapper.exists()).toBe(true);
   });
 
   it("should display error button when error prop is provided", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         error: "Sample error message",
       },
@@ -38,7 +60,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should not display error button when no error prop is provided", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         error: "",
       },
@@ -49,7 +71,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should display max query range warning button when provided", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         maxQueryRangeWarning: "Query range exceeds maximum",
       },
@@ -60,7 +82,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should display limit number of series warning button when provided", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         limitNumberOfSeriesWarningMessage: "Too many series",
       },
@@ -71,7 +93,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should display cached data warning button when flag is true", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         isCachedDataDifferWithCurrentTimeRange: true,
       },
@@ -82,7 +104,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should display partial data warning when isPartialData is true and not loading", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         isPartialData: true,
         isPanelLoading: false,
@@ -94,7 +116,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should not display partial data warning when isPanelLoading is true", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         isPartialData: true,
         isPanelLoading: true,
@@ -106,7 +128,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should display last refreshed time when provided and not in viewOnly mode", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         lastTriggeredAt: Date.now(),
         viewOnly: false,
@@ -118,7 +140,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should not display last refreshed time in viewOnly mode", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         lastTriggeredAt: Date.now(),
         viewOnly: true,
@@ -130,7 +152,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should not display last refreshed time in simplifiedPanelView mode", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         lastTriggeredAt: Date.now(),
         simplifiedPanelView: true,
@@ -142,7 +164,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should not display anything when no props are provided", () => {
-    const wrapper = mount(PanelErrorButtons);
+    const wrapper = mountComponent();
 
     expect(wrapper.find('[data-test="panel-error-data"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(false);
@@ -150,7 +172,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should display multiple warnings simultaneously", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         error: "Error message",
         maxQueryRangeWarning: "Range warning",
@@ -165,7 +187,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should accept null lastTriggeredAt", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         lastTriggeredAt: null,
       },
@@ -176,7 +198,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should accept string timestamp for lastTriggeredAt", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         lastTriggeredAt: "2024-01-01T00:00:00Z",
         viewOnly: false,
@@ -188,7 +210,7 @@ describe("PanelErrorButtons", () => {
   });
 
   it("should accept number timestamp for lastTriggeredAt", () => {
-    const wrapper = mount(PanelErrorButtons, {
+    const wrapper = mountComponent({
       props: {
         lastTriggeredAt: 1704067200000,
         viewOnly: false,

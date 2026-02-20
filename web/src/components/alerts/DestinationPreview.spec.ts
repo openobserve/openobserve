@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
 import DestinationPreview from "./DestinationPreview.vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
@@ -21,266 +21,203 @@ import i18n from "@/locales";
 installQuasar();
 
 describe("DestinationPreview", () => {
+  let wrapper: any;
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("should render the component", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
-        modelValue: true,
-        type: "slack",
-      },
+  afterEach(() => {
+    if (wrapper) {
+      wrapper.unmount();
+    }
+  });
+
+  // Helper function to mount component with proper dialog support
+  const mountComponent = async (props: any) => {
+    wrapper = mount(DestinationPreview, {
+      props,
       global: {
         plugins: [i18n],
       },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("should render the component", async () => {
+    await mountComponent({
+      modelValue: true,
+      type: "slack",
     });
 
     expect(wrapper.exists()).toBe(true);
   });
 
-  it("should render Slack preview when type is slack", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
-        modelValue: true,
-        type: "slack",
-      },
-      global: {
-        plugins: [i18n],
-      },
+  it("should render Slack preview when type is slack", async () => {
+    await mountComponent({
+      modelValue: true,
+      type: "slack",
     });
 
-    const slackPreview = wrapper.find('[data-test="slack-preview"]');
-    expect(slackPreview.exists()).toBe(true);
+    const slackPreview = document.querySelector('[data-test="slack-preview"]');
+    expect(slackPreview).toBeTruthy();
   });
 
-  it("should display Slack bot name", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
-        modelValue: true,
-        type: "slack",
-      },
-      global: {
-        plugins: [i18n],
-      },
+  it("should display Slack bot name", async () => {
+    await mountComponent({
+      modelValue: true,
+      type: "slack",
     });
 
-    const botName = wrapper.find('[data-test="slack-bot-name"]');
-    expect(botName.text()).toBe("OpenObserve Bot");
+    const botName = document.querySelector('[data-test="slack-bot-name"]');
+    expect(botName?.textContent).toBe("OpenObserve Bot");
   });
 
-  it("should display Slack message body", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
-        modelValue: true,
-        type: "slack",
-      },
-      global: {
-        plugins: [i18n],
-      },
+  it("should display Slack message body", async () => {
+    await mountComponent({
+      modelValue: true,
+      type: "slack",
     });
 
-    const messageBody = wrapper.find('[data-test="slack-message-body"]');
-    expect(messageBody.exists()).toBe(true);
+    const messageBody = document.querySelector('[data-test="slack-message-body"]');
+    expect(messageBody).toBeTruthy();
   });
 
-  it("should render MS Teams preview when type is msteams", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should render MS Teams preview when type is msteams", async () => {
+    await mountComponent({
         modelValue: true,
         type: "msteams",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const teamsPreview = wrapper.find('[data-test="msteams-preview"]');
-    expect(teamsPreview.exists()).toBe(true);
+    const teamsPreview = document.querySelector('[data-test="msteams-preview"]');
+    expect(teamsPreview).toBeTruthy();
   });
 
-  it("should display MS Teams card content", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should display MS Teams card content", async () => {
+    await mountComponent({
         modelValue: true,
         type: "msteams",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const cardContent = wrapper.find('[data-test="msteams-card-content"]');
-    expect(cardContent.exists()).toBe(true);
-    expect(cardContent.text()).toContain("Alert");
+    const cardContent = document.querySelector('[data-test="msteams-card-content"]');
+    expect(cardContent).toBeTruthy();
+    expect(cardContent?.textContent).toContain("Alert");
   });
 
-  it("should render Email preview when type is email", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should render Email preview when type is email", async () => {
+    await mountComponent({
         modelValue: true,
         type: "email",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const emailPreview = wrapper.find('[data-test="email-preview"]');
-    expect(emailPreview.exists()).toBe(true);
+    const emailPreview = document.querySelector('[data-test="email-preview"]');
+    expect(emailPreview).toBeTruthy();
   });
 
-  it("should display Email subject", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should display Email subject", async () => {
+    await mountComponent({
         modelValue: true,
         type: "email",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const subject = wrapper.find('[data-test="email-subject"]');
-    expect(subject.text()).toContain("OpenObserve Alert Notification");
+    const subject = document.querySelector('[data-test="email-subject"]');
+    expect(subject?.textContent).toContain("OpenObserve Alert Notification");
   });
 
-  it("should display Email from address", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should display Email from address", async () => {
+    await mountComponent({
         modelValue: true,
         type: "email",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const from = wrapper.find('[data-test="email-from"]');
-    expect(from.text()).toContain("alerts@openobserve.ai");
+    const from = document.querySelector('[data-test="email-from"]');
+    expect(from?.textContent).toContain("alerts@openobserve.ai");
   });
 
-  it("should display Email body", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should display Email body", async () => {
+    await mountComponent({
         modelValue: true,
         type: "email",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const body = wrapper.find('[data-test="email-body"]');
-    expect(body.exists()).toBe(true);
+    const body = document.querySelector('[data-test="email-body"]');
+    expect(body).toBeTruthy();
   });
 
-  it("should render PagerDuty preview when type is pagerduty", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should render PagerDuty preview when type is pagerduty", async () => {
+    await mountComponent({
         modelValue: true,
         type: "pagerduty",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const pagerdutyPreview = wrapper.find('[data-test="pagerduty-preview"]');
-    expect(pagerdutyPreview.exists()).toBe(true);
+    const pagerdutyPreview = document.querySelector('[data-test="pagerduty-preview"]');
+    expect(pagerdutyPreview).toBeTruthy();
   });
 
-  it("should render ServiceNow preview when type is servicenow", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should render ServiceNow preview when type is servicenow", async () => {
+    await mountComponent({
         modelValue: true,
         type: "servicenow",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const servicenowPreview = wrapper.find('[data-test="servicenow-preview"]');
-    expect(servicenowPreview.exists()).toBe(true);
+    const servicenowPreview = document.querySelector('[data-test="servicenow-preview"]');
+    expect(servicenowPreview).toBeTruthy();
   });
 
-  it("should render Opsgenie preview when type is opsgenie", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should render Opsgenie preview when type is opsgenie", async () => {
+    await mountComponent({
         modelValue: true,
         type: "opsgenie",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const opsgeniePreview = wrapper.find('[data-test="opsgenie-preview"]');
-    expect(opsgeniePreview.exists()).toBe(true);
+    const opsgeniePreview = document.querySelector('[data-test="opsgenie-preview"]');
+    expect(opsgeniePreview).toBeTruthy();
   });
 
   it("should emit update:modelValue when close button is clicked", async () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+    await mountComponent({
         modelValue: true,
         type: "slack",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const closeBtn = wrapper.find('[data-test="preview-close-button"]');
-    await closeBtn.trigger("click");
+    const closeBtn = document.querySelector('[data-test="preview-close-button"]') as HTMLElement;
+    closeBtn?.click();
+    await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
     expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([false]);
   });
 
-  it("should display correct destination type name for slack", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should display correct destination type name for slack", async () => {
+    await mountComponent({
         modelValue: true,
         type: "slack",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const title = wrapper.find('[data-test="preview-title"]');
-    expect(title.text()).toContain("Slack");
+    const title = document.querySelector('[data-test="preview-title"]');
+    expect(title?.textContent).toContain("Slack");
   });
 
-  it("should display correct destination type name for msteams", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should display correct destination type name for msteams", async () => {
+    await mountComponent({
         modelValue: true,
         type: "msteams",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const title = wrapper.find('[data-test="preview-title"]');
-    expect(title.text()).toContain("Microsoft Teams");
+    const title = document.querySelector('[data-test="preview-title"]');
+    expect(title?.textContent).toContain("Microsoft Teams");
   });
 
-  it("should display correct destination type name for email", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should display correct destination type name for email", async () => {
+    await mountComponent({
         modelValue: true,
         type: "email",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const title = wrapper.find('[data-test="preview-title"]');
-    expect(title.text()).toContain("Email");
+    const title = document.querySelector('[data-test="preview-title"]');
+    expect(title?.textContent).toContain("Email");
   });
 
   it("should handle copy template action", async () => {
@@ -291,15 +228,10 @@ describe("DestinationPreview", () => {
       },
     });
 
-    const wrapper = mount(DestinationPreview, {
-      props: {
+    await mountComponent({
         modelValue: true,
         type: "slack",
         templateContent: "Test template content",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     await wrapper.vm.copyTemplate();
@@ -307,15 +239,10 @@ describe("DestinationPreview", () => {
     expect(mockWriteText).toHaveBeenCalledWith("Test template content");
   });
 
-  it("should display current time", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should display current time", async () => {
+    await mountComponent({
         modelValue: true,
         type: "slack",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     const time = wrapper.vm.getCurrentTime();
@@ -323,15 +250,10 @@ describe("DestinationPreview", () => {
     expect(typeof time).toBe("string");
   });
 
-  it("should get correct destination type name", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should get correct destination type name", async () => {
+    await mountComponent({
         modelValue: true,
         type: "slack",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     expect(wrapper.vm.getDestinationTypeName("slack")).toBe("Slack");
@@ -343,47 +265,32 @@ describe("DestinationPreview", () => {
     expect(wrapper.vm.getDestinationTypeName("unknown")).toBe("unknown");
   });
 
-  it("should render copy template button", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should render copy template button", async () => {
+    await mountComponent({
         modelValue: true,
         type: "slack",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
-    const copyBtn = wrapper.find('[data-test="preview-copy-button"]');
-    expect(copyBtn.exists()).toBe(true);
-    expect(copyBtn.text()).toContain("Copy Template");
+    const copyBtn = document.querySelector('[data-test="preview-copy-button"]');
+    expect(copyBtn).toBeTruthy();
+    expect(copyBtn?.textContent).toContain("Copy Template");
   });
 
-  it("should not render preview when modelValue is false", () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+  it("should not render preview when modelValue is false", async () => {
+    await mountComponent({
         modelValue: false,
         type: "slack",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     // When modelValue is false, q-dialog doesn't render content
-    const card = wrapper.find('[data-test="destination-preview-card"]');
-    expect(card.exists()).toBe(false);
+    const card = document.querySelector('[data-test="destination-preview-card"]');
+    expect(card).toBeNull();
   });
 
   it("should update isOpen when modelValue changes", async () => {
-    const wrapper = mount(DestinationPreview, {
-      props: {
+    await mountComponent({
         modelValue: false,
         type: "slack",
-      },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     expect(wrapper.vm.isOpen).toBe(false);
