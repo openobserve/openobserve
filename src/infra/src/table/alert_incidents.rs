@@ -560,7 +560,10 @@ pub async fn upgrade_incident_correlation(
 /// Auto-resolve stale incidents that haven't received new alerts
 ///
 /// Returns the number of incidents resolved
-pub async fn auto_resolve_stale(stale_threshold_micros: i64) -> Result<u64, errors::Error> {
+/// Returns (count, Vec<(org_id, incident_id)>) of resolved incidents
+pub async fn auto_resolve_stale(
+    stale_threshold_micros: i64,
+) -> Result<(u64, Vec<(String, String)>), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
     let cutoff = now - stale_threshold_micros;
@@ -574,8 +577,11 @@ pub async fn auto_resolve_stale(stale_threshold_micros: i64) -> Result<u64, erro
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     let count = stale_incidents.len() as u64;
+    let mut resolved_ids = Vec::with_capacity(stale_incidents.len());
 
     for incident in stale_incidents {
+        let org_id = incident.org_id.clone();
+        let incident_id = incident.id.clone();
         let mut active: alert_incidents::ActiveModel = incident.into();
         active.status = Set("resolved".to_string());
         active.resolved_at = Set(Some(now));
@@ -583,10 +589,12 @@ pub async fn auto_resolve_stale(stale_threshold_micros: i64) -> Result<u64, erro
 
         if let Err(e) = active.update(client).await {
             log::warn!("[incidents] Failed to auto-resolve incident: {}", e);
+        } else {
+            resolved_ids.push((org_id, incident_id));
         }
     }
 
-    Ok(count)
+    Ok((count, resolved_ids))
 }
 
 #[cfg(test)]
