@@ -88,7 +88,8 @@
     "status": "Status",
     "cancel": "Annuleer",
     "relative": "Relatief",
-    "absolute": "Absoluut"
+    "absolute": "Absoluut",
+    "off": "Uit"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

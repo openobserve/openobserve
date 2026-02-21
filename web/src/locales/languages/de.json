@@ -88,7 +88,8 @@
     "status": "Status",
     "cancel": "Stornieren",
     "relative": "Relativ",
-    "absolute": "Absolut"
+    "absolute": "Absolut",
+    "off": "Aus"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",

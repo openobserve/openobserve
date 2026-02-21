@@ -88,7 +88,8 @@
     "status": "상태",
     "cancel": "취소",
     "relative": "상대적",
-    "absolute": "앱솔루트"
+    "absolute": "앱솔루트",
+    "off": "끄기"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",

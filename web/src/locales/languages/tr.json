@@ -88,7 +88,8 @@
     "status": "Durum",
     "cancel": "İptal",
     "relative": "Göreceli",
-    "absolute": "Mutlak"
+    "absolute": "Mutlak",
+    "off": "Kapalı"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

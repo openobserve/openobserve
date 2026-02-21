@@ -88,7 +88,8 @@
     "status": "État",
     "cancel": "Annuler",
     "relative": "Relatif",
-    "absolute": "Absolu"
+    "absolute": "Absolu",
+    "off": "Off"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",

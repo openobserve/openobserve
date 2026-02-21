@@ -88,7 +88,8 @@
     "status": "Estado",
     "cancel": "Cancelar",
     "relative": "Relativo",
-    "absolute": "Absoluto"
+    "absolute": "Absoluto",
+    "off": "Apagado"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
