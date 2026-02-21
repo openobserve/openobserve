@@ -182,7 +182,8 @@ pub async fn do_partitioned_search(
                 log::info!(
                     "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
                 );
-                search_res.hits.truncate(req_size as usize);
+                let allowed = (req_size - (curr_res_size - total_hits)) as usize;
+                search_res.hits.truncate(allowed);
                 search_res.total = search_res.hits.len();
             }
         }
