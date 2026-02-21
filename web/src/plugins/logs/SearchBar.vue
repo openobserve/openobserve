@@ -479,7 +479,7 @@ class="q-pr-sm q-pt-xs" />
             {{ t("search.moreActions") }}
           </q-tooltip>
         </q-btn>
-        <div class="float-left tw:mr-[4px]">
+        <div class="float-left tw-mr-[4px]">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -1275,7 +1275,7 @@ class="q-pr-sm q-pt-xs" />
                         dense
                         clearable
                         debounce="300"
-                        class="tw:mx-2 tw:my-2"
+                        class="tw-mx-2 tw-my-2"
                         :placeholder="t('search.searchSavedView')"
                       >
                         <template #prepend>
@@ -1296,7 +1296,7 @@ class="q-pr-sm q-pt-xs" />
                   <template v-slot:no-data>
                     <div
                       v-if="searchObj.loadingSavedView == false"
-                      class="text-center q-pa-sm tw:w-full"
+                      class="text-center q-pa-sm tw-w-full"
                     >
                       <q-item-label>{{
                         t("search.savedViewsNotFound")

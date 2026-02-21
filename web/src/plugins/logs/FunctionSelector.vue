@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-btn-group
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs tw:h-[32px] function-selector element-box-shadow el-border"
+    class="q-pa-none float-left q-mr-xs tw-h-[32px] function-selector element-box-shadow el-border"
   >
-    <div class="tw:flex tw:items-center">
+    <div class="tw-flex tw-items-center">
       <q-toggle
         data-test="logs-search-bar-show-query-toggle-btn"
         v-model="searchObj.meta.showTransformEditor"
@@ -31,13 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'o2-toggle-button-xs-light'
         "
       >
-        <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
+        <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
           {{ t('search.toggleFunctionEditor') }}
         </q-tooltip>
       </q-toggle>
     </div>
     <div>
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
+      <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">{{
         selectedFunctionTooltip
       }}</q-tooltip>
       <q-btn-dropdown
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="12px"
         :icon="iconRight"
         no-caps
-        class="btn-function no-case q-pr-none no-border no-outline tw:border-none"
+        class="btn-function no-case q-pr-none no-border no-outline tw-border-none"
       >
         <q-tooltip :delay="0">
           {{ selectedFunctionTooltip }}
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="save"
       @click="fnSavedFunctionDialog"
     >
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
+      <q-tooltip class="tw-text-[12px]" :offset="[0, 6]">
         {{ t("common.save") }}
       </q-tooltip>
     </q-btn>

@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-btn-group
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs tw:h-[32px] transform-selector element-box-shadow el-border"
+    class="q-pa-none float-left q-mr-xs tw-h-[32px] transform-selector element-box-shadow el-border"
   >
-    <div class="tw:flex tw:items-center">
+    <div class="tw-flex tw-items-center">
       <q-toggle
         data-test="logs-search-bar-show-query-toggle-btn"
         v-model="searchObj.meta.showTransformEditor"
@@ -33,13 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'o2-toggle-button-xs-light'
         "
       >
-        <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
+        <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
           {{ getTransformLabelTooltip }}
         </q-tooltip>
       </q-toggle>
     </div>
     <div style="border-right: 1px solid var(--o2-border-color)">
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
+      <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">{{
         transformsLabel
       }}</q-tooltip>
       <q-btn-dropdown
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="12px"
         :icon="transformIcon"
         no-caps
-        class="btn-function no-case q-pr-none no-border no-outline tw:border-none"
+        class="btn-function no-case q-pr-none no-border no-outline tw-border-none"
         :class="`${searchObj.data.transformType || 'transform'}-icon`"
         label-class="no-case"
       >
