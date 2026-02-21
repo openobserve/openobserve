@@ -1268,9 +1268,10 @@ class="q-pr-sm q-pt-xs" />
                   class="saved-view-table full-height"
                   no-hover
                   :rows-per-page-options="[]"
+                  style="min-height: 420px; height: 420px;"
                   :hide-bottom="searchObj.data.savedViews.length == 0"
                 >
-                  <template #top-right>
+                  <template #top>
                     <div class="full-width">
                       <q-input
                         data-test="log-search-saved-view-field-search-input"
@@ -1278,7 +1279,7 @@ class="q-pr-sm q-pt-xs" />
                         borderless
                         dense
                         clearable
-                        debounce="1"
+                        debounce="300"
                         class="tw:mx-2 tw:my-2"
                         :placeholder="t('search.searchSavedView')"
                       >
@@ -1289,25 +1290,23 @@ class="q-pr-sm q-pt-xs" />
                     </div>
                     <div
                       v-if="searchObj.loadingSavedView == true"
-                      class="full-width float-left"
+                      class="full-width q-pa-sm"
                     >
-                      <div class="text-subtitle2 text-weight-bold float-left">
+                      <div class="text-subtitle2 text-weight-bold">
                         <q-spinner-hourglass size="20px" />
                         {{ t("confirmDialog.loading") }}
                       </div>
                     </div>
-                    <q-tr>
-                      <q-td
-                        v-if="
-                          searchObj.data.savedViews.length == 0 &&
-                          searchObj.loadingSavedView == false
-                        "
-                      >
-                        <q-item-label class="q-pl-sm q-pt-sm">{{
-                          t("search.savedViewsNotFound")
-                        }}</q-item-label>
-                      </q-td>
-                    </q-tr>
+                  </template>
+                  <template v-slot:no-data>
+                    <div
+                      v-if="searchObj.loadingSavedView == false"
+                      class="text-center q-pa-sm tw:w-full"
+                    >
+                      <q-item-label>{{
+                        t("search.savedViewsNotFound")
+                      }}</q-item-label>
+                    </div>
                   </template>
                   <template v-slot:body-cell-view_name="props">
                     <q-td :props="props" class="field_list" no-hover>
