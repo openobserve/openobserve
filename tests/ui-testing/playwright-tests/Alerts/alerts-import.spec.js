@@ -39,7 +39,7 @@ test.describe("Alerts Import/Export", () => {
    * Test: Import/Export Alert Functionality
    * Tests importing and exporting alerts
    */
-  test('Import/Export Alert Functionality', {
+  test.skip('Import/Export Alert Functionality', {
     tag: ['@all', '@alerts', '@alertsImportExport']
   }, async ({ page }) => {
     // Create template

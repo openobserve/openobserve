@@ -2057,4 +2057,852 @@ describe("AddAlert Component", () => {
     });
   });
 
+  describe('Panel Data Import - Alert Name Sanitization', () => {
+    let w: any;
+
+    it('should sanitize spaces in panel title when creating alert name', async () => {
+      const panelData = {
+        panelTitle: 'My Test Panel',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      // Mock router with panel query params
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_My_Test_Panel');
+    });
+
+    it('should sanitize colon characters in panel title', async () => {
+      const panelData = {
+        panelTitle: 'CPU:Usage',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_CPU_Usage');
+    });
+
+    it('should sanitize multiple special characters in panel title', async () => {
+      const panelData = {
+        panelTitle: 'Panel #1: Usage?',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      // Panel #1: Usage? -> Panel_1_Usage (trailing underscore trimmed)
+      expect(w.vm.formData.name).toBe('Alert_from_Panel_1_Usage');
+    });
+
+    it('should sanitize all forbidden characters: : # ? & % \' "', async () => {
+      const panelData = {
+        panelTitle: 'Test:#?&%\'"Panel',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_Test_Panel');
+    });
+
+    it('should handle consecutive special characters by replacing with single underscore', async () => {
+      const panelData = {
+        panelTitle: 'Panel  ::  Name',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_Panel_Name');
+    });
+
+    it('should handle empty/null panel title with fallback', async () => {
+      const panelData = {
+        panelTitle: null,
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_panel');
+    });
+
+    it('should handle empty string panel title with fallback', async () => {
+      const panelData = {
+        panelTitle: '',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_panel');
+    });
+
+    it('should handle whitespace-only panel title with fallback', async () => {
+      const panelData = {
+        panelTitle: '   ',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_panel');
+    });
+
+    it('should handle panel title with only special characters with fallback', async () => {
+      const panelData = {
+        panelTitle: ':#?&%\'"',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_panel');
+    });
+
+    it('should trim leading underscores from sanitized panel title', async () => {
+      const panelData = {
+        panelTitle: '  ##Panel Name',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_Panel_Name');
+    });
+
+    it('should trim trailing underscores from sanitized panel title', async () => {
+      const panelData = {
+        panelTitle: 'Panel Name##  ',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_Panel_Name');
+    });
+
+    it('should truncate very long panel titles to 200 characters', async () => {
+      const longTitle = 'A'.repeat(250); // 250 characters
+      const panelData = {
+        panelTitle: longTitle,
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      // Should be Alert_from_ (11 chars) + truncated title (200 chars) = 211 chars max
+      expect(w.vm.formData.name).toBe('Alert_from_' + 'A'.repeat(200));
+      expect(w.vm.formData.name.length).toBe(211);
+    });
+
+    it('should handle panel title with mix of valid and invalid characters', async () => {
+      const panelData = {
+        panelTitle: 'CPU_Usage-Metrics:2024#Q1?Test&Info%',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      // CPU_Usage-Metrics:2024#Q1?Test&Info%
+      // Underscores and hyphens are valid, others replaced
+      // Expected: CPU_Usage-Metrics_2024_Q1_Test_Info_
+      // After trimming trailing underscore: CPU_Usage-Metrics_2024_Q1_Test_Info
+      expect(w.vm.formData.name).toBe('Alert_from_CPU_Usage-Metrics_2024_Q1_Test_Info');
+    });
+
+    it('should collapse multiple consecutive invalid characters into single underscore', async () => {
+      const panelData = {
+        panelTitle: 'Panel:::Name???Test',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      // Panel:::Name???Test -> Panel_Name_Test (collapsed)
+      expect(w.vm.formData.name).toBe('Alert_from_Panel_Name_Test');
+    });
+  });
+
+  describe('PromQL Condition Handling', () => {
+    let w: any;
+
+    beforeEach(async () => {
+      vi.clearAllMocks();
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+      await nextTick();
+    });
+
+    afterEach(() => {
+      w.unmount();
+    });
+
+    it('should initialize promql_condition with column field when switching to promql tab', async () => {
+      // Initially promql_condition should be null
+      expect(w.vm.formData.query_condition.promql_condition).toBeNull();
+
+      // Switch to promql mode
+      w.vm.formData.query_condition.type = 'promql';
+      await nextTick();
+      await flushPromises();
+
+      // promql_condition should be initialized with all required fields
+      expect(w.vm.formData.query_condition.promql_condition).toBeDefined();
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>=');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(1);
+    });
+
+    it('should not reinitialize promql_condition if it already exists', async () => {
+      // Set up existing promql_condition
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>',
+        value: 50,
+      };
+
+      // Switch to promql mode
+      w.vm.formData.query_condition.type = 'promql';
+      await nextTick();
+      await flushPromises();
+
+      // Should preserve existing values
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(50);
+    });
+
+    it('should include column field in promql_condition payload', () => {
+      w.vm.formData.query_condition.type = 'promql';
+      w.vm.formData.query_condition.promql = 'up{job="test"}';
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>=',
+        value: 10,
+      };
+
+      const payload = w.vm.getAlertPayload();
+
+      expect(payload.query_condition.promql_condition).toBeDefined();
+      expect(payload.query_condition.promql_condition.column).toBe('value');
+      expect(payload.query_condition.promql_condition.operator).toBe('>=');
+      expect(payload.query_condition.promql_condition.value).toBe(10);
+    });
+
+    it('should set promql_condition to null when switching from promql to sql', () => {
+      // Start with promql
+      w.vm.formData.query_condition.type = 'promql';
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>=',
+        value: 10,
+      };
+
+      // Switch to sql
+      w.vm.formData.query_condition.type = 'sql';
+      const payload = w.vm.getAlertPayload();
+
+      expect(payload.query_condition.promql_condition).toBeNull();
+    });
+
+    it('should set promql_condition to null when switching from promql to custom', () => {
+      // Start with promql
+      w.vm.formData.query_condition.type = 'promql';
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>=',
+        value: 10,
+      };
+
+      // Switch to custom
+      w.vm.formData.query_condition.type = 'custom';
+      const payload = w.vm.getAlertPayload();
+
+      expect(payload.query_condition.promql_condition).toBeNull();
+    });
+
+    it('should initialize promql_condition when loading from dashboard panel with promql query', async () => {
+      const panelData = {
+        queryType: 'promql',
+        queries: [{
+          query: 'up{job="test"}',
+          customQuery: true
+        }],
+        threshold: 75,
+        condition: 'above',
+      };
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+      await flushPromises();
+
+      // Should have promql_condition with column field
+      expect(w.vm.formData.query_condition.promql_condition).toBeDefined();
+      expect(w.vm.formData.query_condition.promql_condition).not.toBeNull();
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>=');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(75);
+    });
+
+    it('should use <= operator when panel condition is below', async () => {
+      const panelData = {
+        queryType: 'promql',
+        queries: [{
+          query: 'up{job="test"}',
+          customQuery: true
+        }],
+        threshold: 25,
+        condition: 'below',
+      };
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+      await flushPromises();
+
+      expect(w.vm.formData.query_condition.promql_condition).not.toBeNull();
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('<=');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(25);
+    });
+
+    it('should preserve promql_condition when editing existing alert', async () => {
+      const existingAlert = {
+        name: 'Test Alert',
+        stream_type: 'metrics',
+        stream_name: 'test_stream',
+        is_real_time: false,
+        query_condition: {
+          type: 'promql',
+          promql: 'up{job="test"}',
+          promql_condition: {
+            column: 'value',
+            operator: '>',
+            value: 100,
+          },
+          conditions: null,
+          sql: null,
+          aggregation: null,
+        },
+        trigger_condition: {
+          period: 10,
+          operator: '>=',
+          threshold: 1,
+          frequency: 10,
+          silence: 10,
+        },
+        destinations: ['test-dest'],
+      };
+
+      w.vm.formData = { ...w.vm.formData, ...existingAlert };
+      await nextTick();
+
+      // promql_condition should be preserved with all fields
+      expect(w.vm.formData.query_condition.promql_condition).toBeDefined();
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(100);
+    });
+
+    it('should clear sql when query type is promql in payload', () => {
+      w.vm.formData.query_condition.type = 'promql';
+      w.vm.formData.query_condition.promql = 'up{job="test"}';
+      w.vm.formData.query_condition.sql = 'SELECT * FROM test';
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>=',
+        value: 1,
+      };
+
+      const payload = w.vm.getAlertPayload();
+
+      expect(payload.query_condition.type).toBe('promql');
+      expect(payload.query_condition.promql).toBe('up{job="test"}');
+      expect(payload.query_condition.sql).toBe('');
+      expect(payload.query_condition.promql_condition).toBeDefined();
+    });
+
+    it('should clear conditions array when query type is promql in payload', () => {
+      w.vm.formData.query_condition.type = 'promql';
+      w.vm.formData.query_condition.promql = 'up{job="test"}';
+      w.vm.formData.query_condition.conditions = {
+        version: 2,
+        conditions: {
+          filterType: 'group',
+          logicalOperator: 'AND',
+          groupId: 'test',
+          conditions: [{ column: 'test', operator: '=', value: '1' }]
+        }
+      };
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>=',
+        value: 1,
+      };
+
+      const payload = w.vm.getAlertPayload();
+
+      expect(payload.query_condition.type).toBe('promql');
+      expect(payload.query_condition.conditions).toEqual([]);
+      expect(payload.query_condition.promql_condition).toBeDefined();
+    });
+
+    it('should add column field to legacy promql_condition on load (backward compatibility)', async () => {
+      // Simulate loading a legacy alert without the column field
+      const legacyAlert = {
+        name: 'Legacy Alert',
+        stream_type: 'metrics',
+        stream_name: 'test_stream',
+        is_real_time: false,
+        query_condition: {
+          type: 'promql',
+          promql: 'up{job="test"}',
+          promql_condition: {
+            // No column field - this is a legacy alert
+            operator: '>',
+            value: 100,
+          },
+          conditions: null,
+          sql: null,
+          aggregation: null,
+        },
+        trigger_condition: {
+          period: 10,
+          operator: '>=',
+          threshold: 1,
+          frequency: 10,
+          silence: 10,
+        },
+        destinations: ['test-dest'],
+      };
+
+      // Mount with isUpdated=true to simulate editing an existing alert
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        },
+        props: {
+          modelValue: legacyAlert,
+          isUpdated: true,
+        }
+      });
+
+      await flushPromises();
+      await nextTick();
+
+      // The column field should be automatically added during created() lifecycle
+      expect(w.vm.formData.query_condition.promql_condition).toBeDefined();
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(100);
+    });
+
+    it('should initialize all missing fields in malformed promql_condition', async () => {
+      // Simulate a severely malformed alert missing multiple fields
+      const malformedAlert = {
+        name: 'Malformed Alert',
+        stream_type: 'metrics',
+        stream_name: 'test_stream',
+        is_real_time: false,
+        query_condition: {
+          type: 'promql',
+          promql: 'up{job="test"}',
+          promql_condition: {
+            // Missing column, operator, and value
+          },
+          conditions: null,
+          sql: null,
+          aggregation: null,
+        },
+        trigger_condition: {
+          period: 10,
+          operator: '>=',
+          threshold: 1,
+          frequency: 10,
+          silence: 10,
+        },
+        destinations: ['test-dest'],
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        },
+        props: {
+          modelValue: malformedAlert,
+          isUpdated: true,
+        }
+      });
+
+      await flushPromises();
+      await nextTick();
+
+      // All missing fields should be initialized with defaults
+      expect(w.vm.formData.query_condition.promql_condition).toBeDefined();
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>=');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(1);
+    });
+
+    it('should preserve existing values and only add missing column field', async () => {
+      // Alert with operator and value, but missing column
+      const partialAlert = {
+        name: 'Partial Alert',
+        stream_type: 'metrics',
+        stream_name: 'test_stream',
+        is_real_time: false,
+        query_condition: {
+          type: 'promql',
+          promql: 'up{job="test"}',
+          promql_condition: {
+            operator: '<',
+            value: 50,
+            // Missing column only
+          },
+          conditions: null,
+          sql: null,
+          aggregation: null,
+        },
+        trigger_condition: {
+          period: 10,
+          operator: '>=',
+          threshold: 1,
+          frequency: 10,
+          silence: 10,
+        },
+        destinations: ['test-dest'],
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        },
+        props: {
+          modelValue: partialAlert,
+          isUpdated: true,
+        }
+      });
+
+      await flushPromises();
+      await nextTick();
+
+      // Should add column but preserve existing operator and value
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('<');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(50);
+    });
+  });
+
 });

@@ -1427,6 +1427,12 @@ pub struct Limit {
     pub alert_schedule_concurrency: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
+    #[env_config(
+        name = "ZO_ALERT_PREVIEW_TIMERANGE_MINUTES",
+        default = 0,
+        help = "Time range in minutes for alert preview. If set to 0 (default), uses the alert's period value. If greater than 0, overrides period for preview."
+    )]
+    pub alert_preview_timerange_minutes: i64,
     #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
     pub report_schedule_timeout: i64,
     #[env_config(name = "ZO_DERIVED_STREAM_SCHEDULE_INTERVAL", default = 300)] // seconds
