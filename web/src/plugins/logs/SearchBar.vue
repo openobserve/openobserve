@@ -294,9 +294,10 @@ alt="Quick Mode" class="toolbar-icon" />
 
         <q-btn
           data-test="logs-search-bar-more-options-btn"
-          class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
+          class=" download-logs-btn q-px-sm element-box-shadow el-border "
+          style="padding: 0.25rem 0.25rem !important;"
+          icon="menu"
         >
-        <Menu size="1rem" />
           <q-menu>
             <q-list>
               <q-item
@@ -473,7 +474,7 @@ class="q-pr-sm q-pt-xs" />
               </q-item>
             </q-list>
           </q-menu>
-          <q-tooltip style="width: 80px">
+          <q-tooltip style="width: 110px">
             {{ t("search.moreActions") }}
           </q-tooltip>
         </q-btn>
