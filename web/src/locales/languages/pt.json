@@ -88,7 +88,8 @@
     "status": "Status",
     "cancel": "Cancelar",
     "relative": "Relativo",
-    "absolute": "Absoluto"
+    "absolute": "Absoluto",
+    "off": "Desligado"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -277,7 +278,16 @@
     "transformLabel": "Transformar",
     "addToDashboard": "Adicionar ao painel",
     "selectStream": "Selecione Stream",
-    "pattern_summary": "Mostrando de 1 a 50 dos eventos {totalEvents} e padrões {patternsFound} encontrados em eventos {logsAnalyzed} em {totalTime} ms."
+    "pattern_summary": "Mostrando de 1 a 50 dos eventos {totalEvents} e padrões {patternsFound} encontrados em eventos {logsAnalyzed} em {totalTime} ms.",
+    "toggleFunctionEditor": "Alternar editor de funções",
+    "hide": "Esconder",
+    "show": "Mostra",
+    "editor": "Editor",
+    "webUrlNotConfigured": "O URL de compartilhamento é desativado até que ZO_WEB_URL seja configurado pelo administrador.",
+    "showHideColumns": "Mostrar/ocultar colunas",
+    "autoRefresh": "Atualização automática",
+    "createSavedView": "Criar visualização salva",
+    "listSavedViews": "Listar visualizações salvas"
   },
   "menu": {
     "home": "Início",

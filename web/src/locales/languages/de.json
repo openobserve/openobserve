@@ -88,7 +88,8 @@
     "status": "Status",
     "cancel": "Stornieren",
     "relative": "Relativ",
-    "absolute": "Absolut"
+    "absolute": "Absolut",
+    "off": "Aus"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -277,7 +278,16 @@
     "transformLabel": "Verwandeln",
     "addToDashboard": "Zum Dashboard hinzufügen",
     "selectStream": "Wählen Sie Stream",
-    "pattern_summary": "Es werden 1 bis 50 von {totalEvents} -Ereignissen und {patternsFound} -Mustern angezeigt, die in {logsAnalyzed} -Ereignissen in {totalTime} ms gefunden wurden."
+    "pattern_summary": "Es werden 1 bis 50 von {totalEvents} -Ereignissen und {patternsFound} -Mustern angezeigt, die in {logsAnalyzed} -Ereignissen in {totalTime} ms gefunden wurden.",
+    "toggleFunctionEditor": "Funktionseditor umschalten",
+    "hide": "Verstecken",
+    "show": "Zeige",
+    "editor": "Redakteur",
+    "webUrlNotConfigured": "URL teilen ist deaktiviert, bis ZO_WEB_URL von Ihrem Administrator konfiguriert wurde.",
+    "showHideColumns": "Spalten ein-/ausblenden",
+    "autoRefresh": "Automatische Aktualisierung",
+    "createSavedView": "Gespeicherte Ansicht erstellen",
+    "listSavedViews": "Gespeicherte Ansichten auflisten"
   },
   "menu": {
     "home": "Startseite",

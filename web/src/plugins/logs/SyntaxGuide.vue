@@ -19,13 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-cy="syntax-guide-button"
     dense
     flat
-    class="q-ml-xs q-pa-xs"
     :class="[
+      noBorder ? 'syntax-guide-no-border' : 'q-ml-xs q-pa-xs',
       sqlmode ? 'sql-mode' : 'normal-mode',
       !store.state.isAiChatEnabled ? 'syntax-guide-button' : '',
       store.state.theme == 'dark' && !sqlmode ? 'syntax-guide-button-dark' : ''
     ]"
     icon="help"
+    :label="label || (noBorder ? undefined : 'Syntax Guide')"
   >
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <q-card flat v-if="!sqlmode">
@@ -223,6 +224,14 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    noBorder: {
+      type: Boolean,
+      default: false,
+    },
+    label: {
+      type: String,
+      default: '',
+    },
   },
   components:{
   },
@@ -239,4 +248,38 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 @import "@/styles/logs/syntax-guide.scss";
+
+.syntax-guide-no-border {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100%;
+  justify-content: flex-start;
+
+  :deep(.q-btn__content) {
+    padding: 0 !important;
+    gap: 0;
+    justify-content: flex-start;
+    width: 100%;
+
+    .q-icon {
+      font-size: 20px;
+      width: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 8px;
+      margin-left: 3px;
+    }
+  }
+
+  &:hover {
+    background: transparent !important;
+  }
+
+  &:before {
+    display: none !important;
+  }
+}
 </style>
