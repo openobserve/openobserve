@@ -21,13 +21,13 @@ use std::{
     sync::Arc,
 };
 
-use arrow::{error::ArrowError, record_batch::RecordBatch};
 #[cfg(feature = "vortex")]
 use arrow::{array::StructArray, datatypes::DataType};
+use arrow::{error::ArrowError, record_batch::RecordBatch};
 use arrow_schema::Schema;
-use futures::{Stream, TryStreamExt};
 #[cfg(feature = "vortex")]
 use futures::StreamExt;
+use futures::{Stream, TryStreamExt};
 use parquet::{
     arrow::{
         AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
