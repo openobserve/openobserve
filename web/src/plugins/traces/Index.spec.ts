@@ -207,15 +207,11 @@ vi.mock("@/composables/useTraces", () => ({
   }),
 }));
 
-const { mockGetStreams } = vi.hoisted(() => ({
-  mockGetStreams: vi.fn(),
-}));
-
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    getStreams: mockGetStreams,
+    getStreams: vi.fn(() => Promise.resolve(mockStreamList)),
     getStream: vi.fn((streamName) =>
-      Promise.resolve(mockStreamList.list.find((s) => s.name === streamName))
+      Promise.resolve(mockStreamList.list.find((s) => s.name === streamName)),
     ),
   }),
 }));
@@ -265,14 +261,12 @@ describe("Index.vue (Main Traces Page)", () => {
 
   beforeEach(async () => {
     // Reset mock data
-    mockGetStreams.mockResolvedValue(mockStreamList);
     mockSearchObj.loading = false;
     mockSearchObj.loadingStream = false;
     mockSearchObj.data.stream.streamLists = [];
     mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
     mockSearchObj.data.queryResults = { hits: [] };
     mockSearchObj.data.errorMsg = "";
-    mockSearchObj.data.errorCode = 0;
     mockSearchObj.data.editorValue = "";
 
     // Mock router query params
@@ -510,7 +504,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(mockSearchObj.data.stream.selectedStream.value).toBe(
-        "test-stream"
+        "test-stream",
       );
     });
 
@@ -537,7 +531,9 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="logs-search-no-stream-selected-text"]').exists()
+        wrapper
+          .find('[data-test="logs-search-no-stream-selected-text"]')
+          .exists(),
       ).toBe(true);
     });
   });
@@ -575,7 +571,9 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="traces-search-result-not-found-text"]').exists()
+        wrapper
+          .find('[data-test="traces-search-result-not-found-text"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -659,7 +657,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="traces-search-error-message"]').exists()
+        wrapper.find('[data-test="traces-search-error-message"]').exists(),
       ).toBe(true);
     });
 
@@ -689,7 +687,9 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="traces-search-result-not-found-text"]').exists()
+        wrapper
+          .find('[data-test="traces-search-result-not-found-text"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -719,9 +719,9 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      expect(wrapper.find('[data-test="traces-search-error-20003"]').exists()).toBe(
-        true
-      );
+      expect(
+        wrapper.find('[data-test="traces-search-error-20003"]').exists(),
+      ).toBe(true);
     });
   });
 
@@ -748,7 +748,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       // Find and click collapse button
       const collapseBtn = wrapper.find(
-        '[data-test="logs-search-field-list-collapse-btn"]'
+        '[data-test="logs-search-field-list-collapse-btn"]',
       );
       expect(collapseBtn.exists()).toBe(true);
 
@@ -917,7 +917,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(mockSearchObj.data.editorValue).toBe(
-        "duration >= 100 AND service_name = 'test'"
+        "duration >= 100 AND service_name = 'test'",
       );
     });
 
@@ -1121,7 +1121,14 @@ describe("Index.vue (Main Traces Page)", () => {
 
   describe("Edge Cases", () => {
     it("should handle empty stream list gracefully", async () => {
-      mockGetStreams.mockResolvedValueOnce({ list: [] });
+      const mockGetStreams = vi.fn(() => Promise.resolve({ list: [] }));
+
+      vi.doMock("@/composables/useStreams", () => ({
+        default: () => ({
+          getStreams: mockGetStreams,
+          getStream: vi.fn(),
+        }),
+      }));
 
       wrapper = mount(Index, {
         attachTo: node,
