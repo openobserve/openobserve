@@ -2380,7 +2380,7 @@ export default defineComponent({
     const saveToHistory = async () => {
       saveHistoryLoading.value = true;
       if (chatMessages.value.length === 0) return;
-      
+
       try {
         const db = await initDB();
         const transaction = db.transaction(STORE_NAME, 'readwrite');
@@ -2427,25 +2427,31 @@ export default defineComponent({
         // Always use put with the current chat ID to update existing chat
         // instead of creating a new one
         let chatId = currentChatId.value || Date.now();
-        const request = DbIndexStore.put({ 
-          ...chatData, 
-          id: chatId // Use timestamp as ID if no current ID
-        });
 
+        // Wrap IndexedDB operation in a Promise to properly await it
+        await new Promise<void>((resolve, reject) => {
+          const request = DbIndexStore.put({
+            ...chatData,
+            id: chatId // Use timestamp as ID if no current ID
+          });
 
+          request.onsuccess = (event: Event) => {
+            if (!currentChatId.value) {
+              currentChatId.value = (event.target as IDBRequest).result as number;
 
-
-        request.onsuccess = (event: Event) => {
-          if (!currentChatId.value) {
-            currentChatId.value = (event.target as IDBRequest).result as number;
-
-            // Apply pending auto navigation preference to the new chat
-            if (pendingAutoNavigation.value && currentChatId.value) {
-              autoNavigationPreferences.value.set(currentChatId.value, true);
-              saveAutoNavigationPreferences();
+              // Apply pending auto navigation preference to the new chat
+              if (pendingAutoNavigation.value && currentChatId.value) {
+                autoNavigationPreferences.value.set(currentChatId.value, true);
+                saveAutoNavigationPreferences();
+              }
             }
-          }
-        };
+            resolve();
+          };
+
+          request.onerror = () => {
+            reject(request.error);
+          };
+        });
       } catch (error) {
         console.error('Error saving chat history:', error);
       }
@@ -2916,6 +2922,7 @@ export default defineComponent({
                    action.resource_type.charAt(0).toUpperCase() + action.resource_type.slice(1);
       }
 
+      // Perform navigation FIRST
       if (action.action === 'load_query') {
         const targetPath = `/${action.resource_type}`;
         const target = action.target;
@@ -3003,33 +3010,40 @@ export default defineComponent({
         await router.push({ path, query: queryParams });
       }
 
-      // Add success message to chat after navigation
-      const successMessage = `Successfully navigated to ${pageName}`;
-      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+      // Use setTimeout to add message AFTER navigation fully completes and settles
+      setTimeout(async () => {
+        try {
+          // Add success message AFTER navigation completes
+          const successMessage = `Successfully navigated to ${pageName}`;
+          let lastMessage = chatMessages.value[chatMessages.value.length - 1];
 
-      if (!lastMessage || lastMessage.role !== 'assistant') {
-        // Create new assistant message
-        chatMessages.value.push({
-          role: 'assistant',
-          content: successMessage,
-          contentBlocks: [{ type: 'text', text: successMessage }]
-        });
-      } else {
-        // Append to existing assistant message
-        if (lastMessage.content) {
-          lastMessage.content += '\n\n' + successMessage;
-        } else {
-          lastMessage.content = successMessage;
-        }
-        if (!lastMessage.contentBlocks) {
-          lastMessage.contentBlocks = [];
-        }
-        lastMessage.contentBlocks.push({ type: 'text', text: successMessage });
-      }
+          if (!lastMessage || lastMessage.role !== 'assistant') {
+            // Create new assistant message
+            chatMessages.value.push({
+              role: 'assistant',
+              content: successMessage,
+              contentBlocks: [{ type: 'text', text: successMessage }]
+            });
+          } else {
+            // Append to existing assistant message
+            if (lastMessage.content) {
+              lastMessage.content += '\n\n' + successMessage;
+            } else {
+              lastMessage.content = successMessage;
+            }
+            if (!lastMessage.contentBlocks) {
+              lastMessage.contentBlocks = [];
+            }
+            lastMessage.contentBlocks.push({ type: 'text', text: successMessage });
+          }
 
-      // Save to history and scroll to bottom
-      await saveToHistory();
-      await scrollToBottom();
+          // Save to history after adding message
+          await saveToHistory();
+          await scrollToBottom();
+        } catch (error) {
+          console.error('Error adding navigation success message:', error);
+        }
+      }, 500);
     };
 
     const confirmClearAllConversations = async () => {

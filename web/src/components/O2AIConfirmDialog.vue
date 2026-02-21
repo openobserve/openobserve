@@ -171,17 +171,32 @@ const isFocusedYes = ref(false);
 const isFocusedNo = ref(false);
 const isFocusedAlways = ref(false);
 
-// Auto-focus Yes button when dialog appears
+// Auto-focus button when dialog appears
+// For delete operations, focus "No" button by default to prevent accidental deletions
+// For other operations, focus "Yes" button
 watch(
   () => props.visible,
   (newValue) => {
     if (newValue) {
       nextTick(() => {
         setTimeout(() => {
-          const button = yesButtonRef.value?.$el;
-          if (button) {
-            button.focus();
-            isFocusedYes.value = true;
+          // Check if this is a delete operation
+          const isDeleteOperation = props.confirmation?.tool?.startsWith('Delete');
+
+          if (isDeleteOperation) {
+            // Focus "No" button for delete operations
+            const button = noButtonRef.value?.$el;
+            if (button) {
+              button.focus();
+              isFocusedNo.value = true;
+            }
+          } else {
+            // Focus "Yes" button for other operations
+            const button = yesButtonRef.value?.$el;
+            if (button) {
+              button.focus();
+              isFocusedYes.value = true;
+            }
           }
         }, 100);
       });
