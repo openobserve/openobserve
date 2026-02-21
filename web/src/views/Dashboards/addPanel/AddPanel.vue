@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="overflow-y: auto" class="scroll">
+    <!-- Header Section -->
     <div class="tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs">
       <div
         class="flex items-center q-pa-sm card-container"
@@ -200,532 +201,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div>
-      <div class="row" style="overflow-y: auto">
-        <div class="tw:pl-[0.625rem]">
-          <div
-            class="col scroll card-container tw:mr-[0.625rem]"
-            style="
-              overflow-y: auto;
-              height: 100%;
-              min-width: 100px;
-              max-width: 100px;
-            "
-          >
-            <ChartSelection
-              v-model:selectedChartType="dashboardPanelData.data.type"
-              @update:selected-chart-type="resetAggregationFunction"
-            />
-          </div>
-        </div>
-        <q-separator vertical />
-        <!-- for query related chart only -->
-        <div
-          v-if="
-            !['html', 'markdown', 'custom_chart'].includes(
-              dashboardPanelData.data.type,
-            )
-          "
-          class="col tw:mr-[0.625rem]"
-          style="display: flex; flex-direction: row; overflow-x: hidden"
-        >
-          <!-- collapse field list bar -->
-          <div
-            v-if="!dashboardPanelData.layout.showFieldList"
-            class="field-list-sidebar-header-collapsed card-container"
-            @click="collapseFieldList"
-            style="width: 50px; height: 100%; flex-shrink: 0"
-          >
-            <q-icon
-              name="expand_all"
-              class="field-list-collapsed-icon rotate-90"
-              data-test="dashboard-field-list-collapsed-icon"
-            />
-            <div class="field-list-collapsed-title">
-              {{ t("panel.fields") }}
-            </div>
-          </div>
-          <q-splitter
-            v-model="dashboardPanelData.layout.splitter"
-            :limits="[0, 20]"
-            :style="{
-              width: dashboardPanelData.layout.showFieldList
-                ? '100%'
-                : 'calc(100% - 50px)',
-              height: '100%',
-            }"
-          >
-            <template #before>
-              <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-                <div
-                  v-if="dashboardPanelData.layout.showFieldList"
-                  class="col scroll card-container"
-                  style="height: calc(100vh - 110px); overflow-y: auto"
-                >
-                  <div class="column" style="height: 100%">
-                    <div class="col-auto q-pa-sm">
-                      <span class="text-weight-bold">{{
-                        t("panel.fields")
-                      }}</span>
-                    </div>
-                    <div class="col" style="width: 100%">
-                      <!-- <GetFields :editMode="editMode" /> -->
-                      <FieldList :editMode="editMode" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <template #separator>
-              <div class="splitter-vertical splitter-enabled"></div>
-              <q-btn
-                color="primary"
-                size="sm"
-                :icon="
-                  dashboardPanelData.layout.showFieldList
-                    ? 'chevron_left'
-                    : 'chevron_right'
-                "
-                dense
-                round
-                :class="
-                  dashboardPanelData.layout.showFieldList
-                    ? 'splitter-icon-expand'
-                    : 'splitter-icon-collapse'
-                "
-                style="top: 14px; z-index: 100"
-                @click.stop="collapseFieldList"
-              />
-            </template>
-            <template #after>
-              <div class="row card-container">
-                <div
-                  class="col scroll"
-                  style="height: calc(100vh - 110px); overflow-y: auto"
-                >
-                  <div class="layout-panel-container col">
-                    <DashboardQueryBuilder
-                      :dashboardData="currentDashboardData.data"
-                      @custom-chart-template-selected="
-                        handleCustomChartTemplateSelected
-                      "
-                    />
-                    <q-separator />
-                    <VariablesValueSelector
-                      v-if="
-                        dateTimeForVariables ||
-                        (dashboardPanelData.meta.dateTime &&
-                          dashboardPanelData.meta.dateTime.start_time &&
-                          dashboardPanelData.meta.dateTime.end_time)
-                      "
-                      :variablesConfig="currentDashboardData.data?.variables"
-                      :showDynamicFilters="
-                        currentDashboardData.data?.variables?.showDynamicFilters
-                      "
-                      :selectedTimeDate="
-                        dateTimeForVariables || dashboardPanelData.meta.dateTime
-                      "
-                      @variablesData="variablesDataUpdated"
-                      @openAddVariable="handleOpenAddVariable"
-                      :initialVariableValues="initialVariableValues"
-                      :showAddVariableButton="true"
-                      :showAllVisible="true"
-                      :tabId="currentTabId"
-                      :panelId="currentPanelId"
-                    />
 
-                    <div v-if="isOutDated" class="tw:p-2">
-                      <div
-                        :style="{
-                          borderColor: '#c3920d',
-                          borderWidth: '1px',
-                          borderStyle: 'solid',
-                          backgroundColor:
-                            store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
-                          padding: '1%',
-                          borderRadius: '5px',
-                        }"
-                      >
-                        <div style="font-weight: 700">
-                          Your chart is not up to date
-                        </div>
-                        <div>
-                          Chart Configuration / Variables has been updated, but
-                          the chart was not updated automatically. Click on the
-                          "Apply" button to run the query again
-                        </div>
-                      </div>
-                    </div>
-                    <div class="tw:flex tw:justify-end tw:mr-2 tw:items-center">
-                        <PanelErrorButtons
-                          :error="errorMessage"
-                          :maxQueryRangeWarning="maxQueryRangeWarning"
-                          :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-                          :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
-                          :isPartialData="isPartialData"
-                          :isPanelLoading="isPanelLoading"
-                          :lastTriggeredAt="lastTriggeredAt"
-                          :viewOnly="false"
-                        />
-                    </div>
-                    <div class="tw:h-[calc(100vh-500px)] tw:min-h-[140px]">
-                      <PanelSchemaRenderer
-                        v-if="chartData"
-                        @metadata-update="metaDataValue"
-                        @result-metadata-update="handleResultMetadataUpdate"
-                        @limit-number-of-series-warning-message-update="
-                          handleLimitNumberOfSeriesWarningMessage
-                        "
-                        :key="dashboardPanelData.data.type"
-                        :panelSchema="chartData"
-                        :dashboard-id="queryParams?.dashboard"
-                        :folder-id="queryParams?.folder"
-                        :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                        :variablesData="updatedVariablesData"
-                        :allowAnnotationsAdd="editMode"
-                        :width="6"
-                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
-                        :showLegendsButton="true"
-                        @error="handleChartApiError"
-                        @updated:data-zoom="onDataZoom"
-                        @updated:vrlFunctionFieldList="
-                          updateVrlFunctionFieldList
-                        "
-                        @last-triggered-at-update="handleLastTriggeredAtUpdate"
-                        searchType="dashboards"
-                        @series-data-update="seriesDataUpdate"
-                        @show-legends="showLegendsDialog = true"
-                        @is-partial-data-update="handleIsPartialDataUpdate"
-                        @loading-state-change="handleLoadingStateChange"
-                        @is-cached-data-differ-with-current-time-range-update="
-                          handleIsCachedDataDifferWithCurrentTimeRangeUpdate
-                        "
-                        ref="panelSchemaRendererRef"
-                      />
-                      <q-dialog v-model="showViewPanel">
-                        <QueryInspector
-                          :metaData="metaData"
-                          :data="panelTitle"
-                        ></QueryInspector>
-                      </q-dialog>
-                    </div>
-                    <DashboardErrorsComponent
-                      :errors="errorData"
-                      class="col-auto"
-                      style="flex-shrink: 0"
-                    />
-                  </div>
-                  <div class="row column tw:h-[calc(100vh-180px)]">
-                    <DashboardQueryEditor />
-                  </div>
-                </div>
-                <q-separator vertical />
-                <div class="col-auto">
-                  <PanelSidebar
-                    :title="t('dashboard.configLabel')"
-                    v-model="dashboardPanelData.layout.isConfigPanelOpen"
-                  >
-                    <ConfigPanel
-                      :dashboardPanelData="dashboardPanelData"
-                      :variablesData="updatedVariablesData"
-                      :panelData="seriesData"
-                    />
-                  </PanelSidebar>
-                </div>
-              </div>
-            </template>
-          </q-splitter>
-        </div>
-        <div
-          v-if="dashboardPanelData.data.type == 'html'"
-          class="col column"
-          style="width: 100%; height: calc(100vh - 99px); flex: 1"
-        >
-          <div class="card-container tw:h-full tw:flex tw:flex-col">
-            <VariablesValueSelector
-              :variablesConfig="currentDashboardData.data?.variables"
-              :showDynamicFilters="
-                currentDashboardData.data?.variables?.showDynamicFilters
-              "
-              :selectedTimeDate="dashboardPanelData.meta.dateTime"
-              @variablesData="variablesDataUpdated"
-              :initialVariableValues="initialVariableValues"
-              class="tw:flex-shrink-0 q-mb-sm"
-              :showAddVariableButton="true"
-              :showAllVisible="true"
-              :tabId="currentTabId"
-              :panelId="currentPanelId"
-            />
-            <CustomHTMLEditor
-              v-model="dashboardPanelData.data.htmlContent"
-              style="flex: 1; min-height: 0"
-              :initialVariableValues="liveVariablesData"
-              :tabId="currentTabId"
-              :panelId="currentPanelId"
-            />
-            <DashboardErrorsComponent
-              :errors="errorData"
-              class="tw:flex-shrink-0"
-            />
-          </div>
-        </div>
-        <div
-          v-if="dashboardPanelData.data.type == 'markdown'"
-          class="col column"
-          style="width: 100%; height: calc(100vh - 99px); flex: 1"
-        >
-          <div class="card-container tw:h-full tw:flex tw:flex-col">
-            <VariablesValueSelector
-              :variablesConfig="currentDashboardData.data?.variables"
-              :showDynamicFilters="
-                currentDashboardData.data?.variables?.showDynamicFilters
-              "
-              :selectedTimeDate="dashboardPanelData.meta.dateTime"
-              @variablesData="variablesDataUpdated"
-              :initialVariableValues="initialVariableValues"
-              class="tw:flex-shrink-0 q-mb-sm"
-              :showAddVariableButton="true"
-              :showAllVisible="true"
-              :tabId="currentTabId"
-              :panelId="currentPanelId"
-            />
-            <CustomMarkdownEditor
-              v-model="dashboardPanelData.data.markdownContent"
-              style="flex: 1; min-height: 0"
-              :initialVariableValues="liveVariablesData"
-              :tabId="currentTabId"
-              :panelId="currentPanelId"
-            />
-            <DashboardErrorsComponent
-              :errors="errorData"
-              class="tw:flex-shrink-0"
-            />
-          </div>
-        </div>
-        <div
-          v-if="dashboardPanelData.data.type == 'custom_chart'"
-          class="col"
-          style="
-            overflow-y: auto;
-            display: flex;
-            flex-direction: row;
-            overflow-x: hidden;
-          "
-        >
-          <!-- collapse field list bar -->
-          <div
-            v-if="!dashboardPanelData.layout.showFieldList"
-            class="field-list-sidebar-header-collapsed card-container"
-            @click="collapseFieldList"
-            style="width: 50px; height: 100%; flex-shrink: 0"
-          >
-            <q-icon
-              name="expand_all"
-              class="field-list-collapsed-icon rotate-90"
-              data-test="dashboard-field-list-collapsed-icon"
-            />
-            <div class="field-list-collapsed-title">
-              {{ t("panel.fields") }}
-            </div>
-          </div>
-          <q-splitter
-            v-model="dashboardPanelData.layout.splitter"
-            :limits="[0, 20]"
-            :style="{
-              width: dashboardPanelData.layout.showFieldList
-                ? '100%'
-                : 'calc(100% - 50px)',
-              height: '100%',
-            }"
-          >
-            <template #before>
-              <div
-                class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]"
-              >
-                <div
-                  class="col scroll card-container"
-                  style="height: calc(100vh - 99px); overflow-y: auto"
-                >
-                  <div
-                    v-if="dashboardPanelData.layout.showFieldList"
-                    class="column"
-                    style="height: 100%"
-                  >
-                    <div class="col-auto q-pa-sm">
-                      <span class="text-weight-bold">{{
-                        t("panel.fields")
-                      }}</span>
-                    </div>
-                    <div class="col" style="width: 100%">
-                      <!-- <GetFields :editMode="editMode" /> -->
-                      <FieldList :editMode="editMode" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <template #separator>
-              <div class="splitter-vertical splitter-enabled"></div>
-              <q-btn
-                color="primary"
-                size="sm"
-                :icon="
-                  dashboardPanelData.layout.showFieldList
-                    ? 'chevron_left'
-                    : 'chevron_right'
-                "
-                dense
-                round
-                style="top: 14px; z-index: 100"
-                @click="collapseFieldList"
-              />
-            </template>
-            <template #after>
-              <div
-                class="row card-container"
-                style="height: calc(100vh - 99px); overflow-y: auto"
-              >
-                <div
-                  class="col scroll"
-                  style="height: 100%; display: flex; flex-direction: column"
-                >
-                  <div style="height: 500px; flex-shrink: 0; overflow: hidden">
-                    <q-splitter
-                      class="query-editor-splitter"
-                      v-model="splitterModel"
-                      style="height: 100%"
-                      @update:model-value="layoutSplitterUpdated"
-                    >
-                      <template #before>
-                        <div
-                          style="position: relative; width: 100%; height: 100%"
-                        >
-                          <CustomChartEditor
-                            v-model="dashboardPanelData.data.customChartContent"
-                            style="width: 100%; height: 100%"
-                          />
-                          <!-- Custom Chart Type Selector Button overlaid on Editor -->
-                          <div
-                            style="
-                              position: absolute;
-                              bottom: 10px;
-                              right: 10px;
-                              z-index: 10;
-                            "
-                          >
-                            <q-btn
-                              unelevated
-                              color="primary"
-                              icon="bar_chart"
-                              label="Example Charts"
-                              @click="openCustomChartTypeSelector"
-                              data-test="custom-chart-type-selector-btn"
-                              no-caps
-                              size="md"
-                            />
-                            <!-- Custom Chart Type Selector Dialog -->
-                            <q-dialog v-model="showCustomChartTypeSelector">
-                              <CustomChartTypeSelector
-                                @select="handleChartTypeSelection"
-                                @close="showCustomChartTypeSelector = false"
-                              />
-                            </q-dialog>
-                          </div>
-                        </div>
-                      </template>
-                      <template #separator>
-                        <div class="splitter-vertical splitter-enabled"></div>
-                        <q-avatar
-                          color="primary"
-                          text-color="white"
-                          size="20px"
-                          icon="drag_indicator"
-                          style="top: 10px; left: 3.5px"
-                          data-test="dashboard-markdown-editor-drag-indicator"
-                        />
-                      </template>
-                      <template #after>
-                        <PanelSchemaRenderer
-                          v-if="chartData"
-                          @metadata-update="metaDataValue"
-                          @result-metadata-update="handleResultMetadataUpdate"
-                          @limit-number-of-series-warning-message-update="
-                            handleLimitNumberOfSeriesWarningMessage
-                          "
-                          :key="dashboardPanelData.data.type"
-                          :panelSchema="chartData"
-                          :dashboard-id="queryParams?.dashboard"
-                          :folder-id="queryParams?.folder"
-                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="updatedVariablesData"
-                          :width="6"
-                          :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
-                          :showLegendsButton="true"
-                          @error="handleChartApiError"
-                          @updated:data-zoom="onDataZoom"
-                          @updated:vrlFunctionFieldList="
-                            updateVrlFunctionFieldList
-                          "
-                          @last-triggered-at-update="
-                            handleLastTriggeredAtUpdate
-                          "
-                          searchType="dashboards"
-                          @series-data-update="seriesDataUpdate"
-                          @is-partial-data-update="handleIsPartialDataUpdate"
-                          @loading-state-change="handleLoadingStateChange"
-                          @is-cached-data-differ-with-current-time-range-update="
-                            handleIsCachedDataDifferWithCurrentTimeRangeUpdate
-                          "
-                        />
-                      </template>
-                    </q-splitter>
-                  </div>
-                  <div class="col-auto" style="flex-shrink: 0; display: flex; align-items: center;">
-                    <PanelErrorButtons
-                      :error="errorMessage"
-                      :maxQueryRangeWarning="maxQueryRangeWarning"
-                      :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-                      :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
-                      :isPartialData="isPartialData"
-                      :isPanelLoading="isPanelLoading"
-                    />
-                    <DashboardErrorsComponent
-                      :errors="errorData"
-                      class="col-auto"
-                      style="flex-shrink: 0"
-                    />
-                  </div>
-                  <div class="row column tw:h-[calc(100vh-180px)]">
-                    <DashboardQueryEditor />
-                  </div>
-                </div>
-                <q-separator vertical />
-                <div class="col-auto">
-                  <PanelSidebar
-                    :title="t('dashboard.configLabel')"
-                    v-model="dashboardPanelData.layout.isConfigPanelOpen"
-                  >
-                    <ConfigPanel
-                      :dashboardPanelData="dashboardPanelData"
-                      :variablesData="updatedVariablesData"
-                      :panelData="seriesData"
-                    />
-                  </PanelSidebar>
-                </div>
-              </div>
-            </template>
-          </q-splitter>
-        </div>
-      </div>
-    </div>
-    <q-dialog v-model="showLegendsDialog">
-      <ShowLegendsPopup
-        :panelData="currentPanelData"
-        @close="showLegendsDialog = false"
-      />
+    <!-- PanelEditor Content Area -->
+    <PanelEditor
+      ref="panelEditorRef"
+      pageType="dashboard"
+      :editMode="editMode"
+      :dashboardData="dashboardDataForPanelEditor"
+      :variablesData="updatedVariablesData"
+      :selectedDateTime="dateTimeForVariables || dashboardPanelData.meta.dateTime"
+      @variablesDataUpdated="variablesDataUpdated"
+      @openAddVariable="handleOpenAddVariable"
+      @chartApiError="handleChartApiError"
+      @dataZoom="onDataZoom"
+      @metaDataUpdated="metaDataValue"
+    />
+
+    <!-- Query Inspector Dialog -->
+    <q-dialog v-model="showViewPanel">
+      <QueryInspector
+        :metaData="metaData"
+        :data="panelTitle"
+      ></QueryInspector>
     </q-dialog>
 
-    <!-- Add Variable -->
+    <!-- Add Variable Drawer -->
     <div
       v-if="isAddVariableOpen"
       class="add-variable-drawer-overlay"
@@ -759,14 +259,6 @@ import {
   onMounted,
   defineAsyncComponent,
 } from "vue";
-import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
-import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
-const PanelErrorButtons = defineAsyncComponent(() => {
-  return import("@/components/dashboards/PanelErrorButtons.vue");
-});
-import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
-import CustomChartTypeSelector from "../../../components/dashboards/addPanel/customChartExamples/CustomChartTypeSelector.vue";
-
 import { useI18n } from "vue-i18n";
 import {
   addPanel,
@@ -779,14 +271,9 @@ import {
 } from "../../../utils/commons";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import DashboardQueryBuilder from "../../../components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
-import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue";
-import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import AddSettingVariable from "../../../components/dashboards/settings/AddSettingVariable.vue";
-import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
-import RelativeTime from "@/components/common/RelativeTime.vue";
 import { useLoading } from "@/composables/useLoading";
 import { debounce, isEqual } from "lodash-es";
 import { provide, inject } from "vue";
@@ -796,40 +283,16 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import { loadCustomChartTemplate } from "@/components/dashboards/addPanel/customChartExamples/customChartTemplates";
 import {
   createDashboardsContextProvider,
   contextRegistry,
 } from "@/composables/contextProviders";
-import {
-  outlinedWarning,
-  outlinedRunningWithErrors,
-} from "@quasar/extras/material-icons-outlined";
-import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
-
-const ConfigPanel = defineAsyncComponent(() => {
-  return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
-});
-
-const ShowLegendsPopup = defineAsyncComponent(() => {
-  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
-});
+import { PanelEditor } from "@/components/dashboards/PanelEditor";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
-});
-
-const CustomHTMLEditor = defineAsyncComponent(() => {
-  return import("@/components/dashboards/addPanel/CustomHTMLEditor.vue");
-});
-
-const CustomMarkdownEditor = defineAsyncComponent(() => {
-  return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
-});
-const CustomChartEditor = defineAsyncComponent(() => {
-  return import("@/components/dashboards/addPanel/CustomChartEditor.vue");
 });
 
 export default defineComponent({
@@ -837,36 +300,20 @@ export default defineComponent({
   props: ["metaData"],
 
   components: {
-    ChartSelection,
-    FieldList,
-    DashboardQueryBuilder,
     DateTimePickerDashboard,
-    DashboardErrorsComponent,
-    PanelSidebar,
-    ConfigPanel,
-    ShowLegendsPopup,
-    VariablesValueSelector,
     AddSettingVariable,
-    PanelSchemaRenderer,
-    RelativeTime,
-    CustomChartTypeSelector,
-    DashboardQueryEditor: defineAsyncComponent(
-      () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue"),
-    ),
     QueryInspector,
-    CustomHTMLEditor,
-    CustomMarkdownEditor,
-    CustomChartEditor,
-    PanelErrorButtons,
+    PanelEditor,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "dashboard");
 
+    // PanelEditor ref for accessing exposed methods/properties
+    const panelEditorRef = ref<InstanceType<typeof PanelEditor> | null>(null);
+
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
-    const showLegendsDialog = ref(false);
-    const panelSchemaRendererRef: any = ref(null);
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();
@@ -896,7 +343,6 @@ export default defineComponent({
     const editMode = ref(false);
     const selectedDate: any = ref(null);
     const dateTimePickerRef: any = ref(null);
-    const splitterModel = ref(50);
     const errorData: any = reactive({
       errors: [],
     });
@@ -905,62 +351,6 @@ export default defineComponent({
     const { getStream } = useStreams();
     const seriesData = ref([]);
     const shouldRefreshWithoutCache = ref(false);
-
-    // Custom Chart Type Selector
-    const selectedCustomChartType = ref(null);
-    const showCustomChartTypeSelector = ref(false);
-
-    const openCustomChartTypeSelector = () => {
-      showCustomChartTypeSelector.value = true;
-    };
-
-    const handleChartTypeSelection = async (selection: any) => {
-      // Extract chart and replaceQuery option from the selection
-      const chart = selection.chart || selection; // Support both old and new format
-      const replaceQuery = selection.replaceQuery ?? false; // Default to false (unchecked)
-
-      selectedCustomChartType.value = chart;
-
-      try {
-        // Lazy load the template
-        const template = await loadCustomChartTemplate(chart.value);
-
-        if (template) {
-          // Keep the default commented instructions and only replace the option code
-          const defaultComments = `// To know more about ECharts , 
-// visit: https://echarts.apache.org/examples/en/index.html 
-// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple 
-// Define your ECharts 'option' here. 
-// 'data' variable is available for use and contains the response data from the search result and it is an array.
-`;
-          dashboardPanelData.data.customChartContent =
-            defaultComments + template.code;
-
-          // Handle query replacement based on user selection
-          const currentQueryIndex =
-            dashboardPanelData.layout.currentQueryIndex || 0;
-          if (dashboardPanelData.data.queries[currentQueryIndex]) {
-            if (replaceQuery && template.query && template.query.trim()) {
-              // Replace with example query if option is selected
-              dashboardPanelData.data.queries[currentQueryIndex].query =
-                template.query.trim();
-              // Enable custom query mode for custom charts
-              dashboardPanelData.data.queries[currentQueryIndex].customQuery =
-                true;
-            }
-            // If replaceQuery is false, preserve the existing query (do nothing)
-          }
-        }
-      } catch (error) {
-        showErrorNotification(
-          "There was an error applying the chart example code. Please try again",
-        );
-      }
-    };
-
-    const seriesDataUpdate = (data: any) => {
-      seriesData.value = data;
-    };
 
     // Warning messages
     const maxQueryRangeWarning = ref("");
@@ -1048,9 +438,7 @@ export default defineComponent({
     const metaData = ref(null);
     const showViewPanel = ref(false);
     const metaDataValue = (metadata: any) => {
-      // console.time("metaDataValue");
       metaData.value = metadata;
-      // console.timeEnd("metaDataValue");
     };
 
     //dashboard tutorial link on click
@@ -1073,6 +461,7 @@ export default defineComponent({
           if (editMode.value || !isInitialDashboardPanelData()) {
             // Copy the panel data to trigger chart render with initial variables
             chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+            panelEditorRef.value?.initChartData(dashboardPanelData.data);
           }
         }
         // After initial load, don't return - we still need to update URL params below
@@ -1123,19 +512,25 @@ export default defineComponent({
       data: {},
     });
 
+    // Dashboard data for PanelEditor (includes dashboard config plus current panel/tab IDs)
+    const dashboardDataForPanelEditor = computed(() => ({
+      ...currentDashboardData.data,
+      dashboardId: route.query.dashboard,
+      folderId: route.query.folder ?? "default",
+      tabId: currentTabId.value,
+      panelId: currentPanelId.value,
+    }));
+
     // this is used to activate the watcher only after on mounted
     let isPanelConfigWatcherActivated = false;
     const isPanelConfigChanged = ref(false);
 
     const savePanelData = useLoading(async () => {
-      // console.time("savePanelData");
       const dashboardId = route.query.dashboard + "";
       await savePanelChangesToDashboard(dashboardId);
-      // console.timeEnd("savePanelData");
     });
 
     onUnmounted(async () => {
-      // console.time("onUnmounted");
       // clear a few things
       resetDashboardPanelData();
 
@@ -1148,8 +543,6 @@ export default defineComponent({
       contextRegistry.unregister("dashboards");
       contextRegistry.setActive("");
 
-      // console.timeEnd("onUnmounted");
-
       // Clear all refs to prevent memory leaks
       dateTimePickerRef.value = null;
     });
@@ -1160,7 +553,6 @@ export default defineComponent({
 
       errorData.errors = [];
 
-      // console.time("onMounted");
       // todo check for the edit more
       if (route.query.panelId) {
         editMode.value = true;
@@ -1204,24 +596,23 @@ export default defineComponent({
         }
 
         await nextTick();
-        // Set chartData immediately after loading panel, regardless of variables
-        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        // Initialize PanelEditor's chartData after loading panel data
+        panelEditorRef.value?.initChartData(dashboardPanelData.data);
         updateDateTime(selectedDate.value);
       } else {
         editMode.value = false;
         resetDashboardPanelDataAndAddTimeField();
-        chartData.value = {};
+        // Initialize PanelEditor's chartData as empty for new panel
+        panelEditorRef.value?.initChartData({});
         // set the value of the date time after the reset
         updateDateTime(selectedDate.value);
       }
-      // console.timeEnd("onMounted");
       // let it call the wathcers and then mark the panel config watcher as activated
       await nextTick();
       isPanelConfigWatcherActivated = true;
 
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
-      // console.time("add panel loadDashboard");
       await loadDashboard();
 
       // Call makeAutoSQLQuery after dashboard data is loaded
@@ -1246,8 +637,6 @@ export default defineComponent({
       );
       contextRegistry.register("dashboards", dashboardProvider);
       contextRegistry.setActive("dashboards");
-
-      // console.timeEnd("add panel loadDashboard");
     });
 
     let list = computed(function () {
@@ -1270,11 +659,7 @@ export default defineComponent({
       relativeTimePeriod: params.period ? params.period : "15m",
     });
 
-    // const getDashboard = () => {
-    //   return currentDashboard.dashboardId;
-    // };
     const loadDashboard = async () => {
-      // console.time("AddPanel:loadDashboard");
       let data = JSON.parse(
         JSON.stringify(
           (await getDashboard(
@@ -1284,9 +669,7 @@ export default defineComponent({
           )) ?? {},
         ),
       );
-      // console.timeEnd("AddPanel:loadDashboard");
 
-      // console.time("AddPanel:loadDashboard:after");
       currentDashboardData.data = data;
 
       if (
@@ -1353,7 +736,7 @@ export default defineComponent({
 
       // Capture initial variable names on first load (only once during mount)
       if (initialVariableNames.value.length === 0) {
-        initialVariableNames.value = 
+        initialVariableNames.value =
           currentDashboardData.data?.variables?.list?.map((v: any) => v.name) || [];
       }
 
@@ -1467,10 +850,9 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.data.type,
       async () => {
-        // console.time("watch:dashboardPanelData.data.type");
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-        // console.timeEnd("watch:dashboardPanelData.data.type");
+        panelEditorRef.value?.initChartData(dashboardPanelData.data);
       },
     );
     const dateTimeForVariables = ref(null);
@@ -1487,95 +869,22 @@ export default defineComponent({
       };
     };
     watch(selectedDate, () => {
-      // console.time("watch:selectedDate");
       updateDateTime(selectedDate.value);
-      // console.timeEnd("watch:selectedDate");
     });
 
     // resize the chart when config panel is opened and closed
     watch(
       () => dashboardPanelData.layout.isConfigPanelOpen,
       () => {
-        // console.time("watch:dashboardPanelData.layout.isConfigPanelOpen");
         window.dispatchEvent(new Event("resize"));
-        // console.timeEnd("watch:dashboardPanelData.layout.isConfigPanelOpen");
       },
     );
 
-    // Generate the query when the fields are updated
-    watch(
-      () => [
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.x,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.latitude,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.longitude,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.weight,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.source,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.target,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.value,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.name,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.value_for_maps,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.limit,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].joins,
-      ],
-      () => {
-        // only continue if current mode is auto query generation
-        if (
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery
-        ) {
-          // makeAutoSQLQuery is async function
-          makeAutoSQLQuery();
-        }
-      },
-      { deep: true },
-    );
 
     // resize the chart when query editor is opened and closed
     watch(
       () => dashboardPanelData.layout.showQueryBar,
       (newValue) => {
-        // console.time("watch:dashboardPanelData.layout.showQueryBar");
         if (!newValue) {
           dashboardPanelData.layout.querySplitter = 41;
         } else {
@@ -1584,21 +893,15 @@ export default defineComponent({
               expandedSplitterHeight.value;
           }
         }
-        // console.timeEnd("watch:dashboardPanelData.layout.showQueryBar");
       },
     );
 
     const runQuery = (withoutCache = false) => {
       try {
-        // console.time("runQuery");
         if (!isValid(true, true)) {
           // do not return if query is not valid
           // allow to fire query
-          // return;
         }
-        // if (dashboardPanelData.data.type === "custom_chart") {
-        //   runJavaScriptCode();
-        // }
 
         // should use cache flag
         shouldRefreshWithoutCache.value = withoutCache;
@@ -1609,10 +912,15 @@ export default defineComponent({
 
         // copy the data object excluding the reactivity
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        panelEditorRef.value?.initChartData(dashboardPanelData.data);
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
         updateDateTime(selectedDate.value);
-        // console.timeEnd("runQuery");
+
+        // Call PanelEditor's runQuery if available
+        if (panelEditorRef.value) {
+          panelEditorRef.value.runQuery(withoutCache);
+        }
       } catch (err) {
         // Error during query execution
       }
@@ -1688,11 +996,9 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.data,
       () => {
-        // console.time("watch:dashboardPanelData.data");
         if (isPanelConfigWatcherActivated) {
           isPanelConfigChanged.value = true;
         }
-        // console.timeEnd("watch:dashboardPanelData.data");
       },
       { deep: true },
     );
@@ -1765,15 +1071,6 @@ export default defineComponent({
       // will push errors in errors array
       validatePanel(errors, isFieldsValidationRequired);
 
-      // show all the errors
-      // for (let index = 0; index < errors.length; index++) {
-      //   $q.notify({
-      //     type: "negative",
-      //     message: errors[index],
-      //     timeout: 5000,
-      //   });
-      // }
-
       if (errors.length) {
         showErrorNotification(
           "There are some errors, please fix them and try again",
@@ -1802,21 +1099,20 @@ export default defineComponent({
       }
 
       try {
-        // console.time("savePanelChangesToDashboard");
         if (editMode.value) {
           // If variables were created during edit session, we need to save them too
           if (variablesCreatedInSession.value.length > 0) {
             // Update variables with "current_panel" to use the actual panel ID
-            const currentPanelId = route.query.panelId as string;
+            const currentPanelIdValue = route.query.panelId as string;
 
             variablesWithCurrentPanel.value.forEach((variableName) => {
               const variable = currentDashboardData.data?.variables?.list?.find(
                 (v: any) => v.name === variableName,
               );
-              if (variable && variable.panels && currentPanelId) {
+              if (variable && variable.panels && currentPanelIdValue) {
                 const index = variable.panels.indexOf("current_panel");
                 if (index !== -1) {
-                  variable.panels[index] = currentPanelId;
+                  variable.panels[index] = currentPanelIdValue;
                 }
               }
             });
@@ -1875,6 +1171,7 @@ export default defineComponent({
 
           dashboardPanelData.data.id = panelId;
           chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+          panelEditorRef.value?.initChartData(dashboardPanelData.data);
 
           // Replace "current_panel" with actual panel ID in variables before saving
           if (variablesWithCurrentPanel.value.length > 0) {
@@ -1919,14 +1216,9 @@ export default defineComponent({
             return;
           }
         }
-        // console.timeEnd("savePanelChangesToDashboard");
 
         isPanelConfigWatcherActivated = false;
         isPanelConfigChanged.value = false;
-
-        // Clear variables created during session since panel is being saved
-        variablesCreatedInSession.value = [];
-        variablesWithCurrentPanel.value = [];
 
         // Clear variables created during session since panel is being saved
         variablesCreatedInSession.value = [];
@@ -1966,37 +1258,7 @@ export default defineComponent({
       }
     };
 
-    const layoutSplitterUpdated = () => {
-      window.dispatchEvent(new Event("resize"));
-    };
-
-    // Handler for custom chart template selection
-    const handleCustomChartTemplateSelected = (templateCode: string) => {
-      // Update the custom chart content with the selected template
-      dashboardPanelData.data.customChartContent = templateCode;
-    };
-
-    watch(
-      () => dashboardPanelData.layout.splitter,
-      (newVal) => {
-        // Only update showFieldList if splitter crosses the threshold
-        // This prevents infinite loops and ensures proper sync
-        if (newVal > 0 && !dashboardPanelData.layout.showFieldList) {
-          dashboardPanelData.layout.showFieldList = true;
-        } else if (newVal === 0 && dashboardPanelData.layout.showFieldList) {
-          dashboardPanelData.layout.showFieldList = false;
-        }
-      },
-    );
-
     const expandedSplitterHeight = ref(null);
-
-    const querySplitterUpdated = (newHeight: any) => {
-      window.dispatchEvent(new Event("resize"));
-      if (dashboardPanelData.layout.showQueryBar) {
-        expandedSplitterHeight.value = newHeight;
-      }
-    };
 
     const handleChartApiError = (errorMsg: any) => {
       if (typeof errorMsg === "string") {
@@ -2014,19 +1276,7 @@ export default defineComponent({
       }
     };
 
-    // Handle limit number of series warning from PanelSchemaRenderer
-    const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
-      limitNumberOfSeriesWarningMessage.value = message;
-    };
-
-    const handleResultMetadataUpdate = (metadata: any) => {
-      maxQueryRangeWarning.value = processQueryMetadataErrors(
-        metadata,
-        store.state.timezone,
-      );
-    };
     const onDataZoom = (event: any) => {
-      // console.time("onDataZoom");
       const selectedDateObj = {
         start: new Date(event.start),
         end: new Date(event.end),
@@ -2043,238 +1293,7 @@ export default defineComponent({
 
       // set it as a absolute time
       dateTimePickerRef?.value?.setCustomDate("absolute", selectedDateObj);
-      // console.timeEnd("onDataZoom");
     };
-
-    const updateVrlFunctionFieldList = (fieldList: any) => {
-      // extract all panelSchema alias
-      const aliasList: any = [];
-
-      // if auto sql
-      if (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery === false
-      ) {
-        // remove panelschema fields from field list
-
-        // add x axis alias
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.x?.forEach((it: any) => {
-          if (!it.isDerived) {
-            aliasList.push(it.alias);
-          }
-        });
-
-        // add breakdown alias
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.breakdown?.forEach((it: any) => {
-          if (!it.isDerived) {
-            aliasList.push(it.alias);
-          }
-        });
-
-        // add y axis alias
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.y?.forEach((it: any) => {
-          if (!it.isDerived) {
-            aliasList.push(it.alias);
-          }
-        });
-
-        // add z axis alias
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.z?.forEach((it: any) => {
-          if (!it.isDerived) {
-            aliasList.push(it.alias);
-          }
-        });
-
-        // add latitude alias
-        if (
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.latitude?.alias &&
-          !dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.latitude?.isDerived
-        ) {
-          aliasList.push(
-            dashboardPanelData?.data?.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.fields?.latitude.alias,
-          );
-        }
-
-        // add longitude alias
-        if (
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.longitude?.alias &&
-          !dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.longitude?.isDerived
-        ) {
-          aliasList.push(
-            dashboardPanelData?.data?.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.fields?.longitude.alias,
-          );
-        }
-
-        // add weight alias
-        if (
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.weight?.alias &&
-          !dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.weight?.isDerived
-        ) {
-          aliasList.push(
-            dashboardPanelData?.data?.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.fields?.weight.alias,
-          );
-        }
-
-        // add source alias
-        if (
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.source?.alias &&
-          !dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.source?.isDerived
-        ) {
-          aliasList.push(
-            dashboardPanelData?.data?.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.fields?.source.alias,
-          );
-        }
-
-        // add target alias
-        if (
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.target?.alias &&
-          !dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.target?.isDerived
-        ) {
-          aliasList.push(
-            dashboardPanelData?.data?.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.fields?.target.alias,
-          );
-        }
-
-        // add source alias
-        if (
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.value?.alias &&
-          !dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.value?.isDerived
-        ) {
-          aliasList.push(
-            dashboardPanelData?.data?.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.fields?.value.alias,
-          );
-        }
-
-        // add name alias
-        if (
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.name?.alias &&
-          !dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.name?.isDerived
-        ) {
-          aliasList.push(
-            dashboardPanelData?.data?.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.fields?.name.alias,
-          );
-        }
-
-        // add value_for_maps alias
-        if (
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.value_for_maps?.alias &&
-          !dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.value_for_maps?.isDerived
-        ) {
-          aliasList.push(
-            dashboardPanelData?.data?.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.fields?.value_for_maps.alias,
-          );
-        }
-      }
-
-      // remove custom query fields from field list
-      dashboardPanelData.meta.stream.customQueryFields.forEach((it: any) => {
-        aliasList.push(it.name);
-      });
-
-      // rest will be vrl function fields
-      fieldList = fieldList
-        .filter(
-          (field: any) =>
-            !aliasList.some(
-              (alias: string) => alias.toLowerCase() === field.toLowerCase(),
-            ),
-        )
-        .map((field: any) => ({ name: field, type: "Utf8" }));
-
-      dashboardPanelData.meta.stream.vrlFunctionFieldList = fieldList;
-    };
-
-    const hoveredSeriesState = ref({
-      hoveredSeriesName: "",
-      panelId: -1,
-      dataIndex: -1,
-      seriesIndex: -1,
-      hoveredTime: null,
-      setHoveredSeriesName: function (name: string) {
-        hoveredSeriesState.value.hoveredSeriesName = name ?? "";
-      },
-      setIndex: function (
-        dataIndex: number,
-        seriesIndex: number,
-        panelId: any,
-        hoveredTime?: any,
-      ) {
-        hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
-        hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
-        hoveredSeriesState.value.panelId = panelId ?? -1;
-        hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
-      },
-    });
-
-    const currentPanelData = computed(() => {
-      // panelData is a ref exposed by PanelSchemaRenderer
-      const rendererData = panelSchemaRendererRef.value?.panelData || {};
-      return {
-        ...rendererData,
-        config: dashboardPanelData.data.config || {},
-      };
-    });
-
-    // used provide and inject to share data between components
-    // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
-    provide("hoveredSeriesState", hoveredSeriesState);
 
     // [START] cancel running queries
 
@@ -2314,16 +1333,6 @@ export default defineComponent({
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
-    const collapseFieldList = () => {
-      if (dashboardPanelData.layout.showFieldList) {
-        dashboardPanelData.layout.splitter = 0;
-        dashboardPanelData.layout.showFieldList = false;
-      } else {
-        dashboardPanelData.layout.splitter = 20;
-        dashboardPanelData.layout.showFieldList = true;
-      }
-    };
-
     const onApplyBtnClick = () => {
       if (searchRequestTraceIds.value.length > 0) {
         cancelAddPanelQuery();
@@ -2355,6 +1364,7 @@ export default defineComponent({
 
         if (!configNeedsApiCall) {
           chartData.value = JSON.parse(JSON.stringify(newVal));
+          panelEditorRef.value?.initChartData(newVal);
 
           window.dispatchEvent(new Event("resize"));
         }
@@ -2588,14 +1598,7 @@ export default defineComponent({
       goBack,
       savePanelChangesToDashboard,
       runQuery,
-      layoutSplitterUpdated,
-      handleCustomChartTemplateSelected,
-      selectedCustomChartType,
-      showCustomChartTypeSelector,
-      openCustomChartTypeSelector,
-      handleChartTypeSelection,
       expandedSplitterHeight,
-      querySplitterUpdated,
       currentDashboard,
       list,
       dashboardPanelData,
@@ -2620,7 +1623,6 @@ export default defineComponent({
       panelTitle,
       onDataZoom,
       showTutorial,
-      updateVrlFunctionFieldList,
       queryParams: route.query as any,
       initialVariableValues,
       lastTriggeredAt,
@@ -2629,26 +1631,15 @@ export default defineComponent({
       cancelAddPanelQuery,
       disable,
       config,
-      collapseFieldList,
-      splitterModel,
       inputStyle,
       setTimeForVariables,
       dateTimeForVariables,
-      seriesDataUpdate,
       seriesData,
       onApplyBtnClick,
       shouldRefreshWithoutCache,
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,
       errorMessage,
-      handleLimitNumberOfSeriesWarningMessage,
-      handleResultMetadataUpdate,
-      outlinedWarning,
-      symOutlinedDataInfoAlert,
-      outlinedRunningWithErrors,
-      showLegendsDialog,
-      currentPanelData,
-      panelSchemaRendererRef,
       isAddVariableOpen,
       selectedVariableToEdit,
       handleOpenAddVariable,
@@ -2656,12 +1647,8 @@ export default defineComponent({
       handleSaveVariable,
       currentTabId,
       currentPanelId,
-      isPartialData,
-      isPanelLoading,
-      isCachedDataDifferWithCurrentTimeRange,
-      handleIsPartialDataUpdate,
-      handleLoadingStateChange,
-      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
+      panelEditorRef,
+      dashboardDataForPanelEditor,
     };
   },
   methods: {
@@ -2673,63 +1660,10 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.layout-panel-container {
-  display: flex;
-  flex-direction: column;
-}
-
-.splitter {
-  height: 4px;
-  width: 100%;
-}
-.splitter-vertical {
-  width: 4px;
-  height: 100%;
-}
-.splitter-enabled {
-  background-color: #ffffff00;
-  transition: 0.3s;
-  transition-delay: 0.2s;
-}
-
-.splitter-enabled:hover {
-  background-color: orange;
-}
-
-:deep(.query-editor-splitter .q-splitter__separator) {
-  background-color: transparent !important;
-}
-
-.field-list-sidebar-header-collapsed {
-  cursor: pointer;
-  width: 50px;
-  height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.field-list-collapsed-icon {
-  margin-top: 10px;
-  font-size: 20px;
-}
-
-.field-list-collapsed-title {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-weight: bold;
-}
-
 .dynamic-input {
   min-width: 200px;
   max-width: 500px;
   transition: width 0.2s ease;
-}
-
-.warning {
-  color: var(--q-warning);
 }
 
 .add-variable-drawer-overlay {

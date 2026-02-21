@@ -44,3 +44,62 @@ export const decodeVisualizationConfig = (encodedConfig: string) => {
     return null;
   }
 };
+
+// ============================================================================
+// Build Page Configuration Helpers
+// ============================================================================
+
+/**
+ * Extract build configuration from dashboard panel data for URL sharing
+ * Includes builder fields, chart type, and config
+ */
+export const getBuildConfig = (dashboardPanelData: any) => {
+  if (!dashboardPanelData?.data) {
+    return null;
+  }
+
+  const currentQuery = dashboardPanelData.data.queries?.[0];
+  if (!currentQuery) {
+    return null;
+  }
+
+  return {
+    config: dashboardPanelData.data.config || {},
+    type: dashboardPanelData.data.type || "line",
+    fields: {
+      stream: currentQuery.fields?.stream || "",
+      stream_type: currentQuery.fields?.stream_type || "logs",
+      x: currentQuery.fields?.x || [],
+      y: currentQuery.fields?.y || [],
+      breakdown: currentQuery.fields?.breakdown || [],
+      filter: currentQuery.fields?.filter || { filterType: "group", logicalOperator: "AND", conditions: [] },
+    },
+    joins: currentQuery.joins || [],
+    customQuery: currentQuery.customQuery || false,
+    query: currentQuery.query || "",
+  };
+};
+
+/**
+ * Encode build configuration for URL
+ */
+export const encodeBuildConfig = (config: any) => {
+  try {
+    return b64EncodeUnicode(JSON.stringify(config));
+  } catch (error) {
+    console.error("Failed to encode build config:", error);
+    return null;
+  }
+};
+
+/**
+ * Decode build configuration from URL
+ */
+export const decodeBuildConfig = (encodedConfig: string) => {
+  try {
+    return JSON.parse(b64DecodeUnicode(encodedConfig) ?? "{}");
+  } catch (error) {
+    console.error("Failed to decode build config:", error);
+    return null;
+  }
+};

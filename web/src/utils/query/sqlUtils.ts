@@ -293,26 +293,73 @@ export const isGivenFieldInOrderBy = async (
   }
 };
 
-// Function to extract field names, aliases, and aggregation functions
-export function extractFields(parsedAst: any, timeField: string) {
+/**
+ * Reconstruct a CASE expression from AST node to SQL string
+ * @param caseExpr The CASE expression AST node
+ * @param parser The SQL parser instance (must be initialized)
+ * @returns SQL string representation of the CASE expression
+ */
+function reconstructCaseExpression(caseExpr: any, sqlParser: any): string {
+  try {
+    // Use the parser to sqlify just the case expression
+    // We wrap it in a minimal SELECT to get the expression
+    const tempAst = {
+      type: "select",
+      columns: [{ expr: caseExpr, as: null }],
+      from: [{ table: "temp", as: null }],
+    };
+    const sql = sqlParser.sqlify(tempAst);
+    // Extract just the CASE expression from "SELECT CASE ... FROM temp"
+    // Use [\s\S] instead of . with s flag for cross-line matching
+    const match = sql.match(/SELECT\s+(CASE[\s\S]+?END)\s+FROM/i);
+    if (match && match[1]) {
+      return match[1].replace(/`/g, '"');
+    }
+    // Fallback: return the whole expression part
+    const selectMatch = sql.match(/SELECT\s+([\s\S]+?)\s+FROM/i);
+    if (selectMatch && selectMatch[1]) {
+      return selectMatch[1].replace(/`/g, '"');
+    }
+    return "";
+  } catch (e) {
+    return "";
+  }
+}
+
+// Function to extract field names, aliases, aggregation functions, and stream aliases
+export function extractFields(parsedAst: any, timeField: string, sqlParser?: any) {
   let fields = parsedAst.columns.map((column: any) => {
-    const field = {
+    const field: any = {
       column: "",
       alias: "",
       aggregationFunction: null,
+      streamAlias: null, // For JOIN queries - which stream/table the field belongs to
     };
 
     if (column.expr.type === "column_ref") {
       field.column = column?.expr?.column?.expr?.value ?? timeField;
+      // Extract table/streamAlias for JOIN queries (e.g., "stream_0.field_name")
+      field.streamAlias = column?.expr?.table || null;
     } else if (column.expr.type === "aggr_func") {
       field.column = column?.expr?.args?.expr?.column?.expr?.value ?? timeField;
       field.aggregationFunction = column?.expr?.name?.toLowerCase() ?? "count";
+      // Extract table/streamAlias from aggregation function argument
+      field.streamAlias = column?.expr?.args?.expr?.table || null;
     } else if (column.expr.type === "function") {
       // histogram field
       field.column =
         column?.expr?.args?.value[0]?.column?.expr?.value ?? timeField;
       field.aggregationFunction =
         column?.expr?.name?.name[0]?.value?.toLowerCase() ?? "histogram";
+      // Extract table/streamAlias from function argument
+      field.streamAlias = column?.expr?.args?.value?.[0]?.table || null;
+    } else if (column.expr.type === "case" && sqlParser) {
+      // CASE/WHEN expression - treat as raw field
+      const rawQuery = reconstructCaseExpression(column.expr, sqlParser);
+      field.type = "raw";
+      field.rawQuery = rawQuery;
+      field.column = ""; // No column for raw expressions
+      field.aggregationFunction = null;
     }
 
     field.alias = column?.as ?? field?.column ?? timeField;
@@ -331,6 +378,79 @@ export function extractFields(parsedAst: any, timeField: string) {
   }
 
   return fields;
+}
+
+/**
+ * Extract JOIN information from parsed AST
+ * Returns array of join objects matching the dashboard panel format
+ */
+export function extractJoins(parsedAst: any): any[] {
+  const joins: any[] = [];
+
+  if (!parsedAst?.from || !Array.isArray(parsedAst.from)) {
+    return joins;
+  }
+
+  // The first item in 'from' is the main table, subsequent items with 'join' property are JOINs
+  for (let i = 1; i < parsedAst.from.length; i++) {
+    const fromItem = parsedAst.from[i];
+
+    if (fromItem.join) {
+      // Parse join type from "INNER JOIN", "LEFT JOIN", etc.
+      const joinTypeMatch = fromItem.join.match(/^(INNER|LEFT|RIGHT|FULL|CROSS)/i);
+      const joinType = joinTypeMatch ? joinTypeMatch[1].toLowerCase() : "inner";
+
+      // Extract join conditions from ON clause
+      const conditions: any[] = [];
+      if (fromItem.on) {
+        extractJoinConditions(fromItem.on, conditions);
+      }
+
+      const joinObj = {
+        stream: fromItem.table,
+        streamAlias: fromItem.as || `stream_${i - 1}`,
+        joinType: joinType,
+        conditions: conditions,
+      };
+      joins.push(joinObj);
+    }
+  }
+
+  return joins;
+}
+
+/**
+ * Helper to recursively extract join conditions from ON clause
+ */
+function extractJoinConditions(onClause: any, conditions: any[]): void {
+  if (!onClause) return;
+
+  if (onClause.type === "binary_expr") {
+    if (onClause.operator === "AND" || onClause.operator === "OR") {
+      // Recurse into left and right
+      extractJoinConditions(onClause.left, conditions);
+      extractJoinConditions(onClause.right, conditions);
+    } else if (["=", "!=", "<>", ">", "<", ">=", "<="].includes(onClause.operator)) {
+      // Comparison condition like "a.field = b.field" or "a.field >= b.field"
+      const leftField = {
+        streamAlias: onClause.left?.table || null,
+        field: onClause.left?.column?.expr?.value || onClause.left?.column || "",
+      };
+      const rightField = {
+        streamAlias: onClause.right?.table || null,
+        field: onClause.right?.column?.expr?.value || onClause.right?.column || "",
+      };
+
+      // Normalize "<>" to "!=" for consistency
+      const operation = onClause.operator === "<>" ? "!=" : onClause.operator;
+
+      conditions.push({
+        leftField,
+        rightField,
+        operation,
+      });
+    }
+  }
 }
 
 function parseCondition(condition: any) {
@@ -386,22 +506,31 @@ function parseCondition(condition: any) {
         condition.operator == "<=" ||
         condition.operator == ">="
       ) {
+        // Extract column with streamAlias for JOIN support
+        const columnObj = {
+          field: condition?.left?.column?.expr?.value,
+          streamAlias: condition?.left?.table || null,
+        };
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column?.expr?.value,
+          column: columnObj,
           operator: condition?.operator,
-          value: `'${condition?.right?.value}'`,
+          value: `${condition?.right?.value}`,
           logicalOperator: "AND",
           filterType: "condition",
         };
       } else if (condition.operator == "!=" || condition.operator == "<>") {
+        const columnObj = {
+          field: condition?.left?.column?.expr?.value,
+          streamAlias: condition?.left?.table || null,
+        };
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column?.expr?.value,
+          column: columnObj,
           operator: "<>",
-          value: `'${condition?.right?.value}'`,
+          value: `${condition?.right?.value}`,
           logicalOperator: "AND",
           filterType: "condition",
         };
@@ -411,11 +540,15 @@ function parseCondition(condition: any) {
         const values =
           condition?.right?.value?.map((value: any) => `'${value?.value}'`) ??
           [];
+        const columnObj = {
+          field: condition?.left?.column?.expr?.value ?? "",
+          streamAlias: condition?.left?.table || null,
+        };
 
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column?.expr?.value ?? "",
+          column: columnObj,
           operator: condition?.operator,
           value: values?.join(","),
           logicalOperator: "AND",
@@ -426,11 +559,15 @@ function parseCondition(condition: any) {
         const values = condition.right.value.map(
           (value: any) => `${value?.value}`,
         );
+        const columnObj = {
+          field: condition?.left?.column?.expr?.value ?? "",
+          streamAlias: condition?.left?.table || null,
+        };
 
         return {
           type: "list",
           values: values,
-          column: condition?.left?.column?.expr?.value ?? "",
+          column: columnObj,
           operator: null,
           value: null,
           logicalOperator: "AND",
@@ -438,10 +575,14 @@ function parseCondition(condition: any) {
         };
       } else if (condition.operator == "IS") {
         // consider this as "IS NULL"
+        const columnObj = {
+          field: condition?.left?.column?.expr?.value,
+          streamAlias: condition?.left?.table || null,
+        };
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column?.expr?.value,
+          column: columnObj,
           operator: "Is Null",
           value: null,
           logicalOperator: "AND",
@@ -449,10 +590,14 @@ function parseCondition(condition: any) {
         };
       } else if (condition.operator == "IS NOT") {
         // consider this as "IS NOT NULL"
+        const columnObj = {
+          field: condition?.left?.column?.expr?.value,
+          streamAlias: condition?.left?.table || null,
+        };
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column?.expr?.value,
+          column: columnObj,
           operator: "Is Not Null",
           value: null,
           logicalOperator: "AND",
@@ -461,6 +606,10 @@ function parseCondition(condition: any) {
       } else if (condition?.operator == "LIKE") {
         // Check the pattern to determine the specific operator
         const rightValue = condition?.right?.value || "";
+        const columnObj = {
+          field: condition?.left?.column?.expr?.value,
+          streamAlias: condition?.left?.table || null,
+        };
 
         if (rightValue.startsWith("%") && rightValue.endsWith("%")) {
           // Pattern: %value% - Contains
@@ -468,7 +617,7 @@ function parseCondition(condition: any) {
           return {
             type: "condition",
             values: [],
-            column: condition?.left?.column?.expr?.value,
+            column: columnObj,
             operator: "Contains",
             value: `${value}`,
             logicalOperator: "AND",
@@ -480,7 +629,7 @@ function parseCondition(condition: any) {
           return {
             type: "condition",
             values: [],
-            column: condition?.left?.column?.expr?.value,
+            column: columnObj,
             operator: "Ends With",
             value: `${value}`,
             logicalOperator: "AND",
@@ -492,7 +641,7 @@ function parseCondition(condition: any) {
           return {
             type: "condition",
             values: [],
-            column: condition?.left?.column?.expr?.value,
+            column: columnObj,
             operator: "Starts With",
             value: `${value}`,
             logicalOperator: "AND",
@@ -503,7 +652,7 @@ function parseCondition(condition: any) {
           return {
             type: "condition",
             values: [],
-            column: condition?.left?.column?.expr?.value,
+            column: columnObj,
             operator: "Contains",
             value: `${rightValue}`,
             logicalOperator: "AND",
@@ -516,10 +665,14 @@ function parseCondition(condition: any) {
         const value = condition?.right?.value
           ?.replace(/^%/, "")
           .replace(/%$/, "");
+        const columnObj = {
+          field: condition?.left?.column?.expr?.value,
+          streamAlias: condition?.left?.table || null,
+        };
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column?.expr?.value,
+          column: columnObj,
           operator: "Not Contains",
           value: `${value}`,
           logicalOperator: "AND",
@@ -541,10 +694,14 @@ function parseCondition(condition: any) {
       const conditionsWithoutFieldName = ["match_all"];
 
       if (conditionsWithFieldName.includes(conditionName)) {
+        const columnObj = {
+          field: condition?.args?.value[0]?.column?.expr?.value ?? "",
+          streamAlias: condition?.args?.value[0]?.table || null,
+        };
         return {
           type: "condition",
           values: [],
-          column: condition?.args?.value[0]?.column?.expr?.value ?? "",
+          column: columnObj,
           operator: conditionName,
           value: condition?.args?.value[1]?.value ?? "",
           logicalOperator: "AND",
@@ -628,11 +785,13 @@ export const getFieldsFromQuery = async (
     const ast: any = parser.astify(query);
 
     const streamName = extractTableName(ast) ?? null;
-    let fields = extractFields(ast, timeField);
+    // Pass parser to extractFields for CASE/WHEN reconstruction
+    let fields = extractFields(ast, timeField, parser);
     let filters: any = extractFilters(ast);
+    const joins = extractJoins(ast);
 
-    // remove wrong fields and filters
-    fields = fields.filter((field: any) => field.column);
+    // remove wrong fields and filters (but keep raw fields)
+    fields = fields.filter((field: any) => field.column || field.type === "raw");
 
     // if type is condition
     if (filters?.filterType === "condition") {
@@ -647,6 +806,7 @@ export const getFieldsFromQuery = async (
       fields,
       filters,
       streamName,
+      joins,
     };
   } catch (error) {
     return {
@@ -668,6 +828,7 @@ export const getFieldsFromQuery = async (
         conditions: [],
       },
       streamName: null,
+      joins: [],
     };
   }
 };
@@ -925,14 +1086,14 @@ const processField = (field: any) => {
   }
 };
 
-function buildJoinConditions(conditions: any[]) {
+function buildJoinConditions(conditions: any[]): any {
   if (!conditions || conditions.length === 0) return null;
 
   if (conditions.length === 1) {
     return createBinaryExpr(conditions[0]);
   }
 
-  let conditionTree = createBinaryExpr(conditions[0]);
+  let conditionTree: any = createBinaryExpr(conditions[0]);
 
   for (let i = 1; i < conditions.length; i++) {
     conditionTree = {

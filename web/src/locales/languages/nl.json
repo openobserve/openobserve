@@ -112,7 +112,10 @@
     "id": "ID",
     "getStarted": "Ga aan de slag",
     "reset": "Resetten",
-    "retry": "Probeer het opnieuw"
+    "retry": "Probeer het opnieuw",
+    "copy": "Kopiëren",
+    "copySuccess": "Gekopieerd naar klembord",
+    "copyError": "Kopiëren naar klembord is mislukt"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -309,7 +312,11 @@
     "show": "Laat zien",
     "editor": "Redacteur",
     "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder.",
-    "showHideColumns": "Kolommen tonen/verbergen"
+    "showHideColumns": "Kolommen tonen/verbergen",
+    "buildQuery": "Bouwen",
+    "enableSqlModeForBuild": "Schakel de SQL-modus in en selecteer een enkele stream om de querybuilder te gebruiken",
+    "applyToSearch": "Toepassen om te zoeken",
+    "complexQueryDetected": "Complexe zoekopdracht gedetecteerd. Met behulp van de aangepaste modus."
   },
   "menu": {
     "home": "Home",
@@ -1484,7 +1491,10 @@
     "SQL": "SQL",
     "builder": "Bouwer",
     "custom": "Op maat",
-    "sqlBuilder": "SQL Builder"
+    "sqlBuilder": "SQL Builder",
+    "generatedSql": "Gegenereerde SQL",
+    "enterCustomSql": "Voer uw aangepaste SQL-query in...",
+    "customSql": "SQL op maat"
   },
   "home": {
     "streams": "Streams",
