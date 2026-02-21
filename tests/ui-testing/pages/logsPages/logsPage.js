@@ -1813,9 +1813,12 @@ export class LogsPage {
         try {
             // Wait for any ongoing search to complete by checking for the logs table
             // This indicates the search triggered by applySavedView has finished
-            await this.waitForSearchResults().catch(() => {
+            // Note: We check for the table itself, not specific columns, since columns
+            // vary depending on the stream and saved view
+            const table = this.page.locator(this.logsTable);
+            await table.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {
                 // Ignore timeout - there might not be a search running
-                // (e.g., first time opening the dialog)
+                // (e.g., first time opening the dialog or no data)
             });
 
             // Extra wait for the search to fully settle and UI to update
@@ -1971,23 +1974,32 @@ export class LogsPage {
 
     async clickDeleteSavedViewButton(savedViewName) {
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
-        
+
+        // Close any open saved views dialog from previous operations
+        const backdrop = this.page.locator('.q-dialog__backdrop');
+        const isBackdropVisible = await backdrop.isVisible().catch(() => false);
+        if (isBackdropVisible) {
+            await this.page.keyboard.press('Escape');
+            await this.waitForTimeout(500);
+            await backdrop.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
+        }
+
         // Wait for the saved views area to be stable after navigation
         await this.waitForTimeout(2000);
-        
+
         // Ensure saved views panel is expanded and wait for stability
         await this.clickSavedViewsExpand();
         await this.waitForTimeout(1000);
-        
+
         // Wait for the search input to be stable and ready
         await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'attached', timeout: 5000 });
         await this.waitForTimeout(500);
-        
+
         // Click and fill the search input with better error handling
         await this.page.locator(this.savedViewSearchInput).click({ force: true });
         await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
         await this.waitForTimeout(1500);
-        
+
         // Wait for and click the delete button
         await this.page.locator(deleteButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(deleteButtonSelector).click({ force: true });
