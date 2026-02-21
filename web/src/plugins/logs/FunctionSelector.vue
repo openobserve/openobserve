@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tooltip>
       </q-toggle>
     </div>
-    <div style="border-right: 1px solid var(--o2-border-color)">
+    <div>
       <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
         selectedFunctionTooltip
       }}</q-tooltip>
