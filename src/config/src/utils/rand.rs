@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use rand::{
-    Rng,
+    RngExt,
     distr::{Alphanumeric, SampleString},
 };
 
