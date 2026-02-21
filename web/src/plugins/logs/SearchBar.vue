@@ -159,6 +159,7 @@ alt="Quick Mode" class="toolbar-icon" />
         </div>
         <!-- this is the button group responsible for showing all the utilities -->
         <q-btn
+          data-test="logs-search-bar-utilities-menu-btn"
           class="group-menu-btn element-box-shadow"
           no-caps
           menu-anchor="bottom left"
@@ -1267,10 +1268,7 @@ class="q-pr-sm q-pt-xs" />
                   class="saved-view-table full-height"
                   no-hover
                   :rows-per-page-options="[]"
-                  :hide-bottom="
-                    searchObj.data.savedViews.length <= rowsPerPage ||
-                    searchObj.data.savedViews.length == 0
-                  "
+                  :hide-bottom="searchObj.data.savedViews.length == 0"
                 >
                   <template #top-right>
                     <div class="full-width">
@@ -1401,10 +1399,10 @@ class="q-pr-sm q-pt-xs" />
                   :rows="localSavedViews"
                   :row-key="(row) => 'favorite_saved_view_' + row.view_name"
                   hide-header
-                  hide-bottom
                   :wrap-cells="searchObj.meta.resultGrid.wrapCells"
                   class="saved-view-table full-height"
-                  :rows-per-page-options="[0]"
+                  :rows-per-page-options="[]"
+                  :hide-bottom="true"
                 >
                   <template #top-right>
                     <q-item style="padding: 0px"
