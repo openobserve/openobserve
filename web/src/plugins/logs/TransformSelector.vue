@@ -15,28 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="toolbar-toggle-container float-left">
-    <q-toggle
-      data-test="logs-search-bar-show-query-toggle-btn"
-      v-model="searchObj.meta.showTransformEditor"
-      class="o2-toggle-button-xs element-box-shadow"
-      size="xs"
-      flat
-      :disable="!searchObj.data.transformType"
-    >
-      <q-icon :name="transformIcon" class="toolbar-icon-in-toggle" :class="transformsLabel" />
-      <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
-        {{ getTransformLabelTooltip }}
-      </q-tooltip>
-    </q-toggle>
-  </div>
-
   <q-btn-group
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs tw-h-[32px] transform-selector element-box-shadow el-border"
+    class="q-pa-none float-left q-mr-xs tw:h-[32px] transform-selector element-box-shadow el-border"
   >
-    <div>
-      <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">{{
+    <div class="tw:flex tw:items-center">
+      <q-toggle
+        data-test="logs-search-bar-show-query-toggle-btn"
+        v-model="searchObj.meta.showTransformEditor"
+        class="o2-toggle-button-xs"
+        size="xs"
+        flat
+        :disable="!searchObj.data.transformType"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-toggle-button-xs-dark'
+            : 'o2-toggle-button-xs-light'
+        "
+      >
+        <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
+          {{ getTransformLabelTooltip }}
+        </q-tooltip>
+      </q-toggle>
+    </div>
+    <div style="border-right: 1px solid var(--o2-border-color)">
+      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
         transformsLabel
       }}</q-tooltip>
       <q-btn-dropdown
@@ -44,12 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="functionModel"
         size="12px"
         :icon="transformIcon"
-        :label="transformsLabel"
         no-caps
-        class="btn-function no-case q-pl-sm q-pr-none no-border no-outline tw-border-none"
+        class="btn-function no-case q-pr-none no-border no-outline tw:border-none"
         :class="`${searchObj.data.transformType || 'transform'}-icon`"
         label-class="no-case"
       >
+        <q-tooltip :delay="0">
+          {{ transformsLabel }}
+        </q-tooltip>
         <q-list data-test="logs-search-saved-function-list">
           <!-- Search Input -->
           <div

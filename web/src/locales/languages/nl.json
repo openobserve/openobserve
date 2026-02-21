@@ -277,7 +277,16 @@
     "transformLabel": "Transformeren",
     "addToDashboard": "Aan dashboard toevoegen",
     "selectStream": "Selecteer Stream",
-    "pattern_summary": "Toont 1 tot 50 van de {totalEvents} -gebeurtenissen en {PatternsFound} -patronen gevonden in {logsAnalyzed} -gebeurtenissen in {totalTime} ms."
+    "pattern_summary": "Toont 1 tot 50 van de {totalEvents} -gebeurtenissen en {PatternsFound} -patronen gevonden in {logsAnalyzed} -gebeurtenissen in {totalTime} ms.",
+    "toggleFunctionEditor": "Functie-editor in- en uitschakelen",
+    "hide": "Verstoppen",
+    "show": "Laat zien",
+    "editor": "Redacteur",
+    "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder.",
+    "showHideColumns": "Kolommen tonen/verbergen",
+    "autoRefresh": "Automatisch verversen",
+    "createSavedView": "Opgeslagen weergave maken",
+    "listSavedViews": "Opgeslagen weergaven weergeven"
   },
   "menu": {
     "home": "Home",

@@ -277,7 +277,16 @@
     "transformLabel": "转换",
     "addToDashboard": "添加到仪表盘",
     "selectStream": "选择数据流",
-    "pattern_summary": "在 {totalTime} 毫秒内显示在 {LogsAnalyzed} 事件中找到的 {TotalEvents} 事件和 {PatternsFound} 模式中的 1 到 50 个。"
+    "pattern_summary": "在 {totalTime} 毫秒内显示在 {LogsAnalyzed} 事件中找到的 {TotalEvents} 事件和 {PatternsFound} 模式中的 1 到 50 个。",
+    "toggleFunctionEditor": "切换函数编辑器",
+    "hide": "隐藏",
+    "show": "显示",
+    "editor": "编辑器",
+    "webUrlNotConfigured": "在管理员配置 ZO_WEB_URL 之前，共享 URL 处于禁用状态。",
+    "showHideColumns": "显示/隐藏列",
+    "autoRefresh": "自动刷新",
+    "createSavedView": "创建保存的视图",
+    "listSavedViews": "列出保存的视图"
   },
   "menu": {
     "home": "主页",
