@@ -1784,7 +1784,12 @@ export class LogsPage {
     }
 
     async clickSavedViewsButton() {
-        return await this.page.locator(this.savedViewsButton).click({ force: true });
+        // This method is used to create a new saved view
+        // It should open the utilities menu and click "Create Saved View"
+        // This is the same as clickSaveViewButton but without the dialog cleanup
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(300);
+        return await this.page.locator(this.createSavedViewButton).click();
     }
 
     async clickSavedViewsExpand() {
@@ -2910,11 +2915,19 @@ export class LogsPage {
     }
 
     async clickFunctionDropdownSave() {
+        // The save button is now a standalone button (not in dropdown)
+        // Try FunctionSelector button first, then TransformSelector button
         try {
-            await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click({ timeout: 3000 });
+            // Try FunctionSelector save button (when actions are disabled)
+            await this.page.locator('[data-test="logs-search-bar-save-function-btn"]').click({ timeout: 3000 });
         } catch (error) {
-            // If save button click fails, click the save transform button
-            await this.page.locator(this.logsSearchBarSaveTransformBtn).click();
+            try {
+                // Try TransformSelector save button (when actions are enabled)
+                await this.page.locator(this.logsSearchBarSaveTransformBtn).click({ timeout: 3000 });
+            } catch (transformError) {
+                // Fallback: Try old dropdown approach
+                await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click();
+            }
         }
     }
 
