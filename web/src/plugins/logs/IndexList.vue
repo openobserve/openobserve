@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="handleMultiStreamSelection"
       >
         <q-tooltip
-          v-if="searchObj.data.stream.selectedStream.length > 0"
+          v-if="searchObj.data.stream.selectedStream.length > 1"
           :delay="500"
           anchor="bottom left"
           self="top left"
