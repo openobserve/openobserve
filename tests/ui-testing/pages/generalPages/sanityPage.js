@@ -20,6 +20,7 @@ export class SanityPage {
         
         // Search and Refresh locators
         this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
+        this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
         
         // Pagination and Results locators
@@ -40,7 +41,10 @@ export class SanityPage {
         
         // Function locators
         this.functionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
+        // TransformSelector save button (when actions are enabled)
         this.functionSaveButton = '[data-test="logs-search-bar-save-transform-btn"]';
+        // FunctionSelector save button (when actions are disabled)
+        this.functionSaveButtonNew = '[data-test="logs-search-bar-save-function-btn"]';
         this.functionSaveButtonAlternate = '[data-test="logs-search-bar-function-dropdown"]';
         this.fnEditor = '#fnEditor';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
@@ -284,7 +288,10 @@ export class SanityPage {
         await this.page.locator(this.refreshButton).click({ force: true });
         
         await expect(this.page.getByText(/Showing 1 to 5/)).toBeVisible({ timeout: 15000 });
-        
+
+        // Reset filters is now inside utilities menu, so open menu first
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(300);
         await this.page.locator(this.resetFiltersButton).click();
         await this.page.waitForLoadState('domcontentloaded');
     }
@@ -342,27 +349,40 @@ export class SanityPage {
         await this.page.waitForTimeout(3000);
 
         // Try clicking the Save button with fallback strategies
+        // Note: The app uses different selectors based on whether actions are enabled:
+        // - TransformSelector (actions enabled): logs-search-bar-save-transform-btn
+        // - FunctionSelector (actions disabled): logs-search-bar-save-function-btn
         let saveDialogVisible = false;
 
-        // First attempt: Click primary save button
+        // First attempt: Click TransformSelector save button (actions enabled)
         try {
-          testLogger.info('Attempting to click primary function save button');
-          await this.page.locator(this.functionSaveButton).click({ timeout: 10000 });
+          testLogger.info('Attempting to click TransformSelector save button');
+          await this.page.locator(this.functionSaveButton).click({ timeout: 5000 });
           await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
           saveDialogVisible = true;
-          testLogger.info('Primary save button click succeeded');
+          testLogger.info('TransformSelector save button click succeeded');
         } catch (error) {
-          testLogger.warn('Primary save button click failed, trying alternate locator');
+          testLogger.warn('TransformSelector save button not found, trying FunctionSelector');
 
-          // Second attempt: Try alternate locator (button inside dropdown)
+          // Second attempt: Click FunctionSelector save button (actions disabled)
           try {
-            await this.page.locator(this.functionSaveButtonAlternate).getByRole('button').filter({ hasText: 'save' }).click();
+            await this.page.locator(this.functionSaveButtonNew).click({ timeout: 5000 });
             await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
             saveDialogVisible = true;
-            testLogger.info('Alternate save button click succeeded');
-          } catch (alternateError) {
-            testLogger.error('Both save button attempts failed');
-            throw new Error('Failed to open function save dialog using primary and alternate locators');
+            testLogger.info('FunctionSelector save button click succeeded');
+          } catch (functionSelectorError) {
+            testLogger.warn('FunctionSelector save button also failed, trying dropdown fallback');
+
+            // Third attempt: Try alternate locator (button inside dropdown)
+            try {
+              await this.page.locator(this.functionSaveButtonAlternate).getByRole('button').filter({ hasText: 'save' }).click();
+              await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
+              saveDialogVisible = true;
+              testLogger.info('Dropdown fallback save button click succeeded');
+            } catch (alternateError) {
+              testLogger.error('All save button attempts failed');
+              throw new Error('Failed to open function save dialog using all available locators (TransformSelector, FunctionSelector, and dropdown)');
+            }
           }
         }
         
