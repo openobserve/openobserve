@@ -309,7 +309,10 @@
     "show": "Zeige",
     "editor": "Redakteur",
     "webUrlNotConfigured": "URL teilen ist deaktiviert, bis ZO_WEB_URL von Ihrem Administrator konfiguriert wurde.",
-    "showHideColumns": "Spalten ein-/ausblenden"
+    "showHideColumns": "Spalten ein-/ausblenden",
+    "autoRefresh": "Automatische Aktualisierung",
+    "createSavedView": "Gespeicherte Ansicht erstellen",
+    "listSavedViews": "Gespeicherte Ansichten auflisten"
   },
   "menu": {
     "home": "Startseite",
