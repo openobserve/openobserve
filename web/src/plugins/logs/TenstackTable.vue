@@ -558,14 +558,14 @@ watch(
 
     await nextTick();
 
-    if (props.columns?.length && tableRows.value?.length) {
+    if (props.columns?.length && props.rows?.length) {
       processHitsInChunks(
-        tableRows.value,
+        props.rows,
         props.columns,
         true,
         props.highlightQuery,
-        200,
-        selectedStreamFtsKeys.value
+        100,
+        selectedStreamFtsKeys.value,
       );
     }
 
@@ -584,14 +584,14 @@ watch(
 
     await nextTick();
 
-    if (props.columns?.length && tableRows.value?.length) {
+    if (props.columns?.length && props.rows?.length) {
       processHitsInChunks(
-        tableRows.value,
+        props.rows,
         props.columns,
         false,
         props.highlightQuery,
         100,
-        selectedStreamFtsKeys.value
+        selectedStreamFtsKeys.value,
       );
     }
 
@@ -763,7 +763,7 @@ const rowVirtualizerOptions = computed(() => {
         ? expandedRowHeights.value[index] || 300 // Default expanded height
         : 24; // Fixed collapsed height
     },
-    overscan: 20,
+    overscan: 100,
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
         ? (element: any) => {
