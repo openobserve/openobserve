@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :placeholder="placeHolderText"
         input-debounce="0"
         behavior="menu"
+       popup-content-style="height: 500px"
         borderless
         dense
         use-input
