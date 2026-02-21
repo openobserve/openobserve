@@ -314,6 +314,42 @@ class TestBackfillJob:
             print(f"    Query {stream_name} failed: {response.text[:200]}")
         return []
 
+    def _verify_backdated_timestamps(self, hits: list, min_expected_age_minutes: float, description: str = "") -> tuple:
+        """Verify that backdated timestamps were stored correctly.
+
+        Args:
+            hits: List of query result hits
+            min_expected_age_minutes: Minimum expected age of oldest record in minutes
+            description: Optional description for logging (e.g., "2-hour-old")
+
+        Returns:
+            Tuple of (oldest_age_minutes, newest_age_minutes)
+
+        Raises:
+            AssertionError if oldest record is younger than min_expected_age_minutes
+        """
+        desc_prefix = f"{description} " if description else ""
+        print(f"  Verifying {desc_prefix}backdated timestamps...")
+
+        timestamps_ages = []
+        for hit in hits:
+            record_ts = hit.get("_timestamp", 0)
+            record_time = datetime.fromtimestamp(record_ts / 1000000, tz=timezone.utc)
+            age_minutes = (datetime.now(timezone.utc) - record_time).total_seconds() / 60
+            timestamps_ages.append(age_minutes)
+
+        oldest_age = max(timestamps_ages)
+        newest_age = min(timestamps_ages)
+        print(f"    Record timestamps range: {oldest_age:.1f}min ago (oldest) to {newest_age:.1f}min ago (newest)")
+
+        assert oldest_age > min_expected_age_minutes, \
+            f"Oldest record should be ~{min_expected_age_minutes}min ago, but is only {oldest_age:.1f}min old. " \
+            f"This indicates backdated ingestion failed - data was stored with current timestamp " \
+            f"instead of the backdated timestamp. Check ZO_INGEST_ALLOWED_UPTO setting."
+        print(f"    ✓ {desc_prefix.strip() if desc_prefix else 'Backdated'} ingestion verified: oldest record is {oldest_age:.1f} minutes ago")
+
+        return oldest_age, newest_age
+
     # ==================== BASIC BACKFILL TESTS ====================
 
     def test_01_create_backfill_job(self):
@@ -372,6 +408,11 @@ class TestBackfillJob:
         max_wait = MAX_QUERY_RETRIES * QUERY_RETRY_INTERVAL_SECONDS
         assert len(source_hits) >= record_count, \
             f"Source data not queryable after {max_wait}s. Found {len(source_hits)}, expected {record_count}"
+
+        # 2b. Verify backdated timestamps were stored correctly
+        # This confirms ZO_INGEST_ALLOWED_UPTO setting is working
+        # Records span from 15min ago (record 0) to 6min ago (record 9)
+        self._verify_backdated_timestamps(source_hits, min_expected_age_minutes=10, description="15-minute")
 
         # 3. Create scheduled pipeline that adds processing_status field
         pipeline_id = self._create_scheduled_pipeline(
@@ -809,3 +850,199 @@ class TestBackfillJob:
         assert backfill_resp.status_code == 400, \
             f"Backfill for realtime pipeline should return 400: {backfill_resp.status_code} - {backfill_resp.text[:500]}"
         print("  Backfill for realtime pipeline correctly rejected")
+
+    # ==================== EXTENDED TIMESTAMP VERIFICATION ====================
+
+    def test_11_backfill_with_2_hour_old_data(self):
+        """Test backfill with 2-hour-old data for stronger timestamp verification.
+
+        This test uses data from 2 hours ago (instead of 15 minutes) to provide
+        stronger validation that:
+        1. ZO_INGEST_ALLOWED_UPTO setting is working correctly
+        2. Backdated timestamps are preserved, not overwritten with current time
+        3. Backfill can process data that's significantly in the past
+        """
+        print("\n=== Test: Backfill with 2-hour-old data (extended timestamp verification) ===")
+
+        # 1. Ingest data with timestamps from 2 HOURS ago
+        two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
+        record_count = 10
+
+        print(f"  Ingesting {record_count} records with timestamps starting at {two_hours_ago.isoformat()}")
+        assert self._ingest_logs_with_timestamp(self.source_stream, two_hours_ago, count=record_count)
+
+        # 2. Wait for data to be indexed and queryable
+        print("  Waiting for source data to be queryable...")
+        source_hits = []
+        for attempt in range(MAX_QUERY_RETRIES):
+            time.sleep(QUERY_RETRY_INTERVAL_SECONDS)
+            source_hits = self._query_stream(self.source_stream)
+            if len(source_hits) >= record_count:
+                print(f"  Source data ready after {(attempt+1)*QUERY_RETRY_INTERVAL_SECONDS}s: {len(source_hits)} records")
+                break
+            print(f"    Attempt {attempt+1}: found {len(source_hits)} records, waiting...")
+
+        max_wait = MAX_QUERY_RETRIES * QUERY_RETRY_INTERVAL_SECONDS
+        assert len(source_hits) >= record_count, \
+            f"Source data not queryable after {max_wait}s. Found {len(source_hits)}, expected {record_count}"
+
+        # 3. Verify backdated timestamps were stored correctly (KEY VERIFICATION)
+        # This confirms ZO_INGEST_ALLOWED_UPTO setting is working
+        # Records span from 2 hours ago (record 0) to ~1h 51min ago (record 9)
+        self._verify_backdated_timestamps(source_hits, min_expected_age_minutes=100, description="2-hour-old")
+
+        # 4. Create scheduled pipeline
+        pipeline_id = self._create_scheduled_pipeline(
+            self.source_stream,
+            self.dest_stream,
+            name_suffix="2hour"
+        )
+
+        # 5. Create and run backfill - time range covers the 2-hour-old data
+        # start_time = 2.5 hours ago, end_time = 5 minutes ago (must be in the past)
+        # Using generous end_time to ensure all data (120min to 111min ago) is covered
+        start_time = int((two_hours_ago - timedelta(minutes=30)).timestamp() * 1000000)
+        end_time = int((datetime.now(timezone.utc) - timedelta(minutes=5)).timestamp() * 1000000)
+
+        print(f"  Creating backfill job for time range: 2.5h ago to 5min ago")
+        job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=30)
+
+        # 6. Wait for completion
+        final_status = self._wait_for_backfill(pipeline_id, job_id, timeout_seconds=BACKFILL_TIMEOUT_SECONDS)
+
+        assert final_status is not None, "Should get final status"
+        status = final_status.get("status")
+        print(f"  Final status: {status}")
+
+        # 7. Query destination stream to verify data was processed
+        print("  Waiting for destination data...")
+        dest_hits = []
+        for attempt in range(MAX_QUERY_RETRIES):
+            time.sleep(QUERY_RETRY_INTERVAL_SECONDS)
+            dest_hits = self._query_stream(self.dest_stream)
+            if len(dest_hits) > 0:
+                print(f"  Destination data found after {(attempt+1)*QUERY_RETRY_INTERVAL_SECONDS}s: {len(dest_hits)} records")
+                break
+            print(f"    Attempt {attempt+1}: destination empty, waiting...")
+
+        print(f"  Destination stream has {len(dest_hits)} records")
+
+        # Backfill MUST complete successfully
+        assert status == "completed", \
+            f"Backfill did not complete within timeout. Status: {status}, full: {final_status}"
+
+        # Destination MUST have data
+        assert len(dest_hits) > 0, \
+            f"Backfill completed but no data in destination stream '{self.dest_stream}'. " \
+            f"Source had {len(source_hits)} records from 2 hours ago. " \
+            f"Status: {final_status}"
+
+        # Verify transformation was applied
+        for hit in dest_hits[:3]:
+            assert "processing_status" in hit, \
+                f"Record missing 'processing_status' field: {hit}"
+            assert hit["processing_status"] == "backfill_processed", \
+                f"Record should have processing_status='backfill_processed': {hit}"
+
+        print(f"  ✓ 2-hour-old data backfill passed - {len(dest_hits)} records processed with transformation")
+
+    def test_12_backfill_at_47_hour_boundary(self):
+        """Test backfill with data at 47 hours ago (just under 48-hour ZO_INGEST_ALLOWED_UPTO limit).
+
+        This boundary test verifies:
+        1. Data at 47 hours is accepted (within 48-hour limit)
+        2. Timestamps are preserved correctly at the boundary
+        3. Backfill can process data near the maximum allowed age
+
+        Note: We use 47 hours instead of exactly 48 to have a safety margin
+        for test execution time and avoid flakiness at the exact boundary.
+        """
+        print("\n=== Test: Backfill at 47-hour boundary (near ZO_INGEST_ALLOWED_UPTO=48 limit) ===")
+
+        # 1. Ingest data with timestamps from 47 HOURS ago (just under 48h limit)
+        hours_ago = 47
+        past_time = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
+        record_count = 5
+
+        print(f"  Ingesting {record_count} records with timestamps from {hours_ago} hours ago")
+        print(f"  Timestamp: {past_time.isoformat()}")
+        assert self._ingest_logs_with_timestamp(self.source_stream, past_time, count=record_count)
+
+        # 2. Wait for data to be indexed and queryable
+        print("  Waiting for source data to be queryable...")
+        source_hits = []
+        for attempt in range(MAX_QUERY_RETRIES):
+            time.sleep(QUERY_RETRY_INTERVAL_SECONDS)
+            source_hits = self._query_stream(self.source_stream)
+            if len(source_hits) >= record_count:
+                print(f"  Source data ready after {(attempt+1)*QUERY_RETRY_INTERVAL_SECONDS}s: {len(source_hits)} records")
+                break
+            print(f"    Attempt {attempt+1}: found {len(source_hits)} records, waiting...")
+
+        max_wait = MAX_QUERY_RETRIES * QUERY_RETRY_INTERVAL_SECONDS
+        if len(source_hits) < record_count:
+            # Server likely doesn't have sufficient ZO_INGEST_ALLOWED_UPTO setting
+            # Skip this test gracefully - it's designed for CI with ZO_INGEST_ALLOWED_UPTO=48
+            pytest.skip(
+                f"47-hour-old data not queryable after {max_wait}s (found {len(source_hits)}). "
+                f"Server may not have ZO_INGEST_ALLOWED_UPTO >= 48. This test is for CI validation."
+            )
+
+        # 3. Verify backdated timestamps were stored correctly at the boundary
+        # Oldest record should be ~47 hours = 2820 minutes
+        expected_min_age = (hours_ago - 1) * 60  # 46 hours in minutes = 2760
+        self._verify_backdated_timestamps(source_hits, min_expected_age_minutes=expected_min_age, description="47-hour-old")
+
+        # 4. Create scheduled pipeline
+        pipeline_id = self._create_scheduled_pipeline(
+            self.source_stream,
+            self.dest_stream,
+            name_suffix="47hour"
+        )
+
+        # 5. Create and run backfill - time range covers the 47-hour-old data
+        # start_time = 48 hours ago, end_time = 46 hours ago
+        start_time = int((past_time - timedelta(hours=1)).timestamp() * 1000000)
+        end_time = int((past_time + timedelta(hours=1)).timestamp() * 1000000)
+
+        print(f"  Creating backfill job for time range: {hours_ago+1}h ago to {hours_ago-1}h ago")
+        job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=60)
+
+        # 6. Wait for completion
+        final_status = self._wait_for_backfill(pipeline_id, job_id, timeout_seconds=BACKFILL_TIMEOUT_SECONDS)
+
+        assert final_status is not None, "Should get final status"
+        status = final_status.get("status")
+        print(f"  Final status: {status}")
+
+        # 7. Query destination stream to verify data was processed
+        print("  Waiting for destination data...")
+        dest_hits = []
+        for attempt in range(MAX_QUERY_RETRIES):
+            time.sleep(QUERY_RETRY_INTERVAL_SECONDS)
+            dest_hits = self._query_stream(self.dest_stream)
+            if len(dest_hits) > 0:
+                print(f"  Destination data found after {(attempt+1)*QUERY_RETRY_INTERVAL_SECONDS}s: {len(dest_hits)} records")
+                break
+            print(f"    Attempt {attempt+1}: destination empty, waiting...")
+
+        print(f"  Destination stream has {len(dest_hits)} records")
+
+        # Backfill MUST complete successfully
+        assert status == "completed", \
+            f"Backfill did not complete within timeout. Status: {status}, full: {final_status}"
+
+        # Destination MUST have data
+        assert len(dest_hits) > 0, \
+            f"Backfill completed but no data in destination stream '{self.dest_stream}'. " \
+            f"Source had {len(source_hits)} records from {hours_ago} hours ago. " \
+            f"Status: {final_status}"
+
+        # Verify transformation was applied
+        for hit in dest_hits[:3]:
+            assert "processing_status" in hit, \
+                f"Record missing 'processing_status' field: {hit}"
+            assert hit["processing_status"] == "backfill_processed", \
+                f"Record should have processing_status='backfill_processed': {hit}"
+
+        print(f"  ✓ 47-hour boundary test passed - {len(dest_hits)} records processed at near-limit age")
