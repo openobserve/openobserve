@@ -15,9 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="error-viewer-container tw:mx-[0.625rem] tw:mb-[0.375rem] card-container"
-  >
+  <div class="error-viewer-container tw:mx-[0.625rem] tw:my-[0.375rem] card-container">
     <template v-if="isLoading.length">
       <div
         class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-12.5rem)]"
@@ -104,21 +102,21 @@ const getErrorLogs = () => {
         query: req,
         page_type: "logs",
       },
-      "RUM",
+      "RUM"
     )
     .then((res) => {
       const errorIndex = res.data.hits.findIndex(
-        (hit: any) => hit.error_id === errorDetails.value.error_id,
+        (hit: any) => hit.error_id === errorDetails.value.error_id
       );
       errorDetails.value.events = res.data.hits.slice(
         errorIndex,
-        errorIndex + 100,
+        errorIndex + 100
       );
       errorDetails.value.events = errorDetails.value.events.map(
         (event: any) => ({
           ...event,
           category: getErrorCategory(event),
-        }),
+        })
       );
     })
     .finally(() => isLoading.value.pop());
@@ -156,7 +154,7 @@ const getError = () => {
           query: req,
           page_type: "logs",
         },
-        "RUM",
+        "RUM"
       )
       .then((res) => {
         errorDetails.value = { ...res.data.hits[0] };

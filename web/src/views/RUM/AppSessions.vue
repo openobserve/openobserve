@@ -19,9 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isSessionReplayEnabled">
       <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
         <div class="card-container">
-          <div
-            class="text-right tw:p-[0.375rem] flex align-center justify-between"
-          >
+          <div class="text-right tw:p-[0.375rem] flex align-center justify-between">
             <syntax-guide />
             <div class="flex align-center justify-end metrics-date-time">
               <date-time
@@ -62,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <q-splitter
-        class="tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]"
+        class="tw:pl-[0.625rem]! tw:h-[calc(100%-80px)]"
         v-model="splitterModel"
         unit="px"
         vertical
@@ -76,8 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 endTime: dateTime.endTime,
               }"
               :stream-name="rumSessionStreamName"
-              :query="completeQuery"
-              :show-count="false"
               @event-emitted="handleSidebarEvent"
             />
           </div>
@@ -162,7 +158,6 @@ import {
   type Ref,
   onBeforeMount,
   defineAsyncComponent,
-  computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/rum/AppTable.vue";
@@ -221,16 +216,7 @@ const dateTime = ref({
   relativeTimePeriod: "",
   valueType: "relative",
 });
-const rumSessionStreamName = "_rumdata";
-
-// Computed query that includes session_has_replay filter
-const completeQuery = computed(() => {
-  let whereClause = "session_has_replay IS NOT NULL AND session_id is not null";
-  if (sessionState.data.editorValue.length) {
-    whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
-  }
-  return whereClause;
-});
+const rumSessionStreamName = "_sessionreplay";
 
 const isMounted = ref(false);
 
@@ -264,8 +250,6 @@ const userDataSet = new Set([
   "source",
   "api",
   "usr_email",
-  "session_id",
-  "view_id",
 ]);
 
 const columns = ref([
@@ -345,9 +329,12 @@ onBeforeMount(() => {
 });
 
 onMounted(async () => {
+  // TODO OK : Store stream fields in composable
+
   if (router.currentRoute.value.name === "Sessions") {
     isMounted.value = true;
     await getStreamFields();
+    await getRumDataFields();
     getSessions();
   }
 });
@@ -360,24 +347,18 @@ const getStreamFields = () => {
         const fieldsToVerify = new Set([
           "geo_info_city",
           "geo_info_country",
-          "geo_info_country_iso_code",
-          "usr_email",
-          "usr_id",
-          "usr_name",
+          // "usr_email",
+          // "usr_id",
+          // "usr_name",
         ]);
-
-        // Define priority fields that should appear at the top
-        const priorityFields = [
-          "application_id",
-          "usr_email",
-          "session_id",
-          "env",
-        ];
-        const priorityFieldsMap = new Map(
-          priorityFields.map((field, index) => [field, index]),
-        );
-
         streamFields.value = [];
+
+        // streamFields.value.push({
+        //   name: "usr_email",
+        //   type: "UTF8",
+        //   stream_name: "_rumdata",
+        //   showValues: true,
+        // });
 
         stream.schema.forEach((field: any) => {
           if (fieldsToVerify.has(field.name))
@@ -390,27 +371,35 @@ const getStreamFields = () => {
             });
           }
         });
+      })
+      .finally(() => {
+        resolve(true);
+        isLoading.value.pop();
+      });
+  });
+};
 
-        // Sort fields: priority fields first, then alphabetically
-        streamFields.value.sort((a, b) => {
-          const aPriority = priorityFieldsMap.get(a.name);
-          const bPriority = priorityFieldsMap.get(b.name);
-
-          // If both are priority fields, sort by priority order
-          if (aPriority !== undefined && bPriority !== undefined) {
-            return aPriority - bPriority;
-          }
-          // If only a is priority, it comes first
-          if (aPriority !== undefined) return -1;
-          // If only b is priority, it comes first
-          if (bPriority !== undefined) return 1;
-          // Otherwise, sort alphabetically
-          return a.name.localeCompare(b.name);
+const getRumDataFields = () => {
+  isLoading.value.push(true);
+  return new Promise((resolve) => {
+    getStream("_rumdata", "logs", true)
+      .then((stream) => {
+        const fieldsToVerify = new Set([
+          "geo_info_city",
+          "geo_info_country",
+          "geo_info_country_iso_code",
+          "usr_email",
+          "usr_id",
+          "usr_name",
+        ]);
+        stream.schema.forEach((field: any) => {
+          if (fieldsToVerify.has(field.name))
+            schemaMapping.value[field.name] = field;
         });
       })
       .finally(() => {
-        isLoading.value.pop();
         resolve(true);
+        isLoading.value.pop();
       });
   });
 };
@@ -435,56 +424,20 @@ const getSessions = () => {
     timeInterval: interval.interval,
     sqlMode: false,
     currentPage: sessionState.data.resultGrid.currentPage,
-    selectedStream: "_rumdata",
+    selectedStream: rumSessionStreamName,
     parsedQuery,
-    streamName: "_rumdata",
+    streamName: rumSessionStreamName,
   };
 
   const req = buildQueryPayload(queryPayload);
 
-  // Build optional fields based on schema
-  let geoFields = "";
-  if (schemaMapping.value["geo_info_city"]) {
-    geoFields += "min(geo_info_city) as city,";
-  }
-  if (schemaMapping.value["geo_info_country"]) {
-    geoFields += "min(geo_info_country) as country,";
-  }
-  if (schemaMapping.value["geo_info_country_iso_code"]) {
-    geoFields += "min(geo_info_country_iso_code) as country_iso_code,";
-  }
-  if (schemaMapping.value["usr_email"]) {
-    geoFields += "max(usr_email) as user_email,";
-  }
-
-  // Build frustration count field with null check
-  let frustrationCountField = "0 AS frustration_count";
-  if (schemaMapping.value["action_frustration_type"]) {
-    frustrationCountField =
-      "SUM(CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS frustration_count";
-  }
-
-  // Build WHERE clause with session replay filter
-  let whereClause = "session_has_replay IS NOT NULL";
-  if (sessionState.data.editorValue.length) {
-    whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
-  }
-
-  // Query 1: Get sessions with all metrics from _rumdata (supports usr_email, usr_id, session_id filters)
-  req.query.sql = `
-    SELECT
-      min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp,
-      min(type) as type,
-      SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count,
-      ${frustrationCountField},
-      SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events,
-      ${geoFields}
-      session_id
-    FROM "_rumdata"
-    WHERE ${whereClause}
-    GROUP BY session_id
-    ORDER BY zo_sql_timestamp DESC
-    LIMIT ${sessionState.data.resultGrid.size}`;
+  req.query.sql = `select min(${
+    store.state.zoConfig.timestamp_column
+  }) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, session_id from "_sessionreplay" ${
+    sessionState.data.editorValue.length
+      ? " where " + sessionState.data.editorValue.trim()
+      : ""
+  } group by session_id order by zo_sql_timestamp DESC`;
   delete req.aggs;
   isLoading.value.push(true);
 
@@ -500,33 +453,16 @@ const getSessions = () => {
       "RUM",
     )
     .then((res) => {
-      const hits = res.data.hits;
-
-      if (hits.length === 0) {
-        rows.value = [];
-        return;
-      }
-
-      // Store all session data from _rumdata
-      hits.forEach((hit: any) => {
-        sessionState.data.sessions[hit.session_id] = {
-          session_id: hit.session_id,
-          zo_sql_timestamp: hit.zo_sql_timestamp,
-          timestamp: hit.zo_sql_timestamp,
-          type: hit.type,
-          error_count: hit.error_count,
-          frustration_count: hit.frustration_count || 0,
-          user_email: hit.user_email,
-          country: hit.country,
-          city: hit.city,
-          country_iso_code: hit.country_iso_code?.toLowerCase(),
-        };
+      res.data.hits.forEach((hit: any) => {
+        sessionState.data.sessions[hit.session_id] = hit;
+        sessionState.data.sessions[hit.session_id]["type"] = hit.source;
+        sessionState.data.sessions[hit.session_id]["time_spent"] =
+          hit.end_time - hit.start_time;
+        sessionState.data.sessions[hit.session_id]["timestamp"] =
+          hit.zo_sql_timestamp;
       });
 
-      const sessionIds = hits.map((hit: any) => hit.session_id);
-
-      // Query 2: Get start/end times from _sessionreplay
-      getSessionTimeFromReplay(req, sessionIds);
+      getSessionLogs(req);
     })
     .catch((err) => {
       rows.value = [];
@@ -536,47 +472,58 @@ const getSessions = () => {
         position: "bottom",
       });
     })
-    .finally(() => {
-      isLoading.value.pop();
-    });
+    .finally(() => isLoading.value.pop());
 };
 
-// Query 2: Get start/end times from _sessionreplay for the sessions
-const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
-  if (sessionIds.length === 0) {
-    rows.value = [];
-    isLoading.value.pop();
-    return;
+const getSessionLogs = (req: any) => {
+  let geoFields = "";
+  let userFields = "";
+  if (schemaMapping.value["geo_info_city"]) {
+    geoFields += "min(geo_info_city) as city,";
+  }
+  if (schemaMapping.value["geo_info_city"]) {
+    geoFields += "min(geo_info_country) as country,";
   }
 
-  // Sanitize session IDs to prevent SQL injection
-  // Only allow alphanumeric characters, hyphens, and underscores
-  const sanitizedIds = sessionIds
-    .filter((id) => /^[a-zA-Z0-9_-]+$/.test(id))
-    .map((id) => id.replace(/'/g, "''")) // Escape single quotes
-    .map((id) => `'${id}'`)
-    .join(", ");
-
-  if (!sanitizedIds) {
-    rows.value = [];
-    isLoading.value.pop();
-    return;
+  if (schemaMapping.value["geo_info_country_iso_code"]) {
+    geoFields += "min(geo_info_country_iso_code) as country_iso_code,";
   }
 
-  const whereClause = `WHERE session_id IN (${sanitizedIds})`;
+  if (schemaMapping.value["usr_email"]) {
+    geoFields += "min(usr_email) as user_email,";
+  }
+  if (schemaMapping.value["usr_id"]) {
+    geoFields += "min(usr_id) as user_id,";
+  }
 
-  req.query.sql = `
-    SELECT
-      min(start) as start_time,
-      max(end) as end_time,
-      min(user_agent_user_agent_family) as browser,
-      min(user_agent_os_family) as os,
-      min(ip) as ip,
-      min(source) as source,
+  // Build frustration count field with null check
+  let frustrationCountField = "0 AS frustration_count";
+  if (schemaMapping.value["action_frustration_type"]) {
+    frustrationCountField =
+      "SUM(CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS frustration_count";
+  }
+
+  let whereClause = "";
+  const sessionsKeys = Object.keys(sessionState.data.sessions);
+  if (sessionsKeys.length > 0) {
+    whereClause = `where session_id IN (${sessionsKeys.map((item) => `'${item}'`).join(", ")})`;
+  }
+
+  req.query.sql = req.query.sql = `
+    select
+      min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp,
+      min(type) as type,
+      -- Count total errors for this session
+      SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count,
+      -- Count actions with frustration signals (action_frustration_type is NOT NULL)
+      ${frustrationCountField},
+      -- Count all non-null event types
+      SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events,
+      ${userFields} ${geoFields}
       session_id
-    FROM "_sessionreplay"
-    ${whereClause}
-    GROUP BY session_id`;
+    from "_rumdata" ${whereClause}
+    group by session_id
+    order by zo_sql_timestamp DESC`;
 
   isLoading.value.push(true);
   searchService
@@ -589,26 +536,26 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
       "RUM",
     )
     .then((res) => {
-      res.data.hits.forEach((hit: any) => {
+      const hits = res.data.hits;
+      hits.forEach((hit: any) => {
         if (sessionState.data.sessions[hit.session_id]) {
-          sessionState.data.sessions[hit.session_id].start_time =
-            hit.start_time;
-          sessionState.data.sessions[hit.session_id].end_time = hit.end_time;
-          sessionState.data.sessions[hit.session_id].browser = hit.browser;
-          sessionState.data.sessions[hit.session_id].os = hit.os;
-          sessionState.data.sessions[hit.session_id].ip = hit.ip;
-          sessionState.data.sessions[hit.session_id].source = hit.source;
-          sessionState.data.sessions[hit.session_id].time_spent =
-            hit.end_time - hit.start_time;
+          sessionState.data.sessions[hit.session_id].error_count =
+            hit.error_count;
+          sessionState.data.sessions[hit.session_id].frustration_count =
+            hit.frustration_count || 0;
+          sessionState.data.sessions[hit.session_id].user_email =
+            hit.user_email;
+          sessionState.data.sessions[hit.session_id].country = hit.country;
+          sessionState.data.sessions[hit.session_id].city = hit.city;
+          sessionState.data.sessions[hit.session_id].country_iso_code =
+            hit.country_iso_code?.toLowerCase();
         }
       });
       rows.value = Object.values(sessionState.data.sessions);
     })
     .catch((err) => {
       q.notify({
-        message:
-          err.response?.data?.message ||
-          "Error while fetching session replay data",
+        message: err.response?.data?.message || "Error while fetching sessions",
         position: "bottom",
         color: "negative",
         timeout: 4000,
@@ -745,6 +692,7 @@ const getStarted = () => {
 </script>
 <style scoped lang="scss">
 .sessions_page {
+
 }
 </style>
 <style lang="scss">
