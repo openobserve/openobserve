@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ]"
         size="18px"
       />
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
+      <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
         {{ t('search.autoRefresh') }}: {{ selectedLabel }}
       </q-tooltip>
 
