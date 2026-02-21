@@ -110,7 +110,7 @@ export class LogsPage {
         // Additional locators
         this.fnEditor = '#fnEditor';
         this.searchListFirstTextLeft = '.search-list > :nth-child(1) > .text-left';
-        this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn-dropdown"]';
+        this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn"]';
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
         this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
