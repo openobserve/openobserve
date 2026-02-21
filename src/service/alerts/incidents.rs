@@ -978,7 +978,7 @@ pub async fn trigger_rca_for_incident(
         return Ok(()); // Not an error - just not configured
     }
 
-    if config.incidents.rca_agent_url.is_empty() {
+    if config.ai.agent_url.is_empty() {
         log::debug!("[INCIDENTS::RCA] RCA agent URL not set, skipping immediate trigger");
         return Ok(());
     }
@@ -1008,7 +1008,7 @@ pub async fn trigger_rca_for_incident(
     let username = &zo_config.auth.root_user_email;
     let password = &zo_config.auth.root_user_password;
 
-    let client = RcaAgentClient::new(&config.incidents.rca_agent_url, username, password)?;
+    let client = RcaAgentClient::new(&config.ai.agent_url, username, password)?;
 
     // Quick health check
     if let Err(e) = client.health().await {

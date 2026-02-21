@@ -184,7 +184,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
-        if config.incidents.rca_agent_url.is_empty() {
+        if config.ai.agent_url.is_empty() {
             return MetaHttpResponse::bad_request("AI agent URL is not set");
         }
 
@@ -204,7 +204,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         // Create agent client
         let zo_config = get_config();
         let client = match RcaAgentClient::new(
-            &config.incidents.rca_agent_url,
+            &config.ai.agent_url,
             &zo_config.auth.root_user_email,
             &zo_config.auth.root_user_password,
         ) {
@@ -879,7 +879,7 @@ pub async fn confirm_action(
         // Forward the confirmation to the agent's /confirm endpoint
         let confirm_url = format!(
             "{}/confirm/{}",
-            config.incidents.rca_agent_url.trim_end_matches('/'),
+            config.ai.agent_url.trim_end_matches('/'),
             session_id
         );
 
