@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="handleMultiStreamSelection"
       >
         <q-tooltip
-          v-if="searchObj.data.stream.selectedStream.length > 0"
+          v-if="searchObj.data.stream.selectedStream.length > 1"
           :delay="500"
           anchor="bottom left"
           self="top left"
@@ -219,21 +219,21 @@ export default defineComponent({
         this.searchObj.data.stream.selectedFields = [];
       }
       this.searchObj.data.stream.selectedStream = [opt.value];
-      // Clear the filter input and close the menu when single stream is selected
-      //we will first check if qselect is there or not and then call the method
-      //we will use the quasar next tick to ensure that the dom is updated before we call the method
-      //we will also us the quasar's updateInputValue method to clear the input value
+      // Close the popup first (synchronously) before clearing the filter.
+      // If we clear the filter first, the virtual scroll re-renders with the full
+      // list while the dropdown is still open, causing a blank/misaligned display.
+      const indexListSelectField = this.$refs.streamSelect as any;
+      if (indexListSelectField?.hidePopup) {
+        indexListSelectField.hidePopup();
+      }
       this.$nextTick(() => {
-        const indexListSelectField = this.$refs.streamSelect;
-        if (indexListSelectField) {
-          // Clear the search input
-          if (indexListSelectField.updateInputValue) {
-            indexListSelectField.updateInputValue("");
-          }
-          // // Close the dropdown menu
-          // if (indexListSelectField.hidePopup) {
-          //   indexListSelectField.hidePopup();
-          // }
+        if (indexListSelectField?.updateInputValue) {
+          indexListSelectField.updateInputValue("");
+        }
+        // Reset virtual scroll to the top so the list starts from position 0
+        // the next time the dropdown is opened.
+        if (indexListSelectField?.scrollTo) {
+          indexListSelectField.scrollTo(0);
         }
       });
       this.onStreamChange("");
