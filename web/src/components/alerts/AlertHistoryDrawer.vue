@@ -20,25 +20,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card-section class="q-ma-none">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div class="tw:text-[18px] tw:flex tw:items-center" data-test="alert-details-title">
+          <div class="tw-text-[18px] tw-flex tw-items-center" data-test="alert-details-title">
             {{ t('alert_list.alert_history') }}
             <!-- Alert Name Badge -->
             <span
               v-if="alertDetails"
               :class="[
-                'tw:font-bold tw:mr-4 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
+                'tw-font-bold tw-mr-4 tw-px-2 tw-py-1 tw-rounded-md tw-ml-2 tw-max-w-xs tw-truncate tw-inline-block',
                 store.state.theme === 'dark'
-                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                  : 'tw:text-blue-600 tw:bg-blue-50'
+                  ? 'tw-text-blue-400 tw-bg-blue-900/50'
+                  : 'tw-text-blue-600 tw-bg-blue-50'
               ]"
             >
               {{ alertDetails.name }}
-              <q-tooltip v-if="alertDetails.name && alertDetails.name.length > 35" class="tw:text-xs">
+              <q-tooltip v-if="alertDetails.name && alertDetails.name.length > 35" class="tw-text-xs">
                 {{ alertDetails.name }}
               </q-tooltip>
             </span>
             <!-- Alert Type Icon -->
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="tw-flex tw-items-center tw-gap-2">
               <q-icon
                 :name="alertDetails?.is_real_time ? 'bolt' : 'schedule'"
                 size="20px"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <div class="col-auto tw:flex tw:items-center">
+        <div class="col-auto tw-flex tw-items-center">
           <q-btn
             data-test="alert-details-edit-btn"
             flat
@@ -89,10 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <!-- Content -->
-    <div class="tw:mx-2 q-py-md alert-details-content" v-if="alertDetails">
+    <div class="tw-mx-2 q-py-md alert-details-content" v-if="alertDetails">
       <!-- SQL Query / PromQL Query / Conditions -->
-      <div class="tw:mb-3">
-        <div class="tw:flex tw:items-center tw:justify-between tw:mb-1">
+      <div class="tw-mb-3">
+        <div class="tw-flex tw-items-center tw-justify-between tw-mb-1">
           <div class="section-label">
             {{ alertDetails.type == "sql" ? t('alerts.alertDetails.sqlQuery') : alertDetails.type == "promql" ? t('alerts.alertDetails.promqlQuery') : t('alerts.alertDetails.conditions') }}
           </div>
@@ -103,14 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             dense
             icon="content_copy"
-            class="tw:ml-2"
+            class="tw-ml-2"
             data-test="alert-details-copy-conditions-btn"
           >
             <q-tooltip>{{ t('alerts.alertDetails.copy') }}</q-tooltip>
           </q-btn>
         </div>
         <pre
-          class="el-border el-border-radius tw:p-2 tw:text-sm tw:overflow-x-auto"
+          class="el-border el-border-radius tw-p-2 tw-text-sm tw-overflow-x-auto"
           style="white-space: pre-wrap"
         >{{
           alertDetails.conditions != "" && alertDetails.conditions != "--"
@@ -120,30 +120,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Description (only show if exists) -->
-      <div v-if="alertDetails.description" class="tw:mb-3">
-        <div class="section-label tw:mb-1">{{ t('common.description') }}</div>
+      <div v-if="alertDetails.description" class="tw-mb-3">
+        <div class="section-label tw-mb-1">{{ t('common.description') }}</div>
         <pre
-          class="el-border el-border-radius tw:p-2 tw:text-sm"
+          class="el-border el-border-radius tw-p-2 tw-text-sm"
           style="white-space: pre-wrap"
         >{{ alertDetails.description }}</pre>
       </div>
 
       <!-- Alert History Table -->
-      <div class="tw:mb-6 tw:flex tw:flex-col" style="min-height: 300px;">
-        <div v-if="isLoadingHistory" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1">
+      <div class="tw-mb-6 tw-flex tw-flex-col" style="min-height: 300px;">
+        <div v-if="isLoadingHistory" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1">
           <q-spinner-hourglass size="32px" color="primary" />
-          <div class="tw:text-sm tw:mt-3" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">
+          <div class="tw-text-sm tw-mt-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">
             {{ t('alerts.alertDetails.loadingHistory') }}
           </div>
         </div>
 
         <div
           v-else-if="alertHistory.length === 0"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1"
-          :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+          class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1"
+          :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
         >
-          <q-icon name="history" size="48px" class="tw:mb-2 tw:opacity-30" />
-          <div class="tw:text-sm">{{ t('alerts.alertDetails.noHistoryAvailable') }}</div>
+          <q-icon name="history" size="48px" class="tw-mb-2 tw-opacity-30" />
+          <div class="tw-text-sm">{{ t('alerts.alertDetails.noHistoryAvailable') }}</div>
         </div>
 
         <q-table
@@ -177,9 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ props.row.query_took || '-' }}
                 </template>
                 <template v-else-if="col.name === 'error'">
-                  <div v-if="props.row.error" class="tw:flex tw:items-center">
-                    <q-icon name="error" size="20px" class="tw:text-red-500 tw:cursor-pointer">
-                      <q-tooltip class="tw:text-xs tw:max-w-md">
+                  <div v-if="props.row.error" class="tw-flex tw-items-center">
+                    <q-icon name="error" size="20px" class="tw-text-red-500 tw-cursor-pointer">
+                      <q-tooltip class="tw-text-xs tw-max-w-md">
                         {{ props.row.error }}
                       </q-tooltip>
                     </q-icon>
@@ -191,8 +191,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="scope">
-            <div class="bottom-btn tw:h-[48px] tw:flex tw:w-full">
-              <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[220px] tw:mr-md">
+            <div class="bottom-btn tw-h-[48px] tw-flex tw-w-full">
+              <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[220px] tw-mr-md">
                 {{ resultTotal }} {{ t('alerts.alertDetails.results') }}
               </div>
               <QTablePagination
