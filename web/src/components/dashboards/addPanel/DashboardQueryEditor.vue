@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip>
                   {{
                     dashboardPanelData.layout.hiddenQueries.includes(index)
-                      ? "Show query results"
-                      : "Hide query results"
+                      ? t("dashboard.showQueryResults")
+                      : t("dashboard.hideQueryResults")
                   }}
                 </q-tooltip>
               </q-icon>
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
           :icon="'img:' + getImageURL('images/common/function.svg')"
-          title="Toggle Function Editor"
+          :title="t('dashboard.toggleFunctionEditor')"
           @update:model-value="onFunctionToggle"
           :disable="promqlMode"
           class="float-left tw:h-[36px] o2-toggle-button-xs tw:mt-2"
@@ -161,84 +161,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #before>
-              <QueryEditor
+              <UnifiedQueryEditor
                 ref="queryEditorRef"
-                class="monaco-editor tw:h-full!"
-                style="width: 100%"
-                v-model:query="
+                :languages="['sql', 'promql']"
+                :default-language="dashboardPanelData.data.queryType"
+                :query="
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].query
                 "
-                data-test="dashboard-panel-query-editor"
-                editor-id="dashboard-query-editor"
-                :keywords="
-                  dashboardPanelData.data.queryType === 'promql'
-                    ? promqlAutoCompleteKeywords
-                    : sqlAutoCompleteKeywords
-                "
-                :suggestions="
-                  dashboardPanelData.data.queryType === 'promql'
-                    ? []
-                    : sqlAutoCompleteSuggestions
-                "
-                :autoComplete="
-                  dashboardPanelData.data.queryType === 'promql' && {
-                    showEmpty: true,
-                    selectOnOpen: true,
-                    filter: true,
-                    filterStrict: true,
-                  }
-                "
-                @update-query="updateQuery"
-                @run-query="searchData"
-                :readOnly="
+                :read-only="
                   !dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].customQuery
                 "
-                :language="dashboardPanelData.data.queryType"
-                :key="dashboardPanelData.data.queryType"
-              ></QueryEditor>
+                :hide-nl-toggle="
+                  !dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].customQuery
+                "
+                @update:query="handleQueryUpdate"
+                @language-change="handleLanguageChange"
+                @ask-ai="handleAskAI"
+                @run-query="handleRunQuery"
+                data-test="dashboard-panel-query-editor"
+                data-test-prefix="dashboard-query"
+                editor-height="100%"
+              />
             </template>
             <template #after>
               <div style="height: 100%; width: 100%">
                 <div style="height: calc(100% - 40px); width: 100%">
-                  <QueryEditor
+                  <UnifiedQueryEditor
                     v-if="
                       !promqlMode && dashboardPanelData.layout.vrlFunctionToggle
                     "
                     data-test="dashboard-vrl-function-editor"
                     style="width: 100%; height: 100%"
                     ref="vrlFnEditorRef"
-                    editor-id="fnEditor"
-                    class="monaco-editor"
-                    language="vrl"
-                    v-model:query="
+                    :languages="['vrl']"
+                    default-language="vrl"
+                    :query="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].vrlFunctionQuery
                     "
-                    :class="
-                      (!dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ]?.vrlFunctionQuery ||
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ]?.vrlFunctionQuery === '') &&
-                      functionEditorPlaceholderFlag
-                        ? 'empty-function'
-                        : ''
-                    "
-                    @focus="functionEditorPlaceholderFlag = false"
-                    @blur="functionEditorPlaceholderFlag = true"
-                  ></QueryEditor>
+                    :hide-nl-toggle="false"
+                    :disable-ai="false"
+                    :disable-ai-reason="''"
+                    :ai-placeholder="t('function.askAIFunctionPlaceholder')"
+                    :ai-tooltip="t('function.enterFunctionPrompt')"
+                    editor-height="100%"
+                    @update:query="handleVrlFunctionUpdate"
+                    @generation-start="handleVrlGenerationStart"
+                    @generation-end="handleVrlGenerationEnd"
+                    @generation-success="handleVrlGenerationSuccess"
+                  />
                 </div>
                 <div style="height: 40px; width: 100%">
                   <div style="display: flex; height: 40px">
                     <q-select
                       v-model="selectedFunction"
-                      label="Use Saved function"
+                      :label="t('dashboard.useSavedFunction')"
                       :options="functionOptions"
                       data-test="dashboard-use-saved-vrl-function"
                       input-debounce="0"
@@ -279,10 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         self="top right"
                         max-width="250px"
                       >
-                        To use extracted VRL fields in the chart, write a VRL
-                        function and click on the Apply button. The fields will
-                        be extracted, allowing you to use them to build the
-                        chart.
+                        {{ t('dashboard.vrlExtractionTooltip') }}
                       </q-tooltip>
                     </q-btn>
                   </div>
@@ -324,17 +305,16 @@ import useNotifications from "@/composables/useNotifications";
 import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
   components: {
     ConfirmDialog,
     QueryTypeSelector,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    UnifiedQueryEditor,
   },
-  emits: ["searchdata"],
+  emits: ["searchdata", "run-query"],
   methods: {
     searchData() {
       this.$emit("searchdata");
@@ -386,7 +366,7 @@ export default defineComponent({
         });
         return;
       } catch (e) {
-        showErrorNotification("Error while fetching functions");
+        showErrorNotification(t("dashboard.errorFetchingFunctions"));
       }
     };
 
@@ -405,7 +385,7 @@ export default defineComponent({
       selectedFunction.value = "";
 
       // show success message
-      showPositiveNotification(`${val.name} function applied successfully.`);
+      showPositiveNotification(t("dashboard.functionAppliedSuccess", { name: val.name }));
     };
 
     const {
@@ -621,6 +601,77 @@ export default defineComponent({
       dashboardPanelData.layout.showQueryBar = true;
     };
 
+    // Unified Query Editor: Handle query update
+    const handleQueryUpdate = (newQuery) => {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query = newQuery;
+
+      // Also call the existing updateQuery logic for autocomplete
+      updateQuery(newQuery, {});
+    };
+
+    // Unified Query Editor: Handle language change
+    const handleLanguageChange = (newLanguage: 'sql' | 'promql') => {
+      console.log('[DashboardQueryEditor] Language changed to:', newLanguage);
+      dashboardPanelData.data.queryType = newLanguage;
+
+      // Explicitly sync the editor with the correct query after language change
+      setTimeout(() => {
+        if (queryEditorRef.value && queryEditorRef.value.setValue) {
+          const currentQuery = dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query;
+          console.log('[DashboardQueryEditor] Syncing editor with query for', newLanguage, ':', currentQuery);
+          queryEditorRef.value.setValue(currentQuery);
+        }
+      }, 50);
+    };
+
+    // Unified Query Editor: Handle Ask AI
+    const handleAskAI = async (naturalLanguage: string, language: 'sql' | 'promql') => {
+      console.log('[DashboardQueryEditor] Ask AI for language:', language, 'input:', naturalLanguage);
+      // The unified component handles AI generation internally
+      // This event is just for parent components that may need to react
+    };
+
+    // Try to inject runQuery from parent (if provided), otherwise use emit
+    const injectedRunQuery = inject<((withoutCache?: boolean) => void) | null>('runQuery', null);
+
+    // Unified Query Editor: Handle run query from AI bar execution intent
+    const handleRunQuery = () => {
+      console.log('[DashboardQueryEditor] Run query triggered from AI bar');
+      if (injectedRunQuery) {
+        injectedRunQuery(false);
+      } else {
+        // Emit event for parent to handle
+        // Note: emits need to be handled by parent in template
+        console.warn('[DashboardQueryEditor] No injected runQuery found, parent should listen to @run-query event');
+      }
+    };
+
+    // VRL Function Editor AI Handlers
+    const handleVrlFunctionUpdate = (newFunction: string) => {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].vrlFunctionQuery = newFunction;
+    };
+
+    const handleVrlGenerationStart = () => {
+      console.log('[DashboardQueryEditor] VRL AI generation started');
+      // Can add loading indicators here if needed
+    };
+
+    const handleVrlGenerationEnd = () => {
+      console.log('[DashboardQueryEditor] VRL AI generation ended');
+      // Can remove loading indicators here if needed
+    };
+
+    const handleVrlGenerationSuccess = (payload: {type: string, message: string}) => {
+      console.log('[DashboardQueryEditor] VRL AI generation success:', payload.type);
+      // VRL function code is already updated via @update:query handler
+    };
+
     return {
       t,
       router,
@@ -648,6 +699,14 @@ export default defineComponent({
       onFunctionSelect,
       selectedStreamFieldsBasedOnUserDefinedSchema,
       store,
+      handleQueryUpdate,
+      handleLanguageChange,
+      handleAskAI,
+      handleRunQuery,
+      handleVrlFunctionUpdate,
+      handleVrlGenerationStart,
+      handleVrlGenerationEnd,
+      handleVrlGenerationSuccess,
     };
   },
 });

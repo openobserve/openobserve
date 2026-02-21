@@ -154,18 +154,24 @@ export const createLogsContextProvider = (
   return {
     async getContext(): Promise<PageContext> {
       try {
-        // Extract streams and stream type based on current mode
-        const streams = searchObj.meta.logsVisualizeToggle === "logs"
-          ? searchObj.data.stream.selectedStream
-          : dashboardPanelData ? [
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream,
-            ] : [];
+        // Always use the selected stream - it's what the user explicitly chose
+        let actualStreams: string[] = [];
+
+        // Handle logs and patterns mode - always use selected stream
+        if (searchObj.meta.logsVisualizeToggle === "logs" || searchObj.meta.logsVisualizeToggle === "patterns") {
+          actualStreams = searchObj.data.stream.selectedStream || [];
+        } else {
+          // Dashboard/visualize mode
+          actualStreams = dashboardPanelData ? [
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream,
+          ] : [];
+        }
 
         const streamType = searchObj.meta.logsVisualizeToggle === "logs"
           ? searchObj.data.stream.streamType
-          : dashboardPanelData ? 
+          : dashboardPanelData ?
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.stream_type : null;
@@ -179,7 +185,7 @@ export const createLogsContextProvider = (
           currentVRLQuery: searchObj?.data?.tempFunctionContent || '',
 
           // Stream information
-          selectedStreams: streams || [],
+          selectedStreams: actualStreams || [],
           streamType: streamType,
 
           // Interesting fields organized by stream name (using actual structure)

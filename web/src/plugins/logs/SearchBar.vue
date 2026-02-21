@@ -971,40 +971,43 @@ class="q-pr-sm q-pt-xs" />
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
-                :class="
-                  config.isEnterprise == 'true'
-                    ? 'search-button-enterprise-border-radius'
-                    : 'search-button-normal-border-radius'
-                "
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
+              <!-- Main action button: "Ask AI" when NL detected + AI bar not open, otherwise "Run Query" -->
               <q-btn
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
                   dense
                   flat
-                  :title="t('search.runQuery')"
-                  class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
-                  :class="
+                  :title="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t('search.generateQueryTooltip') : t('search.runQuery')"
+                  :disable="isGeneratingSQL || ((isNaturalLanguageDetected && !searchObj.meta.nlpMode) && !searchObj.data.stream.selectedStream.length)"
+                  class="q-pa-none tw:h-[30px]  element-box-shadow"
+                  :class="[
+                    (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
                     config.isEnterprise == 'true'
                       ? 'search-button-enterprise-border-radius'
                       : 'search-button-normal-border-radius'
-                  "
+                  ]"
+                  :color="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'primary' : undefined"
                   no-caps
-                  @click="handleRunQueryFn"
-                  >{{ t("search.runQuery") }}</q-btn
+                  @click="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? handleGenerateSQLQuery() : handleRunQueryFn()"
+                  >
+                  {{ (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t("search.generateQuery") : t("search.runQuery") }}
+                </q-btn
                 >
-              <q-separator class="tw:h-[29px] tw:w-[1px]" />
+              <q-separator v-if="visualizeSearchRequestTraceIds.length === 0" class="tw:h-[29px] tw:w-[1px]" />
               <q-btn-dropdown
+                v-if="visualizeSearchRequestTraceIds.length === 0"
                 flat
                 class="tw:h-[29px] search-button-dropdown"
                 :class="[
-                  config.isEnterprise == 'true' &&
+                  (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-dropdown-button' : '',
+                  !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) && config.isEnterprise == 'true' &&
                   visualizeSearchRequestTraceIds.length
                     ? 'o2-color-cancel'
-                    : 'o2-color-primary',
+                    : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-color-primary' : '',
                   config.isEnterprise == 'true'
                     ? 'search-button-dropdown-enterprise-border-radius'
                     : 'search-button-normal-border-radius',
@@ -1012,43 +1015,122 @@ class="q-pr-sm q-pt-xs" />
                 unelevated
                 dense
               >
-                <q-btn
-                  data-test="logs-search-bar-refresh-btn"
-                  data-cy="search-bar-visuzlie-hard-refresh-button"
-                  dense
-                  flat
-                  no-caps
-                  :title="t('search.refreshCacheAndRunQuery')"
-                  class="q-pa-sm search-button-dropdown tw:text-[12px]"
-                  v-close-popup
-                  @click="handleRunQueryFn(true)"
-                  :disable="
-                    config.isEnterprise == 'true' &&
-                    !!visualizeSearchRequestTraceIds.length
-                  "
-                >
-                  <q-icon name="refresh" class="q-mr-xs" />
-                  {{ t("search.refreshCacheAndRunQuery") }}</q-btn
-                >
+                <!-- Normal mode or AI bar open: Refresh option -->
+                <template v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)">
+                  <q-btn
+                    data-test="logs-search-bar-refresh-btn"
+                    data-cy="search-bar-visuzlie-hard-refresh-button"
+                    dense
+                    flat
+                    no-caps
+                    :title="t('search.refreshCacheAndRunQuery')"
+                    class="q-pa-sm search-button-dropdown tw:text-[12px]"
+                    v-close-popup
+                    @click="handleRunQueryFn(true)"
+                    :disable="
+                      config.isEnterprise == 'true' &&
+                      !!visualizeSearchRequestTraceIds.length
+                    "
+                  >
+                    <q-icon name="refresh" class="q-mr-xs" />
+                    {{ t("search.refreshCacheAndRunQuery") }}
+                  </q-btn>
+                </template>
+
+                <!-- NLP Mode: No additional options -->
+                <template v-else>
+                  <q-list class="tw:min-w-[140px] tw:p-2">
+                    <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
+                      {{ t('nlMode.noAdditionalOptions') }}
+                    </q-item-label>
+                  </q-list>
+                </template>
               </q-btn-dropdown>
               </div>
               <div v-else class="tw:flex">
+                <!-- Cancel button when query is running -->
                 <q-btn
+                v-if="
+                  visualizeSearchRequestTraceIds.length > 0
+                "
+                data-test="logs-search-bar-visualize-cancel-btn"
+                dense
+                flat
+                :title="t('search.cancel')"
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                @click="cancelVisualizeQueries"
+                >{{ t("search.cancel") }}</q-btn
+              >
+                <!-- Main action button -->
+                <q-btn
+                  v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
                   dense
                   flat
-                  :title="t('search.runQuery')"
-                  class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
-                  :class="
+                  :title="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t('search.generateQueryTooltip') : t('search.runQuery')"
+                  :disable="disable || isGeneratingSQL || ((isNaturalLanguageDetected && !searchObj.meta.nlpMode) && !searchObj.data.stream.selectedStream.length)"
+                  class="q-pa-none tw:h-[30px]  element-box-shadow"
+                  :class="[
+                    (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
                     config.isEnterprise == 'true'
                       ? 'search-button-enterprise-border-radius'
                       : 'search-button-normal-border-radius'
-                  "
+                  ]"
+                  :color="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'primary' : undefined"
                   no-caps
-                  @click="handleRunQueryFn"
-                  :disable="disable"
-                  >{{ t("search.runQuery") }}</q-btn
+                  @click="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? handleGenerateSQLQuery() : handleRunQueryFn()"
+                  >
+                  {{ (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t("search.generateQuery") : t("search.runQuery") }}
+                </q-btn>
+                <q-separator v-if="visualizeSearchRequestTraceIds.length === 0" class="tw:h-[29px] tw:w-[1px]" />
+                <q-btn-dropdown
+                  v-if="visualizeSearchRequestTraceIds.length === 0"
+                  flat
+                  class="tw:h-[29px] search-button-dropdown"
+                  :class="[
+                    (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-dropdown-button' : '',
+                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) && config.isEnterprise == 'true' &&
+                    visualizeSearchRequestTraceIds.length
+                      ? 'o2-color-cancel'
+                      : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-color-primary' : '',
+                    config.isEnterprise == 'true'
+                      ? 'search-button-dropdown-enterprise-border-radius'
+                      : 'search-button-normal-border-radius',
+                  ]"
+                  unelevated
+                  dense
                 >
+                  <!-- Normal mode or AI bar open: Refresh option -->
+                  <template v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)">
+                    <q-btn
+                      data-test="logs-search-bar-refresh-btn"
+                      data-cy="search-bar-visuzlie-hard-refresh-button"
+                      dense
+                      flat
+                      no-caps
+                      :title="t('search.refreshCacheAndRunQuery')"
+                      class="q-pa-sm search-button-dropdown tw:text-[12px]"
+                      v-close-popup
+                      @click="handleRunQueryFn(true)"
+                      :disable="
+                        config.isEnterprise == 'true' &&
+                        !!visualizeSearchRequestTraceIds.length
+                      "
+                    >
+                      <q-icon name="refresh" class="q-mr-xs" />
+                      {{ t("search.refreshCacheAndRunQuery") }}
+                    </q-btn>
+                  </template>
+
+                  <!-- NL detected, AI bar not open: No additional options -->
+                  <template v-else>
+                    <q-list class="tw:min-w-[140px] tw:p-2">
+                      <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
+                        {{ t('nlMode.noAdditionalOptions') }}
+                      </q-item-label>
+                    </q-list>
+                  </template>
+                </q-btn-dropdown>
               </div>
             </div>
             <div v-else class="tw:flex">
@@ -1069,34 +1151,51 @@ class="q-pr-sm q-pt-xs" />
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
+              <!-- Main action button: "Ask AI" when NL detected but AI bar not open, otherwise "Run Query" -->
               <q-btn
                 v-else
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                :title="t('search.runQuery')"
-                class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
-                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
+                :title="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t('search.generateQueryTooltip') : t('search.runQuery')"
+                class="q-pa-none tw:h-[30px] element-box-shadow"
+                :class="[
+                  (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
+                  config.isEnterprise == 'true'
+                    ? 'search-button-enterprise-border-radius'
+                    : 'search-button-normal-border-radius'
+                ]"
+                :color="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'primary' : undefined"
                 no-caps
-                @click="handleRunQueryFn"
+                @click="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? handleGenerateSQLQuery() : handleRunQueryFn()"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disable="
                   searchObj.loading == true ||
-                  searchObj.loadingHistogram == true
+                  searchObj.loadingHistogram == true ||
+                  isGeneratingSQL ||
+                  ((isNaturalLanguageDetected && !searchObj.meta.nlpMode) && !searchObj.data.stream.selectedStream.length)
                 "
-                >{{ t("search.runQuery") }}</q-btn
-              >
-               <q-separator  class="tw:h-[29px] tw:w-[1px]" />
-              <q-btn-dropdown v-if="config.isEnterprise == 'true'" flat class="tw:h-[29px]"
+                >
+                {{ (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t("search.generateQuery") : t("search.runQuery") }}
+              </q-btn>
+              <!-- Dropdown: "Ask AI" state only when NL detected + AI bar not open -->
+              <q-separator v-if="config.isEnterprise == 'true'" class="tw:h-[29px] tw:w-[1px]" />
+              <q-btn-dropdown
+                v-if="config.isEnterprise == 'true'"
+                flat
+                class="tw:h-[29px] search-button-dropdown"
                 :class="[
-                config.isEnterprise == 'true' &&
+                (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-dropdown-button' : '',
+                !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) && config.isEnterprise == 'true' &&
                     (!!searchObj.data.searchRequestTraceIds.length ||
                       !!searchObj.data.searchWebSocketTraceIds.length) &&
                     (searchObj.loading == true ||
-                      searchObj.loadingHistogram == true) ? 'o2-color-cancel' : 'o2-color-primary',
+                      searchObj.loadingHistogram == true) ? 'o2-color-cancel' : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-color-primary' : '',
                 config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
                 ]"
-               unelevated dense >
+              unelevated dense >
+                  <!-- SQL Mode / AI bar open: Refresh option -->
+                  <template v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)">
                     <q-btn
                       data-test="logs-search-bar-refresh-btn"
                       data-cy="search-bar-refresh-button"
@@ -1113,7 +1212,17 @@ class="q-pr-sm q-pt-xs" />
                       "
                       >
                       <q-icon name="refresh" class="q-mr-xs" />
-                      {{ t("search.refreshCacheAndRunQuery") }}</q-btn>
+                      {{ t("search.refreshCacheAndRunQuery") }}
+                    </q-btn>
+                  </template>
+                  <!-- NL detected, AI bar not open: Empty menu -->
+                  <template v-else>
+                    <q-list class="tw:min-w-[140px] tw:p-2">
+                      <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
+                        No additional options
+                      </q-item-label>
+                    </q-list>
+                  </template>
               </q-btn-dropdown>
             </div>
           </div>
@@ -1137,29 +1246,38 @@ class="q-pr-sm q-pt-xs" />
               class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full"
               :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw:ml-[0.375rem]' : 'tw:mx-[0.375rem]'"
             >
-              <code-query-editor
+              <!-- Unified Query Editor (with built-in AI bar) -->
+              <unified-query-editor
                 v-if="router.currentRoute.value.name === 'logs'"
-                data-test="logs-search-bar-query-editor"
-                editor-id="logsQueryEditor"
                 ref="queryEditorRef"
-                class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
-                :style="editorWidthToggleFunction"
-                v-model:query="searchObj.data.query"
+                :query="searchObj.data.query"
                 :keywords="autoCompleteKeywords"
                 :suggestions="autoCompleteSuggestions"
-                :debounceTime="100"
-                @update:query="updateQueryValue"
-                @run-query="handleRunQueryFn"
-                @keydown="handleKeyDown"
+                :debounce-time="100"
+                :nlp-mode="searchObj.meta.nlpMode"
+                :show-ai-icon="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                :disable-ai="!searchObj.data.stream.selectedStream.length || isSqlModeDisabled"
+                :disable-ai-reason="!searchObj.data.stream.selectedStream.length ? t('search.selectStreamForAI') : t('search.nlpModeDisabledForVisualization')"
+                data-test="logs-search-bar-query-editor"
+                data-test-prefix="logs-search-bar"
+                editor-height="100%"
+                @toggle-nlp-mode="handleToggleNlpMode"
+                :style="editorWidthToggleFunction"
                 :class="
                   searchObj.data.editorValue == '' &&
                   searchObj.meta.queryEditorPlaceholderFlag
                     ? 'empty-query'
                     : ''
                 "
-                language="sql"
+                @update:query="updateQueryValue"
+                @update:nlp-mode="(val) => searchObj.meta.nlpMode = val"
+                @run-query="handleRunQueryFn"
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
+                @nlp-detected="handleNlpModeDetected"
+                @generation-start="handleGenerationStart"
+                @generation-end="handleGenerationEnd"
+                @generation-success="handleGenerationSuccess"
               />
             </div>
           </template>
@@ -1172,30 +1290,42 @@ class="q-pr-sm q-pt-xs" />
               <template v-if="showFunctionEditor">
                 <div class="tw:relative tw:h-full tw:w-full">
                   <div
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mr-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mr-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:h-full"
                   >
-                    <code-query-editor
+                    <!-- Unified Query Editor (with built-in AI bar) -->
+                    <unified-query-editor
                       v-if="router.currentRoute.value.name === 'logs'"
                       data-test="logs-vrl-function-editor"
                       ref="fnEditorRef"
-                      editor-id="fnEditor"
-                      class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
-                      v-model:query="searchObj.data.tempFunctionContent"
+                      :languages="['vrl']"
+                      :default-language="'vrl'"
+                      :query="searchObj.data.tempFunctionContent"
+                      :hide-nl-toggle="false"
+                      :disable-ai="isVrlEditorDisabled"
+                      :disable-ai-reason="isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''"
+                      :ai-placeholder="t('search.askAIFunctionPlaceholder')"
+                      :ai-tooltip="t('search.enterFunctionPrompt')"
+                      :read-only="isVrlEditorDisabled"
+                      editor-height="100%"
+                      class="monaco-editor"
                       :class="
                         searchObj.data.tempFunctionContent == '' &&
                         searchObj.meta.functionEditorPlaceholderFlag
                           ? 'empty-function'
                           : ''
                       "
-                      :readOnly="isVrlEditorDisabled"
+                      @update:query="searchObj.data.tempFunctionContent = $event"
                       @keydown="handleKeyDown"
-                      language="vrl"
                       @focus="
                         searchObj.meta.functionEditorPlaceholderFlag = false
                       "
                       @blur="
                         searchObj.meta.functionEditorPlaceholderFlag = true
                       "
+                      @toggle-nlp-mode="handleFunctionEditorToggleNlpMode"
+                      @generation-start="handleFunctionEditorGenerationStart"
+                      @generation-end="handleFunctionEditorGenerationEnd"
+                      @generation-success="handleFunctionEditorGenerationSuccess"
                     />
                     <!-- VRL disabled warning for non-table charts -->
                     <div
@@ -1249,9 +1379,9 @@ class="q-pr-sm q-pt-xs" />
         dense
         size="10px"
         round
-        color="primary"
         @click="isFocused = !isFocused"
-        class="q-pa-xs tw:absolute! tw:top-[3.3rem]! tw:right-[1.2rem]! tw:z-50"
+        :class="searchObj.meta.showTransformEditor ? 'tw:right-[2.1rem]!' : 'tw:right-[2.4rem]!'"
+        class="q-pa-xs tw:absolute! tw:top-[6.5rem]! tw:z-50 fullscreen-hover-btn"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />
@@ -1680,9 +1810,13 @@ import shortURLService from "@/services/short_url";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-// Lazy load CodeQueryEditor to avoid loading Monaco Editor eagerly
+// Lazy load CodeQueryEditor for VRL/action editors (still needed)
 const CodeQueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
+);
+// Unified QueryEditor for main query editor (with built-in AI bar)
+const UnifiedQueryEditor = defineAsyncComponent(
+  () => import("@/components/QueryEditor.vue")
 );
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
@@ -1707,7 +1841,7 @@ import { cloneDeep } from "lodash-es";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { inject } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
-import { computed } from "vue";
+import { computed, unref } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
@@ -1728,6 +1862,8 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { Bookmark, ChartLine, ChartNoAxesColumn, RefreshCcw, ScanSearch, Share, Menu, Maximize, Minimize } from "lucide-vue-next";
 import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
+import { useNLQuery } from "@/composables/useNLQuery";
+import { isFunction } from "@tanstack/vue-table";
 
 const defaultValue: any = () => {
   return {
@@ -1749,6 +1885,7 @@ export default defineComponent({
     TransformSelector,
     FunctionSelector,
     CodeQueryEditor,
+    UnifiedQueryEditor,
     QueryPlanDialog,
     ScanSearch,
     ChartLine,
@@ -1769,6 +1906,7 @@ export default defineComponent({
     "onAutoIntervalTrigger",
     "showSearchHistory",
     "extractPatterns",
+    "sendToAiChat",
   ],
   methods: {
     searchData() {
@@ -1987,6 +2125,9 @@ export default defineComponent({
       updateFunctionKeywords,
     } = useSqlSuggestions();
 
+    // Natural Language Query composable for SQL detection
+    const { detectNaturalLanguage } = useNLQuery();
+
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = Number(item.value);
     };
@@ -2039,6 +2180,13 @@ export default defineComponent({
         searchObj.meta.showHistogram = value;
       },
     });
+
+    // Track if AI is currently generating SQL query
+    // Updated via @generation-start / @generation-end events from QueryEditor
+    const isGeneratingSQL = ref(false);
+
+    const hasInteractedWithAI = ref(false); // Track if user has used AI in non-NLP mode
+    const isNaturalLanguageDetected = ref(false); // Track NL detection without switching modes
 
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
@@ -2134,6 +2282,62 @@ export default defineComponent({
         if (funs.length) updateFunctionKeywords(funs);
       },
       { immediate: true, deep: true },
+    );
+
+
+
+    // Watch SQL mode toggle - turn off NLP mode when SQL mode is enabled
+    watch(
+      () => searchObj.meta.sqlMode,
+      (newSqlMode, oldSqlMode) => {
+        // Only act when SQL mode is turned ON (not when turning off)
+        if (newSqlMode === true && oldSqlMode === false) {
+          console.log('[NL2Q-Handler] SQL mode enabled, turning off NLP mode (mutually exclusive)');
+          searchObj.meta.nlpMode = false;
+          // Reset flags when switching to SQL mode
+          hasInteractedWithAI.value = false;
+          isNaturalLanguageDetected.value = false;
+        }
+      }
+    );
+
+    // Watch NLP mode toggle - turn off SQL mode when NLP mode is enabled
+    // Also prevent auto-detection from immediately turning it back off
+    watch(
+      () => searchObj.meta.nlpMode,
+      (newNlpMode, oldNlpMode) => {
+        if (newNlpMode === true && oldNlpMode === false) {
+          // NLP mode turned ON
+          console.log('[NL2Q-Handler] NLP mode manually enabled, turning off SQL mode (mutually exclusive)');
+          searchObj.meta.sqlMode = false;
+          // Reset detection flag when manually switching to NLP mode
+          isNaturalLanguageDetected.value = false;
+
+          // CRITICAL: User manually toggled NLP mode ON
+          // We need to prevent the next auto-detection from turning it back OFF
+          // The existing text in editor might be SQL, which would trigger auto-detection
+          // and emit nlpModeDetected:false, turning NLP mode back OFF
+          // So we don't emit auto-detection events when nlpMode prop is already true
+        } else if (newNlpMode === false && oldNlpMode === true) {
+          // NLP mode turned OFF - default to SQL mode
+          console.log('[NL2Q-Handler] NLP mode disabled, switching to SQL mode');
+
+          // CRITICAL: Preserve the current editor content (e.g., AI-generated SQL)
+          // Sync editorValue → query BEFORE enabling sqlMode, so the fullSQLMode
+          // watcher in Index.vue doesn't rebuild the query from stale data.
+          const currentEditorValue = searchObj.data.editorValue || '';
+          if (currentEditorValue.trim()) {
+            searchObj.data.query = currentEditorValue;
+          }
+
+          // Set manual trigger flag so the fullSQLMode watcher skips setQuery()
+          searchObj.meta.sqlModeManualTrigger = true;
+          searchObj.meta.sqlMode = true;
+          // Reset flags
+          isNaturalLanguageDetected.value = false;
+          hasInteractedWithAI.value = false;
+        }
+      }
     );
 
     onBeforeUnmount(() => {
@@ -2301,8 +2505,10 @@ export default defineComponent({
           }
         }
       }
+      // Only auto-enable SQL mode if NOT in NLP mode (manual toggle takes precedence)
       if (
         searchObj.meta.sqlMode === false &&
+        searchObj.meta.nlpMode === false &&
         value.toLowerCase().includes("select") &&
         value.toLowerCase().includes("from")
       ) {
@@ -2558,6 +2764,11 @@ export default defineComponent({
     };
 
     onMounted(async () => {
+      console.log('[NL2Q-SearchBar] Component mounted, handler registered:', typeof handleNlpModeDetected);
+      console.log('[NL2Q-SearchBar] AI enabled:', store.state.zoConfig?.ai_enabled);
+      console.log('[NL2Q-SearchBar] Current route:', router.currentRoute.value.name);
+      console.log('[NL2Q-SearchBar] CodeQueryEditor should render:', router.currentRoute.value.name === 'logs');
+
       searchObj.data.transformType =
         router.currentRoute.value.query.transformType || "function";
 
@@ -3875,10 +4086,153 @@ export default defineComponent({
     const handleHistogramMode = () => {};
 
     const handleRunQueryFn = (clear_cache = false) => {
+      // If in NLP mode and the editor has a full SQL query (AI-generated),
+      // switch to SQL mode so the query is sent as-is, not wrapped as a filter.
+      if (searchObj.meta.nlpMode && !searchObj.meta.sqlMode) {
+        const editorValue = (searchObj.data.editorValue || '').trim().toLowerCase();
+        if (editorValue.includes('select') && editorValue.includes('from')) {
+          // Sync editor content to query and switch to SQL mode
+          searchObj.data.query = searchObj.data.editorValue;
+          searchObj.meta.sqlModeManualTrigger = true;
+          searchObj.meta.sqlMode = true;
+          searchObj.meta.nlpMode = false;
+          isNaturalLanguageDetected.value = false;
+        }
+      }
+
       if (searchObj.meta.logsVisualizeToggle == "visualize" || searchObj.meta.logsVisualizeToggle == "patterns") {
         emit("handleRunQueryFn", typeof clear_cache === 'boolean' ? clear_cache : false);
       } else {
         handleRunQuery(typeof clear_cache === 'boolean' ? clear_cache : false);
+      }
+    };
+
+    /**
+     * Handle natural language detection from CodeQueryEditor
+     *
+     * IMPORTANT: This no longer switches modes automatically!
+     * It only tracks detection state to change button text.
+     * User must manually toggle NLP mode or AI bar only appears after first AI interaction.
+     */
+    const handleNlpModeDetected = (isDetected: boolean) => {
+      console.log('[NL2Q-Handler] ===== HANDLER CALLED =====');
+      console.log('[NL2Q-Handler] handleNlpModeDetected called', {
+        isDetected,
+        aiEnabled: store.state.zoConfig.ai_enabled,
+        currentNlpMode: searchObj.meta.nlpMode,
+        manuallyToggled: searchObj.meta.nlpMode,
+        currentDetectionFlag: isNaturalLanguageDetected.value
+      });
+
+      // Only respond to auto-detection if AI is enabled AND user hasn't manually set NLP mode
+      if (store.state.zoConfig.ai_enabled && !searchObj.meta.nlpMode) {
+        // Update detection flag (for button text) but DON'T switch modes
+        const oldValue = isNaturalLanguageDetected.value;
+        isNaturalLanguageDetected.value = isDetected;
+        console.log('[NL2Q-Handler] Detection flag updated:', oldValue, '→', isDetected);
+        console.log('[NL2Q-Handler] Natural language detection:', isDetected ? 'YES (button → Ask AI)' : 'NO (button → Run Query)');
+      } else if (searchObj.meta.nlpMode) {
+        console.log('[NL2Q-Handler] NLP mode manually enabled, ignoring auto-detection');
+      } else {
+        console.log('[NL2Q-Handler] AI not enabled, not tracking detection');
+      }
+    };
+
+    /**
+     * Handle toggle NLP mode from AI icon in CodeQueryEditor
+     */
+    const handleToggleNlpMode = () => {
+      console.log('[SearchBar] Toggling NLP mode from AI icon');
+      searchObj.meta.nlpMode = !searchObj.meta.nlpMode;
+
+      // If enabling NLP mode, disable SQL mode (mutually exclusive)
+      if (searchObj.meta.nlpMode) {
+        searchObj.meta.sqlMode = false;
+        isNaturalLanguageDetected.value = false;
+      }
+    };
+
+    /**
+     * Handle generation start event from CodeQueryEditor
+     */
+    const handleGenerationStart = () => {
+      console.log('[SearchBar] Generation started - disabling button');
+      isGeneratingSQL.value = true;
+    };
+
+    /**
+     * Handle generation end event from CodeQueryEditor
+     */
+    const handleGenerationEnd = () => {
+      console.log('[SearchBar] Generation ended - enabling button');
+      isGeneratingSQL.value = false;
+    };
+
+    /**
+     * Handle generation success with response type
+     */
+    const handleGenerationSuccess = (payload: {type: string, message: string}) => {
+      console.log('[SearchBar] Generation success:', payload.type);
+
+      // Track that user has interacted with AI
+      hasInteractedWithAI.value = true;
+      // NLP mode is already ON (set in handleGenerateSQLQuery) — AI bar stays visible.
+      // QueryEditor manages its own AI bar success text internally.
+    };
+
+    /**
+     * Handle NLP mode toggle for VRL function editor
+     */
+    const handleFunctionEditorToggleNlpMode = () => {
+      console.log('[SearchBar] VRL Function Editor: Toggling NLP mode from AI icon');
+      // UnifiedQueryEditor manages its own NLP mode state internally
+    };
+
+    /**
+     * Handle generation start for VRL function editor
+     */
+    const handleFunctionEditorGenerationStart = () => {
+      console.log('[SearchBar] VRL Function Editor: AI generation started');
+      // Can add loading indicators here if needed
+    };
+
+    /**
+     * Handle generation end for VRL function editor
+     */
+    const handleFunctionEditorGenerationEnd = () => {
+      console.log('[SearchBar] VRL Function Editor: AI generation ended');
+      // Can remove loading indicators here if needed
+    };
+
+    /**
+     * Handle successful generation for VRL function editor
+     */
+    const handleFunctionEditorGenerationSuccess = (payload: {type: string, message: string}) => {
+      console.log('[SearchBar] VRL Function Editor: AI generation success:', payload.type);
+      // Function content is already updated via @update:query handler
+    };
+
+    /**
+     * Handle Generate SQL Query when in NLP mode OR when NL detected
+     * Combines AI bar text + editor text, then calls CodeQueryEditor generation
+     */
+    const handleGenerateSQLQuery = async () => {
+      const queryEditor = queryEditorRef.value;
+      if (!queryEditor?.handleGenerateSQL) return;
+
+      // Turn on NLP mode immediately so the AI bar appears and shows progress/streaming
+      isNaturalLanguageDetected.value = false;
+      searchObj.meta.nlpMode = true;
+      searchObj.meta.sqlMode = false;
+
+      // Delegate to QueryEditor — it handles its own AI bar text internally
+      const editorText = (searchObj.data.editorValue || '').trim();
+      if (editorText) {
+        try {
+          await queryEditor.handleGenerateSQL(editorText);
+        } catch (error) {
+          // QueryEditor handles errors internally
+        }
       }
     };
 
@@ -4252,6 +4606,11 @@ export default defineComponent({
         ? getImageURL("images/common/hugeicons_sql_light.svg")
         : getImageURL("images/common/hugeicons_sql.svg");
     });
+    const nlpIcon = computed(() => {
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon.svg");
+    });
     const quickModeIcon = computed(() => {
       return store.state.theme === "dark"
         ? getImageURL("images/common/quick_mode_light.svg")
@@ -4409,12 +4768,22 @@ export default defineComponent({
       visualizeIcon,
       histogramIcon,
       sqlIcon,
+      nlpIcon,
       quickModeIcon,
       searchHistoryIcon,
       downloadTableIcon,
       customRangeIcon,
       createScheduledSearchIcon,
       listScheduledSearchIcon,
+      handleNlpModeDetected,
+      handleToggleNlpMode,
+      handleGenerationStart,
+      handleGenerationEnd,
+      handleGenerationSuccess,
+      handleGenerateSQLQuery,
+      isGeneratingSQL,
+      isNaturalLanguageDetected,
+      hasInteractedWithAI,
       getColumnNames,
       getSearchObj,
       toggleHistogram,
@@ -4699,6 +5068,57 @@ export default defineComponent({
   object-fit: contain;
 }
 
+// AI Generate Button Styling (matches O2 AI Assistant - purple gradient)
+.o2-ai-generate-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  border: none !important;
+  font-size: 0.6875rem !important; // 11px - match Run Query button
+  font-weight: 600 !important;
+  line-height: 1rem !important; // 16px - match Run Query button
+  transition: all 0.3s ease !important;
+  box-shadow: 0 0.25rem 0.9375rem 0 rgba(102, 126, 234, 0.3) !important; // 0 4px 15px
+  padding: 0 0.75rem !important; // 0 12px - same as Run Query button
+  width: 92px !important; // Fixed width - matches Run Query button
+
+  // Flexbox alignment to control spacing
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.25rem !important; // 4px gap between icon and text (tighter spacing)
+
+  &:hover:not(.disabled):not([disabled]):not(:disabled) {
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
+    box-shadow: 0 0.375rem 1.25rem 0 rgba(102, 126, 234, 0.4) !important; // 0 6px 20px
+    transform: translateY(-0.0625rem) !important; // -1px
+  }
+
+  &:active:not(.disabled):not([disabled]):not(:disabled) {
+    transform: translateY(0) !important;
+    box-shadow: 0 0.125rem 0.625rem 0 rgba(102, 126, 234, 0.3) !important; // 0 2px 10px
+  }
+
+  // Icon styling within button - white color to match text
+  img {
+    filter: brightness(0) invert(1);
+    opacity: 1;
+    margin: 0 !important; // Remove any default margin, using gap instead
+    width: 0.875rem !important; // 14px - slightly smaller for better fit
+    height: 0.875rem !important; // 14px
+  }
+}
+
+// Dropdown button in AI mode - same gradient as main button but auto width
+.o2-ai-dropdown-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  border: none !important;
+
+  &:hover:not(.disabled):not([disabled]):not(:disabled) {
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
+  }
+}
+
 .q-dark .toolbar-icon {
   filter: invert(1);
 }
@@ -4706,6 +5126,7 @@ export default defineComponent({
 .toolbar-icon-in-toggle {
   font-size: 0.9rem; // ~14.4px
 }
+
 
 .syntax-guide-in-menu {
   :deep(.q-btn) {
@@ -4807,6 +5228,15 @@ export default defineComponent({
 .logs-search-splitter {
   :deep(.q-splitter__separator) {
     height: 100%;
+  }
+}
+
+.fullscreen-hover-btn:hover {
+  background-color: var(--q-primary) !important;
+  color: white !important;
+
+  svg {
+    color: white !important;
   }
 }
 </style>

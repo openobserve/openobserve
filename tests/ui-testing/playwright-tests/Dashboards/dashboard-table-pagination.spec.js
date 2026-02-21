@@ -924,8 +924,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await page.locator('[data-test="dashboard-custom-query-type"]').click();
 
     // Focus on the editor
-    await page.locator('.view-line').first().click();
-    await page.locator('[data-test="dashboard-panel-query-editor"]').locator('.monaco-editor').click();
+    await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole('code').click();
     await page.locator('[data-test="dashboard-panel-query-editor"]').locator('.inputarea').fill(
       'SELECT kubernetes_container_name, count(*) as count FROM "e2e_automate" GROUP BY kubernetes_container_name'
     );
@@ -1031,7 +1030,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
     // Focus on the editor and enter a simple PromQL query using keyboard.type for reliable Monaco input
-    await queryEditor.locator('.monaco-editor').click();
+    await queryEditor.getByRole('code').click();
     await page.keyboard.press('Control+a');
     await page.keyboard.type('up');
     await page.keyboard.press('Escape'); // Dismiss any Monaco autocomplete suggestions
@@ -1121,7 +1120,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
     // Focus on the editor and enter a PromQL query using keyboard.type for reliable Monaco input
-    await queryEditor.locator('.monaco-editor').click();
+    await queryEditor.getByRole('code').click();
     await page.keyboard.press('Control+a');
     await page.keyboard.type('up');
     await page.keyboard.press('Escape'); // Dismiss any Monaco autocomplete suggestions

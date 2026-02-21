@@ -18,6 +18,7 @@ import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
 
 installQuasar();
 
@@ -61,11 +62,19 @@ vi.mock("@/utils/query/vrlLanguageDefinition", () => ({
 
 describe("CodeQueryEditor", () => {
   let store: any;
+  let i18n: any;
 
   beforeEach(() => {
     store = createStore({
       state: {
         theme: "light",
+      },
+    });
+    i18n = createI18n({
+      legacy: false,
+      locale: "en",
+      messages: {
+        en: {},
       },
     });
     vi.clearAllMocks();
@@ -79,7 +88,7 @@ describe("CodeQueryEditor", () => {
         ...props,
       },
       global: {
-        plugins: [store],
+        plugins: [store, i18n],
       },
     });
   };

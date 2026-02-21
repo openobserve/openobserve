@@ -380,7 +380,7 @@ export class MetricsPage {
         }
 
         // Click on the Monaco editor to focus it
-        await editorContainer.locator('.monaco-editor').click();
+        await editorContainer.getByRole('code').click();
         await this.page.waitForTimeout(100);
 
         // Use platform-specific key combo for select all
@@ -477,7 +477,7 @@ export class MetricsPage {
             editorContainer = this.page.locator('.monaco-editor').first();
         }
 
-        await editorContainer.locator('.monaco-editor').click();
+        await editorContainer.getByRole('code').click();
         const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
         await this.page.keyboard.press(selectAllKey);
         await this.page.keyboard.press('Delete');
