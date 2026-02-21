@@ -95,7 +95,7 @@ pub fn is_querier_route(path: &str) -> bool {
 #[inline]
 pub fn is_querier_route_by_body(path: &str) -> bool {
     let path = remove_base_uri(path);
-    QUERIER_ROUTES_BY_BODY.iter().any(|x| path.contains(x))
+    QUERIER_ROUTES_BY_BODY.iter().any(|x| path.ends_with(x))
 }
 
 #[inline]
@@ -156,7 +156,9 @@ mod tests {
         ));
 
         assert!(!is_querier_route_by_body("/other_route"));
-        assert!(is_querier_route_by_body("/_search_other"));
+        // _search_history must NOT match /_search (was the root cause bug)
+        assert!(!is_querier_route_by_body("/_search_history"));
+        assert!(!is_querier_route_by_body("/api/org1/_search_history"));
     }
 
     #[test]
