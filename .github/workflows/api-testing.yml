@@ -62,6 +62,9 @@ jobs:
           cache-on-failure: true
           prefix-key: api-testing
 
+      - name: Install mold and lld linkers
+        run: sudo apt-get install -y mold clang lld
+
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
