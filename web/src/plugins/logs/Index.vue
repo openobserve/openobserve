@@ -1679,13 +1679,10 @@ export default defineComponent({
 
             let logsPageQuery = "";
 
-            // handle sql mode
-            if (!searchObj.meta.sqlMode) {
+
+            // Everytime, build the query inrespective of sqlMode
               const queryBuild = buildSearch();
               logsPageQuery = queryBuild?.query?.sql ?? "";
-            } else {
-              logsPageQuery = searchObj.data.query;
-            }
 
             // Check if query is SELECT * which is not supported for visualization
             if (
