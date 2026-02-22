@@ -671,12 +671,6 @@ export default defineComponent({
       emit("update:promqlQuery", value);
     };
 
-    const updateVrlFunction = (value: string) => {
-      vrlFunctionContent.value = value;
-      // Encode VRL function before emitting
-      const encoded = b64EncodeUnicode(value);
-      emit("update:vrlFunction", encoded);
-    };
 
     // Handler for VRL function updates from QueryEditorDialog
     // The dialog emits the encoded value, so we just pass it through
