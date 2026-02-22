@@ -2729,11 +2729,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     // Preserve stream name and type across field resets — these identify
     // which stream the query targets and should not change when chart type
     // or field layout changes.
-    const currentFields = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields;
-    const preservedStream = currentFields.stream || "";
-    const preservedStreamType = currentFields.stream_type || "logs";
+    const currentFields = dashboardPanelData?.data?.queries?.[
+      dashboardPanelData?.layout?.currentQueryIndex
+    ]?.fields;
+    const preservedStream = currentFields?.stream ?? "";
+    const preservedStreamType = currentFields?.stream_type ?? "logs";
 
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
