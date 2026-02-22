@@ -61,6 +61,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+
+      - name: Install mold and lld linkers
+        run: sudo apt-get install -y mold clang lld
+
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
