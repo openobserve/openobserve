@@ -48,6 +48,9 @@ jobs:
           cache-on-failure: true
           prefix-key: amd64
 
+      - name: Install mold and lld linkers
+        run: sudo apt-get install -y mold clang lld
+
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
@@ -132,6 +135,9 @@ jobs:
         with:
           cache-on-failure: true
           prefix-key: arm64
+
+      - name: Install mold and lld linkers
+        run: sudo apt-get install -y mold clang lld
 
       - name: Install Protoc
         run: |
