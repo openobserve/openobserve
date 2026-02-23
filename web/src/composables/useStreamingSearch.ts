@@ -111,7 +111,7 @@ const useHttpStreaming = () => {
   const fetchQueryDataWithHttpStream = async (
     data: {
       queryReq: SearchRequestPayload | any;
-      type: "search" | "histogram" | "pageCount" | "values" | "promql";
+      type: "search" | "histogram" | "pageCount" | "values" | "promql" | "traces";
       traceId: string;
       org_id: string;
       pageType?: string;
@@ -162,7 +162,7 @@ const useHttpStreaming = () => {
   const initiateStreamConnection = async (
     data: {
       queryReq: SearchRequestPayload | any;
-      type: "search" | "histogram" | "pageCount" | "values" | "promql";
+      type: "search" | "histogram" | "pageCount" | "values" | "promql" | "traces";
       traceId: string;
       org_id: string;
       pageType?: string;
@@ -246,6 +246,11 @@ const useHttpStreaming = () => {
       if (meta?.run_id) url += `&run_id=${meta?.run_id}`;
       if (meta?.tab_id) url += `&tab_id=${meta?.tab_id}`;
       if (meta?.tab_name) url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
+    } else if (type === "traces") {
+      // Traces latest_stream endpoint — GET with query params
+      const { stream_name, filter, start_time, end_time, from, size, timeout } = queryReq;
+      url = `/${stream_name}/traces/latest_stream?filter=${encodeURIComponent(filter || "")}&start_time=${start_time}&end_time=${end_time}&from=${from ?? 0}&size=${size ?? 25}`;
+      if (timeout) url += `&timeout=${timeout}`;
     }
 
     url = `${store.state.API_ENDPOINT}/api/${org_id}` + url;
@@ -255,8 +260,9 @@ const useHttpStreaming = () => {
       const traceparent = `00-${traceId}-${spanId}-01`;
 
       // Make the HTTP/2 streaming request
+      const useGetMethod = type === "promql" || type === "traces";
       const fetchOptions: any = {
-        method: type === "promql" ? 'GET' : 'POST',
+        method: useGetMethod ? 'GET' : 'POST',
         credentials: 'include',
         headers: {
           'traceparent': traceparent,
@@ -265,7 +271,7 @@ const useHttpStreaming = () => {
       };
 
       // Add Content-Type and body only for POST requests
-      if (type !== "promql") {
+      if (!useGetMethod) {
         fetchOptions.headers['Content-Type'] = 'application/json';
         fetchOptions.body = JSON.stringify((isMultiStream && type != "values") ? queryReq.query : queryReq);
       }

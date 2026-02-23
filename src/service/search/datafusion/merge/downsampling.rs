@@ -31,7 +31,9 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
+#[cfg(all(feature = "enterprise", feature = "vortex"))]
 use o2_enterprise::enterprise::search::vortex::{Utf8Compressor, VORTEX_RUNTIME};
+#[cfg(all(feature = "enterprise", feature = "vortex"))]
 use vortex::{
     VortexSessionDefault,
     array::{ArrayRef, arrow::FromArrowArray},
@@ -114,8 +116,15 @@ pub async fn merge_parquet_files_with_downsampling(
         FileFormat::Parquet => {
             write_downsampled_parquet(rx, &schema, bloom_filter_fields, &metadata, &cfg).await?
         }
+        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         FileFormat::Vortex => {
             write_downsampled_vortex(rx, schema.clone(), cfg.compact.max_file_size as i64).await?
+        }
+        #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
+        FileFormat::Vortex => {
+            return Err(DataFusionError::Execution(
+                "Vortex file format requires enterprise and vortex features".to_string(),
+            ));
         }
     };
 
@@ -197,6 +206,7 @@ async fn write_downsampled_parquet(
     Ok((bufs, file_metas))
 }
 
+#[cfg(all(feature = "enterprise", feature = "vortex"))]
 async fn write_downsampled_vortex(
     mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     schema: Arc<datafusion::arrow::datatypes::Schema>,
