@@ -181,8 +181,8 @@ pub async fn chat(
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
-        if !config.incidents.rca_enabled || config.incidents.rca_agent_url.is_empty() {
-            return MetaHttpResponse::bad_request("Agent service not configured");
+        if config.ai.agent_url.is_empty() {
+            return MetaHttpResponse::bad_request("AI agent URL is not set");
         }
 
         // Extract user token from cookie/header for per-user MCP auth
@@ -200,7 +200,7 @@ pub async fn chat(
         // Create agent client
         let zo_config = get_config();
         let client = match RcaAgentClient::new(
-            &config.incidents.rca_agent_url,
+            &config.ai.agent_url,
             &zo_config.auth.root_user_email,
             &zo_config.auth.root_user_password,
         ) {
@@ -765,7 +765,7 @@ pub async fn confirm_action(
         // Forward the confirmation to the agent's /confirm endpoint
         let confirm_url = format!(
             "{}/confirm/{}",
-            config.incidents.rca_agent_url.trim_end_matches('/'),
+            config.ai.agent_url.trim_end_matches('/'),
             session_id
         );
 
