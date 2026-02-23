@@ -242,10 +242,17 @@ const determineChartType = (extractedFields: {
     )
   );
 
-  // If we have a time series field OR time-based grouping, use line chart
+  // For raw log data (no group_by)
+  // we will show table by default becuase no group by means no aggregation so for no aggregation queries we dont show any line chart
+  if (extractedFields.group_by.length === 0) {
+    return 'table';
+  }
+
+  // If we have a time series field with time-based grouping, use line chart
   if (
-    extractedFields.timeseries_field ||
-    (hasTimeSeriesGrouping && extractedFields.group_by.length <= 2)
+    extractedFields.timeseries_field &&
+    hasTimeSeriesGrouping &&
+    extractedFields.group_by.length <= 2
   ) {
     return "line";
   }
