@@ -393,8 +393,9 @@ export function useLatencyInsightsDashboard() {
       (config.rateFilter !== undefined && config.rateFilter.timeStart !== undefined && config.rateFilter.timeEnd !== undefined) ||
       (config.errorFilter !== undefined && config.errorFilter.timeStart !== undefined && config.errorFilter.timeEnd !== undefined);
     const isSameTimeRange =
-      config.streamType === "logs" &&
-      config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
+      config.streamType &&
+      config.baselineTimeRange.startTime ===
+        config.selectedTimeRange.startTime &&
       config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
     const isComparisonMode = hasTimeBasedFilter || !isSameTimeRange;
 
@@ -460,20 +461,22 @@ export function useLatencyInsightsDashboard() {
           },
           axis_label_rotate: 30,
           axis_label_truncate_width: 80,
-          color: isComparisonMode ? {
-            mode: "palette-classic-by-series",
-            fixedColor: ["#ffc107", "#1976d2"],
-            seriesBy: "last",
-            colorBySeries: [
-              { name: "Selected", color: "#ffc107" },
-              { name: "Baseline", color: "#1976d2" },
-            ],
-          } : {
-            mode: "palette-classic-by-series",
-            fixedColor: ["#5960b2"],
-            seriesBy: "last",
-            colorBySeries: [],
-          },
+          color: isComparisonMode
+            ? {
+                mode: "palette-classic-by-series",
+                fixedColor: ["#ffc107", "#4d9ef0"],
+                seriesBy: "last",
+                colorBySeries: [
+                  { name: "Selected", color: "#ffc107" },
+                  { name: "Baseline", color: "#4d9ef0" },
+                ],
+              }
+            : {
+                mode: "shades",
+                fixedColor: ["#4d9ef0"],
+                seriesBy: "last",
+                colorBySeries: [],
+              },
           top_results_others: false,
           line_thickness: 1.5,
           step_value: "0",

@@ -188,37 +188,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Table Skeleton (initial load) -->
         <div
           v-else-if="isLoading && !hasError"
-          class="tw:p-4"
+          class="tw:h-full tw:flex tw:flex-col tw:items-center tw:justify-center"
           data-test="table-skeleton"
         >
-          <!-- Table Header Skeleton -->
+          <!-- Loading indicator -->
           <div
-            class="tw:flex tw:gap-4 tw:mb-4 tw:pb-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+            class="tw:flex tw:items-center tw:justify-center tw:gap-3"
           >
-            <q-skeleton type="text" width="12%" height="20px" />
-            <q-skeleton type="text" width="15%" height="20px" />
-            <q-skeleton type="text" width="40%" height="20px" />
-            <q-skeleton type="text" width="10%" height="20px" />
-            <q-skeleton type="text" width="10%" height="20px" />
-          </div>
-
-          <!-- Table Row Skeletons -->
-          <div v-for="i in 8" :key="i" class="tw:mb-3">
-            <div class="tw:flex tw:gap-4 tw:items-center">
-              <q-skeleton type="text" width="12%" height="16px" />
-              <q-skeleton type="text" width="15%" height="16px" />
-              <q-skeleton type="text" width="40%" height="16px" />
-              <q-skeleton type="text" width="10%" height="16px" />
-              <q-skeleton type="text" width="10%" height="16px" />
-            </div>
-          </div>
-
-          <!-- Loading indicator inside skeleton -->
-          <div
-            class="tw:flex tw:items-center tw:justify-center tw:mt-8 tw:gap-3"
-          >
-            <q-spinner color="primary" size="24px" />
-            <span class="tw:text-sm tw:text-gray-600">
+            <q-spinner color="primary" size="md" />
+            <span class="tw:text-sm tw:opacity-70">
               {{ t("correlation.logs.loading") }}
             </span>
           </div>
@@ -230,27 +208,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           data-test="error-state"
         >
-          <q-icon
-            name="error_outline"
-            size="3rem"
-            color="negative"
-            class="tw:mb-4"
-          />
-          <p class="tw:text-base tw:text-negative tw:font-medium tw:mb-2">
-            {{ t("correlation.logs.error") }}
-          </p>
           <p
-            class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:max-w-md tw:text-center"
+            class="tw:text-base tw:opacity-70 tw:max-w-md tw:text-center"
           >
-            {{ error }}
+            {{ error || t("correlation.logs.errorDetails") }}
           </p>
-          <q-btn
-            class="o2-secondary-button"
-            :label="t('common.retry')"
-            icon="refresh"
-            @click="handleRetry"
-            data-test="retry-btn"
-          />
         </div>
 
         <!-- Empty State -->
@@ -259,27 +221,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           data-test="empty-state"
         >
-          <q-icon
-            name="search_off"
-            size="3rem"
-            color="grey-6"
-            class="tw:mb-4"
-          />
-          <p class="tw:text-base tw:font-medium tw:text-gray-600 tw:mb-2">
+          <p class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
             {{ t("correlation.logs.noData") }}
           </p>
-          <p class="tw:text-sm tw:text-gray-500 tw:mb-4">
+          <p class="tw:text-sm tw:opacity-70 tw:mb-4">
             {{ t("correlation.logs.noDataDetails") }}
           </p>
-          <q-btn
-            v-if="!props.hideResetFiltersButton"
-            class="o2-secondary-button"
-            :label="t('correlation.logs.resetFilters')"
-            outline
-            icon="restart_alt"
-            @click="handleResetFilters"
-            data-test="reset-filters-btn"
-          />
         </div>
       </div>
     </div>
@@ -791,14 +738,6 @@ const handleDimensionUpdate = ({
 const handleApplyFilters = () => {
   // Update all filters at once using batch update (triggers single API call)
   updateFilters(pendingFilters.value);
-};
-
-const handleRefresh = () => {
-  refresh();
-};
-
-const handleRetry = () => {
-  refresh();
 };
 
 const handleResetFilters = () => {

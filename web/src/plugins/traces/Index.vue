@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage"
-style="min-height: auto">
+  <q-page class="tracePage" id="tracePage" style="min-height: auto">
     <div id="tracesSecondLevel">
       <div
         class="tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
@@ -43,10 +42,16 @@ style="min-height: auto">
 
       <!-- Service Graph Tab Content -->
       <div
-        v-if="activeTab === 'service-graph' && store.state.zoConfig.service_graph_enabled"
+        v-if="
+          activeTab === 'service-graph' &&
+          store.state.zoConfig.service_graph_enabled
+        "
         class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-90px)] tw:overflow-hidden"
       >
-        <service-graph class="tw:h-full" @view-traces="handleServiceGraphViewTraces" />
+        <service-graph
+          class="tw:h-full"
+          @view-traces="handleServiceGraphViewTraces"
+        />
       </div>
 
       <!-- Search Tab Content -->
@@ -79,11 +84,19 @@ style="min-height: auto">
           <template #separator>
             <q-btn
               data-test="logs-search-field-list-collapse-btn"
-              :icon="searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'"
-              :title="
-                searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')
+              :icon="
+                searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
               "
-              :class="searchObj.meta.showFields ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
+              :title="
+                searchObj.meta.showFields
+                  ? t('traces.collapseFields')
+                  : t('traces.openFields')
+              "
+              :class="
+                searchObj.meta.showFields
+                  ? 'splitter-icon-collapse'
+                  : 'splitter-icon-expand'
+              "
               color="primary"
               size="sm"
               dense
@@ -92,10 +105,8 @@ style="min-height: auto">
             />
           </template>
           <template #after>
-            <div
-              class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]"
-            >
-              <div class="card-container tw:h-full">
+            <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+              <div class="card-container tw:h-full tw:overflow-hidden">
                 <div
                   v-if="
                     searchObj.data.errorMsg !== '' && searchObj.loading == false
@@ -147,7 +158,7 @@ style="min-height: auto">
                   >
                     <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noStreamSelectedMessage") }}
-                </div>
+                  </div>
                 </div>
                 <div
                   data-test="logs-search-result-not-found-text"
@@ -158,8 +169,7 @@ style="min-height: auto">
                   "
                   class="text-center tw:mx-[10%] tw:py-[40px] tw:text-[20px]"
                 >
-                  <q-icon name="info"
-color="primary" size="md" />
+                  <q-icon name="info" color="primary" size="md" />
                   {{ t("search.applySearch") }}
                 </div>
 
@@ -178,6 +188,26 @@ color="primary" size="md" />
         </q-splitter>
       </div>
     </div>
+
+    <!-- Color Preview Dialog (Test) -->
+    <q-dialog
+      v-model="showColorPreview"
+      maximized
+      transition-show="slide-up"
+      transition-hide="slide-down"
+    >
+      <q-card class="tw:bg-[var(--o2-primary-background)]">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Span Color Palette Preview</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section class="tw:h-[calc(100vh-60px)] tw:overflow-auto">
+          <span-color-preview />
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -209,7 +239,9 @@ import {
   formatTimeWithSuffix,
   timestampToTimezoneDate,
   escapeSingleQuotes,
+  getUUID,
 } from "@/utils/zincutils";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
@@ -246,8 +278,12 @@ let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
 const indexListRef = ref(null);
+const showColorPreview = ref(false);
 const { getStreams, getStream } = useStreams();
 const chartRedrawTimeout = ref(null);
+const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+// Track the current search stream so we can cancel it when a new search starts
+let currentSearchTraceId: string | null = null;
 
 searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
 
@@ -616,19 +652,14 @@ async function getQueryData() {
 
     if (searchObj.data.resultGrid.currentPage == 0) {
       searchObj.loading = true;
-      // searchObj.data.stream.selectedFields = [];
-      // searchObj.data.stream.addToFilter = "";
       searchObj.data.queryResults = {};
-      // searchObj.data.resultGrid.columns = [];
       searchObj.data.sortedQueryResults = [];
-      // searchObj.data.streamResults = [];
       searchObj.data.histogram = {
         layout: {},
         data: [],
       };
-      // searchObj.data.editorValue = "";
     }
-    // dismiss = Notify();
+
     let queryReq;
 
     if (!searchObj.data.resultGrid.currentPage) {
@@ -639,7 +670,6 @@ async function getQueryData() {
     }
 
     if (queryReq == null) {
-      // dismiss();
       return false;
     }
 
@@ -666,101 +696,144 @@ async function getQueryData() {
     }
 
     // Filters are already in editorValue (set by metrics dashboard brush selections)
-    // No need to add them again here
-    let filter = searchObj.data.editorValue.trim();
+    const filter = searchObj.data.editorValue.trim();
     const combinedFilter = filter;
 
     if (queryReq.query.from === 0) searchResultRef.value.getDashboardData();
 
-    searchService
-      .get_traces({
-        org_identifier: searchObj.organizationIdentifier,
-        start_time: queryReq.query.start_time,
-        end_time: queryReq.query.end_time,
-        filter: combinedFilter || "",
-        size: queryReq.query.size,
-        from: queryReq.query.from,
-        stream_name: selectedStreamName.value,
-      })
-      .then(async (res) => {
-        searchObj.loading = false;
-
-        if (
-          filter &&
-          filter.includes("trace_id") &&
-          res.data.hits.length === 1 &&
-          res.data.hits[0].start_time &&
-          res.data.hits[0].end_time
-        ) {
-          const startTime = Math.floor(res.data.hits[0].start_time / 1000);
-          const endTime = Math.ceil(res.data.hits[0].end_time / 1000);
-          // If the trace is not in the current time range, update the time range
-          if (
-            !(
-              startTime >= queryReq.query.start_time &&
-              endTime <= queryReq.query.end_time
-            )
-          ) {
-            updateNewDateTime(startTime, endTime);
-          }
-        }
-
-        const formattedHits = formatTracesMetaData(res.data.hits);
-        if (res.data.from > 0) {
-          searchObj.data.queryResults.from = res.data.from;
-          searchObj.data.queryResults.hits.push(...formattedHits);
-        } else {
-          searchObj.data.queryResults = {
-            ...res.data,
-            hits: formattedHits,
-          };
-        }
-
-        updateFieldValues(res.data.hits);
-
-        //update grid columns
-        updateGridColumns();
-      })
-      .catch((err) => {
-        searchObj.loading = false;
-        // dismiss();
-        if (err.response != undefined) {
-          if (err.response.data.error) {
-            searchObj.data.errorMsg = err.response.data.error;
-          } else if (err.response.data.message) {
-            searchObj.data.errorMsg = err.response.data.message;
-          }
-        } else if (err.message) {
-          searchObj.data.errorMsg = err.message;
-        }
-
-        if (err.response?.data?.code) {
-          const customMessage = logsErrorMessage(err.response.data.code);
-          searchObj.data.errorCode = err.response.data.code;
-          if (customMessage != "") {
-            searchObj.data.errorMsg = t(customMessage);
-          }
-        }
-
-        if (err.response?.data?.code && err.response?.data?.message) {
-          searchObj.data.errorMsg = err.response.data.message;
-          searchObj.data.errorCode = err.response.data.code;
-        }
-
-        if (err.response?.data?.code && err.response?.data?.error_detail) {
-          searchObj.data.errorDetail = err.response.data.error_detail;
-          searchObj.data.errorCode = err.response.data.code;
-        }
-
-        // $q.notify({
-        //   message: searchObj.data.errorMsg,
-        //   color: "negative",
-        // });
-      })
-      .finally(() => {
-        if (dismiss) dismiss();
+    // Cancel any in-flight stream before starting a new one
+    if (currentSearchTraceId) {
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: currentSearchTraceId,
+        org_id: searchObj.organizationIdentifier,
       });
-  } catch (e) {
+      currentSearchTraceId = null;
+    }
+
+    // Generate a unique ID for this search request
+    const searchTraceId = getUUID().replace(/-/g, "");
+    currentSearchTraceId = searchTraceId;
+
+    // Initialise results container on the first page
+    if (queryReq.query.from === 0) {
+      searchObj.data.queryResults = {
+        hits: [],
+        total: 0,
+        from: 0,
+        size: queryReq.query.size,
+        took: 0,
+      };
+    }
+
+    fetchQueryDataWithHttpStream(
+      {
+        queryReq: {
+          stream_name: selectedStreamName.value,
+          filter: combinedFilter || "",
+          start_time: queryReq.query.start_time,
+          end_time: queryReq.query.end_time,
+          from: queryReq.query.from,
+          size: queryReq.query.size,
+        },
+        type: "traces",
+        traceId: searchTraceId,
+        org_id: searchObj.organizationIdentifier,
+      },
+      {
+        data: (_payload: any, response: any) => {
+          if (
+            response.type === "search_response_metadata" ||
+            response.type === "search_response_hits"
+          ) {
+            const rawHits: any[] =
+              response.content?.results?.hits || [];
+            if (rawHits.length === 0) return;
+
+            // Handle single-trace-id filter: auto-adjust time range on first hit batch
+            if (
+              filter &&
+              filter.includes("trace_id") &&
+              rawHits.length === 1 &&
+              rawHits[0].start_time &&
+              rawHits[0].end_time
+            ) {
+              const startTime = Math.floor(rawHits[0].start_time / 1000);
+              const endTime = Math.ceil(rawHits[0].end_time / 1000);
+              if (
+                !(
+                  startTime >= queryReq.query.start_time &&
+                  endTime <= queryReq.query.end_time
+                )
+              ) {
+                updateNewDateTime(startTime, endTime);
+              }
+            }
+
+            const formattedHits = formatTracesMetaData(rawHits);
+            if (!searchObj.data.queryResults.hits) {
+              searchObj.data.queryResults = {
+                hits: [],
+                total: 0,
+                from: queryReq.query.from,
+                size: queryReq.query.size,
+                took: 0,
+              };
+            }
+            searchObj.data.queryResults.hits.push(...formattedHits);
+            // Keep queryResults.from in sync so SearchResult.vue's onScroll gate
+            // (currentPage <= queryResults.from / rowsPerPage) allows further pages.
+            searchObj.data.queryResults.from = queryReq.query.from;
+            // Use backend total when available (cumulative across partitions);
+            // fall back to hits.length only if not provided.
+            const backendTotal = response.content?.results?.total;
+            searchObj.data.queryResults.total =
+              backendTotal != null ? backendTotal : searchObj.data.queryResults.hits.length;
+
+            updateFieldValues(rawHits);
+            updateGridColumns();
+          }
+        },
+        error: (_payload: any, err: any) => {
+          searchObj.loading = false;
+          if (dismiss) dismiss();
+
+          const errData = err?.content || err;
+          if (errData?.message) {
+            searchObj.data.errorMsg = errData.message;
+          } else if (err?.message) {
+            searchObj.data.errorMsg = err.message;
+          } else {
+            searchObj.data.errorMsg = "Search request failed";
+          }
+          if (errData?.code) {
+            searchObj.data.errorCode = errData.code;
+            const customMessage = logsErrorMessage(errData.code);
+            if (customMessage !== "") {
+              searchObj.data.errorMsg = t(customMessage);
+            }
+          }
+          if (errData?.code && errData?.message) {
+            searchObj.data.errorMsg = errData.message;
+            searchObj.data.errorCode = errData.code;
+          }
+          if (errData?.code && errData?.error_detail) {
+            searchObj.data.errorDetail = errData.error_detail;
+            searchObj.data.errorCode = errData.code;
+          }
+          currentSearchTraceId = null;
+        },
+        complete: (_payload: any) => {
+          searchObj.loading = false;
+          if (dismiss) dismiss();
+          currentSearchTraceId = null;
+        },
+        reset: (_payload: any) => {
+          searchObj.data.queryResults = {};
+          searchObj.data.sortedQueryResults = [];
+        },
+      }
+    );
+  } catch (e: any) {
     console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
     showErrorNotification("Search request failed");
@@ -836,8 +909,8 @@ async function extractFields() {
       const importantFields = {
         duration: 1,
         service_name: 1,
-        operation_name: 1,
         span_status: 1,
+        operation_name: 1,
         trace_id: 1,
         span_id: 1,
         reference_parent_span_id: 1,
@@ -1038,13 +1111,13 @@ onBeforeMount(async () => {
   restoreUrlQueryParams();
   // Restore active tab from URL query params
   const queryParams = router.currentRoute.value.query;
-  if (queryParams.tab === 'service-graph') {
+  if (queryParams.tab === "service-graph") {
     // Only allow service-graph tab if service graph is enabled
     if (store.state.zoConfig.service_graph_enabled) {
-      activeTab.value = 'service-graph';
+      activeTab.value = "service-graph";
     } else {
       // If service graph is disabled, default to search tab
-      activeTab.value = 'search';
+      activeTab.value = "search";
     }
   }
   await importSqlParser();
@@ -1378,7 +1451,7 @@ watch(moveSplitter, () => {
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
   // Switch to search tab
-  activeTab.value = 'search';
+  activeTab.value = "search";
 
   // Set the selected stream in dropdown
   if (data.stream) {
@@ -1423,13 +1496,13 @@ watch(updateSelectedColumns, () => {
 // Watch for active tab changes and update URL
 watch(activeTab, (newTab) => {
   const query = { ...router.currentRoute.value.query };
-  if (newTab === 'service-graph') {
+  if (newTab === "service-graph") {
     // Only set service-graph tab if service graph is enabled
     if (store.state.zoConfig.service_graph_enabled) {
-      query.tab = 'service-graph';
+      query.tab = "service-graph";
     } else {
       // If service graph is disabled, force back to search tab
-      activeTab.value = 'search';
+      activeTab.value = "search";
       delete query.tab;
     }
   } else {

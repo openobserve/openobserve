@@ -238,6 +238,184 @@ export class PipelinesPage {
         await this.logsOption.click();
     }
 
+    /**
+     * Click the stream type select dropdown in the add pipeline dialog
+     */
+    async clickStreamTypeSelect() {
+        // Wait for the add pipeline dialog to be visible
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+
+        // The data-test attribute is on a wrapper div, the q-select is inside
+        // Target the q-select input inside the wrapper
+        const streamTypeWrapper = this.page.locator('[data-test="add-pipeline-stream-type-select"]');
+        await streamTypeWrapper.waitFor({ state: 'visible', timeout: 15000 });
+
+        // Click on the q-select component inside the wrapper
+        const qSelect = streamTypeWrapper.locator('.q-select');
+        await qSelect.waitFor({ state: 'visible', timeout: 10000 });
+        await qSelect.click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Verify that a stream type option exists in the dropdown
+     * @param {string} typeName - The name of the stream type to verify (e.g., 'metrics', 'traces', 'logs')
+     * @returns {Promise<boolean>} - True if option exists
+     */
+    async verifyStreamTypeOptionExists(typeName) {
+        const optionLocator = this.page.getByRole('option', { name: typeName, exact: true });
+        return await optionLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click the stream type select dropdown in the stream node form
+     * This is used when adding a stream node in the pipeline editor
+     */
+    async clickInputNodeStreamTypeSelect() {
+        // Wait for the stream form dialog to be visible
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(500);
+
+        // The data-test attribute is on a wrapper div, the q-select is inside
+        const streamTypeWrapper = this.page.locator('[data-test="input-node-stream-type-select"]').first();
+        await streamTypeWrapper.waitFor({ state: 'visible', timeout: 15000 });
+
+        // Click on the q-select component inside the wrapper
+        const qSelect = streamTypeWrapper.locator('.q-select');
+        await qSelect.waitFor({ state: 'visible', timeout: 10000 });
+        await qSelect.click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Select metrics as the stream type in the pipeline node form
+     */
+    async selectMetrics() {
+        // Click the stream type dropdown - use first() to handle multiple elements
+        const streamTypeSelect = this.page.locator('[data-test="input-node-stream-type-select"]').first();
+        await streamTypeSelect.click();
+        await this.page.waitForTimeout(500);
+        // Select metrics option
+        await this.page.getByRole('option', { name: 'metrics', exact: true }).click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Select traces as the stream type in the pipeline node form
+     */
+    async selectTraces() {
+        // Click the stream type dropdown - use first() to handle multiple elements
+        const streamTypeSelect = this.page.locator('[data-test="input-node-stream-type-select"]').first();
+        await streamTypeSelect.click();
+        await this.page.waitForTimeout(500);
+        // Select traces option
+        await this.page.getByRole('option', { name: 'traces', exact: true }).click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Get the locator for metrics option in dropdown
+     */
+    get metricsOptionLocator() {
+        return this.page.getByRole('option', { name: 'metrics', exact: true });
+    }
+
+    /**
+     * Get the locator for traces option in dropdown
+     */
+    get tracesOptionLocator() {
+        return this.page.getByRole('option', { name: 'traces', exact: true });
+    }
+
+    /**
+     * Check if metrics option is visible in the dropdown
+     * @returns {Promise<boolean>} - True if metrics option is visible
+     */
+    async isMetricsOptionVisible() {
+        const optionLocator = this.page.getByRole('option', { name: 'metrics', exact: true });
+        return await optionLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if traces option is visible in the dropdown
+     * @returns {Promise<boolean>} - True if traces option is visible
+     */
+    async isTracesOptionVisible() {
+        const optionLocator = this.page.getByRole('option', { name: 'traces', exact: true });
+        return await optionLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Log all available menu options (for debugging)
+     */
+    async logMenuOptions() {
+        const options = await this.page.locator('[role="option"]').allTextContents();
+        testLogger.debug('[logMenuOptions] Available options', { options });
+    }
+
+    /**
+     * Get the locator for after flattening toggle
+     */
+    get afterFlatteningToggleLocator() {
+        return this.page.locator('[data-test="associate-function-after-flattening-toggle"]');
+    }
+
+    /**
+     * Check if after flattening toggle is visible
+     * @returns {Promise<boolean>} - True if toggle is visible
+     */
+    async isAfterFlatteningToggleVisible() {
+        const toggle = this.page.locator('[data-test="associate-function-after-flattening-toggle"]');
+        return await toggle.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click the after flattening toggle
+     */
+    async clickAfterFlatteningToggle() {
+        const toggle = this.page.locator('[data-test="associate-function-after-flattening-toggle"]');
+        await toggle.waitFor({ state: 'visible', timeout: 10000 });
+        await toggle.click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Check if after flattening text is visible (alternative check)
+     * @returns {Promise<boolean>} - True if text is visible
+     */
+    async isAfterFlatteningTextVisible() {
+        const text = this.page.getByText('After Flattening');
+        return await text.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if the pipeline list search input is visible
+     * @returns {Promise<boolean>} - True if input is visible
+     */
+    async isPipelineListSearchInputVisible() {
+        return await this.pipelineSearchInput.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Fill the pipeline list search input
+     * @param {string} searchTerm - The search term to enter
+     */
+    async fillPipelineListSearch(searchTerm) {
+        await this.pipelineSearchInput.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineSearchInput.fill(searchTerm);
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Clear the pipeline list search input
+     */
+    async clearPipelineListSearch() {
+        await this.pipelineSearchInput.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineSearchInput.clear();
+        await this.page.waitForTimeout(500);
+    }
+
     async saveStream() {
         await this.saveButton.click();
     }
@@ -272,6 +450,20 @@ export class PipelinesPage {
         await this.e2eAutomateOption.click();
     }
 
+    /**
+     * Select a stream option by name from the dropdown
+     * @param {string} streamName - The name of the stream to select
+     */
+    async selectStreamOptionByName(streamName) {
+        await this.page.waitForTimeout(1000);
+        const optionLocator = this.page.getByRole('option', { name: streamName, exact: true });
+        await optionLocator.waitFor({ state: 'visible', timeout: 10000 });
+        await optionLocator.click();
+        // Press Escape to close any open dropdown menus
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+    }
+
     async saveInputNodeStream() {
         await this.inputNodeStreamSaveButton.click();
     }
@@ -295,7 +487,7 @@ export class PipelinesPage {
 
     async selectAndDragFunction() {
         await this.secondStreamButton.click();
-        await this.dragStreamToTarget(this.functionButton, { x: 50, y: 50 });
+        await this.dragStreamToTarget(this.functionButton, { x: 250, y: 200 });
     }
 
     async selectPreviousNode() {
@@ -324,8 +516,84 @@ export class PipelinesPage {
         await this.pipelineSearchInput.fill(pipelineName);
     }
 
+    /**
+     * Verify that a pipeline exists in the pipeline list
+     * @param {string} pipelineName - Name of the pipeline to verify
+     * @returns {Promise<boolean>} - True if pipeline exists, false otherwise
+     */
+    async verifyPipelineExists(pipelineName) {
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(2000);
+        await this.searchPipeline(pipelineName);
+        await this.page.waitForTimeout(2000);
+        const pipelineRow = this.page.locator('tbody tr').filter({ hasText: pipelineName }).first();
+        return await pipelineRow.isVisible({ timeout: 10000 }).catch(() => false);
+    }
+
     async confirmDeletePipeline() {
         await this.confirmDeleteButton.click();
+    }
+
+    /**
+     * Verify that a metrics destination stream exists
+     * @param {string} streamName - Name of the stream to verify
+     * @returns {Promise<boolean>} - True if stream exists, false otherwise
+     */
+    async verifyMetricsDestinationStreamExists(streamName) {
+        try {
+            // Use API to check stream existence - more reliable than UI navigation
+            const orgName = process.env["ORGNAME"];
+            const baseUrl = process.env["ZO_BASE_URL"] || process.env["INGESTION_URL"]?.replace('/api/', '') || 'http://localhost:5080';
+            const basicAuth = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+
+            const response = await this.page.request.get(
+                `${baseUrl}/api/${orgName}/streams?type=metrics&keyword=${streamName}`,
+                { headers: { 'Authorization': `Basic ${basicAuth}` } }
+            );
+
+            if (response.ok()) {
+                const data = await response.json();
+                const found = data.list?.some(s => s.name === streamName) || false;
+                testLogger.debug('[verifyMetricsDestinationStreamExists] API check', { streamName, found, total: data.list?.length });
+                return found;
+            }
+            testLogger.debug('[verifyMetricsDestinationStreamExists] API returned non-OK', { status: response.status() });
+            return false;
+        } catch (e) {
+            testLogger.debug('[verifyMetricsDestinationStreamExists] Error during verification', { error: e.message, streamName });
+            return false;
+        }
+    }
+
+    /**
+     * Verify that a traces destination stream exists
+     * @param {string} streamName - Name of the stream to verify
+     * @returns {Promise<boolean>} - True if stream exists, false otherwise
+     */
+    async verifyTracesDestinationStreamExists(streamName) {
+        try {
+            // Use API to check stream existence - more reliable than UI navigation
+            const orgName = process.env["ORGNAME"];
+            const baseUrl = process.env["ZO_BASE_URL"] || process.env["INGESTION_URL"]?.replace('/api/', '') || 'http://localhost:5080';
+            const basicAuth = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+
+            const response = await this.page.request.get(
+                `${baseUrl}/api/${orgName}/streams?type=traces&keyword=${streamName}`,
+                { headers: { 'Authorization': `Basic ${basicAuth}` } }
+            );
+
+            if (response.ok()) {
+                const data = await response.json();
+                const found = data.list?.some(s => s.name === streamName) || false;
+                testLogger.debug('[verifyTracesDestinationStreamExists] API check', { streamName, found, total: data.list?.length });
+                return found;
+            }
+            testLogger.debug('[verifyTracesDestinationStreamExists] API returned non-OK', { status: response.status() });
+            return false;
+        } catch (e) {
+            testLogger.debug('[verifyTracesDestinationStreamExists] Error during verification', { error: e.message, streamName });
+            return false;
+        }
     }
 
     // Method to verify deletion success message
@@ -437,7 +705,7 @@ export class PipelinesPage {
     }
     async deleteEnrichmentTableByName(fileName) {
         // First ensure we search for the specific file
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         const searchBox = this.page.getByPlaceholder('Search Enrichment Table');
         await searchBox.waitFor({ state: 'visible' });
         await searchBox.clear();
@@ -1438,6 +1706,10 @@ export class PipelinesPage {
         await this.page.mouse.down();
         await this.pipelineNodeDefaultInputHandle.hover({ force: true });
         await this.page.mouse.up();
+        await this.page.waitForTimeout(1000);
+
+        // Press Escape to cancel any pending edge creation state
+        await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(500);
 
         // Connect middle node to output
@@ -1446,6 +1718,23 @@ export class PipelinesPage {
         await this.pipelineNodeOutputInputHandle.hover({ force: true });
         await this.page.mouse.up();
         await this.page.waitForTimeout(1000);
+
+        // Check edge count and retry second connection if needed
+        const edgeCount = await this.page.locator('.vue-flow__edge').count();
+        if (edgeCount < 2) {
+            testLogger.info(`First attempt created ${edgeCount}/2 edges, retrying with dragTo`);
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
+
+            // Use Playwright's dragTo API for more reliable drag
+            const midOutHandle = this.page.locator('[data-test="pipeline-node-default-output-handle"]');
+            const destHandle = this.page.locator('[data-test="pipeline-node-output-input-handle"]');
+            await midOutHandle.dragTo(destHandle, { force: true });
+            await this.page.waitForTimeout(1000);
+        }
+
+        const finalEdgeCount = await this.page.locator('.vue-flow__edge').count();
+        testLogger.info(`connectNodesViaMiddleNode completed with ${finalEdgeCount} edges`);
     }
 
     /**
@@ -1488,7 +1777,26 @@ export class PipelinesPage {
      */
     async selectStreamOption(streamName) {
         await this.page.waitForTimeout(2000);
-        await this.page.getByRole("option", { name: streamName, exact: true }).first().click();
+        // Wait for the option to be enabled (not disabled) before clicking
+        const option = this.page.getByRole("option", { name: streamName, exact: true }).first();
+        // Wait for the option to not have disabled class
+        await this.page.waitForFunction(
+            (name) => {
+                const options = document.querySelectorAll('[role="option"]');
+                for (const opt of options) {
+                    if (opt.textContent?.includes(name) && !opt.classList.contains('disabled')) {
+                        return true;
+                    }
+                }
+                return false;
+            },
+            streamName,
+            { timeout: 10000 }
+        ).catch(() => {
+            // If wait times out, try clicking anyway
+            testLogger.debug('selectStreamOption: Wait for enabled option timed out, attempting click anyway');
+        });
+        await option.click();
     }
 
     // ============= Methods for raw selector fixes =============
@@ -2167,6 +2475,657 @@ export class PipelinesPage {
     }
 
     // ============================================================================
+    // TRACES/METRICS PIPELINE POM METHODS
+    // Added for PR #10158 - Raw selector fixes
+    // ============================================================================
+
+    /**
+     * Check if destination required error is visible
+     * Replaces: page.getByText(/destination.*required/i).isVisible()
+     * @returns {Promise<boolean>} True if error is visible
+     */
+    async isDestinationRequiredErrorVisible() {
+        const errorLocator = this.page.getByText(/destination.*required/i);
+        return await errorLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if pipeline save success message is visible
+     * Replaces: page.getByText(/success|created|saved/i).isVisible()
+     * @returns {Promise<boolean>} True if success message is visible
+     */
+    async isPipelineSaveSuccessVisible() {
+        const successLocator = this.page.getByText(/success|created|saved/i);
+        return await successLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if pipeline name input is visible (for checking if still on edit page)
+     * Replaces: page.locator('[data-test="pipeline-name-input"]').isVisible()
+     * @returns {Promise<boolean>} True if input is visible
+     */
+    async isPipelineNameInputVisible() {
+        return await this.pipelineNameInput.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click cancel pipeline button with force option
+     * For dismissing dialogs with overlay that intercepts clicks
+     * Replaces: page.locator('[data-test="add-pipeline-cancel-btn"]').click({ force: true })
+     */
+    async clickCancelPipelineBtnForce() {
+        await this.cancelPipelineBtn.click({ force: true });
+        testLogger.info('Clicked cancel pipeline button (force)');
+    }
+
+    // ============================================================================
+    // BACKFILL PAGE METHODS
+    // Added for pipeline-backfill.spec.js
+    // ============================================================================
+
+    /** @returns {import('@playwright/test').Locator} Backfill page container */
+    get backfillPageLocator() {
+        return this.page.locator('[data-test="backfill-jobs-page"], [data-test*="backfill"]').first();
+    }
+
+    /**
+     * Navigate to backfill jobs page
+     * @param {string} orgName - Organization name
+     */
+    async navigateToBackfillPage(orgName) {
+        const backfillUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/backfill?org_identifier=${orgName}`;
+        await this.page.goto(backfillUrl);
+        await this.page.waitForLoadState('networkidle');
+        testLogger.info('Navigated to backfill jobs page', { url: backfillUrl });
+    }
+
+    /**
+     * Check if backfill page is visible
+     * @returns {Promise<boolean>} True if page is visible
+     */
+    async isBackfillPageVisible() {
+        const pageLocator = this.page.locator('[data-test="backfill-jobs-page"], [data-test*="backfill"], .backfill-page').first();
+        return await pageLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if backfill text content is visible
+     * @returns {Promise<boolean>} True if text is visible
+     */
+    async isBackfillTextVisible() {
+        const textLocator = this.page.getByText(/backfill/i).first();
+        return await textLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if status filter is visible on backfill page
+     * @returns {Promise<boolean>} True if filter is visible
+     */
+    async isStatusFilterVisible() {
+        const filterLocator = this.page.locator('[data-test*="status-filter"], [data-test*="filter"]').first();
+        return await filterLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if pipeline filter is visible on backfill page
+     * @returns {Promise<boolean>} True if filter is visible
+     */
+    async isPipelineFilterVisible() {
+        const filterLocator = this.page.locator('[data-test*="pipeline-filter"], select, .q-select').first();
+        return await filterLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if backfill table is visible
+     * @returns {Promise<boolean>} True if table is visible
+     */
+    async isBackfillTableVisible() {
+        const tableLocator = this.page.locator('[data-test*="backfill-table"], table, .q-table').first();
+        return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if refresh button is visible on backfill page
+     * @returns {Promise<boolean>} True if button is visible
+     */
+    async isRefreshButtonVisible() {
+        const refreshLocator = this.page.locator('[data-test*="refresh"], button:has-text("Refresh")').first();
+        return await refreshLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click refresh button on backfill page
+     */
+    async clickRefreshButton() {
+        const refreshLocator = this.page.locator('[data-test*="refresh"], button:has-text("Refresh")').first();
+        await refreshLocator.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked refresh button');
+    }
+
+    /**
+     * Navigate back from backfill page
+     */
+    async navigateBackFromBackfill() {
+        const backButton = this.page.locator('[data-test*="back"], button:has-text("Back"), .q-btn:has-text("Back")').first();
+        if (await backButton.isVisible().catch(() => false)) {
+            await backButton.click();
+        } else {
+            await this.page.goBack();
+        }
+        await this.page.waitForLoadState('networkidle');
+        testLogger.info('Navigated back from backfill page');
+    }
+
+    /**
+     * Filter backfill jobs by status
+     * @param {string} status - Status to filter by
+     */
+    async filterByStatus(status) {
+        const statusFilter = this.page.locator('[data-test*="status-filter"], select').first();
+        if (await statusFilter.isVisible().catch(() => false)) {
+            await statusFilter.click();
+            await this.page.getByRole('option', { name: status }).click().catch(() => {
+                testLogger.debug('Status option not found via role, trying text match');
+            });
+        }
+        testLogger.info('Filtered by status', { status });
+    }
+
+    /**
+     * Clear all filters on backfill page
+     */
+    async clearAllFilters() {
+        const clearButton = this.page.locator('[data-test*="clear"], button:has-text("Clear")').first();
+        if (await clearButton.isVisible().catch(() => false)) {
+            await clearButton.click();
+            await this.page.waitForTimeout(500);
+        }
+        testLogger.info('Cleared all filters');
+    }
+
+    /**
+     * Get count of backfill job rows
+     * @returns {Promise<number>} Count of rows
+     */
+    async getBackfillJobCount() {
+        const rows = this.page.locator('[data-test*="backfill-row"], table tbody tr').all();
+        return (await rows).length;
+    }
+
+    /**
+     * Check if progress bar is visible for any job
+     * @returns {Promise<boolean>} True if progress bar is visible
+     */
+    async isProgressBarVisible() {
+        const progressLocator = this.page.locator('[data-test*="progress"], .q-linear-progress, progress').first();
+        return await progressLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if action buttons are visible for jobs
+     * @returns {Promise<boolean>} True if action buttons are visible
+     */
+    async areActionButtonsVisible() {
+        const actionLocator = this.page.locator('[data-test*="action"], button.action, .q-btn').first();
+        return await actionLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check for no jobs message
+     * @returns {Promise<boolean>} True if no jobs message is visible
+     */
+    async isNoJobsMessageVisible() {
+        const noJobsLocator = this.page.getByText(/no.*jobs|no.*data|empty/i).first();
+        return await noJobsLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    // ============================================================================
+    // HISTORY PAGE METHODS
+    // Added for pipeline-history.spec.js
+    // ============================================================================
+
+    /** @returns {import('@playwright/test').Locator} History page container */
+    get historyPageLocator() {
+        return this.page.locator('[data-test="pipeline-history-page"], [data-test*="history"]').first();
+    }
+
+    /**
+     * Navigate to pipeline history page
+     * @param {string} orgName - Organization name
+     */
+    async navigateToHistoryPage(orgName) {
+        const historyUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/history?org_identifier=${orgName}`;
+        await this.page.goto(historyUrl);
+        await this.page.waitForLoadState('networkidle');
+        testLogger.info('Navigated to pipeline history page', { url: historyUrl });
+    }
+
+    /**
+     * Check if history page is visible
+     * @returns {Promise<boolean>} True if page is visible
+     */
+    async isHistoryPageVisible() {
+        const pageLocator = this.page.locator('[data-test="pipeline-history-page"], [data-test*="history"], .history-page').first();
+        return await pageLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if history text content is visible
+     * @returns {Promise<boolean>} True if text is visible
+     */
+    async isHistoryTextVisible() {
+        const textLocator = this.page.getByText(/history/i).first();
+        return await textLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if history page title is visible
+     * @returns {Promise<boolean>} True if title is visible
+     */
+    async isHistoryTitleVisible() {
+        const titleLocator = this.page.locator('[data-test*="history-title"], h1:has-text("History"), h2:has-text("History"), .page-title').first();
+        return await titleLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if history table is visible
+     * @returns {Promise<boolean>} True if table is visible
+     */
+    async isHistoryTableVisible() {
+        const tableLocator = this.page.locator('[data-test*="history-table"], table, .q-table').first();
+        return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Get count of history rows
+     * @returns {Promise<number>} Count of rows
+     */
+    async getHistoryRowCount() {
+        const rows = this.page.locator('[data-test*="history-row"], table tbody tr').all();
+        return (await rows).length;
+    }
+
+    /**
+     * Navigate back from history page
+     */
+    async navigateBackFromHistory() {
+        const backButton = this.page.locator('[data-test*="back"], button:has-text("Back"), .q-btn:has-text("Back")').first();
+        if (await backButton.isVisible().catch(() => false)) {
+            await backButton.click();
+        } else {
+            await this.page.goBack();
+        }
+        await this.page.waitForLoadState('networkidle');
+        testLogger.info('Navigated back from history page');
+    }
+
+    /**
+     * Filter history by date range
+     * @param {string} startDate - Start date
+     * @param {string} endDate - End date
+     */
+    async filterHistoryByDateRange(startDate, endDate) {
+        const dateFilter = this.page.locator('[data-test*="date-filter"], [data-test*="date-range"]').first();
+        if (await dateFilter.isVisible().catch(() => false)) {
+            await dateFilter.click();
+            // Date range logic would go here
+        }
+        testLogger.info('Filtered history by date range', { startDate, endDate });
+    }
+
+    // ============================================================================
+    // ADDITIONAL BACKFILL PAGE METHODS
+    // Added to fix missing POM methods in pipeline-backfill.spec.js
+    // ============================================================================
+
+    /** @returns {import('@playwright/test').Locator} Status badges in backfill/history tables */
+    get statusBadges() {
+        return this.page.locator('.q-badge, .status-badge, [data-test*="status"], .q-chip');
+    }
+
+    /** @returns {import('@playwright/test').Locator} Job rows in backfill table */
+    get jobRows() {
+        return this.page.locator('[data-test*="backfill-row"], [data-test*="job-row"], table tbody tr');
+    }
+
+    /**
+     * Check if clear filters button is visible
+     * @returns {Promise<boolean>} True if button is visible
+     */
+    async isClearFiltersBtnVisible() {
+        const clearBtn = this.page.locator('[data-test*="clear-filter"], button:has-text("Clear"), [data-test*="reset"]').first();
+        return await clearBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click clear filters button
+     */
+    async clickClearFiltersBtn() {
+        const clearBtn = this.page.locator('[data-test*="clear-filter"], button:has-text("Clear"), [data-test*="reset"]').first();
+        if (await clearBtn.isVisible().catch(() => false)) {
+            await clearBtn.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Clicked clear filters button');
+        } else {
+            testLogger.info('Clear filters button not found');
+        }
+    }
+
+    /**
+     * Check if backfill refresh button is visible
+     * @returns {Promise<boolean>} True if button is visible
+     */
+    async isBackfillRefreshBtnVisible() {
+        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
+        return await refreshBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click backfill refresh button
+     */
+    async clickBackfillRefreshBtn() {
+        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
+        if (await refreshBtn.isVisible().catch(() => false)) {
+            await refreshBtn.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Clicked backfill refresh button');
+        } else {
+            testLogger.info('Backfill refresh button not found');
+        }
+    }
+
+    /**
+     * Check if backfill jobs table is visible
+     * @returns {Promise<boolean>} True if table is visible
+     */
+    async isBackfillJobsTableVisible() {
+        const tableLocator = this.page.locator('[data-test*="backfill-table"], [data-test*="jobs-table"], table, .q-table').first();
+        return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if generic table is visible (fallback)
+     * @returns {Promise<boolean>} True if any table is visible
+     */
+    async isGenericTableVisible() {
+        const tableLocator = this.page.locator('table, .q-table, [role="table"]').first();
+        return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click back button on backfill page
+     */
+    async clickBackfillBackBtn() {
+        const backBtn = this.page.locator('[data-test="backfill-jobs-back-btn"], [data-test*="back-btn"], button:has-text("Back")').first();
+        if (await backBtn.isVisible().catch(() => false)) {
+            await backBtn.click();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            testLogger.info('Clicked backfill back button');
+        } else {
+            await this.page.goBack();
+            testLogger.info('Used browser back navigation');
+        }
+    }
+
+    /**
+     * Filter by pipeline name
+     */
+    async filterByPipeline() {
+        const pipelineFilter = this.page.locator('[data-test*="pipeline-filter"], [data-test*="pipeline-select"], .q-select').first();
+        if (await pipelineFilter.isVisible().catch(() => false)) {
+            await pipelineFilter.click();
+            await this.page.waitForTimeout(500);
+            // Select first available option
+            const option = this.page.locator('.q-item, [role="option"]').first();
+            if (await option.isVisible().catch(() => false)) {
+                await option.click();
+            }
+            testLogger.info('Filtered by pipeline');
+        } else {
+            testLogger.info('Pipeline filter not found');
+        }
+    }
+
+    /**
+     * Get count of progress bars in backfill table
+     * @returns {Promise<number>} Count of progress bars
+     */
+    async getProgressBarCount() {
+        const progressBars = await this.page.locator('.q-linear-progress, progress, [data-test*="progress"]').all();
+        return progressBars.length;
+    }
+
+    /**
+     * Get job action button counts
+     * @returns {Promise<{pause: number, resume: number, cancel: number, total: number}>} Button counts
+     */
+    async getJobActionButtonCounts() {
+        const pauseCount = await this.page.locator('button:has-text("Pause"), [data-test*="pause"]').count();
+        const resumeCount = await this.page.locator('button:has-text("Resume"), [data-test*="resume"]').count();
+        const cancelCount = await this.page.locator('button:has-text("Cancel"), [data-test*="cancel"]').count();
+        return {
+            pause: pauseCount,
+            resume: resumeCount,
+            cancel: cancelCount,
+            total: pauseCount + resumeCount + cancelCount
+        };
+    }
+
+    /**
+     * Get count of buttons in table
+     * @returns {Promise<number>} Count of buttons
+     */
+    async getTableButtonCount() {
+        const buttons = await this.page.locator('table button, .q-table button').all();
+        return buttons.length;
+    }
+
+    /**
+     * Get count of jobs with specific status
+     * @param {string} status - Status to count (e.g., 'Completed', 'Running', 'Failed')
+     * @returns {Promise<number>} Count of jobs with status
+     */
+    async getJobStatusCount(status) {
+        const statusElements = await this.page.locator(`[data-test*="status"]:has-text("${status}"), .q-badge:has-text("${status}"), .status-badge:has-text("${status}")`).all();
+        return statusElements.length;
+    }
+
+    /**
+     * Get count of error indicators
+     * @returns {Promise<number>} Count of error indicators
+     */
+    async getErrorIndicatorCount() {
+        const errorIndicators = await this.page.locator('[data-test*="error"], .error-indicator, .text-negative, .q-icon[color="negative"]').all();
+        return errorIndicators.length;
+    }
+
+    /**
+     * Click first error indicator
+     */
+    async clickFirstErrorIndicator() {
+        const errorIndicator = this.page.locator('[data-test*="error"], .error-indicator, .text-negative').first();
+        if (await errorIndicator.isVisible().catch(() => false)) {
+            await errorIndicator.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Clicked first error indicator');
+        }
+    }
+
+    /**
+     * Check if error dialog is visible
+     * @returns {Promise<boolean>} True if dialog is visible
+     */
+    async isErrorDialogVisible() {
+        const dialog = this.page.locator('.q-dialog, [role="dialog"], [data-test*="error-dialog"]').first();
+        return await dialog.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Close error dialog
+     */
+    async closeErrorDialog() {
+        const closeBtn = this.page.locator('.q-dialog button:has-text("Close"), .q-dialog button:has-text("OK"), .q-dialog [data-test*="close"]').first();
+        if (await closeBtn.isVisible().catch(() => false)) {
+            await closeBtn.click();
+            await this.page.waitForTimeout(300);
+            testLogger.info('Closed error dialog');
+        }
+    }
+
+    /**
+     * Check if empty backfill message is visible
+     * @returns {Promise<boolean>} True if message is visible
+     */
+    async isEmptyBackfillMessageVisible() {
+        const emptyMsg = this.page.locator('[data-test*="empty"], [data-test*="no-data"]').first();
+        const textMsg = this.page.getByText(/no.*jobs|no.*data|empty|no records/i).first();
+        return await emptyMsg.isVisible({ timeout: 3000 }).catch(() => false) ||
+               await textMsg.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    // ============================================================================
+    // ADDITIONAL HISTORY PAGE METHODS
+    // Added to fix missing POM methods in pipeline-history.spec.js
+    // ============================================================================
+
+    /**
+     * Check if history date picker is visible
+     * @returns {Promise<boolean>} True if date picker is visible
+     */
+    async isHistoryDatePickerVisible() {
+        const datePicker = this.page.locator('[data-test*="date-picker"], [data-test*="date-range"], .date-picker, .q-date').first();
+        return await datePicker.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if history search select is visible
+     * @returns {Promise<boolean>} True if search select is visible
+     */
+    async isHistorySearchSelectVisible() {
+        const searchSelect = this.page.locator('[data-test*="search-select"], [data-test*="pipeline-select"], .q-select, select').first();
+        return await searchSelect.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if history manual search button is visible
+     * @returns {Promise<boolean>} True if button is visible
+     */
+    async isHistoryManualSearchBtnVisible() {
+        const searchBtn = this.page.locator('[data-test*="search-btn"], button:has-text("Search"), button:has-text("Run")').first();
+        return await searchBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check if history refresh button is visible
+     * @returns {Promise<boolean>} True if button is visible
+     */
+    async isHistoryRefreshBtnVisible() {
+        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
+        return await refreshBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click history back button
+     */
+    async clickHistoryBackBtn() {
+        const backBtn = this.page.locator('[data-test*="back-btn"], [data-test*="back"], button:has-text("Back"), .back-btn').first();
+        if (await backBtn.isVisible().catch(() => false)) {
+            await backBtn.click();
+            await this.page.waitForLoadState('networkidle');
+            testLogger.info('Clicked history back button');
+        } else {
+            await this.page.goBack();
+            testLogger.info('Used browser back navigation');
+        }
+    }
+
+    /**
+     * Click history refresh button
+     */
+    async clickHistoryRefreshBtn() {
+        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
+        if (await refreshBtn.isVisible().catch(() => false)) {
+            await refreshBtn.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Clicked history refresh button');
+        } else {
+            testLogger.info('History refresh button not found');
+        }
+    }
+
+    /**
+     * Check if column header is visible
+     * @param {string} columnName - Name of the column
+     * @returns {Promise<boolean>} True if column is visible
+     */
+    async isColumnHeaderVisible(columnName) {
+        const columnHeader = this.page.locator(`th:has-text("${columnName}"), [data-test*="column"]:has-text("${columnName}")`).first();
+        return await columnHeader.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click history search select
+     */
+    async clickHistorySearchSelect() {
+        const searchSelect = this.page.locator('[data-test*="search-select"], [data-test*="pipeline-select"], .q-select').first();
+        if (await searchSelect.isVisible().catch(() => false)) {
+            await searchSelect.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Clicked history search select');
+        }
+    }
+
+    /**
+     * Select first option in dropdown
+     */
+    async selectFirstOption() {
+        const option = this.page.locator('.q-item, [role="option"], .q-menu .q-item').first();
+        if (await option.isVisible().catch(() => false)) {
+            await option.click();
+            await this.page.waitForTimeout(300);
+            testLogger.info('Selected first option');
+        }
+    }
+
+    /**
+     * Click history manual search button
+     */
+    async clickHistoryManualSearchBtn() {
+        const searchBtn = this.page.locator('[data-test*="search-btn"], button:has-text("Search"), button:has-text("Run")').first();
+        if (await searchBtn.isVisible().catch(() => false)) {
+            await searchBtn.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Clicked history manual search button');
+        }
+    }
+
+    /**
+     * Get status counts from history/backfill page
+     * @returns {Promise<{success: number, error: number, warning: number}>} Status counts
+     */
+    async getStatusCounts() {
+        const successCount = await this.page.locator('.q-badge:has-text("Success"), .q-badge:has-text("Completed"), .text-positive, [data-test*="status-success"]').count();
+        const errorCount = await this.page.locator('.q-badge:has-text("Error"), .q-badge:has-text("Failed"), .text-negative, [data-test*="status-error"]').count();
+        const warningCount = await this.page.locator('.q-badge:has-text("Warning"), .text-warning, [data-test*="status-warning"]').count();
+        return {
+            success: successCount,
+            error: errorCount,
+            warning: warningCount
+        };
+    }
+
+    /**
+     * Check if empty state message is visible
+     * @returns {Promise<boolean>} True if message is visible
+     */
+    async isEmptyStateMessageVisible() {
+        const emptyMsg = this.page.locator('[data-test*="empty"], [data-test*="no-data"], .empty-state').first();
+        const textMsg = this.page.getByText(/no.*history|no.*data|empty|no records/i).first();
+        return await emptyMsg.isVisible({ timeout: 3000 }).catch(() => false) ||
+               await textMsg.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
     // SCHEDULED PIPELINE TAB METHODS - POM Compliance Fix
     // These methods replace raw selectors in spec files for PromQL/SQL tab switching
     // ============================================================================
@@ -2180,7 +3139,7 @@ export class PipelinesPage {
         await promqlTab.waitFor({ state: 'visible', timeout: 5000 });
         await promqlTab.click();
         testLogger.info('Clicked PromQL tab');
-    }
+    };
 
     /**
      * Click SQL tab in scheduled pipeline dialog
@@ -2211,5 +3170,110 @@ export class PipelinesPage {
         const sqlTab = this.scheduledPipelineTabs.locator('[data-test="tab-sql"]');
         await expect(sqlTab).toHaveClass(/active/);
         testLogger.info('Verified SQL tab is active');
+    }
+
+    // =========================================================================
+    // Helper Methods - Reduce duplication across spec files
+    // =========================================================================
+
+    /**
+     * Dismiss any open dialogs or menus.
+     * Use in afterEach cleanup instead of raw page.locator('.q-dialog').
+     */
+    async dismissOpenDialogs() {
+        try {
+            if (await this.qDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
+                await this.page.keyboard.press('Escape');
+                await this.page.waitForTimeout(500);
+            }
+        } catch (e) {
+            // Ignore cleanup errors
+        }
+    }
+
+    /**
+     * Add and configure a source stream node on the pipeline canvas.
+     * Handles: drag stream → select type → enter name → select option → save → delete auto output.
+     * @param {'traces'|'metrics'|'logs'} streamType - The stream type to select
+     * @param {string} streamName - The stream name to enter and select
+     */
+    async addSourceStreamNode(streamType, streamName) {
+        await this.selectStream();
+        await this.dragStreamToTarget(this.streamButton);
+
+        if (streamType === 'traces') {
+            await this.selectTraces();
+        } else if (streamType === 'metrics') {
+            await this.selectMetrics();
+        }
+        // For 'logs', the default type is already selected
+
+        await this.enterStreamName(streamName);
+        await this.page.waitForTimeout(1000);
+        await this.selectStreamOptionByName(streamName);
+        await this.saveInputNodeStream();
+        await this.page.waitForTimeout(2000);
+
+        // Delete auto-created output node
+        await this.deleteOutputStreamNode();
+
+        testLogger.info('Source stream node added', { streamType, streamName });
+    }
+
+    /**
+     * Add and configure a destination stream node on the pipeline canvas.
+     * Handles: drag second stream → select type → fill dest name → save.
+     * @param {'traces'|'metrics'|'logs'} streamType - The stream type to select
+     * @param {string} destName - The destination stream name
+     */
+    async addDestinationStreamNode(streamType, destName) {
+        await this.selectAndDragSecondStream();
+
+        if (streamType === 'traces') {
+            await this.selectTraces();
+        } else if (streamType === 'metrics') {
+            await this.selectMetrics();
+        }
+
+        await this.fillDestinationStreamName(destName);
+        await this.clickInputNodeStreamSave();
+        await this.page.waitForTimeout(2000);
+
+        testLogger.info('Destination stream node added', { streamType, destName });
+    }
+
+    /**
+     * Name and save a pipeline.
+     * @param {string} namePrefix - Prefix for the pipeline name (timestamp suffix added)
+     * @returns {string} The generated pipeline name
+     */
+    async savePipelineWithName(namePrefix) {
+        const pipelineName = `${namePrefix}-${Math.random().toString(36).substring(7)}`;
+        await this.enterPipelineName(pipelineName);
+        const urlBefore = this.page.url();
+        await this.savePipeline();
+        await this.page.waitForTimeout(2000);
+        const urlAfter = this.page.url();
+        // Check for any error toasts/alerts on the page
+        const errorToast = await this.page.locator('.q-notification, [role="alert"], .q-banner').allTextContents().catch(() => []);
+        testLogger.info(`Pipeline saved: ${pipelineName}`, { urlBefore, urlAfter, redirected: urlBefore !== urlAfter, toasts: errorToast });
+        return pipelineName;
+    }
+
+    /**
+     * Clean up a pipeline by searching and deleting it.
+     * Logs warning on failure instead of throwing.
+     * @param {string} pipelineName - The pipeline name to delete
+     */
+    async cleanupPipelineByName(pipelineName) {
+        try {
+            await this.openPipelineMenu();
+            await this.page.waitForTimeout(1000);
+            await this.searchPipeline(pipelineName);
+            await this.deletePipelineByName(pipelineName);
+            testLogger.info('Pipeline cleanup completed');
+        } catch (cleanupError) {
+            testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
+        }
     }
 }

@@ -232,8 +232,10 @@
     "patternColumnHeader": "模式",
     "occurrenceColumnHeader": "发生次数",
     "percentageColumnHeader": "百分比",
+    "anomalyColumnHeader": "异常",
     "actionsColumnHeader": "操作",
     "anomalyLabel": "异常",
+    "anomalyDetected": "检测到异常",
     "includePatternInSearch": "在搜索中加入模式",
     "excludePatternFromSearch": "从搜索中排除模式",
     "showPatternDetails": "显示详细信息（{变量} 变量，{示例} 示例）",
@@ -307,7 +309,10 @@
     "show": "显示",
     "editor": "编辑器",
     "webUrlNotConfigured": "在管理员配置 ZO_WEB_URL 之前，共享 URL 处于禁用状态。",
-    "showHideColumns": "显示/隐藏列"
+    "showHideColumns": "显示/隐藏列",
+    "autoRefresh": "自动刷新",
+    "createSavedView": "创建保存的视图",
+    "listSavedViews": "列出保存的视图"
   },
   "menu": {
     "home": "主页",
@@ -1891,7 +1896,101 @@
     "msteams": "微软团队",
     "pagerduty": "PagerDuty",
     "opsgenie": "Opsgenie",
-    "servicenow": "ServiceNo"
+    "servicenow": "ServiceNo",
+    "saveAlert": "保存提醒",
+    "aggregation_threshold": "如果有群组则发出警报",
+    "thresholdDynamic": {
+      "alertMeWhen": "什么时候提醒我",
+      "metricTypes": {
+        "resultsPassedFilter": "结果已通过过滤器",
+        "distinctGroupsAffected": "不同的群体受到影响",
+        "metricsMatchCriteria": "指标匹配标准",
+        "matchingLogsFound": "已找到匹配日志",
+        "groupsPassFilter": "群组通过筛选标准",
+        "distinctGroups": "找到了不同的群体",
+        "resultRows": "返回的结果行",
+        "timeSeries": "已找到活跃的时间序列",
+        "matchingRecords": "找到了匹配的记录",
+        "groupsWithHaving": "小组比赛条件",
+        "uniqueGroups": "独特的群组",
+        "events": "赛事匹配条件",
+        "aggregatedValue": "比赛条件"
+      },
+      "contextLabels": {
+        "groupedBy": "分组依据：",
+        "havingConditions": "有条件："
+      }
+    },
+    "alertDetails": {
+      "alertName": "警报名称",
+      "sqlQuery": "SQL 查询",
+      "promqlQuery": "PromQL 查询",
+      "conditions": "条件",
+      "copy": "复制",
+      "noCondition": "无条件",
+      "noDescription": "没有描述",
+      "evaluationHistory": "评估历史",
+      "loadingHistory": "正在加载历史记录...",
+      "noHistoryAvailable": "此警报没有评估历史记录",
+      "results": "结果"
+    },
+    "historyTable": {
+      "timestamp": "时间戳",
+      "status": "状态",
+      "evaluationTime": "评估",
+      "queryTime": "查询 (ms)",
+      "error": "错误"
+    },
+    "back": "返回",
+    "continue": "继续",
+    "wouldTrigger": "会触发",
+    "wouldNotTrigger": "不会触发",
+    "queryBuilder": "生成器",
+    "groupByHelp": {
+      "description": "按特定字段对聚合数据进行分组，为每个唯一值创建单独的警报。",
+      "example": "示例：按 “主机名” 分组以获取每台服务器的单独警报，或按 “status_code” 分组以分别跟踪错误。"
+    },
+    "conditions": {
+      "condition": "状况",
+      "conditionGroup": "条件组",
+      "addConditionTooltip": "向该组添加新条件",
+      "addConditionGroupTooltip": "添加嵌套条件组（最大深度：2）",
+      "maxDepthReachedTooltip": "已达到最大嵌套深度"
+    },
+    "compareWithPast": {
+      "alertSetFor": "警报设置为",
+      "currentWindow": "当前窗口",
+      "cycle": "周期",
+      "cycleTooltip": "将结果与上一个周期的相同时间进行比较。",
+      "runningFor": "在每 {频率} 的间隔内运行 {period}",
+      "currentWindowCannotBeDeleted": "无法删除当前窗口",
+      "comparingWith": "与之比较",
+      "referenceWindow": "参考窗口",
+      "timeFrame": "时间框架",
+      "timeFrameTooltip": "您的查询的时间范围。",
+      "comparingText": "将当前窗口查询结果与先前 {offset} 的查询结果进行比较。",
+      "addComparisonWindow": "添加比较窗口",
+      "goToConditions": "转到条件",
+      "goToConditionsTooltip": "单击 “转到条件” 以验证所选比较窗口的事件"
+    },
+    "alertSettings": {
+      "cronSchedule": "Cron 时间表",
+      "addNewDestination": "添加新目的地",
+      "cooldownTooltip": "如果警报触发，则应等待多长时间才能发送另一条通知。例如，如果警报在下午 4:00 触发，静音通知设置为 10 分钟，则即使警报在 1 分钟后仍然存在，它也要等到下午 4:10 才会发送其他通知。这是为了避免向用户发送垃圾通知。",
+      "thresholdTooltip": "根据事件数或聚合值定义何时触发警报。示例：如果设置为 “> 100”，则当事件数超过 100 个时会触发警报。",
+      "periodTooltip": "查询应运行的时间段。例如 10 分钟意味着无论何时运行查询，都将使用最后 10 分钟的数据。",
+      "frequencyTooltipMinutes": "任务应多久执行一次。例如每 5 分钟一次。",
+      "frequencyTooltipCron": "标准 UNIX cron 格式，有 5 个由空格分隔的字段：[0-59 分钟] [小时 0-23] [本月第 1-31 天] [第 1-12 个月或 1 月至 12 月] [周日 0-7 或 '1L-7L'，0 和 7 表示星期日]。",
+      "timezoneWarning": "警告：显示的时区是近似值。手动验证并选择正确的时区。",
+      "destinationsTooltip": "选择一个或多个目的地发送警报通知。",
+      "templateTooltip": "可选：选择一个模板用于此警报中的所有目的地。模板允许您自定义警报消息的格式。如果未选中，则每个目的地都将使用其自己的配置模板。"
+    },
+    "advanced": {
+      "addVariable": "添加变量",
+      "variablesTooltip": "变量用于将数据从警报传递到目标。",
+      "rowTemplateTooltip": "行模板用于格式化警报消息。",
+      "templateType": "模板类型："
+    }
   },
   "alert_templates": {
     "header": "模板",
@@ -1942,7 +2041,10 @@
     "customWebhook": "自定义（Webhook）",
     "customEmail": "自定义（电子邮件）",
     "customAction": "自定义（操作）",
-    "custom": "自定义"
+    "custom": "自定义",
+    "separator": "分隔符",
+    "separator_placeholder": "输入分隔符（例如，|、\\n、\\ t、空格）",
+    "separator_hint": "在记录之间使用的分隔字符串（允许空格）"
   },
   "metrics": {
     "searchMetric": "搜索指标",
@@ -2604,7 +2706,8 @@
     "showLegends": "显示图例"
   },
   "alert_list": {
-    "alert_details": "告警详情"
+    "alert_details": "告警详情",
+    "alert_history": "警报历史"
   },
   "latencyInsights": {
     "title": "标题",
@@ -2758,7 +2861,12 @@
     },
     "viewInTraces": "在轨迹中查看",
     "viewInTracesTooltip": "打开包含 RED 指标仪表板和所有相关追踪记录的跟踪页面",
-    "exportToJson": "导出到 JSON"
+    "exportToJson": "导出到 JSON",
+    "noLogsDescription": "在所选时间范围内未找到此关联的日志。",
+    "tracesErrorDetails": "获取跟踪数据时出错。请重试。",
+    "metricsError": "无法加载指标",
+    "metricsErrorDetails": "获取指标数据时出错。请再试一次。",
+    "noMetricsDescription": "在所选时间范围内未找到此关联的指标。"
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",

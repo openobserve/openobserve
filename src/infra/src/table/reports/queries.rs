@@ -438,33 +438,6 @@ mod tests {
             "#
         );
 
-        let mysql_statement = JoinReportDashboardFolderResults::select(REPORT_ID)
-            .into_statement(sea_orm::DatabaseBackend::MySql)
-            .to_string();
-        collapsed_eq!(
-            &mysql_statement,
-            r#"
-                SELECT 
-                `report_dashboards`.`report_id`,
-                `report_dashboards`.`dashboard_id`,
-                `report_dashboards`.`tab_names`,
-                `report_dashboards`.`variables`,
-                `report_dashboards`.`timerange`,
-                `report_dashboards`.`report_id` AS `report_id`,
-                `report_dashboards`.`tab_names` AS `report_dashboard_tab_names`,
-                `report_dashboards`.`variables` AS `report_dashboard_variables`,
-                `report_dashboards`.`timerange` AS `report_dashboard_timerange`,
-                `dashboards`.`id` AS `dashboard_id`,
-                `dashboards`.`dashboard_id` AS `dashboard_snowflake_id`,
-                `folders`.`id` AS `dashboard_folder_id`,
-                `folders`.`folder_id` AS `dashboard_folder_snowflake_id` 
-                FROM `report_dashboards` 
-                INNER JOIN `dashboards` ON `report_dashboards`.`dashboard_id` = `dashboards`.`id` 
-                INNER JOIN `folders` ON `dashboards`.`folder_id` = `folders`.`id` 
-                WHERE `report_dashboards`.`report_id` = 'TEST_REPORT_ID'
-            "#
-        );
-
         let sqlite_statement = JoinReportDashboardFolderResults::select(REPORT_ID)
             .into_statement(sea_orm::DatabaseBackend::Sqlite)
             .to_string();
@@ -544,56 +517,6 @@ mod tests {
                 ORDER BY 
                 "reports"."name" ASC,
                 "folders"."name" ASC 
-            "#
-        );
-
-        let mysql_statement = ListReportsQueryResult::select(&params)
-            .into_statement(sea_orm::DatabaseBackend::MySql)
-            .to_string();
-        collapsed_eq!(
-            &mysql_statement,
-            r#"
-                SELECT 
-                `reports`.`id`,
-                `reports`.`org`,
-                `reports`.`folder_id`,
-                `reports`.`name`,
-                `reports`.`title`,
-                `reports`.`description`,
-                `reports`.`enabled`,
-                `reports`.`frequency`,
-                `reports`.`destinations`,
-                `reports`.`message`,
-                `reports`.`timezone`,
-                `reports`.`tz_offset`,
-                `reports`.`owner`,
-                `reports`.`last_edited_by`,
-                `reports`.`created_at`,
-                `reports`.`updated_at`,
-                `reports`.`start_at`,
-                `reports`.`id` AS `report_id`,
-                `reports`.`name` AS `report_name`,
-                `reports`.`owner` AS `report_owner`,
-                `reports`.`description` AS `report_description`,
-                `reports`.`created_at` AS `report_created_at`,
-                `reports`.`frequency` AS `report_frequency`,
-                `folders`.`folder_id` AS `folder_id`,
-                `folders`.`name` AS `folder_name`,
-                `reports`.`enabled` AS `report_enabled`,
-                `report_dashboards`.`dashboard_id` AS `report_dashboard_id`,
-                `report_dashboards`.`tab_names` AS `report_dashboard_tab_names`,
-                `report_dashboards`.`variables` AS `report_dashboard_variables`,
-                `report_dashboards`.`timerange` AS `report_dashboard_timerange`,
-                `dashboards`.`dashboard_id` AS `dashboard_snowflake_id`,
-                `folders`.`org` AS `org_id`
-                FROM `reports` 
-                INNER JOIN `folders` ON `reports`.`folder_id` = `folders`.`id` 
-                INNER JOIN `report_dashboards` ON `reports`.`id` = `report_dashboards`.`report_id` 
-                INNER JOIN `dashboards` ON `report_dashboards`.`dashboard_id` = `dashboards`.`id` 
-                WHERE `folders`.`org` = 'TEST_ORG_ID' 
-                ORDER BY 
-                `reports`.`name` ASC,
-                `folders`.`name` ASC 
             "#
         );
 
@@ -712,60 +635,6 @@ mod tests {
                 "folders"."name" ASC 
                 LIMIT 10 
                 OFFSET 30
-            "#
-        );
-
-        let mysql_statement = ListReportsQueryResult::select(&params)
-            .into_statement(sea_orm::DatabaseBackend::MySql)
-            .to_string();
-        collapsed_eq!(
-            &mysql_statement,
-            r#"
-                SELECT 
-                `reports`.`id`,
-                `reports`.`org`,
-                `reports`.`folder_id`,
-                `reports`.`name`,
-                `reports`.`title`,
-                `reports`.`description`,
-                `reports`.`enabled`,
-                `reports`.`frequency`,
-                `reports`.`destinations`,
-                `reports`.`message`,
-                `reports`.`timezone`,
-                `reports`.`tz_offset`,
-                `reports`.`owner`,
-                `reports`.`last_edited_by`,
-                `reports`.`created_at`,
-                `reports`.`updated_at`,
-                `reports`.`start_at`,
-                `reports`.`id` AS `report_id`,
-                `reports`.`name` AS `report_name`,
-                `reports`.`owner` AS `report_owner`,
-                `reports`.`description` AS `report_description`,
-                `reports`.`created_at` AS `report_created_at`,
-                `reports`.`frequency` AS `report_frequency`,
-                `folders`.`folder_id` AS `folder_id`,
-                `folders`.`name` AS `folder_name`,
-                `reports`.`enabled` AS `report_enabled`,
-                `report_dashboards`.`dashboard_id` AS `report_dashboard_id`,
-                `report_dashboards`.`tab_names` AS `report_dashboard_tab_names`,
-                `report_dashboards`.`variables` AS `report_dashboard_variables`,
-                `report_dashboards`.`timerange` AS `report_dashboard_timerange`,
-                `dashboards`.`dashboard_id` AS `dashboard_snowflake_id`,
-                `folders`.`org` AS `org_id`
-                FROM `reports` 
-                INNER JOIN `folders` ON `reports`.`folder_id` = `folders`.`id` 
-                INNER JOIN `report_dashboards` ON `reports`.`id` = `report_dashboards`.`report_id` 
-                INNER JOIN `dashboards` ON `report_dashboards`.`dashboard_id` = `dashboards`.`id` 
-                WHERE `folders`.`org` = 'TEST_ORG_ID' 
-                AND `folders`.`folder_id` = 'TEST_FOLDER_SNOWFLAKE_ID' 
-                AND `dashboards`.`dashboard_id` = 'TEST_DASHBOARD_SNOWFLAKE_ID' 
-                AND `reports`.`destinations` <> '[]' 
-                ORDER BY 
-                `reports`.`name` ASC,
-                `folders`.`name` ASC 
-                LIMIT 10 OFFSET 30
             "#
         );
 

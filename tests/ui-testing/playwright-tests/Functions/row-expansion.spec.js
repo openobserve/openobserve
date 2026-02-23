@@ -54,9 +54,9 @@ test.describe('Row Expansion (#ResultArray#) Tests', { tag: ['@rowExpansion', '@
 
       // Step 2: Navigate away and back, verify #ResultArray# marker preserved (former Test 3)
       await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       // Open function and check if #ResultArray# is still there
@@ -174,9 +174,9 @@ if (rows.length > 0) {
 
       // Step 2: Navigate away and back, verify marker + type preserved (former Test 8)
       await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       // Open function and check type and #ResultArray# marker

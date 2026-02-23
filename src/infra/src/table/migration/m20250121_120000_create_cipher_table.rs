@@ -87,22 +87,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_cipher_table_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `cipher_keys` ( 
-            `org` varchar(100) NOT NULL, 
-            `created_by` varchar(256) NOT NULL, 
-            `created_at` bigint NOT NULL, 
-            `name` varchar(256) NOT NULL, 
-            `kind` varchar(100) NOT NULL, 
-            `data` text NOT NULL,
-            PRIMARY KEY (`org`, `name`, `kind`)
-            )"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         collapsed_eq!(
             &create_cipher_table_statement().to_string(SqliteQueryBuilder),

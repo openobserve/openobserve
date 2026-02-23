@@ -984,7 +984,7 @@ export class AlertDestinationsPage {
             testLogger.debug(`Destination not visible, retrying... (${retries} attempts left)`);
             await this.page.waitForTimeout(2000);
             // Refresh the page
-            await this.page.reload({ waitUntil: 'networkidle' });
+            await this.page.reload({ waitUntil: 'domcontentloaded' });
             await this.page.waitForTimeout(2000);
 
             // Try search again after reload
@@ -1160,7 +1160,7 @@ export class AlertDestinationsPage {
 
         // Full page reload to ensure clean state before edit
         // This is critical for ServiceNow and other complex destination types
-        await this.page.reload({ waitUntil: 'networkidle' });
+        await this.page.reload({ waitUntil: 'domcontentloaded' });
         await this.page.waitForTimeout(3000);
 
         // Wait for table to be visible
@@ -1215,7 +1215,7 @@ export class AlertDestinationsPage {
                 }
                 testLogger.debug(`Edit button not found, retrying... (${retries} attempts left)`);
                 await this.page.waitForTimeout(2000);
-                await this.page.reload({ waitUntil: 'networkidle' });
+                await this.page.reload({ waitUntil: 'domcontentloaded' });
                 await this.page.waitForTimeout(2000);
 
                 // Try search again after reload
