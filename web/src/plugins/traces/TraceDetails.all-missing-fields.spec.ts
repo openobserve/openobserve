@@ -475,7 +475,9 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
     });
 
     it("should render span count", () => {
-      const spanCount = wrapper.find('[data-test="trace-details-spans-count"]');
+      const spanCount = wrapper
+        .find('[data-test="trace-details-spans-count"]')
+        .find(['[data-test="spans-count-text"]']);
       if (spanCount.exists()) {
         expect(spanCount.text()).toContain("Spans: 2");
       }

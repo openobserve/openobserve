@@ -41,12 +41,41 @@ vi.mock('../../../aws-exports', () => ({
   }
 }));
 
+// Mock vue-router
+vi.mock('vue-router', () => ({
+  useRoute: vi.fn(() => ({
+    query: {},
+    path: '/aws',
+    name: 'AWSConfig'
+  })),
+  useRouter: vi.fn(() => ({
+    push: vi.fn(),
+    replace: vi.fn()
+  }))
+}));
+
 // Mock CopyContent component to avoid its dependencies
 vi.mock('@/components/CopyContent.vue', () => ({
   default: {
     name: 'CopyContent',
     props: ['content'],
     template: '<div class="copy-content-mock">{{ content }}</div>'
+  }
+}));
+
+// Mock AWS component dependencies
+vi.mock('./AWSQuickSetup.vue', () => ({
+  default: {
+    name: 'AWSQuickSetup',
+    template: '<div class="aws-quick-setup-mock">AWS Quick Setup</div>'
+  }
+}));
+
+vi.mock('./AWSIndividualServices.vue', () => ({
+  default: {
+    name: 'AWSIndividualServices',
+    props: ['initialSearch'],
+    template: '<div class="aws-individual-services-mock">AWS Individual Services</div>'
   }
 }));
 
@@ -229,41 +258,31 @@ describe("AWSConfig", () => {
     expect(content).toContain('Access Key: [BASIC_PASSCODE]');
   });
 
-  // Test 15: AWS service links initialization
-  it("should initialize AWS service links array", () => {
-    expect(wrapper.vm.awsServiceLinks).toBeTruthy();
-    expect(Array.isArray(wrapper.vm.awsServiceLinks)).toBe(true);
-    expect(wrapper.vm.awsServiceLinks.length).toBeGreaterThan(0);
+  // Test 15: AWSQuickSetup component integration (replaces AWSIntegrationGrid)
+  it("should render AWSIntegrationGrid component", () => {
+    // Component now uses AWSQuickSetup and AWSIndividualServices instead of AWSIntegrationGrid
+    const quickSetup = wrapper.findComponent({ name: 'AWSQuickSetup' });
+    expect(quickSetup.exists()).toBe(true);
   });
 
-  // Test 16: AWS service links structure
-  it("should have correct AWS service links structure", () => {
-    const links = wrapper.vm.awsServiceLinks;
-    links.forEach((link: any) => {
-      expect(link).toHaveProperty('name');
-      expect(link).toHaveProperty('link');
-      expect(typeof link.name).toBe('string');
-      expect(typeof link.link).toBe('string');
-    });
+  // Test 16: Template section heading
+  it("should display AWS Integrations heading", () => {
+    const heading = wrapper.find('h6');
+    expect(heading.exists()).toBe(true);
+    expect(heading.text()).toBe('AWS Integrations');
   });
 
-  // Test 17: Specific AWS service links validation
-  it("should include expected AWS services", () => {
-    const links = wrapper.vm.awsServiceLinks;
-    const serviceNames = links.map((link: any) => link.name);
-    
-    expect(serviceNames).toContain('Application Load Balancer (ALB)');
-    expect(serviceNames).toContain('Cloudwatch Logs');
-    expect(serviceNames).toContain('VPC Flow Logs');
-    expect(serviceNames).toContain('API Gateway Logs');
+  // Test 17: Template description text
+  it("should display integration description", () => {
+    const description = wrapper.find('p');
+    expect(description.exists()).toBe(true);
+    expect(description.text()).toContain('Set up AWS monitoring in one click');
   });
 
-  // Test 18: AWS service links URL validation
-  it("should have valid URLs for AWS services", () => {
-    const links = wrapper.vm.awsServiceLinks;
-    links.forEach((link: any) => {
-      expect(link.link).toMatch(/^https?:\/\/.+/);
-    });
+  // Test 18: Integration section structure
+  it("should have correct integration section structure", () => {
+    expect(wrapper.find('.tw\\:mt-8').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:mb-4').exists()).toBe(true);
   });
 
   // Test 19: CopyContent component integration
@@ -281,7 +300,7 @@ describe("AWSConfig", () => {
   // Test 21: Template structure
   it("should have correct template structure", () => {
     expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-    expect(wrapper.find('.q-mt-sm').exists()).toBe(true);
+    expect(wrapper.find('.aws-config-page').exists()).toBe(true);
   });
 
   // Test 22: getImageURL function exposure
@@ -290,52 +309,45 @@ describe("AWSConfig", () => {
     expect(typeof wrapper.vm.getImageURL).toBe('function');
   });
 
-  // Test 23: getImageURL function call
-  it("should call getImageURL function correctly", () => {
-    const result = wrapper.vm.getImageURL('test.png');
-    expect(mockGetImageURL).toHaveBeenCalledWith('test.png');
-    expect(result).toBe('/assets/test.png');
-  });
-
-  // Test 24: Endpoint URL property
+  // Test 23: Endpoint URL property
   it("should have correct endpoint URL", () => {
     expect(wrapper.vm.endpoint.url).toBe('http://localhost:5080');
   });
 
-  // Test 25: Endpoint host property
+  // Test 24: Endpoint host property
   it("should have correct endpoint host", () => {
     expect(wrapper.vm.endpoint.host).toBe('localhost');
   });
 
-  // Test 26: Endpoint port property
+  // Test 25: Endpoint port property
   it("should have correct endpoint port", () => {
     expect(wrapper.vm.endpoint.port).toBe('5080');
   });
 
-  // Test 27: Endpoint protocol property
+  // Test 26: Endpoint protocol property
   it("should have correct endpoint protocol", () => {
     expect(wrapper.vm.endpoint.protocol).toBe('http');
   });
 
-  // Test 28: Endpoint TLS property
+  // Test 27: Endpoint TLS property
   it("should have correct endpoint TLS setting", () => {
     expect(wrapper.vm.endpoint.tls).toBe(false);
   });
 
-  // Test 29: Dynamic organization identifier in content
+  // Test 28: Dynamic organization identifier in content
   it("should use organization identifier from store in content", () => {
     const content = wrapper.vm.content;
     expect(content).toContain('/aws/test_org/');
   });
 
-  // Test 30: Props type validation
+  // Test 29: Props type validation
   it("should validate prop types correctly", () => {
     const propDefs = wrapper.vm.$options.props;
     expect(propDefs.currOrgIdentifier.type).toBe(String);
     expect(propDefs.currUserEmail.type).toBe(String);
   });
 
-  // Test 31: Error handling for getIngestionURL failure
+  // Test 30: Error handling for getIngestionURL failure
   it("should handle getIngestionURL error gracefully", async () => {
     mockGetIngestionURL.mockImplementationOnce(() => {
       throw new Error('Network error');
@@ -368,7 +380,7 @@ describe("AWSConfig", () => {
     errorWrapper.unmount();
   });
 
-  // Test 32: Error handling for getEndPoint failure  
+  // Test 31: Error handling for getEndPoint failure  
   it("should handle getEndPoint error gracefully", async () => {
     mockGetEndPoint.mockImplementationOnce(() => {
       throw new Error('Endpoint parsing error');
@@ -401,71 +413,36 @@ describe("AWSConfig", () => {
     errorWrapper.unmount();
   });
 
-  // Test 33: AWS service links count validation
-  it("should have correct number of AWS service links", () => {
-    const expectedCount = 17; // Based on the component definition (ALB to "Other AWS Services")
-    expect(wrapper.vm.awsServiceLinks).toHaveLength(expectedCount);
-  });
-
-  // Test 34: Complete setup return object validation
+  // Test 32: Complete setup return object validation
   it("should return all required properties from setup", () => {
     expect(wrapper.vm.store).toBeDefined();
     expect(wrapper.vm.config).toBeDefined();
     expect(wrapper.vm.endpoint).toBeDefined();
     expect(wrapper.vm.content).toBeDefined();
     expect(wrapper.vm.getImageURL).toBeDefined();
-    expect(wrapper.vm.awsServiceLinks).toBeDefined();
   });
 
-  // Test 35: Component unmounting cleanup
+  // Test 33: Component unmounting cleanup
   it("should unmount without errors", () => {
     expect(() => wrapper.unmount()).not.toThrow();
   });
 
-  // Test 36: AWS service links content validation
-  it("should have specific AWS services with correct links", () => {
-    const links = wrapper.vm.awsServiceLinks;
-    const albLink = links.find((link: any) => link.name === 'Application Load Balancer (ALB)');
-    const cloudwatchLink = links.find((link: any) => link.name === 'Cloudwatch Logs');
-    
-    expect(albLink.link).toBe('https://short.openobserve.ai/aws/alb');
-    expect(cloudwatchLink.link).toBe('https://short.openobserve.ai/aws/cloudwatch-logs');
-  });
-
-  // Test 37: Content format validation
+  // Test 34: Content format validation
   it("should generate correctly formatted content", () => {
     const content = wrapper.vm.content;
     const lines = content.split('\n');
-    
+
     expect(lines.length).toBe(2); // Should have 2 lines
     expect(lines[0]).toMatch(/^HTTP Endpoint:/);
     expect(lines[1]).toMatch(/^Access Key:/);
   });
 
-  // Test 38: Template documentation links rendering
-  it("should render documentation section", () => {
-    expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:list-decimal').exists()).toBe(true);
-  });
-
-  // Test 39: Template AWS service links rendering
-  it("should render AWS service links in template", () => {
-    const links = wrapper.findAll('a');
-    expect(links.length).toBeGreaterThan(0);
-    
-    // Check that links have correct attributes
-    links.forEach((link) => {
-      expect(link.attributes('target')).toBe('_blank');
-      expect(link.attributes('rel')).toBe('noopener noreferrer');
-    });
-  });
-
-  // Test 40: Integration test - full component workflow
+  // Test 35: Integration test - full component workflow
   it("should perform complete component initialization workflow", async () => {
     // Verify initialization sequence
     expect(mockGetIngestionURL).toHaveBeenCalled();
     expect(mockGetEndPoint).toHaveBeenCalledWith('http://localhost:5080');
-    
+
     // Verify data setup
     expect(wrapper.vm.endpoint).toEqual({
       url: 'http://localhost:5080',
@@ -474,27 +451,23 @@ describe("AWSConfig", () => {
       protocol: 'http',
       tls: false
     });
-    
+
     // Verify content generation
     const content = wrapper.vm.content;
     expect(content).toContain('HTTP Endpoint: http://localhost:5080/aws/test_org/default/_kinesis_firehose');
     expect(content).toContain('Access Key: [BASIC_PASSCODE]');
-    
-    // Verify AWS service links
-    expect(wrapper.vm.awsServiceLinks).toHaveLength(17);
-    expect(wrapper.vm.awsServiceLinks[0]).toEqual({
-      name: 'Application Load Balancer (ALB)',
-      link: 'https://short.openobserve.ai/aws/alb'
-    });
-    
+
     // Verify component rendering
     const copyComponent = wrapper.findComponent({ name: 'CopyContent' });
     expect(copyComponent.exists()).toBe(true);
     expect(copyComponent.props('content')).toBe(content);
-    
+
+    // Verify quick setup component (replaces integration grid)
+    const quickSetupComponent = wrapper.findComponent({ name: 'AWSQuickSetup' });
+    expect(quickSetupComponent.exists()).toBe(true);
+
     // Verify template structure
     expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:list-decimal').exists()).toBe(true);
+    expect(wrapper.find('h6').exists()).toBe(true);
   });
 });

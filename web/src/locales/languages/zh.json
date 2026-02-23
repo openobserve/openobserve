@@ -232,8 +232,10 @@
     "patternColumnHeader": "模式",
     "occurrenceColumnHeader": "发生次数",
     "percentageColumnHeader": "百分比",
+    "anomalyColumnHeader": "异常",
     "actionsColumnHeader": "操作",
     "anomalyLabel": "异常",
+    "anomalyDetected": "检测到异常",
     "includePatternInSearch": "在搜索中加入模式",
     "excludePatternFromSearch": "从搜索中排除模式",
     "showPatternDetails": "显示详细信息（{变量} 变量，{示例} 示例）",
@@ -307,7 +309,10 @@
     "show": "显示",
     "editor": "编辑器",
     "webUrlNotConfigured": "在管理员配置 ZO_WEB_URL 之前，共享 URL 处于禁用状态。",
-    "showHideColumns": "显示/隐藏列"
+    "showHideColumns": "显示/隐藏列",
+    "autoRefresh": "自动刷新",
+    "createSavedView": "创建保存的视图",
+    "listSavedViews": "列出保存的视图"
   },
   "menu": {
     "home": "主页",
@@ -2036,7 +2041,10 @@
     "customWebhook": "自定义（Webhook）",
     "customEmail": "自定义（电子邮件）",
     "customAction": "自定义（操作）",
-    "custom": "自定义"
+    "custom": "自定义",
+    "separator": "分隔符",
+    "separator_placeholder": "输入分隔符（例如，|、\\n、\\ t、空格）",
+    "separator_hint": "在记录之间使用的分隔字符串（允许空格）"
   },
   "metrics": {
     "searchMetric": "搜索指标",
@@ -2853,7 +2861,12 @@
     },
     "viewInTraces": "在轨迹中查看",
     "viewInTracesTooltip": "打开包含 RED 指标仪表板和所有相关追踪记录的跟踪页面",
-    "exportToJson": "导出到 JSON"
+    "exportToJson": "导出到 JSON",
+    "noLogsDescription": "在所选时间范围内未找到此关联的日志。",
+    "tracesErrorDetails": "获取跟踪数据时出错。请重试。",
+    "metricsError": "无法加载指标",
+    "metricsErrorDetails": "获取指标数据时出错。请再试一次。",
+    "noMetricsDescription": "在所选时间范围内未找到此关联的指标。"
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",

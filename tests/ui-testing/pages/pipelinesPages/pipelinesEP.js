@@ -52,6 +52,45 @@ export class PipelinesEP {
         await this.page.locator(this.pipelineMoreOptionsButton(name)).waitFor({ state: 'visible', timeout: 30000 });
     }
 
+    /**
+     * Verify that a scheduled pipeline displays the cron expression in the Frequency column
+     * Bug fix: Cron expression used to not display in the list
+     * @param {string} name - Pipeline name
+     */
+    async expectScheduledPipelineCronDisplayed(name) {
+        // Find the row containing this pipeline by its more-options button
+        const row = this.page.locator(`tr:has([data-test="pipeline-list-${name}-more-options"])`);
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Find the Frequency column index dynamically by header text
+        // This is more resilient than hardcoding nth(5) which breaks if columns change
+        const headerCells = this.page.locator('thead th, thead td');
+        const headerCount = await headerCells.count();
+        let frequencyColumnIndex = -1;
+
+        for (let i = 0; i < headerCount; i++) {
+            const headerText = await headerCells.nth(i).textContent();
+            if (headerText && headerText.toLowerCase().includes('frequency')) {
+                frequencyColumnIndex = i;
+                break;
+            }
+        }
+
+        // Fallback to column 5 if header not found (maintains backwards compatibility)
+        if (frequencyColumnIndex === -1) {
+            frequencyColumnIndex = 5;
+        }
+
+        const frequencyCell = row.locator('td').nth(frequencyColumnIndex);
+        const frequencyText = await frequencyCell.textContent();
+
+        // Verify cron expression is displayed (not blank or "--")
+        expect(frequencyText.trim()).not.toBe('');
+        expect(frequencyText.trim()).not.toBe('--');
+        // Cron expressions typically contain spaces and asterisks (e.g., "10 56 * * *")
+        expect(frequencyText.trim()).toMatch(/[\d\s\*]+/);
+    }
+
     async openFunctionStreamTab() {
 
         await this.page.waitForSelector(this.functionStreamTab);

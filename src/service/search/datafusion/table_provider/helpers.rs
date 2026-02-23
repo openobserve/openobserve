@@ -32,7 +32,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use hashbrown::HashMap;
-#[cfg(feature = "enterprise")]
+#[cfg(all(feature = "enterprise", feature = "vortex"))]
 use o2_enterprise::enterprise::search::vortex::generate_vortex_access_plan;
 
 use crate::service::search::{datafusion::storage, index::IndexCondition};
@@ -44,9 +44,9 @@ pub fn generate_access_plan(
     let file_format = FileFormat::from_extension(file.path().as_ref())?;
     match file_format {
         FileFormat::Parquet => generate_parquet_access_plan(file, segment_ids),
-        #[cfg(feature = "enterprise")]
+        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         FileFormat::Vortex => generate_vortex_access_plan(segment_ids),
-        #[cfg(not(feature = "enterprise"))]
+        #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
         FileFormat::Vortex => None,
     }
 }

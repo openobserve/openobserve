@@ -15,29 +15,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-ma-md">
-    <div class="tw:text-[16px]">
-      <div class="tw:font-bold">
-        Azure Function for sending logs to OpenObserve
-      </div>
-      <div class="tw:py-2">
-        <a
-          href="https://github.com/openobserve/azure-function-openobserve"
-          class="hover:tw:underline"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          https://github.com/openobserve/azure-function-openobserve
-        </a>
-      </div>
-    </div>
+  <div class="q-ma-md azure-config-page">
+    <AzureQuickSetup />
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
+import AzureQuickSetup from "./AzureQuickSetup.vue";
 
 export default defineComponent({
   name: "AzureConfig",
+  components: {
+    AzureQuickSetup,
+  },
 });
 </script>
+
+<style scoped lang="scss">
+.azure-config-page {
+  .body--light & {
+    .page-description {
+      color: #666;
+    }
+  }
+
+  .body--dark & {
+    .page-description {
+      color: #b0b0b0;
+    }
+  }
+}
+</style>
