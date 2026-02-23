@@ -154,8 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-left"
                 :class="
                   store.state.theme == 'dark'
-                    ? 'tw-text-[#f67a7aff]'
-                    : 'tw-text-[#B71C1C]'
+                    ? 'tw:text-[#f67a7aff]'
+                    : 'tw:text-[#B71C1C]'
                 "
               >
                 {{ props.row.field }}
