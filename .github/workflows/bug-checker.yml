@@ -1,0 +1,200 @@
+name: Bug Checker Agent
+
+# Checks open bugs to verify if fixes exist in codebase (using Claude)
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Every Monday at 9 AM UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run mode (only report, don't comment)"
+        required: false
+        default: false
+        type: boolean
+      days_threshold:
+        description: "Only check issues older than N days"
+        required: false
+        default: "30"
+        type: string
+      max_bugs_to_analyze:
+        description: "Max bugs for Claude to analyze"
+        required: false
+        default: "5"
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  # Job 1: Collect bugs to analyze
+  collect-bugs:
+    runs-on: ubuntu-latest
+    outputs:
+      bugs_json: ${{ steps.collect.outputs.bugs_json }}
+      has_bugs: ${{ steps.collect.outputs.has_bugs }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Collect open bugs
+        id: collect
+        run: |
+          set -e
+
+          DAYS_THRESHOLD="${{ inputs.days_threshold || '30' }}"
+          MAX_BUGS="${{ inputs.max_bugs_to_analyze || '5' }}"
+
+          echo "Configuration: days_threshold=$DAYS_THRESHOLD, max_bugs=$MAX_BUGS"
+
+          # Get cutoff date
+          CUTOFF_DATE=$(date -d "-${DAYS_THRESHOLD} days" +%Y-%m-%d)
+          echo "Checking bugs created before: $CUTOFF_DATE"
+
+          # Get open bugs
+          echo ""
+          echo "=== Fetching open bugs with '☢️ Bug' label ==="
+
+          BUGS=$(gh issue list \
+            --label "☢️ Bug" \
+            --state open \
+            --json number,title,body,createdAt \
+            --limit 100)
+
+          TOTAL_BUGS=$(echo "$BUGS" | jq length)
+          echo "Found $TOTAL_BUGS open bugs"
+
+          # Collect bugs for Claude to analyze
+          BUGS_TO_ANALYZE="[]"
+          BUGS_COLLECTED=0
+
+          echo ""
+          echo "=== Collecting bugs for analysis ==="
+
+          for row in $(echo "$BUGS" | jq -r '.[] | @base64'); do
+            if [[ "$BUGS_COLLECTED" -ge "$MAX_BUGS" ]]; then
+              echo "Reached limit of $MAX_BUGS bugs."
+              break
+            fi
+
+            _jq() {
+              echo "$row" | base64 --decode | jq -r "$1"
+            }
+
+            NUMBER=$(_jq '.number')
+            TITLE=$(_jq '.title')
+            BODY=$(_jq '.body')
+            CREATED=$(_jq '.createdAt')
+
+            # Skip recent bugs
+            if [[ "$CREATED" > "$CUTOFF_DATE" ]]; then
+              echo "Skipping #$NUMBER - too recent"
+              continue
+            fi
+
+            # Check if already processed by Bug Checker Agent
+            EXISTING=$(gh issue view "$NUMBER" --json comments \
+              --jq '.comments[] | select(.body | contains("Bug Checker Agent")) | .id' \
+              | head -1 || true)
+
+            if [[ -n "$EXISTING" ]]; then
+              echo "Skipping #$NUMBER - already processed"
+              continue
+            fi
+
+            BUGS_COLLECTED=$((BUGS_COLLECTED + 1))
+            echo "[$BUGS_COLLECTED] Adding #$NUMBER: $TITLE"
+
+            # Truncate body to 1000 chars for JSON
+            BODY_TRUNCATED=$(echo "$BODY" | head -c 1000)
+
+            BUGS_TO_ANALYZE=$(echo "$BUGS_TO_ANALYZE" | jq \
+              --argjson num "$NUMBER" \
+              --arg title "$TITLE" \
+              --arg body "$BODY_TRUNCATED" \
+              '. += [{"number": $num, "title": $title, "body": $body}]')
+          done
+
+          BUG_COUNT=$(echo "$BUGS_TO_ANALYZE" | jq length)
+          echo ""
+          echo "=== Collected $BUG_COUNT bugs for Claude to analyze ==="
+
+          # Output for next job (compact JSON)
+          echo "bugs_json=$(echo "$BUGS_TO_ANALYZE" | jq -c '.')" >> $GITHUB_OUTPUT
+
+          if [[ "$BUG_COUNT" -gt 0 ]]; then
+            echo "has_bugs=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_bugs=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Job 2: Claude analyzes bugs and checks codebase
+  analyze-bugs:
+    needs: collect-bugs
+    if: needs.collect-bugs.outputs.has_bugs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Analyze bugs with Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          prompt: |
+            You are a Bug Verification Agent. Your job is to analyze bug reports and check if the fix already exists in the codebase.
+
+            ## Bugs to Analyze
+            ```json
+            ${{ needs.collect-bugs.outputs.bugs_json }}
+            ```
+
+            ## Your Task
+            For EACH bug in the list:
+
+            1. **Understand the bug**: Read the title and body to understand what the issue is
+            2. **Search the codebase**: Use Glob and Grep to find relevant files
+            3. **Analyze the code**: Read the relevant files to check if:
+               - The bug has been fixed
+               - The problematic code still exists
+               - There's evidence the issue was addressed
+            4. **Make a determination**: Is this bug FIXED, NOT_FIXED, or UNCLEAR?
+
+            ## Important Guidelines
+            - Focus on UI bugs: check `web/src/` directory
+            - Focus on backend bugs: check `src/` directory
+            - Look for recent changes that might address the issue
+            - Be conservative - only mark as FIXED if you have clear evidence
+
+            ## Output
+            For each bug, provide your analysis, then at the end:
+
+            If DRY_RUN is false and you found bugs that are FIXED:
+            - Use `gh issue comment <number> --body "message"` to post a comment
+            - Comment format:
+              ```
+              ## 🔍 Bug Checker Agent Report
+
+              **Status:** ✅ This bug appears to be FIXED
+
+              **Evidence:** <what you found>
+
+              **Files checked:** <list files>
+
+              **Recommendation:** Please verify and close this issue if the fix is confirmed.
+
+              ---
+              _Automated analysis by Bug Checker Agent_
+              ```
+
+            DRY_RUN: ${{ inputs.dry_run || 'false' }}
+
+          claude_args: |
+            --allowedTools "Bash(gh issue comment:*),Bash(gh issue view:*),Read,Grep,Glob"
