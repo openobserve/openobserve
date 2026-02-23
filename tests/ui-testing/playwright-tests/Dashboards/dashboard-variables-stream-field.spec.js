@@ -473,7 +473,13 @@ test.describe(
       // A→C (stream dep), C→B (filter dep), B→A (field dep)
       await scopedVars.editVariable("A");
       await scopedVars.updateStream("$C");
-      await scopedVars.clickSaveButton();
+
+      // Click save directly — don't use clickSaveButton() which waits up to 10s for
+      // the button to hide. A brief DOM rerender can trick it into thinking save
+      // succeeded, masking the cycle error. For cycle detection we just need the click.
+      const saveBtnF1 = page.locator(SELECTORS.VARIABLE_SAVE_BTN);
+      await saveBtnF1.waitFor({ state: "visible", timeout: 10000 });
+      await saveBtnF1.click();
 
       const hasCycleF1 = await scopedVars.hasCircularDependencyError();
       expect(hasCycleF1).toBe(true);
@@ -497,7 +503,11 @@ test.describe(
       await selectStreamType(page, "logs");
       await scopedVars.selectStream("$pod");
       await scopedVars.selectField("$region");
-      await scopedVars.clickSaveButton();
+
+      // Click save directly for cycle detection (same reason as F1 above)
+      const saveBtnF2 = page.locator(SELECTORS.VARIABLE_SAVE_BTN);
+      await saveBtnF2.waitFor({ state: "visible", timeout: 10000 });
+      await saveBtnF2.click();
 
       const hasCycleF2 = await scopedVars.hasCircularDependencyError();
       expect(hasCycleF2).toBe(true);
@@ -618,7 +628,7 @@ test.describe(
           call.url.includes("/_values_stream") &&
           (call.url.includes("/default/_values_stream") || call.stream === "default"),
       });
-      await scopedVars.changeVariableValue("streamName", { optionIndex: 1, timeout: 25000 });
+      await scopedVars.changeVariableValue("streamName", { optionText: "default", timeout: 25000 });
       const streamResult = await streamMonitor;
 
       expect(streamResult.matchedCount).toBeGreaterThanOrEqual(1);
@@ -642,7 +652,7 @@ test.describe(
             call.url.includes("kubernetes_container_name") ||
             (call.field && call.field.includes("kubernetes_container_name"))),
       });
-      await scopedVars.changeVariableValue("fieldName", { optionIndex: 1, timeout: 25000 });
+      await scopedVars.changeVariableValue("fieldName", { optionText: "kubernetes_container_name", timeout: 25000 });
       const fieldResult = await fieldMonitor;
 
       expect(fieldResult.matchedCount).toBeGreaterThanOrEqual(1);

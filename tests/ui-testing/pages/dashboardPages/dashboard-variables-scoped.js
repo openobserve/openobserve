@@ -94,7 +94,8 @@ export default class DashboardVariablesScoped {
    * Change a variable's selected value by clicking the dropdown and selecting an option
    * @param {string} variableName - Variable name/label
    * @param {Object} options - Options
-   * @param {number} options.optionIndex - Index of option to select (default: 1 for second option)
+   * @param {number} options.optionIndex - Index of option to select (default: 1 for second option, ignored if optionText provided)
+   * @param {string} options.optionText - Text of option to select (preferred over optionIndex for reliability)
    * @param {boolean} options.monitorApi - Whether to monitor API calls (default: false)
    * @param {number} options.expectedApiCalls - Expected API call count when monitoring (default: 1)
    * @param {number} options.timeout - Timeout in ms (default: 10000, increased )
@@ -104,9 +105,10 @@ export default class DashboardVariablesScoped {
   async changeVariableValue(variableName, options = {}) {
     const {
       optionIndex = 1,
+      optionText = null,
       monitorApi = false,
       expectedApiCalls = 1,
-      timeout = 10000, // Increased from 5s to 10s 
+      timeout = 10000, // Increased from 5s to 10s
       returnSelectedValue = false
     } = options;
 
@@ -130,8 +132,16 @@ export default class DashboardVariablesScoped {
     // Wait for dropdown menu to open - use last() to target the most recently opened menu
     await this.page.locator(SELECTORS.MENU).last().waitFor({ state: "visible", timeout });
 
-    // Scope option selector to the visible menu to avoid matching stale/hidden options elsewhere on page
-    const targetOption = this.page.locator(SELECTORS.MENU).last().locator(SELECTORS.OPTION).nth(optionIndex);
+    // Build the target option locator - prefer text-based selection for reliability
+    const menu = this.page.locator(SELECTORS.MENU).last();
+    let targetOption;
+    if (optionText) {
+      // Text-based selection: more reliable than index-based, avoids wrong option in CI
+      targetOption = menu.getByRole("option", { name: optionText, exact: true });
+    } else {
+      // Index-based selection: scope to visible menu to avoid matching stale options
+      targetOption = menu.locator(SELECTORS.OPTION).nth(optionIndex);
+    }
     const optionTimeout = Math.max(timeout, 15000); // At least 15s for options under load
 
     // Retry mechanism: if option not visible, reopen dropdown
@@ -1001,24 +1011,12 @@ export default class DashboardVariablesScoped {
     // The error is displayed as red text with the message "Variables has cycle:"
     // When there's a cycle error, the save button should still be visible (save failed)
 
-    // Wait longer to allow async validation to complete after clicking save
-    // Increased to 3s to give more time for validation
-    await this.page.waitForTimeout(3000);
-
-    // Verify save button is still visible (indicates save failed due to error)
-    const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
-    const isSaveBtnVisible = await saveBtn.isVisible().catch(() => false);
-
-    if (!isSaveBtnVisible) {
-      // Save succeeded (button is hidden), so there's no cycle error
-      return false;
-    }
-
-    // Save button is still visible, now look for the cycle error message
+    // First, look for cycle error text directly — don't rely on save button visibility
+    // because brief DOM rerenders can temporarily hide/show the button.
     // Strategy 1: Look for div with inline style containing "color" and text containing "cycle"
     try {
       const errorElement = this.page.locator('div[style*="color"]').filter({ hasText: /cycle/i });
-      await errorElement.waitFor({ state: "visible", timeout: 8000 });
+      await errorElement.waitFor({ state: "visible", timeout: 12000 });
       const text = await errorElement.textContent();
       if (text && text.toLowerCase().includes('cycle')) {
         return true;
@@ -1030,7 +1028,7 @@ export default class DashboardVariablesScoped {
     // Strategy 2: Look for any text containing "Variables has cycle"
     try {
       const fallbackError = this.page.getByText(/Variables has cycle/i);
-      await fallbackError.waitFor({ state: "visible", timeout: 3000 });
+      await fallbackError.waitFor({ state: "visible", timeout: 5000 });
       return true;
     } catch {
       // Continue to next strategy
@@ -1039,7 +1037,7 @@ export default class DashboardVariablesScoped {
     // Strategy 3: Look for any div containing "cycle" (case insensitive)
     try {
       const generalError = this.page.locator('div').filter({ hasText: /cycle/i });
-      await generalError.first().waitFor({ state: "visible", timeout: 2000 });
+      await generalError.first().waitFor({ state: "visible", timeout: 3000 });
       const text = await generalError.first().textContent();
       if (text && /variables.*cycle|cycle.*variable/i.test(text)) {
         return true;
@@ -1048,8 +1046,16 @@ export default class DashboardVariablesScoped {
       // All strategies failed
     }
 
-    // If save button is visible but no error message found,
-    // there might be another validation error or the cycle error isn't displaying
+    // Fallback: check if save button is still visible (save was blocked)
+    const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
+    const isSaveBtnVisible = await saveBtn.isVisible().catch(() => false);
+
+    if (!isSaveBtnVisible) {
+      // Save succeeded (button is hidden), so there's no cycle error
+      return false;
+    }
+
+    // Save button is visible but no cycle text found — might be another error
     return false;
   }
 
