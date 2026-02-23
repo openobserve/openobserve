@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row qp-2 tw:h-full tw:px-[0.625rem]">
+  <div class="row qp-2 tw:h-full tw:px-[0.625rem] tw:pt-[0.25rem]">
     <div class="col-12 row items-end tw:pb-[0.625rem]">
       <div class="col-12 row card-container tw:px-[0.625rem] tw:py-[0.625rem]">
         <div

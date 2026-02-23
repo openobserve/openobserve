@@ -59,18 +59,21 @@ export class LogsPage {
         this.endTimeInput = '[data-test="end-time-input"]';
         this.showQueryToggle = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.fieldListCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
-        this.savedViewsButton = '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown--current > .q-btn__content > :nth-child(1)';
-        this.savedViewsExpand = '[data-test="logs-search-saved-views-btn"]';
+        this.savedViewsButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
+        this.savedViewsExpand = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.saveViewButton = 'button'; // filter by text in method
         this.savedViewNameInput = '[data-test="add-alert-name-input"]';
         this.savedViewDialogSave = '[data-test="saved-view-dialog-save-btn"]';
-        this.savedViewArrow = '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon';
+        this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
         this.confirmButton = '[data-test="confirm-button"]';
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
         this.searchStreamInput = '[placeholder="Search Stream"]';
         this.exploreButtonRole = { role: 'button', name: 'Explore' };
+        this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
+        this.listSavedViewsButton = '[data-test="logs-search-bar-list-saved-views-btn"]';
+        this.createSavedViewButton = '[data-test="logs-search-bar-create-saved-view-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
         this.closeDialog = '[data-test="close-dialog"] > .q-btn__content';
@@ -107,7 +110,7 @@ export class LogsPage {
         // Additional locators
         this.fnEditor = '#fnEditor';
         this.searchListFirstTextLeft = '.search-list > :nth-child(1) > .text-left';
-        this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn-dropdown"]';
+        this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn"]';
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
         this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
@@ -286,6 +289,14 @@ export class LogsPage {
         this.patternLoadingSpinner = '.q-spinner-hourglass';
         this.patternLoadingText = 'text=Extracting patterns from logs...';
         this.patternEmptyState = 'text=No patterns found';
+
+        // ===== V0.40 REGRESSION TEST LOCATORS =====
+        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr';
+        this.tableRowExpandMenu = '[data-test="table-row-expand-menu"]';
+        this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
+        this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
+        this.searchResultText = '[data-test="logs-search-search-result"]';
+        this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
     }
 
 
@@ -1875,15 +1886,77 @@ export class LogsPage {
     }
 
     async clickSavedViewsButton() {
-        return await this.page.locator(this.savedViewsButton).click({ force: true });
+        // This method is used to create a new saved view
+        // It should open the utilities menu and click "Create Saved View"
+        // This is the same as clickSaveViewButton but without the dialog cleanup
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(300);
+        return await this.page.locator(this.createSavedViewButton).click();
     }
 
     async clickSavedViewsExpand() {
-        return await this.page.locator(this.savedViewsExpand).getByLabel('Expand').click();
+        // CRITICAL: This method is often called after applying a saved view
+        //
+        // Problem: When a saved view is applied via applySavedView():
+        // 1. The saved views dialog closes immediately (savedViewsListDialog = false)
+        // 2. applySavedView() fetches the saved view details from API (async)
+        // 3. It updates searchObj with the saved view's query/filters
+        // 4. This triggers a NEW SEARCH which updates the logs table
+        // 5. The search also updates searchObj.data.savedViews (the saved views list)
+        //
+        // If we try to reopen the saved views dialog while the search is still running:
+        // - The dialog's table will be re-rendering as data updates
+        // - The search input element becomes "unstable" (detached/recreated)
+        // - Test clicks fail with "element was detached from DOM"
+        //
+        // Solution: Wait for the search triggered by applySavedView to complete
+        // before opening the dialog again. This ensures the dialog opens with stable data.
+
+        try {
+            // Wait for any ongoing search to complete by checking for the logs table
+            // This indicates the search triggered by applySavedView has finished
+            // Note: We check for the table itself, not specific columns, since columns
+            // vary depending on the stream and saved view
+            const table = this.page.locator(this.logsTable);
+            await table.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {
+                // Ignore timeout - there might not be a search running
+                // (e.g., first time opening the dialog or no data)
+            });
+
+            // Extra wait for the search to fully settle and UI to update
+            // This gives time for:
+            // - All reactive updates to complete
+            // - The saved views list to reload if needed
+            // - Any watchers/computed properties to stabilize
+            await this.page.waitForTimeout(1000);
+        } catch (e) {
+            // Continue if no search results found
+            // This is expected on first load or when no data exists
+        }
+
+        // Now it's safe to open the saved views dialog
+        // Open the utilities menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        // Wait for menu animation to complete and be visible
+        await this.page.waitForTimeout(300);
+        // Click list saved views button to show the saved views panel
+        await this.page.locator(this.listSavedViewsButton).click();
+        // Wait for dialog to open, render, and stabilize
+        await this.page.waitForTimeout(500);
     }
 
     async clickSaveViewButton() {
-        return await this.page.locator(this.saveViewButton).filter({ hasText: 'savesaved_search' }).click();
+        // Close any open dialogs first (e.g., saved views list dialog)
+        const escapeKey = 'Escape';
+        await this.page.keyboard.press(escapeKey);
+        await this.page.waitForTimeout(200);
+
+        // Open the utilities menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(300);
+
+        // Click create saved view button
+        return await this.page.locator(this.createSavedViewButton).click();
     }
 
     async fillSavedViewName(name) {
@@ -1911,7 +1984,46 @@ export class LogsPage {
     }
 
     async clickSavedViewSearchInput() {
-        return await this.page.locator(this.savedViewSearchInput).click();
+        // This method clicks the search input inside the saved views dialog
+        //
+        // Why this needs special handling:
+        // The search input is inside a q-table's #top template slot. When the table's
+        // data updates (e.g., after applying a saved view), the entire #top template
+        // gets re-rendered, causing the input element to be detached and recreated.
+        //
+        // The problem was exacerbated by:
+        // 1. debounce="1" (now changed to 300) - caused rapid re-renders
+        // 2. Table data updating from ongoing searches
+        // 3. Invalid HTML structure (q-tr inside #top-right - now fixed)
+        //
+        // Even with those fixes, if a search just completed, the table might still
+        // be updating its pagination/data, making the input unstable for a brief moment.
+        //
+        // Solution: Multiple layers of waiting to ensure element stability
+
+        const searchInput = this.page.locator(this.savedViewSearchInput);
+
+        // Step 1: Wait for element to be visible in the DOM
+        // This ensures the dialog has opened and rendered
+        await searchInput.waitFor({ state: 'visible', timeout: 15000 });
+
+        // Step 2: Wait for any ongoing table re-renders to complete
+        // After applying a saved view and reopening the dialog:
+        // - The table might still be processing the new data
+        // - Pagination might be recalculating
+        // - Reactive dependencies might be updating
+        // This 1000ms wait gives time for all of that to settle
+        await this.page.waitForTimeout(1000);
+
+        // Step 3: Verify element is still attached to the DOM
+        // This catches cases where the element was recreated during the wait
+        await searchInput.waitFor({ state: 'attached', timeout: 5000 });
+
+        // Step 4: Click with force option
+        // force: true bypasses actionability checks (visible, stable, not obscured)
+        // This is safe here because we've already verified visibility and attachment
+        // It helps handle edge cases where another element might briefly overlap
+        return await searchInput.click({ force: true });
     }
 
     async fillSavedViewSearchInput(text) {
@@ -1964,23 +2076,32 @@ export class LogsPage {
 
     async clickDeleteSavedViewButton(savedViewName) {
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
-        
+
+        // Close any open saved views dialog from previous operations
+        const backdrop = this.page.locator('.q-dialog__backdrop');
+        const isBackdropVisible = await backdrop.isVisible().catch(() => false);
+        if (isBackdropVisible) {
+            await this.page.keyboard.press('Escape');
+            await this.waitForTimeout(500);
+            await backdrop.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
+        }
+
         // Wait for the saved views area to be stable after navigation
         await this.waitForTimeout(2000);
-        
+
         // Ensure saved views panel is expanded and wait for stability
         await this.clickSavedViewsExpand();
         await this.waitForTimeout(1000);
-        
+
         // Wait for the search input to be stable and ready
         await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'attached', timeout: 5000 });
         await this.waitForTimeout(500);
-        
+
         // Click and fill the search input with better error handling
         await this.page.locator(this.savedViewSearchInput).click({ force: true });
         await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
         await this.waitForTimeout(1500);
-        
+
         // Wait for and click the delete button
         await this.page.locator(deleteButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(deleteButtonSelector).click({ force: true });
@@ -1988,6 +2109,11 @@ export class LogsPage {
     }
 
     async clickResetFiltersButton() {
+        // First open the utilities menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        // Wait for menu to be visible
+        await this.page.waitForTimeout(300);
+        // Then click reset filters button
         return await this.page.locator(this.resetFiltersButton).click({ force: true });
     }
 
@@ -2903,11 +3029,19 @@ export class LogsPage {
     }
 
     async clickFunctionDropdownSave() {
+        // The save button is now a standalone button (not in dropdown)
+        // Try FunctionSelector button first, then TransformSelector button
         try {
-            await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click({ timeout: 3000 });
+            // Try FunctionSelector save button (when actions are disabled)
+            await this.page.locator('[data-test="logs-search-bar-save-function-btn"]').click({ timeout: 3000 });
         } catch (error) {
-            // If save button click fails, click the save transform button
-            await this.page.locator(this.logsSearchBarSaveTransformBtn).click();
+            try {
+                // Try TransformSelector save button (when actions are enabled)
+                await this.page.locator(this.logsSearchBarSaveTransformBtn).click({ timeout: 3000 });
+            } catch (transformError) {
+                // Fallback: Try old dropdown approach
+                await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click();
+            }
         }
     }
 
@@ -3739,6 +3873,22 @@ export class LogsPage {
 
     async getLogsTableRowCount() {
         return await this.page.locator(`${this.logsTable} tbody tr`).count();
+    }
+
+    /**
+     * Get log table row texts as an array (one string per row)
+     * @param {number} limit - Maximum number of rows to return
+     * @returns {Promise<string[]>} Array of row text content
+     */
+    async getLogsTableRowTexts(limit = 10) {
+        const rows = this.page.locator(`${this.logsTable} tbody tr`);
+        const count = Math.min(await rows.count(), limit);
+        const texts = [];
+        for (let i = 0; i < count; i++) {
+            const text = await rows.nth(i).textContent();
+            if (text) texts.push(text.trim());
+        }
+        return texts;
     }
 
     // ============================================================================
@@ -5225,15 +5375,6 @@ export class LogsPage {
         await this.page.waitForTimeout(500);
     }
 
-    /**
-     * Get logs table content as text
-     * @returns {Promise<string>} The table content text
-     */
-    async getLogsTableContent() {
-        const table = this.page.locator(this.logsTable);
-        return await table.textContent().catch(() => '');
-    }
-
     // ========== BUG REGRESSION TEST METHODS ==========
 
     /**
@@ -5448,24 +5589,27 @@ export class LogsPage {
     }
 
     /**
-     * Get the saved views button locator
-     * @returns {import('@playwright/test').Locator} Saved views button locator
+     * Get the saved views button locator (now utilities menu button)
+     * @returns {import('@playwright/test').Locator} Utilities menu button locator
      */
     getSavedViewsButtonLocator() {
-        return this.page.locator('[data-test="logs-search-saved-views-btn"]');
+        return this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
     }
 
     /**
-     * Click the saved views dropdown arrow to expand and show the list
-     * This opens the dropdown panel with search input
+     * Click the utilities menu button to show saved views
+     * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
-        const arrow = this.page.locator(this.savedViewArrow);
-        await arrow.waitFor({ state: 'visible', timeout: 10000 });
-        await arrow.click();
-        // Wait for dropdown panel to appear
+        const menuButton = this.page.locator(this.utilitiesMenuButton);
+        await menuButton.waitFor({ state: 'visible', timeout: 10000 });
+        await menuButton.click();
+        // Wait for menu to appear
+        await this.page.waitForTimeout(300);
+        // Click list saved views
+        await this.page.locator(this.listSavedViewsButton).click();
         await this.page.waitForTimeout(500);
-        testLogger.info('Clicked saved views dropdown arrow');
+        testLogger.info('Opened utilities menu and clicked List Saved Views');
     }
 
     /**
@@ -6387,5 +6531,159 @@ export class LogsPage {
             testLogger.info(`Chart type detected via fallback: ${fallback}`);
         }
         return fallback;
+    }
+
+    // ============================================================================
+    // V0.40 REGRESSION TEST METHODS
+    // VRL fields, Query Inspector, Sorting, and Highlight tests
+    // ============================================================================
+
+    /**
+     * Get the logs table element
+     * @returns {Locator} - The logs table locator
+     */
+    getLogsTable() {
+        return this.page.locator(this.logsSearchResultLogsTable);
+    }
+
+    /**
+     * Wait for logs table to be visible
+     * @param {number} timeout - Timeout in milliseconds
+     */
+    async waitForLogsTable(timeout = 30000) {
+        await this.page.locator(this.logsSearchResultLogsTable).waitFor({ state: 'visible', timeout });
+        testLogger.info('Logs table is visible');
+    }
+
+    /**
+     * Get the count of log rows in the table
+     * @returns {Promise<number>} - Number of log rows
+     */
+    async getLogRowCount() {
+        const rows = this.page.locator(this.logsSearchResultTableRows);
+        const count = await rows.count();
+        testLogger.info(`Log row count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get all log rows as locators
+     * @returns {Locator} - All log row locators
+     */
+    getLogRows() {
+        return this.page.locator(this.logsSearchResultTableRows);
+    }
+
+    /**
+     * Click the first expand menu in the logs table
+     */
+    async clickFirstExpandMenu() {
+        const expandMenus = this.page.locator(this.tableRowExpandMenu);
+        await expandMenus.first().click();
+        testLogger.info('Clicked first expand menu');
+    }
+
+    /**
+     * Click the last expand menu in the logs table
+     */
+    async clickLastExpandMenu() {
+        const expandMenus = this.page.locator(this.tableRowExpandMenu);
+        await expandMenus.last().click();
+        testLogger.info('Clicked last expand menu');
+    }
+
+    /**
+     * Check if the first expand menu is visible
+     * @returns {Promise<boolean>} - Whether the first expand menu is visible
+     */
+    async isFirstExpandMenuVisible() {
+        const expandMenus = this.page.locator(this.tableRowExpandMenu);
+        const count = await expandMenus.count();
+        return count > 0;
+    }
+
+    /**
+     * Get timestamp cell values from the logs table
+     * @param {number} limit - Maximum number of timestamps to return
+     * @returns {Promise<string[]>} - Array of timestamp values
+     */
+    async getTimestampCellValues(limit = 5) {
+        const cells = this.page.locator(this.timestampCells);
+        const count = Math.min(await cells.count(), limit);
+        const values = [];
+        for (let i = 0; i < count; i++) {
+            let text = await cells.nth(i).textContent();
+            text = text?.trim() || '';
+            // Strip expand button icon text that appears before the timestamp
+            // The cell contains both the expand icon ("chevron_right" or "expand_more") and the timestamp
+            text = text.replace(/^(chevron_right|expand_more|chevron_left|expand_less)/, '').trim();
+            values.push(text);
+        }
+        testLogger.info(`Got ${values.length} timestamp values`);
+        return values;
+    }
+
+    /**
+     * Get count of timestamp cells in the logs table
+     * @returns {Promise<number>} - Count of timestamp cells
+     */
+    async getTimestampCellCount() {
+        const count = await this.page.locator(this.timestampCells).count();
+        testLogger.info(`Timestamp cell count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get search result text
+     * @returns {Promise<string>} - Search result text
+     */
+    async getSearchResultText() {
+        const text = await this.page.locator(this.searchResultText).textContent().catch(() => '');
+        testLogger.info(`Search result text: ${text?.substring(0, 50)}`);
+        return text;
+    }
+
+    /**
+     * Press Escape key to close any open dialog
+     */
+    async pressEscapeToCloseDialog() {
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
+        testLogger.info('Pressed Escape to close dialog');
+    }
+
+    /**
+     * Get the last row in the logs table
+     * @returns {Locator} - The last row locator
+     */
+    getLastRow() {
+        return this.page.locator(this.logsSearchResultTableRows).last();
+    }
+
+    /**
+     * Get the first row expand menu
+     * @returns {Locator} - The first expand menu locator
+     */
+    getFirstRowExpandMenu() {
+        return this.page.locator(this.tableRowExpandMenu).first();
+    }
+
+    /**
+     * Check if log detail panel is visible
+     * @returns {Promise<boolean>} - Whether panel is visible
+     */
+    async isLogDetailPanelVisible() {
+        const visible = await this.page.locator(this.logDetailPanel).isVisible().catch(() => false);
+        testLogger.info(`Log detail panel visible: ${visible}`);
+        return visible;
+    }
+
+    /**
+     * Assert that a locator is visible
+     * @param {Locator} locator - The locator to check
+     */
+    async expectVisible(locator) {
+        await expect(locator).toBeVisible();
+        testLogger.info('Element is visible');
     }
 }
