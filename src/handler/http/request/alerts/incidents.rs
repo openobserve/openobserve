@@ -287,7 +287,7 @@ pub async fn trigger_incident_rca(
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
 
-    if o2_config.incidents.rca_agent_url.is_empty() {
+    if o2_config.ai.agent_url.is_empty() {
         return HttpResponse::ServiceUnavailable()
             .json(serde_json::json!({"error": "RCA agent URL is not configured"}));
     }
@@ -311,7 +311,7 @@ pub async fn trigger_incident_rca(
     // Create RCA agent client
     let zo_config = config::get_config();
     let client = match RcaAgentClient::new(
-        &o2_config.incidents.rca_agent_url,
+        &o2_config.ai.agent_url,
         &zo_config.auth.root_user_email,
         &zo_config.auth.root_user_password,
     ) {

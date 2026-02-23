@@ -99,14 +99,14 @@ pub async fn agent_chat(
         let o2_config = get_o2_config();
 
         // Check if agent is enabled
-        if !o2_config.incidents.rca_enabled || o2_config.incidents.rca_agent_url.is_empty() {
+        if !o2_config.incidents.rca_enabled || o2_config.ai.agent_url.is_empty() {
             return Ok(MetaHttpResponse::bad_request("Agent chat not enabled"));
         }
 
         // Create agent client
         let zo_config = get_config();
         let client = match RcaAgentClient::new(
-            &o2_config.incidents.rca_agent_url,
+            &o2_config.ai.agent_url,
             &zo_config.auth.root_user_email,
             &zo_config.auth.root_user_password,
         ) {
