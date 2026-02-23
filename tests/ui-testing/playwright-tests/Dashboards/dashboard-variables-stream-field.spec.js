@@ -406,6 +406,7 @@ test.describe(
     test("cross-source cycles: multi-variable chain and edit-introduced cycle", async ({
       page,
     }) => {
+      test.slow(); // Triple timeout — this test creates 7 variables and performs multiple edit cycles
       const pm = new PageManager(page);
       const scopedVars = new DashboardVariablesScoped(page);
       const dashboardName = `Dash_F_${Date.now()}`;
@@ -479,7 +480,10 @@ test.describe(
 
       // Cancel the edit form, go back to variable list
       await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
-      await page.waitForTimeout(500);
+      await safeWaitForNetworkIdle(page, { timeout: 5000 });
+      await page
+        .locator(SELECTORS.ADD_VARIABLE_BTN)
+        .waitFor({ state: "visible", timeout: 10000 });
 
       // --- F2: Edit env to introduce cycle in env→region→pod chain ---
       // Change env from Constant to Query Values with stream=$pod
@@ -495,7 +499,7 @@ test.describe(
 
       // Cancel the edit form before cleanup
       await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
-      await page.waitForTimeout(500);
+      await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -523,6 +527,7 @@ test.describe(
     test("runtime cascade: parent changes reload children via stream and field dependencies", async ({
       page,
     }) => {
+      test.slow(); // Triple timeout — this test creates 5 variables and monitors cascade API calls
       const pm = new PageManager(page);
       const scopedVars = new DashboardVariablesScoped(page);
       const dashboardName = `Dash_G_${Date.now()}`;
@@ -574,10 +579,10 @@ test.describe(
 
       await pm.dashboardSetting.closeSettingWindow();
       await safeWaitForHidden(page, ".q-dialog", { timeout: 10000 });
-      await safeWaitForNetworkIdle(page, { timeout: 10000 });
+      await safeWaitForNetworkIdle(page, { timeout: 15000 });
 
       // Extra wait for dashboard to stabilize in CI/CD environments
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
 
       // Wait for all variables to be visible on dashboard with increased timeout 
       await scopedVars.waitForVariableSelectorVisible("streamName", { timeout: 40000 });
@@ -603,15 +608,15 @@ test.describe(
           call.url.includes("/_values_stream") &&
           (call.url.includes("/default/_values_stream") || call.stream === "default"),
       });
-      await scopedVars.changeVariableValue("streamName", { optionIndex: 1, timeout: 15000 });
+      await scopedVars.changeVariableValue("streamName", { optionIndex: 1, timeout: 20000 });
       const streamResult = await streamMonitor;
 
       expect(streamResult.matchedCount).toBeGreaterThanOrEqual(1);
 
       // Wait for all G1 cascade responses to settle before starting G2 monitor
-      // Increased wait times  environments
-      await safeWaitForNetworkIdle(page, { timeout: 10000 });
-      await page.waitForTimeout(3000);
+      // Increased wait times for CI/CD environments under heavy load
+      await safeWaitForNetworkIdle(page, { timeout: 15000 });
+      await page.waitForTimeout(5000);
 
       // --- G2: Change fieldName from "kubernetes_namespace_name" to "kubernetes_container_name" ---
       // fieldChild has stream=e2e_automate (fixed), field=$fieldName.
@@ -627,7 +632,7 @@ test.describe(
             call.url.includes("kubernetes_container_name") ||
             (call.field && call.field.includes("kubernetes_container_name"))),
       });
-      await scopedVars.changeVariableValue("fieldName", { optionIndex: 1, timeout: 15000 });
+      await scopedVars.changeVariableValue("fieldName", { optionIndex: 1, timeout: 20000 });
       const fieldResult = await fieldMonitor;
 
       expect(fieldResult.matchedCount).toBeGreaterThanOrEqual(1);
