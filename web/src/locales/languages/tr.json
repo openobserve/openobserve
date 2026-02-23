@@ -309,7 +309,10 @@
     "show": "Göster",
     "editor": "Editör",
     "webUrlNotConfigured": "Paylaş URL, ZO_WEB_URL yöneticiniz tarafından yapılandırılana kadar devre dışı bırakılır.",
-    "showHideColumns": "Sütunları Göster/Gizle"
+    "showHideColumns": "Sütunları Göster/Gizle",
+    "autoRefresh": "Otomatik Yenileme",
+    "createSavedView": "Kayıtlı Görünüm Oluştur",
+    "listSavedViews": "Kayıtlı Görünümleri Listele"
   },
   "menu": {
     "home": "Ana Sayfa",

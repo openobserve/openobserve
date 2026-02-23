@@ -571,6 +571,7 @@ pub fn service_routes() -> Router {
 
         // Traces
         .route("/{org_id}/{stream_name}/traces/latest", get(traces::get_latest_traces))
+        .route("/{org_id}/{stream_name}/traces/latest_stream", get(traces::get_latest_traces_stream))
         .route("/{org_id}/{stream_name}/traces/session", get(traces::session::get_latest_sessions))
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))

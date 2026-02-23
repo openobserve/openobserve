@@ -8,6 +8,7 @@ export class LogsQueryPage {
     this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block';
     this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
     this.errorMessage = '[data-test="logs-search-error-message"]';
+    this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
     this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
     this.noDataFoundText = 'warning No data found for';
     this.resultDetail = '[data-test="logs-search-result-detail-undefined"]';
@@ -36,6 +37,9 @@ export class LogsQueryPage {
   }
 
   async clickResetFilters() {
+    // Reset filters button is now inside utilities menu
+    await this.page.locator(this.utilitiesMenuButton).click();
+    await this.page.waitForTimeout(300);
     await this.page.locator(this.resetFiltersButton).click();
   }
 
