@@ -703,11 +703,8 @@ export default defineComponent({
           action_id = searchObj.data.selectedTransform.id;
         }
 
-        fieldValues.value[name] = {
-          isLoading: true,
-          values: [],
-          errMsg: "",
-        };
+        resetFieldValues(name, true);
+
         if (whereClause.trim() != "") {
           // validateFilterForMultiStream function called to get missingStreamMultiStreamFilter
           const validationFlag = validateFilterForMultiStream();
@@ -1092,6 +1089,15 @@ export default defineComponent({
     // ----- WebSocket Implementation -----
 
     const fetchValuesWithWebsocket = (payload: any) => {
+      const fieldName = payload.fields[0];
+      const streamName = payload.stream_name;
+
+      // Pre-allocate the stream slot so handleSearchResponse can write directly
+      // to .values without a null check. The field-level object is guaranteed
+      // to exist because resetFieldValues always runs before this function.
+      if (fieldName && streamName && streamFieldValues.value[fieldName])
+        streamFieldValues.value[fieldName][streamName] = { values: [] };
+
       const wsPayload = {
         queryReq: payload,
         type: "values",
@@ -1205,9 +1211,10 @@ export default defineComponent({
           streamFieldValues.value[fieldName] = {};
         }
 
-        streamFieldValues.value[fieldName][streamName] = {
-          values: [],
-        };
+        if (!streamFieldValues.value[fieldName][streamName])
+          streamFieldValues.value[fieldName][streamName] = {
+            values: [],
+          };
 
         // Process the results
         if (response.content.results.hits.length) {
@@ -1264,20 +1271,26 @@ export default defineComponent({
       }
     };
 
-    const handleSearchReset = (data: any) => {
-      const fieldName = data.payload.queryReq.fields[0];
-
+    const resetFieldValues = (
+      fieldName: string,
+      isLoading: boolean = false,
+    ) => {
       // Reset the main fieldValues state
       fieldValues.value[fieldName] = {
         values: [],
-        isLoading: true,
+        isLoading,
         errMsg: "",
       };
 
       // Reset the streamFieldValues state for this field
-      if (streamFieldValues.value[fieldName]) {
-        streamFieldValues.value[fieldName] = {};
-      }
+      streamFieldValues.value[fieldName] = {};
+    };
+
+    const handleSearchReset = (data: any) => {
+      const fieldName = data.payload.queryReq.fields[0];
+
+      resetFieldValues(fieldName, true);
+      traceIdMapper.value[fieldName] = [];
 
       fetchValuesWithWebsocket(data.payload.queryReq);
     };
