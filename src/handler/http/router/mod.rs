@@ -972,22 +972,36 @@ pub fn create_app_router() -> Router {
         Router::new().merge(basic_routes()).merge(router_routes)
     } else {
         // Non-router node: use direct service routes
-        Router::new()
+        let router_routes = Router::new()
             .merge(basic_routes())
             .nest("/config", config_routes())
             .nest("/api", service_routes())
             .merge(other_service_routes())
-            .merge(proxy_routes(true))
+            .merge(proxy_routes(true));
+
+        if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
+            router_routes
+        } else {
+            Router::new().nest(&cfg.common.base_uri, router_routes)
+        }
     };
 
     // Add UI routes at app level (outside basic_routes to avoid any middleware conflicts)
     if cfg.common.ui_enabled {
+        let base_uri = cfg.common.base_uri.trim_matches('/');
+        let web_path = if base_uri.is_empty() {
+            "/web/".to_string()
+        } else {
+            format!("/{}/web/", base_uri).into()
+        };
+        let web_path_clone = web_path.clone();
+
         app = app
             .route(
                 "/",
-                get(|| async { axum::response::Redirect::permanent("/web/") }),
+                get(move || core::future::ready(axum::response::Redirect::permanent(&web_path))),
             )
-            .nest_service("/web", ui::ui_routes());
+            .nest_service(&web_path_clone, ui::ui_routes());
     }
 
     // Set request body size limit (equivalent to actix-web's PayloadConfig)
