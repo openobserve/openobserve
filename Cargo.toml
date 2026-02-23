@@ -26,6 +26,7 @@ default = []
 enterprise = []
 vectorscan = []
 cloud = []
+vortex = ["config/vortex"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [
