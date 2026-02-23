@@ -414,7 +414,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
       const response = await organizationService.get_organization_summary(
         store.state.selectedOrganization.identifier,
       );
-      if (!response.data.streams.num_streams) {
+      if (!response.data?.streams?.num_streams) {
         store.dispatch("setIsDataIngested", false);
         next({ path: "/ingestion" });
       } else {
