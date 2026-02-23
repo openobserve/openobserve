@@ -21,6 +21,8 @@ test.describe("Logs Regression Bug Fixes", () => {
   // Changed from serial to parallel - tests are independent (each gets own page/PM in beforeEach)
   test.describe.configure({ mode: 'parallel' });
   let pm;
+  // Stream names for field cache test - declared at describe scope for afterEach cleanup
+  let fieldCacheStreamsToCleanup = [];
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -351,7 +353,138 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('✓ PASSED: Error message correctly identifies problematic field');
   });
 
+  // ==========================================================================
+  // Field Values Cache Bug: Field values not refreshed when switching streams
+  // When switching between streams with same field name, values should refresh
+  // Bug: UI displays cached values from previous stream instead of fetching new values
+  // ==========================================================================
+  test("should fetch fresh field values when switching streams @fieldValuesCache @P1 @regression", async ({ page }) => {
+    testLogger.info('Test: Field values should refresh when switching between streams');
+
+    const stream1Name = 'e2e_field_cache_stream1';
+    const stream2Name = 'e2e_field_cache_stream2';
+    // Register streams for cleanup in afterEach
+    fieldCacheStreamsToCleanup = [stream1Name, stream2Name];
+    const testFieldName = 'service_name';
+    const stream1Value = 'service-from-stream1-unique';
+    const stream2Value = 'service-from-stream2-unique';
+
+    // Step 1: Ingest data into stream1 with unique service_name value
+    testLogger.info(`Ingesting data into ${stream1Name} with ${testFieldName}=${stream1Value}`);
+    const timestamp1 = Date.now() * 1000;
+    await pm.logsPage.ingestData(stream1Name, [
+      { [testFieldName]: stream1Value, level: 'info', message: 'Test log stream1', _timestamp: timestamp1 },
+      { [testFieldName]: stream1Value, level: 'info', message: 'Test log stream1 2', _timestamp: timestamp1 + 1000000 },
+    ]);
+
+    // Step 2: Ingest data into stream2 with different unique service_name value
+    // Use offset from timestamp1 to guarantee uniqueness
+    testLogger.info(`Ingesting data into ${stream2Name} with ${testFieldName}=${stream2Value}`);
+    const timestamp2 = timestamp1 + 2000000;
+    await pm.logsPage.ingestData(stream2Name, [
+      { [testFieldName]: stream2Value, level: 'info', message: 'Test log stream2', _timestamp: timestamp2 },
+      { [testFieldName]: stream2Value, level: 'info', message: 'Test log stream2 2', _timestamp: timestamp2 + 1000000 },
+    ]);
+
+    // Step 3: Navigate to logs and select stream1
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await pm.logsPage.selectStream(stream1Name);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Set time range and run query
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
+
+    // Wait for search API response after clicking refresh
+    const searchResponsePromise1 = page.waitForResponse(
+      response => response.url().includes('/_search') && response.status() === 200,
+      { timeout: 30000 }
+    );
+    await pm.logsPage.clickRefreshButton();
+    await searchResponsePromise1;
+
+    // Step 4: Expand the service_name field and capture values from stream1
+    testLogger.info(`Expanding ${testFieldName} field in ${stream1Name}`);
+    await pm.logsPage.fillIndexFieldSearchInput(testFieldName);
+    await pm.logsPage.waitForFieldExpandButtonVisible(testFieldName);
+
+    // Wait for field values API response after expanding
+    const valuesResponsePromise1 = page.waitForResponse(
+      response => response.url().includes('/_values') && response.status() === 200,
+      { timeout: 20000 }
+    );
+    await pm.logsPage.clickFieldExpandButton(testFieldName);
+    await valuesResponsePromise1;
+    await pm.logsPage.waitForFieldValues(testFieldName);
+
+    // Get field values from stream1
+    const stream1FieldValues = await pm.logsPage.getFieldValuesText(testFieldName);
+    testLogger.info(`Stream1 field values: ${JSON.stringify(stream1FieldValues)}`);
+
+    // Verify stream1 values contain our unique value (may have count suffix in UI)
+    const hasStream1Value = stream1FieldValues.some(v => v.startsWith(stream1Value));
+    expect(hasStream1Value, `Expected stream1 values to contain ${stream1Value}, got: ${stream1FieldValues}`).toBeTruthy();
+    testLogger.info(`✓ Stream1 shows correct value: ${stream1Value}`);
+
+    // Collapse the field
+    await pm.logsPage.collapseField(testFieldName);
+
+    // Step 5: Switch to stream2 WITHOUT refreshing the page
+    testLogger.info(`Switching to ${stream2Name} without page refresh`);
+    await pm.logsPage.selectStream(stream2Name);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Run query for stream2 and wait for search API response
+    const searchResponsePromise2 = page.waitForResponse(
+      response => response.url().includes('/_search') && response.status() === 200,
+      { timeout: 30000 }
+    );
+    await pm.logsPage.clickRefreshButton();
+    await searchResponsePromise2;
+
+    // Step 6: Expand the same service_name field in stream2
+    testLogger.info(`Expanding ${testFieldName} field in ${stream2Name}`);
+    await pm.logsPage.fillIndexFieldSearchInput(testFieldName);
+    await pm.logsPage.waitForFieldExpandButtonVisible(testFieldName);
+
+    // Wait for field values API response after expanding
+    const valuesResponsePromise2 = page.waitForResponse(
+      response => response.url().includes('/_values') && response.status() === 200,
+      { timeout: 20000 }
+    );
+    await pm.logsPage.clickFieldExpandButton(testFieldName);
+    await valuesResponsePromise2;
+    await pm.logsPage.waitForFieldValues(testFieldName);
+
+    // Get field values from stream2
+    const stream2FieldValues = await pm.logsPage.getFieldValuesText(testFieldName);
+    testLogger.info(`Stream2 field values: ${JSON.stringify(stream2FieldValues)}`);
+
+    // PRIMARY ASSERTION: Stream2 values should contain stream2 unique value (may have count suffix)
+    const hasStream2Value = stream2FieldValues.some(v => v.startsWith(stream2Value));
+    expect(hasStream2Value, `Expected stream2 values to contain ${stream2Value}, got: ${stream2FieldValues}`).toBeTruthy();
+    testLogger.info(`✓ Stream2 shows correct value: ${stream2Value}`);
+
+    // SECONDARY ASSERTION: Stream2 values should NOT contain stream1 cached values
+    const hasCachedStream1Value = stream2FieldValues.some(v => v.startsWith(stream1Value));
+    expect(hasCachedStream1Value, `Stream2 should not have stream1 cached values, got: ${stream2FieldValues}`).toBeFalsy();
+    testLogger.info('✓ Stream2 does NOT show cached values from stream1');
+
+    testLogger.info('✓ PASSED: Field values correctly refresh when switching streams (no caching issue)');
+  });
+
   test.afterEach(async () => {
+    // Cleanup streams created by field cache test
+    if (fieldCacheStreamsToCleanup.length > 0 && pm) {
+      testLogger.info('Cleaning up test streams');
+      for (const streamName of fieldCacheStreamsToCleanup) {
+        await pm.logsPage.deleteStream(streamName).catch(e =>
+          testLogger.warn(`Failed to delete ${streamName}: ${e.message}`)
+        );
+      }
+      fieldCacheStreamsToCleanup = [];
+      testLogger.info('Test stream cleanup completed');
+    }
     testLogger.info('Logs regression bug test completed');
   });
 });
