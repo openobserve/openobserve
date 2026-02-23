@@ -17,7 +17,7 @@ export default class DashboardTimeRefresh {
     this.applyBtn = page.locator('[data-test="date-time-apply-btn"]');
     this.selectTime = page.locator('[data-test="date-time-relative-10-m-btn"]');
     this.refreshBtnManual = page.locator(
-      '[data-test="logs-search-bar-refresh-interval-btn-dropdown"]'
+      '[data-test="logs-search-bar-refresh-interval-btn"]'
     );
     this.offBtn = page.locator(
       '[data-test="logs-search-off-refresh-interval"]'

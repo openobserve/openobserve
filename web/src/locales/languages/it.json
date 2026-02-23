@@ -232,8 +232,10 @@
     "patternColumnHeader": "Motivo",
     "occurrenceColumnHeader": "Evento",
     "percentageColumnHeader": "Percentuale",
+    "anomalyColumnHeader": "Anomalia",
     "actionsColumnHeader": "Azioni",
     "anomalyLabel": "ANOMALIA",
+    "anomalyDetected": "Anomalia rilevata",
     "includePatternInSearch": "Includi modello nella ricerca",
     "excludePatternFromSearch": "Escludi il pattern dalla ricerca",
     "showPatternDetails": "Mostra dettagli ({variabili}, {esempi} esempi)",
@@ -307,7 +309,10 @@
     "show": "Mostra",
     "editor": "Redattore",
     "webUrlNotConfigured": "L'URL di condivisione è disabilitato finché ZO_WEB_URL non viene configurato dall'amministratore.",
-    "showHideColumns": "Mostra/nascondi colonne"
+    "showHideColumns": "Mostra/nascondi colonne",
+    "autoRefresh": "Aggiornamento automatico",
+    "createSavedView": "Crea visualizzazione salvata",
+    "listSavedViews": "Elenca visualizzazioni salvate"
   },
   "menu": {
     "home": "Home",
@@ -2036,7 +2041,10 @@
     "customWebhook": "Personalizzato (Webhook)",
     "customEmail": "Personalizzato (email)",
     "customAction": "Personalizzato (azione)",
-    "custom": "Personalizzato"
+    "custom": "Personalizzato",
+    "separator": "Separatore",
+    "separator_placeholder": "Inserisci un separatore (ad esempio, |,\\n,\\ t, spazio)",
+    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)"
   },
   "metrics": {
     "searchMetric": "Cerca una metrica",

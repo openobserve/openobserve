@@ -59,18 +59,21 @@ export class LogsPage {
         this.endTimeInput = '[data-test="end-time-input"]';
         this.showQueryToggle = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.fieldListCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
-        this.savedViewsButton = '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown--current > .q-btn__content > :nth-child(1)';
-        this.savedViewsExpand = '[data-test="logs-search-saved-views-btn"]';
+        this.savedViewsButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
+        this.savedViewsExpand = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.saveViewButton = 'button'; // filter by text in method
         this.savedViewNameInput = '[data-test="add-alert-name-input"]';
         this.savedViewDialogSave = '[data-test="saved-view-dialog-save-btn"]';
-        this.savedViewArrow = '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon';
+        this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
         this.confirmButton = '[data-test="confirm-button"]';
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
         this.searchStreamInput = '[placeholder="Search Stream"]';
         this.exploreButtonRole = { role: 'button', name: 'Explore' };
+        this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
+        this.listSavedViewsButton = '[data-test="logs-search-bar-list-saved-views-btn"]';
+        this.createSavedViewButton = '[data-test="logs-search-bar-create-saved-view-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
         this.closeDialog = '[data-test="close-dialog"] > .q-btn__content';
@@ -107,7 +110,7 @@ export class LogsPage {
         // Additional locators
         this.fnEditor = '#fnEditor';
         this.searchListFirstTextLeft = '.search-list > :nth-child(1) > .text-left';
-        this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn-dropdown"]';
+        this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn"]';
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
         this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
@@ -174,6 +177,18 @@ export class LogsPage {
         // Correlation loading and error states
         this.correlationLoadingSpinner = '.q-spinner-hourglass';
         this.correlationErrorMessage = '.tw\\:text-red-500';
+
+        // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
+        this.logsAnalyzeDimensionsButton = '[data-test="logs-analyze-dimensions-button"]';
+        this.analysisDashboardClose = '[data-test="analysis-dashboard-close"]';
+        // Dimension sidebar (visible by default in analysis dashboard, not a dialog)
+        this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
+        this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
+        this.dimensionSearchInput = '[data-test="dimension-search-input"]';
+        this.analysisDashboardCard = '.analysis-dashboard-card';
+        // Analysis dashboard states
+        this.analysisDashboardLoading = '.analysis-dashboard-card .q-spinner, .analysis-dashboard-card .q-spinner-hourglass';
+        this.analysisDashboardError = '.analysis-dashboard-card .q-banner--top-padding';
 
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
@@ -1769,15 +1784,77 @@ export class LogsPage {
     }
 
     async clickSavedViewsButton() {
-        return await this.page.locator(this.savedViewsButton).click({ force: true });
+        // This method is used to create a new saved view
+        // It should open the utilities menu and click "Create Saved View"
+        // This is the same as clickSaveViewButton but without the dialog cleanup
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(300);
+        return await this.page.locator(this.createSavedViewButton).click();
     }
 
     async clickSavedViewsExpand() {
-        return await this.page.locator(this.savedViewsExpand).getByLabel('Expand').click();
+        // CRITICAL: This method is often called after applying a saved view
+        //
+        // Problem: When a saved view is applied via applySavedView():
+        // 1. The saved views dialog closes immediately (savedViewsListDialog = false)
+        // 2. applySavedView() fetches the saved view details from API (async)
+        // 3. It updates searchObj with the saved view's query/filters
+        // 4. This triggers a NEW SEARCH which updates the logs table
+        // 5. The search also updates searchObj.data.savedViews (the saved views list)
+        //
+        // If we try to reopen the saved views dialog while the search is still running:
+        // - The dialog's table will be re-rendering as data updates
+        // - The search input element becomes "unstable" (detached/recreated)
+        // - Test clicks fail with "element was detached from DOM"
+        //
+        // Solution: Wait for the search triggered by applySavedView to complete
+        // before opening the dialog again. This ensures the dialog opens with stable data.
+
+        try {
+            // Wait for any ongoing search to complete by checking for the logs table
+            // This indicates the search triggered by applySavedView has finished
+            // Note: We check for the table itself, not specific columns, since columns
+            // vary depending on the stream and saved view
+            const table = this.page.locator(this.logsTable);
+            await table.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {
+                // Ignore timeout - there might not be a search running
+                // (e.g., first time opening the dialog or no data)
+            });
+
+            // Extra wait for the search to fully settle and UI to update
+            // This gives time for:
+            // - All reactive updates to complete
+            // - The saved views list to reload if needed
+            // - Any watchers/computed properties to stabilize
+            await this.page.waitForTimeout(1000);
+        } catch (e) {
+            // Continue if no search results found
+            // This is expected on first load or when no data exists
+        }
+
+        // Now it's safe to open the saved views dialog
+        // Open the utilities menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        // Wait for menu animation to complete and be visible
+        await this.page.waitForTimeout(300);
+        // Click list saved views button to show the saved views panel
+        await this.page.locator(this.listSavedViewsButton).click();
+        // Wait for dialog to open, render, and stabilize
+        await this.page.waitForTimeout(500);
     }
 
     async clickSaveViewButton() {
-        return await this.page.locator(this.saveViewButton).filter({ hasText: 'savesaved_search' }).click();
+        // Close any open dialogs first (e.g., saved views list dialog)
+        const escapeKey = 'Escape';
+        await this.page.keyboard.press(escapeKey);
+        await this.page.waitForTimeout(200);
+
+        // Open the utilities menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(300);
+
+        // Click create saved view button
+        return await this.page.locator(this.createSavedViewButton).click();
     }
 
     async fillSavedViewName(name) {
@@ -1805,7 +1882,46 @@ export class LogsPage {
     }
 
     async clickSavedViewSearchInput() {
-        return await this.page.locator(this.savedViewSearchInput).click();
+        // This method clicks the search input inside the saved views dialog
+        //
+        // Why this needs special handling:
+        // The search input is inside a q-table's #top template slot. When the table's
+        // data updates (e.g., after applying a saved view), the entire #top template
+        // gets re-rendered, causing the input element to be detached and recreated.
+        //
+        // The problem was exacerbated by:
+        // 1. debounce="1" (now changed to 300) - caused rapid re-renders
+        // 2. Table data updating from ongoing searches
+        // 3. Invalid HTML structure (q-tr inside #top-right - now fixed)
+        //
+        // Even with those fixes, if a search just completed, the table might still
+        // be updating its pagination/data, making the input unstable for a brief moment.
+        //
+        // Solution: Multiple layers of waiting to ensure element stability
+
+        const searchInput = this.page.locator(this.savedViewSearchInput);
+
+        // Step 1: Wait for element to be visible in the DOM
+        // This ensures the dialog has opened and rendered
+        await searchInput.waitFor({ state: 'visible', timeout: 15000 });
+
+        // Step 2: Wait for any ongoing table re-renders to complete
+        // After applying a saved view and reopening the dialog:
+        // - The table might still be processing the new data
+        // - Pagination might be recalculating
+        // - Reactive dependencies might be updating
+        // This 1000ms wait gives time for all of that to settle
+        await this.page.waitForTimeout(1000);
+
+        // Step 3: Verify element is still attached to the DOM
+        // This catches cases where the element was recreated during the wait
+        await searchInput.waitFor({ state: 'attached', timeout: 5000 });
+
+        // Step 4: Click with force option
+        // force: true bypasses actionability checks (visible, stable, not obscured)
+        // This is safe here because we've already verified visibility and attachment
+        // It helps handle edge cases where another element might briefly overlap
+        return await searchInput.click({ force: true });
     }
 
     async fillSavedViewSearchInput(text) {
@@ -1858,23 +1974,32 @@ export class LogsPage {
 
     async clickDeleteSavedViewButton(savedViewName) {
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
-        
+
+        // Close any open saved views dialog from previous operations
+        const backdrop = this.page.locator('.q-dialog__backdrop');
+        const isBackdropVisible = await backdrop.isVisible().catch(() => false);
+        if (isBackdropVisible) {
+            await this.page.keyboard.press('Escape');
+            await this.waitForTimeout(500);
+            await backdrop.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
+        }
+
         // Wait for the saved views area to be stable after navigation
         await this.waitForTimeout(2000);
-        
+
         // Ensure saved views panel is expanded and wait for stability
         await this.clickSavedViewsExpand();
         await this.waitForTimeout(1000);
-        
+
         // Wait for the search input to be stable and ready
         await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'attached', timeout: 5000 });
         await this.waitForTimeout(500);
-        
+
         // Click and fill the search input with better error handling
         await this.page.locator(this.savedViewSearchInput).click({ force: true });
         await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
         await this.waitForTimeout(1500);
-        
+
         // Wait for and click the delete button
         await this.page.locator(deleteButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(deleteButtonSelector).click({ force: true });
@@ -1882,6 +2007,11 @@ export class LogsPage {
     }
 
     async clickResetFiltersButton() {
+        // First open the utilities menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        // Wait for menu to be visible
+        await this.page.waitForTimeout(300);
+        // Then click reset filters button
         return await this.page.locator(this.resetFiltersButton).click({ force: true });
     }
 
@@ -2230,6 +2360,36 @@ export class LogsPage {
 
     async expectErrorMessageVisible() {
         return await expect(this.page.locator(this.errorMessage)).toBeVisible();
+    }
+
+    /**
+     * Get the detailed error dialog text
+     * Clicks on error details button if available and returns the error message text
+     * @returns {Promise<string>} The error dialog text
+     */
+    async getDetailedErrorDialogText() {
+        // Try to click the error details button if visible
+        const detailsBtn = this.page.locator(this.resultErrorDetailsBtn);
+        if (await detailsBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await detailsBtn.click();
+            await this.page.waitForTimeout(500);
+        }
+
+        // Try to get text from detailed error message first
+        const detailedError = this.page.locator(this.searchDetailErrorMessage);
+        if (await detailedError.isVisible({ timeout: 2000 }).catch(() => false)) {
+            return await detailedError.textContent();
+        }
+
+        // Fall back to the main error message
+        const errorMsg = this.page.locator(this.errorMessage);
+        if (await errorMsg.isVisible({ timeout: 2000 }).catch(() => false)) {
+            return await errorMsg.textContent();
+        }
+
+        // Return empty string if no error message found
+        testLogger.warn('No error message found');
+        return '';
     }
 
     async expectWarningElementHidden() {
@@ -2767,11 +2927,19 @@ export class LogsPage {
     }
 
     async clickFunctionDropdownSave() {
+        // The save button is now a standalone button (not in dropdown)
+        // Try FunctionSelector button first, then TransformSelector button
         try {
-            await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click({ timeout: 3000 });
+            // Try FunctionSelector save button (when actions are disabled)
+            await this.page.locator('[data-test="logs-search-bar-save-function-btn"]').click({ timeout: 3000 });
         } catch (error) {
-            // If save button click fails, click the save transform button
-            await this.page.locator(this.logsSearchBarSaveTransformBtn).click();
+            try {
+                // Try TransformSelector save button (when actions are enabled)
+                await this.page.locator(this.logsSearchBarSaveTransformBtn).click({ timeout: 3000 });
+            } catch (transformError) {
+                // Fallback: Try old dropdown approach
+                await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click();
+            }
         }
     }
 
@@ -4222,6 +4390,219 @@ export class LogsPage {
         }
     }
 
+    // ===== ANALYZE DIMENSIONS METHODS =====
+
+    /**
+     * Check if Logs Analyze Dimensions button is visible
+     * Button appears when: results exist AND not in SQL mode
+     * @returns {Promise<boolean>}
+     */
+    async isAnalyzeDimensionsButtonVisible() {
+        return await this.page.locator(this.logsAnalyzeDimensionsButton).isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Expect Analyze Dimensions button to be visible
+     */
+    async expectAnalyzeDimensionsButtonVisible() {
+        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Analyze Dimensions button is visible');
+    }
+
+    /**
+     * Expect Analyze Dimensions button to NOT be visible
+     */
+    async expectAnalyzeDimensionsButtonNotVisible() {
+        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('Analyze Dimensions button is not visible (as expected)');
+    }
+
+    /**
+     * Click Analyze Dimensions button
+     */
+    async clickAnalyzeDimensionsButton() {
+        await this.page.locator(this.logsAnalyzeDimensionsButton).click();
+        await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        testLogger.info('Clicked Analyze Dimensions button');
+    }
+
+    /**
+     * Check if Analysis Dashboard is visible
+     * @returns {Promise<boolean>}
+     */
+    async isAnalysisDashboardVisible() {
+        return await this.page.locator(this.analysisDashboardCard).isVisible({ timeout: 10000 }).catch(() => false);
+    }
+
+    /**
+     * Expect Analysis Dashboard to be visible
+     */
+    async expectAnalysisDashboardVisible() {
+        await expect(this.page.locator(this.analysisDashboardCard)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Analysis Dashboard is visible');
+    }
+
+    /**
+     * Close Analysis Dashboard
+     */
+    async closeAnalysisDashboard() {
+        const closeBtn = this.page.locator(this.analysisDashboardClose);
+        if (await closeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await closeBtn.click();
+            await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            testLogger.info('Closed Analysis Dashboard');
+        }
+    }
+
+    /**
+     * Check if Dimension Selector sidebar is visible in Analysis Dashboard
+     * The sidebar is visible by default when the dashboard opens.
+     * @returns {Promise<boolean>}
+     */
+    async isDimensionSidebarVisible() {
+        return await this.page.locator(this.dimensionSelectorSidebar).isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Toggle dimension selector sidebar via collapse button
+     */
+    async toggleDimensionSidebar() {
+        const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
+        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await btn.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Toggled Dimension Selector sidebar');
+        }
+    }
+
+    /**
+     * Check if dimension search input is visible in sidebar
+     * @returns {Promise<boolean>}
+     */
+    async isDimensionSearchInputVisible() {
+        return await this.page.locator(this.dimensionSearchInput).isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    /**
+     * Search for a dimension in the sidebar
+     * @param {string} searchText
+     */
+    async searchDimension(searchText) {
+        const input = this.page.locator(this.dimensionSearchInput);
+        await input.click();
+        await input.fill(searchText);
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Searched dimension: ${searchText}`);
+    }
+
+    /**
+     * Get the count of dimension checkboxes visible in sidebar
+     * @returns {Promise<number>}
+     */
+    async getDimensionCheckboxCount() {
+        return await this.page.locator('[data-test^="dimension-checkbox-"]').count();
+    }
+
+    /**
+     * Toggle a specific dimension checkbox by its value
+     * @param {string} dimensionValue
+     * @returns {Promise<boolean>}
+     */
+    async toggleDimensionCheckbox(dimensionValue) {
+        const checkbox = this.page.locator(`[data-test="dimension-checkbox-${dimensionValue}"]`);
+        if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await checkbox.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info(`Toggled dimension checkbox: ${dimensionValue}`);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if analysis dashboard has chart panels rendered
+     * @returns {Promise<boolean>}
+     */
+    async hasAnalysisDashboardCharts() {
+        const chartPanel = this.page.locator('.analysis-dashboard-card canvas, .analysis-dashboard-card [data-test*="chart"]');
+        return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
+    }
+
+    /**
+     * Check if the analysis dashboard is in loading state
+     * @returns {Promise<boolean>}
+     */
+    async isAnalysisDashboardLoading() {
+        return await this.page.locator(this.analysisDashboardLoading).isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    /**
+     * Wait for Analysis Dashboard to load completely
+     */
+    async waitForAnalysisDashboardLoad() {
+        // Wait for loading spinner to disappear
+        const spinner = this.page.locator('.q-spinner-hourglass, .q-spinner');
+        try {
+            if (await spinner.isVisible({ timeout: 1000 })) {
+                await spinner.waitFor({ state: 'hidden', timeout: 30000 });
+            }
+        } catch {
+            // Spinner might not appear or already hidden
+        }
+
+        // Wait for dashboard content
+        await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        testLogger.info('Analysis Dashboard loaded');
+    }
+
+    /**
+     * Check if no results message is visible
+     * @returns {Promise<boolean>}
+     */
+    async isNoResultsMessageVisible() {
+        return await this.page.locator('[data-test="logs-search-result-not-found-text"]').isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Close any open dialog by pressing Escape key
+     */
+    async closeDimensionSelectorDialog() {
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+        testLogger.info('Closed dimension selector dialog');
+    }
+
+    /**
+     * Wait for search results to load after clicking refresh.
+     * Waits for either results table or no-results message to appear.
+     */
+    async waitForSearchResultsToLoad() {
+        try {
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            // Wait for either results or no-results indicator
+            await this.page.locator(`${this.logsTable}, [data-test="logs-search-result-not-found-text"]`).first().waitFor({ state: 'visible', timeout: 15000 });
+        } catch {
+            // Fallback: at least wait for any loading to finish
+            testLogger.info('waitForSearchResultsToLoad: timed out waiting for results indicator');
+        }
+    }
+
+    /**
+     * Wait for SQL mode to be active after switching
+     */
+    async waitForSQLModeActive() {
+        await this.page.waitForTimeout(1000);
+        testLogger.info('SQL mode switch stabilized');
+    }
+
+    /**
+     * Wait for dashboard close to complete
+     */
+    async waitForDashboardClose() {
+        await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        testLogger.info('Dashboard close stabilized');
+    }
+
     // ===== SHARE LINK METHODS =====
 
     /**
@@ -5099,24 +5480,27 @@ export class LogsPage {
     }
 
     /**
-     * Get the saved views button locator
-     * @returns {import('@playwright/test').Locator} Saved views button locator
+     * Get the saved views button locator (now utilities menu button)
+     * @returns {import('@playwright/test').Locator} Utilities menu button locator
      */
     getSavedViewsButtonLocator() {
-        return this.page.locator('[data-test="logs-search-saved-views-btn"]');
+        return this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
     }
 
     /**
-     * Click the saved views dropdown arrow to expand and show the list
-     * This opens the dropdown panel with search input
+     * Click the utilities menu button to show saved views
+     * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
-        const arrow = this.page.locator(this.savedViewArrow);
-        await arrow.waitFor({ state: 'visible', timeout: 10000 });
-        await arrow.click();
-        // Wait for dropdown panel to appear
+        const menuButton = this.page.locator(this.utilitiesMenuButton);
+        await menuButton.waitFor({ state: 'visible', timeout: 10000 });
+        await menuButton.click();
+        // Wait for menu to appear
+        await this.page.waitForTimeout(300);
+        // Click list saved views
+        await this.page.locator(this.listSavedViewsButton).click();
         await this.page.waitForTimeout(500);
-        testLogger.info('Clicked saved views dropdown arrow');
+        testLogger.info('Opened utilities menu and clicked List Saved Views');
     }
 
     /**
@@ -5264,6 +5648,22 @@ export class LogsPage {
             testLogger.info('SQL mode enabled');
         } else {
             testLogger.info('SQL mode already enabled');
+        }
+    }
+
+    /**
+     * Disable SQL mode if currently enabled
+     * Combines getSQLModeState() check with clickSQLModeSwitch()
+     */
+    async disableSqlModeIfNeeded() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+        if (isChecked === 'true') {
+            await sqlModeToggle.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('SQL mode disabled');
+        } else {
+            testLogger.info('SQL mode already disabled');
         }
     }
 
