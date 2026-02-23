@@ -1762,15 +1762,24 @@ export default defineComponent({
               isFirstVisualizationToggle.value = false;
             }
 
+            // Ensure stream fields are loaded before building the query.
+            // On page reload, loadVisualizeData() runs async and may not have
+            // finished populating interestingFieldList yet. Without fields,
+            // buildSearch() produces SELECT * which is invalid for visualization.
+            if (
+              searchObj.data.stream.selectedStream?.length > 0 &&
+              searchObj.data.stream.selectedStreamFields?.length === 0
+            ) {
+              await getStreamList();
+              await extractFields();
+            }
+
             let logsPageQuery = "";
 
-            // handle sql mode
-            if (!searchObj.meta.sqlMode) {
+
+            // Everytime, build the query inrespective of sqlMode
               const queryBuild = buildSearch();
               logsPageQuery = queryBuild?.query?.sql ?? "";
-            } else {
-              logsPageQuery = searchObj.data.query;
-            }
 
             // Check if query is SELECT * which is not supported for visualization
             if (
@@ -2166,15 +2175,23 @@ export default defineComponent({
         shouldRefreshWithoutCache.value = clear_cache;
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
+          // Ensure stream fields are loaded before building the query.
+          // On page reload, loadVisualizeData() runs async and may not have
+          // finished populating interestingFieldList yet. Without fields,
+          // buildSearch() produces SELECT * which is invalid for visualization.
+          if (
+            searchObj.data.stream.selectedStream?.length > 0 &&
+            searchObj.data.stream.selectedStreamFields?.length === 0
+          ) {
+            await getStreamList();
+            await extractFields();
+          }
+
           let logsPageQuery = "";
 
-          // handle sql mode
-          if (!searchObj.meta.sqlMode) {
-            const queryBuild = buildSearch();
-            logsPageQuery = queryBuild?.query?.sql ?? "";
-          } else {
-            logsPageQuery = searchObj.data.query;
-          }
+          // Build the query regardless of sqlMode
+          const queryBuild = buildSearch();
+          logsPageQuery = queryBuild?.query?.sql ?? "";
 
           // Check if query is SELECT * which is not supported for visualization
           if (
