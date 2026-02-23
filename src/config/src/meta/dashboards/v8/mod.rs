@@ -649,19 +649,7 @@ pub struct DateTimeOptions {
     pub end_time: Option<i64>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(default)]
-#[serde(rename_all = "camelCase")]
-pub struct PanelTimeRange {
-    #[serde(rename = "type")]
-    pub typee: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub relative_time_period: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub start_time: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub end_time: Option<i64>,
-}
+pub type PanelTimeRange = DateTimeOptions;
 
 #[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(default)]
