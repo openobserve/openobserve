@@ -111,6 +111,9 @@
     "chunkLoadErrorMsg": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요.",
     "id": "신분증",
     "getStarted": "시작하기",
+    "copy": "복사",
+    "copySuccess": "클립보드에 복사됨",
+    "copyError": "클립보드에 복사하지 못했습니다.",
     "reset": "초기화",
     "retry": "재시도"
   },
@@ -312,7 +315,11 @@
     "showHideColumns": "열 표시/숨기기",
     "autoRefresh": "자동 새로고침",
     "createSavedView": "저장된 뷰 생성",
-    "listSavedViews": "저장된 뷰 목록"
+    "listSavedViews": "저장된 뷰 목록",
+    "buildQuery": "짓다",
+    "enableSqlModeForBuild": "SQL 모드를 활성화하고 쿼리 작성기를 사용할 단일 스트림을 선택하십시오.",
+    "applyToSearch": "검색에 적용",
+    "complexQueryDetected": "복잡한 쿼리가 감지되었습니다.커스텀 모드 사용."
   },
   "menu": {
     "home": "홈",
@@ -1487,7 +1494,10 @@
     "SQL": "SQL",
     "builder": "건축업자",
     "custom": "사용자 지정",
-    "sqlBuilder": "SQL 빌더"
+    "sqlBuilder": "SQL 빌더",
+    "generatedSql": "생성된 SQL",
+    "enterCustomSql": "사용자 지정 SQL 쿼리를 입력하세요...",
+    "customSql": "사용자 지정 SQL"
   },
   "home": {
     "streams": "스트림",

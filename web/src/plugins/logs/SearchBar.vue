@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-visualize-toggle"
                 :class="[
                   searchObj.meta.logsVisualizeToggle === 'visualize' ? 'selected' : '',
-                  config.isEnterprise == 'true' ? 'button button-center tw:rounded-none' : 'button button-right tw:rounded-l-none!',
+                  'button button-center tw:rounded-none',
                   'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32'
                 ]"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
@@ -62,6 +62,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-tooltip>
                 <q-tooltip v-else>
                   {{ t("search.visualize") }}
+                </q-tooltip>
+              </q-btn>
+            </div>
+            <div>
+              <!-- DEBUG: Build button should render here -->
+              <q-btn
+                data-test="logs-build-toggle"
+                :class="[
+                  searchObj.meta.logsVisualizeToggle === 'build' ? 'selected' : '',
+                  config.isEnterprise == 'true' ? 'button button-center tw:rounded-none' : 'button button-right tw:rounded-l-none!',
+                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32'
+                ]"
+                @click="onLogsVisualizeToggleUpdate('build')"
+                no-caps
+                size="sm"
+                icon="construction"
+              >
+                <q-tooltip>
+                  {{ t("search.buildQuery") }}
                 </q-tooltip>
               </q-btn>
             </div>
@@ -539,7 +558,7 @@ class="q-pr-sm q-pt-xs" />
                 />
               </q-btn-dropdown>
             </q-btn-group>
-            <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
+            <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize' || searchObj.meta.logsVisualizeToggle === 'build'">
               <div v-if="config.isEnterprise == 'true'" class="tw:flex">
                 <q-btn
                 v-if="
@@ -724,7 +743,7 @@ class="q-pr-sm q-pt-xs" />
         >
           <template #before>
             <div
-              class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full"
+              class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
               :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw:ml-[0.375rem]' : 'tw:mx-[0.375rem]'"
             >
               <code-query-editor
@@ -748,9 +767,31 @@ class="q-pr-sm q-pt-xs" />
                     : ''
                 "
                 language="sql"
+                :readOnly="searchObj.meta.logsVisualizeToggle === 'build' && searchObj.meta.buildModeQueryEditorDisabled"
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
               />
+              <!-- Mode Toggle for Build Mode -->
+              <div
+                v-if="searchObj.meta.logsVisualizeToggle === 'build'"
+                class="query-mode-toggle"
+              >
+                <span class="mode-label">Mode:</span>
+                <div class="mode-buttons">
+                  <button
+                    :class="['mode-btn', { selected: searchObj.meta.buildModeQueryEditorDisabled }]"
+                    @click="onBuildModeToggle(true)"
+                  >
+                    Builder
+                  </button>
+                  <button
+                    :class="['mode-btn', { selected: !searchObj.meta.buildModeQueryEditorDisabled }]"
+                    @click="onBuildModeToggle(false)"
+                  >
+                    Custom
+                  </button>
+                </div>
+              </div>
             </div>
           </template>
           <template #after>
@@ -1217,6 +1258,13 @@ class="q-pr-sm q-pt-xs" />
       </q-card>
     </q-dialog>
     <ConfirmDialog
+      title="Change Query Mode"
+      message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
+      @update:ok="confirmBuildModeChangeOk"
+      @update:cancel="confirmBuildModeChange = false"
+      v-model="confirmBuildModeChange"
+    />
+    <ConfirmDialog
       title="Delete Saved View"
       message="Are you sure you want to delete saved view?"
       @update:ok="confirmDeleteSavedViews"
@@ -1614,6 +1662,7 @@ export default defineComponent({
     "onAutoIntervalTrigger",
     "showSearchHistory",
     "extractPatterns",
+    "buildModeToggle",
   ],
   methods: {
     searchData() {
@@ -3728,14 +3777,36 @@ export default defineComponent({
     const handleHistogramMode = () => {};
 
     const handleRunQueryFn = (clear_cache = false) => {
-      if (searchObj.meta.logsVisualizeToggle == "visualize" || searchObj.meta.logsVisualizeToggle == "patterns") {
+      if (searchObj.meta.logsVisualizeToggle == "visualize" || searchObj.meta.logsVisualizeToggle == "patterns" || searchObj.meta.logsVisualizeToggle == "build") {
         emit("handleRunQueryFn", typeof clear_cache === 'boolean' ? clear_cache : false);
       } else {
         handleRunQuery(typeof clear_cache === 'boolean' ? clear_cache : false);
       }
     };
 
-    const onLogsVisualizeToggleUpdate = (value: any) => {
+    // Toggle between Builder and Custom mode in Build tab
+    const confirmBuildModeChange = ref(false);
+
+    const onBuildModeToggle = (isBuilderMode: boolean) => {
+      const currentlyCustom = !searchObj.meta.buildModeQueryEditorDisabled;
+
+      // Show confirmation when switching from Custom to Builder
+      if (currentlyCustom && isBuilderMode) {
+        confirmBuildModeChange.value = true;
+        return;
+      }
+
+      searchObj.meta.buildModeQueryEditorDisabled = isBuilderMode;
+      emit("buildModeToggle", !isBuilderMode);
+    };
+
+    const confirmBuildModeChangeOk = () => {
+      confirmBuildModeChange.value = false;
+      searchObj.meta.buildModeQueryEditorDisabled = true;
+      emit("buildModeToggle", false); // isCustomMode = false
+    };
+
+    const onLogsVisualizeToggleUpdate = async (value: any) => {
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
       if (
         value === "visualize" &&
@@ -3855,6 +3926,35 @@ export default defineComponent({
 
         // cancel all the logs queries
         cancelQuery();
+      } else if (value == "build") {
+        // Switching to build mode - enable SQL mode and generate query using buildSearch
+        const wasSqlMode = searchObj.meta.sqlMode;
+        if (!wasSqlMode) {
+          searchObj.meta.sqlMode = true;
+        }
+
+        // Generate query using buildSearch if query is empty or doesn't have SELECT
+        if (!searchObj.data.query || searchObj.data.query.toLowerCase().indexOf("select") < 0) {
+          const queryBuild = buildSearch();
+          const builtQuery = queryBuild?.query?.sql ?? "";
+          if (builtQuery) {
+            searchObj.data.query = builtQuery;
+            searchObj.data.editorValue = builtQuery;
+          }
+        }
+
+        // Wait for Vue reactivity to process query changes before switching tabs
+        await nextTick();
+
+        // Enable quick mode if config allows (same as visualization)
+        const isSelectAllQuery = /^\s*select\s+\*\s+from\s+/i.test(searchObj.data.query || "");
+        const shouldEnableQuickMode = !searchObj.meta.sqlMode || isSelectAllQuery;
+        const isQuickModeDisabled = !searchObj.meta.quickMode;
+        const isQuickModeConfigEnabled = store.state.zoConfig.quick_mode_enabled === true;
+
+        if (shouldEnableQuickMode && isQuickModeDisabled && isQuickModeConfigEnabled) {
+          searchObj.meta.quickMode = true;
+        }
       }
       searchObj.meta.logsVisualizeToggle = value;
       updateUrlQueryParams();
@@ -3887,7 +3987,7 @@ export default defineComponent({
 
     const visualizeSearchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
-        variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+        variablesAndPanelsDataLoadingState?.searchRequestTraceIds ?? {},
       )
         .filter((item: any) => item.length > 0)
         .flat() as string[];
@@ -4227,6 +4327,9 @@ export default defineComponent({
       resetRegionFilter,
       cancelQuery,
       onLogsVisualizeToggleUpdate,
+      onBuildModeToggle,
+      confirmBuildModeChange,
+      confirmBuildModeChangeOk,
       visualizeSearchRequestTraceIds,
       disable,
       cancelVisualizeQueries,
@@ -4663,6 +4766,87 @@ export default defineComponent({
 .logs-search-splitter {
   :deep(.q-splitter__separator) {
     height: 100%;
+  }
+}
+
+.query-mode-toggle {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--o2-muted-background);
+  padding: 3px 8px;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  border: 0.0625rem solid var(--o2-border-color);
+
+  .mode-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--o2-text-secondary);
+  }
+
+  .mode-buttons {
+    display: flex;
+    border: 0.0625rem solid var(--o2-border-color);
+    border-radius: 0.375rem;
+    overflow: hidden;
+
+    .mode-btn {
+      border: none;
+      background: var(--o2-muted-background);
+      padding: 2px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--o2-text-primary);
+
+      &:first-child {
+        border-right: 0.0625rem solid var(--o2-border-color);
+      }
+
+      &.selected {
+        background: var(--q-primary) !important;
+        color: white !important;
+        font-weight: 600;
+      }
+
+      &:hover:not(.selected) {
+        background: var(--o2-hover-accent);
+      }
+    }
+  }
+}
+
+// Dark mode support (both .dark-theme and .q-dark selectors)
+.dark-theme .query-mode-toggle,
+.q-dark .query-mode-toggle {
+  background: #1e1e1e;
+  border-color: #3a3a3a;
+
+  .mode-label {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .mode-buttons {
+    border-color: #3a3a3a;
+
+    .mode-btn {
+      background: #2a2a2a;
+      color: rgba(255, 255, 255, 0.8);
+
+      &:first-child {
+        border-color: #3a3a3a;
+      }
+
+      &:hover:not(.selected) {
+        background: #3a3a3a;
+        color: white;
+      }
+    }
   }
 }
 </style>
