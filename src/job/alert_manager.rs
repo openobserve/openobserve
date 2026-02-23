@@ -144,13 +144,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
     {
         let o2_config = get_o2_config();
         if o2_config.incidents.enabled && o2_config.incidents.rca_enabled {
-            if o2_config.incidents.rca_agent_url.is_empty() {
+            if o2_config.ai.agent_url.is_empty() {
                 log::warn!("[INCIDENTS::RCA] RCA enabled but O2_AGENT_URL is not set");
             } else {
                 log::info!(
                     "[INCIDENTS::RCA] RCA job enabled (interval: {}s, agent: {})",
                     o2_config.incidents.rca_interval_secs,
-                    o2_config.incidents.rca_agent_url
+                    o2_config.ai.agent_url
                 );
 
                 spawn_pausable_job!(
@@ -229,7 +229,7 @@ async fn run_rca_job() -> Result<(), anyhow::Error> {
     let password = &zo_config.auth.root_user_password;
 
     // Create RCA agent client
-    let client = RcaAgentClient::new(&config.incidents.rca_agent_url, username, password)?;
+    let client = RcaAgentClient::new(&config.ai.agent_url, username, password)?;
 
     // Check agent health first
     if let Err(e) = client.health().await {
