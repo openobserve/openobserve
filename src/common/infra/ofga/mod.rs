@@ -31,7 +31,7 @@ use o2_openfga::{
         add_tuple_for_pipeline, get_add_user_to_org_tuples, get_org_creation_tuples,
         get_ownership_all_org_tuple, get_ownership_tuple, update_tuples,
     },
-    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
+    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS, OFGAModel},
 };
 
 use crate::{
@@ -45,6 +45,12 @@ use crate::{
 pub async fn init() -> Result<(), anyhow::Error> {
     use o2_openfga::get_all_init_tuples;
 
+    // this is not supposed to be processed by every node
+    // only one region (in super cluster) and only one node (in that region)
+    // should move forward with this. This is because, openfga db is supposed
+    // to be shared across all regions. Hence, since the db is common for all,
+    // we don't need all node to do same changes again and again to the same db.
+
     let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
     let mut need_pipeline_migration = false;
@@ -57,7 +63,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_re_pattern_permission_migration = false;
     let mut need_license_permission_migration = false;
 
-    let mut existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
+    let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
             Ok(Some(model)) => Some(model),
             Ok(None) | Err(_) => {
@@ -66,136 +72,136 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
         };
 
-    // sync with super cluster
-    if get_o2_config().super_cluster.enabled {
-        let meta_in_super = get_model().await?;
-        match (meta_in_super, &existing_meta) {
-            (None, Some(existing_model)) => {
-                // set to super cluster
-                set_model(Some(existing_model.clone())).await?;
-            }
-            (Some(model), None) => {
-                // set to local
-                existing_meta = Some(model.clone());
-                migrate_native_objects = false;
-                db::ofga::set_ofga_model_to_db(model).await?;
-            }
-            (Some(model), Some(existing_model)) => match model.version.cmp(&existing_model.version)
-            {
-                Ordering::Less => {
-                    log::info!(
-                        "[OFGA:SuperCluster] model version changed: {} -> {}",
-                        existing_model.version,
-                        model.version
-                    );
-                    // update version in super cluster
-                    set_model(Some(existing_model.clone())).await?;
-                }
-                Ordering::Greater => {
-                    log::info!(
-                        "[OFGA:SuperCluster] model version changed: {} -> {}",
-                        existing_model.version,
-                        model.version
-                    );
-                    // update version in local
-                    existing_meta = Some(model.clone());
-                    migrate_native_objects = false;
-                    db::ofga::set_ofga_model_to_db(model).await?;
-                }
-                Ordering::Equal => {}
-            },
-            _ => {}
-        }
-    }
-
     let meta = o2_openfga::model::read_ofga_model().await;
     get_all_init_tuples(&mut init_tuples).await;
-    if let Some(existing_model) = &existing_meta {
-        if meta.version == existing_model.version {
-            log::info!("[OFGA:Local] model already exists & no changes required");
-            if !init_tuples.is_empty() {
-                match update_tuples(init_tuples, vec![]).await {
-                    Ok(_) => {
-                        log::info!("[OFGA:Local] Data migrated to openfga");
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "Error writing init ofga tuples to the openfga during migration: {e}"
-                        );
-                    }
+    if let Some(existing_model) = &existing_meta
+        && meta.version == existing_model.version
+    {
+        log::info!("[OFGA:Local] model already exists & no changes required");
+        if !init_tuples.is_empty() {
+            match update_tuples(init_tuples, vec![]).await {
+                Ok(_) => {
+                    log::info!("[OFGA:Local] Data migrated to openfga");
+                }
+                Err(e) => {
+                    log::error!(
+                        "Error writing init ofga tuples to the openfga during migration: {e}"
+                    );
                 }
             }
-            return Ok(());
         }
-
-        log::info!(
-            "[OFGA:Local] model version changed: {} -> {}",
-            existing_model.version,
-            meta.version
-        );
-
-        // Check if ofga migration of index streams are needed
-        let meta_version = version_compare::Version::from(&meta.version).unwrap();
-        let existing_model_version =
-            version_compare::Version::from(&existing_model.version).unwrap();
-        let v0_0_5 = version_compare::Version::from("0.0.5").unwrap();
-        let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
-        let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
-        let v0_0_9 = version_compare::Version::from("0.0.9").unwrap();
-        let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
-        let v0_0_12 = version_compare::Version::from("0.0.12").unwrap();
-        let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
-        let v0_0_15 = version_compare::Version::from("0.0.15").unwrap();
-        let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
-        let v0_0_17 = version_compare::Version::from("0.0.17").unwrap();
-        let v0_0_18 = version_compare::Version::from("0.0.18").unwrap();
-        let v0_0_20 = version_compare::Version::from("0.0.20").unwrap();
-        let v0_0_21 = version_compare::Version::from("0.0.21").unwrap();
-
-        if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
-            need_pipeline_migration = true;
-        }
-        if meta_version > v0_0_8 && existing_model_version < v0_0_9 {
-            need_cipher_keys_migration = true;
-        }
-        if meta_version > v0_0_9 && existing_model_version < v0_0_10 {
-            need_action_scripts_migration = true;
-        }
-        if meta_version > v0_0_12 && existing_model_version < v0_0_13 {
-            log::info!("[OFGA:Local] Alert folders migration needed");
-            need_alert_folders_migration = true;
-        }
-
-        if meta_version > v0_0_15 && existing_model_version < v0_0_16 {
-            log::info!("[OFGA:Local] Ratelimit migration needed");
-            need_ratelimit_migration = true;
-            need_service_accounts_migration = true;
-        }
-        if meta_version > v0_0_17 && existing_model_version < v0_0_18 {
-            log::info!("[OFGA:Local] AI chat permissions migration needed");
-            need_ai_chat_permissions_migration = true;
-        }
-        if existing_model_version < v0_0_20 {
-            log::info!("[OFGA:Local] re_patterns permissions migration needed");
-            need_re_pattern_permission_migration = true;
-        }
-
-        if existing_model_version < v0_0_21 {
-            log::info!("[OFGA:Local] license permissions migration needed");
-            need_license_permission_migration = true;
-        }
+        return Ok(());
     }
 
     // 1. create a cluster lock
     let locker = dist_lock::lock("/ofga/model/", 0)
         .await
         .expect("Failed to acquire lock for openFGA");
+
+    // check again, if ofga model is already updated by other node
+    let mut existing_meta = match db::ofga::get_ofga_model().await {
+        Ok(meta) => meta,
+        Err(e) => {
+            log::warn!("[OFGA] Error getting OFGA model from local: {e}");
+            None
+        }
+    };
+    if get_o2_config().super_cluster.enabled {
+        // Compare super cluster model and local meta model
+        let meta_in_super = match get_model().await {
+            Ok(meta) => meta,
+            Err(e) => {
+                log::error!("[OFGA:SuperCluster] Error getting OFGA model from super cluster: {e}");
+                dist_lock::unlock(&locker)
+                    .await
+                    .expect("Failed to release lock");
+                return Err(e.into());
+            }
+        };
+        match (meta_in_super, &existing_meta) {
+            // Do not set model to super cluster here, we are doing that anyway after saving the
+            // model in the local. This is to set the latest model version and store id
+            // on super cluster only after the local save is done (the ofga table is
+            // already updated)
+            (Some(model), None) => {
+                // set to local
+                log::info!(
+                    "[OFGA:SuperCluster] local model is empty, got model from super cluster with version: {}",
+                    model.version
+                );
+                existing_meta = Some(model.clone());
+                migrate_native_objects = false;
+                if let Err(e) = db::ofga::set_ofga_model_to_db(model).await {
+                    log::error!("[OFGA] Error setting OFGA model to local db: {e}");
+                    dist_lock::unlock(&locker)
+                        .await
+                        .expect("Failed to release lock");
+                    return Err(e);
+                }
+            }
+            (Some(model), Some(existing_model))
+                if model.version.cmp(&existing_model.version) == Ordering::Greater =>
+            {
+                log::info!(
+                    "[OFGA:SuperCluster] model version changed: {} -> {}, needs to update local",
+                    existing_model.version,
+                    model.version
+                );
+                // update version in local
+                existing_meta = Some(model.clone());
+                migrate_native_objects = false;
+                if let Err(e) = db::ofga::set_ofga_model_to_db(model).await {
+                    log::error!("[OFGA] Error setting OFGA model to local db: {e}");
+                    dist_lock::unlock(&locker)
+                        .await
+                        .expect("Failed to release lock");
+                    return Err(e);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let existing_model_version = existing_meta
+        .as_ref()
+        .map(|existing_meta_model| existing_meta_model.version.clone());
+
     match db::ofga::set_ofga_model(existing_meta).await {
-        Ok(store_id) => {
+        Ok((store_id, latest_model_version, matched)) => {
             if store_id.is_empty() {
                 log::error!("[OFGA:Local] OFGA store id is empty");
             }
-            o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), store_id);
+            o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), store_id.clone());
+
+            if get_o2_config().super_cluster.enabled {
+                // Set the model version in the super cluster, only version and store_id is
+                // important
+                if let Err(e) = set_model(Some(OFGAModel {
+                    version: latest_model_version.clone(),
+                    store_id,
+                    model_id: "".to_string(),
+                    model: None,
+                }))
+                .await
+                {
+                    log::error!(
+                        "[OFGA:SuperCluster] Error setting OFGA model to super cluster: {e}"
+                    );
+                    dist_lock::unlock(&locker)
+                        .await
+                        .expect("Failed to release lock");
+                    return Err(e.into());
+                }
+            }
+
+            if matched {
+                // No further openfga init required, as the meta table version was already updated
+                // by some other node. Hence simply unlock and return from here.
+                dist_lock::unlock(&locker)
+                    .await
+                    .expect("Failed to release lock");
+                return Ok(());
+            }
 
             #[cfg(feature = "cloud")]
             if !is_ofga_migrations_done().await.unwrap() {
@@ -205,6 +211,64 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     .await
                     .expect("Failed to release lock");
                 return Ok(());
+            }
+
+            if let Some(existing_model_version) = existing_model_version {
+                log::info!(
+                    "[OFGA:Local] model version changed: {} -> {}",
+                    existing_model_version,
+                    latest_model_version
+                );
+                // Check if ofga migration of index streams are needed
+                let meta_version = version_compare::Version::from(&latest_model_version).unwrap();
+                let existing_model_version =
+                    version_compare::Version::from(&existing_model_version).unwrap();
+                let v0_0_5 = version_compare::Version::from("0.0.5").unwrap();
+                let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
+                let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
+                let v0_0_9 = version_compare::Version::from("0.0.9").unwrap();
+                let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
+                let v0_0_12 = version_compare::Version::from("0.0.12").unwrap();
+                let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
+                let v0_0_15 = version_compare::Version::from("0.0.15").unwrap();
+                let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
+                let v0_0_17 = version_compare::Version::from("0.0.17").unwrap();
+                let v0_0_18 = version_compare::Version::from("0.0.18").unwrap();
+                let v0_0_20 = version_compare::Version::from("0.0.20").unwrap();
+                let v0_0_21 = version_compare::Version::from("0.0.21").unwrap();
+
+                if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
+                    need_pipeline_migration = true;
+                }
+                if meta_version > v0_0_8 && existing_model_version < v0_0_9 {
+                    need_cipher_keys_migration = true;
+                }
+                if meta_version > v0_0_9 && existing_model_version < v0_0_10 {
+                    need_action_scripts_migration = true;
+                }
+                if meta_version > v0_0_12 && existing_model_version < v0_0_13 {
+                    log::info!("[OFGA:Local] Alert folders migration needed");
+                    need_alert_folders_migration = true;
+                }
+
+                if meta_version > v0_0_15 && existing_model_version < v0_0_16 {
+                    log::info!("[OFGA:Local] Ratelimit migration needed");
+                    need_ratelimit_migration = true;
+                    need_service_accounts_migration = true;
+                }
+                if meta_version > v0_0_17 && existing_model_version < v0_0_18 {
+                    log::info!("[OFGA:Local] AI chat permissions migration needed");
+                    need_ai_chat_permissions_migration = true;
+                }
+                if existing_model_version < v0_0_20 {
+                    log::info!("[OFGA:Local] re_patterns permissions migration needed");
+                    need_re_pattern_permission_migration = true;
+                }
+
+                if existing_model_version < v0_0_21 {
+                    log::info!("[OFGA:Local] license permissions migration needed");
+                    need_license_permission_migration = true;
+                }
             }
 
             let mut tuples = vec![];

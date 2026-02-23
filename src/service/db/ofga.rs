@@ -27,12 +27,16 @@ use o2_openfga::{
 use crate::service::db;
 pub const OFGA_KEY_PREFIX: &str = "/ofga/model";
 
-pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, anyhow::Error> {
+// Sets the ofga model using the ofga model.json, Returns a tuple (store id, boolean representing
+// whether existing meta version matched)
+pub async fn set_ofga_model(
+    existing_meta: Option<OFGAModel>,
+) -> Result<(String, String, bool), anyhow::Error> {
     let meta = read_ofga_model().await;
     if let Some(existing_model) = existing_meta {
         if meta.version == existing_model.version {
             log::info!("OFGA model already exists & no changes required");
-            Ok(existing_model.store_id)
+            Ok((existing_model.store_id, meta.version, true))
         } else {
             #[cfg(not(feature = "cloud"))]
             let force_create_new_store = false;
@@ -49,7 +53,9 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
                     let mut loc_meta = meta.clone();
                     loc_meta.store_id = store_id;
                     loc_meta.model = None;
-                    set_ofga_model_to_db(loc_meta).await
+                    set_ofga_model_to_db(loc_meta)
+                        .await
+                        .map(|store_id| (store_id, meta.version, false))
                 }
                 Err(e) => Err(anyhow::anyhow!(e)),
             }
@@ -61,7 +67,9 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
                 let mut loc_meta = meta.clone();
                 loc_meta.store_id = store_id;
                 loc_meta.model = None;
-                set_ofga_model_to_db(loc_meta).await
+                set_ofga_model_to_db(loc_meta)
+                    .await
+                    .map(|store_id| (store_id, meta.version, false))
             }
             Err(e) => Err(anyhow::anyhow!(e)),
         }
