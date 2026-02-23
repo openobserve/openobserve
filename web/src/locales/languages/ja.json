@@ -309,7 +309,10 @@
     "show": "ショー",
     "editor": "エディター",
     "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。",
-    "showHideColumns": "列を表示/非表示"
+    "showHideColumns": "列を表示/非表示",
+    "autoRefresh": "自動更新",
+    "createSavedView": "保存済みビューを作成",
+    "listSavedViews": "保存済みビューを一覧表示"
   },
   "menu": {
     "home": "ホーム",

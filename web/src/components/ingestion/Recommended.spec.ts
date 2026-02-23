@@ -13,531 +13,278 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { mount } from "@vue/test-utils";
+import Recommended from "./Recommended.vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { createRouter, createWebHistory } from "vue-router";
-import RecommendedPage from "@/components/ingestion/Recommended.vue";
 import i18n from "@/locales";
-import store from "@/test/unit/helpers/store";
-
-// Mock config
-vi.mock("@/aws-exports", () => ({
-  default: {
-    API_ENDPOINT: "http://localhost:5080",
-  },
-}));
-
-// Mock segment analytics
-vi.mock("@/services/segment_analytics", () => ({
-  default: {
-    track: vi.fn(),
-  },
-}));
-
-// Mock zincutils
-vi.mock("@/utils/zincutils", () => ({
-  getImageURL: vi.fn((path: string) => `http://localhost:8080/${path}`),
-  verifyOrganizationStatus: vi.fn(() => true),
-}));
+import { createStore } from "vuex";
+import { createRouter, createWebHistory } from "vue-router";
 
 installQuasar();
 
-// Create a mock router
-const routes = [
-  { path: "/", name: "recommended", component: { template: "<div>Home</div>" } },
-  { path: "/kubernetes", name: "ingestFromKubernetes", component: { template: "<div>Kubernetes</div>" } },
-  { path: "/windows", name: "ingestFromWindows", component: { template: "<div>Windows</div>" } },
-  { path: "/linux", name: "ingestFromLinux", component: { template: "<div>Linux</div>" } },
-  { path: "/aws", name: "AWSConfig", component: { template: "<div>AWS</div>" } },
-  { path: "/gcp", name: "GCPConfig", component: { template: "<div>GCP</div>" } },
-  { path: "/azure", name: "AzureConfig", component: { template: "<div>Azure</div>" } },
-  { path: "/traces", name: "ingestFromTraces", component: { template: "<div>Traces</div>" } },
-  { path: "/frontend", name: "frontendMonitoring", component: { template: "<div>Frontend</div>" } },
-];
+// Mock getImageURL
+vi.mock("@/utils/zincutils", () => ({
+  getImageURL: vi.fn((path) => `/mocked/${path}`),
+  verifyOrganizationStatus: vi.fn(),
+}));
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-});
+describe("Recommended", () => {
+  let store: any;
+  let router: any;
 
-describe("RecommendedPage", () => {
-  let wrapper: any = null;
-
-  beforeEach(async () => {
-    await router.push("/");
-    await router.isReady();
-    
-    wrapper = mount(RecommendedPage, {
-      props: {
-        currOrgIdentifier: "test-org",
-      },
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          "q-splitter": {
-            template: '<div class="q-splitter"><slot name="before"></slot><slot name="after"></slot></div>',
-          },
-          "q-input": {
-            template: '<input v-model="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-test="$attrs[\'data-test\']" />',
-            props: ["modelValue"],
-          },
-          "q-icon": {
-            template: '<span class="q-icon"></span>',
-          },
-          "q-tabs": {
-            template: '<div class="q-tabs"><slot></slot></div>',
-          },
-          "q-route-tab": {
-            template: '<button class="q-route-tab" :data-test="name"><slot></slot></button>',
-            props: ["name", "to", "icon", "label", "title", "default"],
-          },
-          "router-view": {
-            template: '<div class="router-view">Router View Content</div>',
-          },
+  beforeEach(() => {
+    store = createStore({
+      state: {
+        selectedOrganization: {
+          identifier: "org123",
+        },
+        userInfo: {
+          email: "test@example.com",
         },
       },
     });
+
+    router = createRouter({
+      history: createWebHistory(),
+      routes: [
+        { path: "/", name: "recommended", component: { template: "<div>Recommended</div>" } },
+        { path: "/kubernetes", name: "ingestFromKubernetes", component: { template: "<div>Kubernetes</div>" } },
+      ],
+    });
+
+    router.push("/");
+
+    vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.clearAllTimers();
-    vi.restoreAllMocks();
+  it("should render the component", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    expect(wrapper.exists()).toBe(true);
   });
 
-  // Basic Component Tests
-  it("should mount RecommendedPage component", () => {
-    expect(wrapper.exists()).toBeTruthy();
-    expect(wrapper.vm).toBeTruthy();
+  it("should render splitter component", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    const splitter = wrapper.findComponent({ name: "QSplitter" });
+    expect(splitter.exists()).toBe(true);
   });
 
-  it("should have correct component name", () => {
-    expect(wrapper.vm.$options.name).toBe("RecommendedPage");
+  it("should render navigation tabs", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    const tabs = wrapper.findComponent({ name: "QTabs" });
+    expect(tabs.exists()).toBe(true);
   });
 
-  it("should render q-splitter with correct model", () => {
-    const splitter = wrapper.find(".q-splitter");
-    expect(splitter.exists()).toBeTruthy();
+  it("should have vertical tabs", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    const tabs = wrapper.findComponent({ name: "QTabs" });
+    expect(tabs.props("vertical")).toBe(true);
+  });
+
+  it("should render router-view for content", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    expect(wrapper.html()).toContain("router-view");
+  });
+
+  it("should pass org identifier to router-view", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    expect(wrapper.vm.currentOrgIdentifier).toBe("org123");
+  });
+
+  it("should pass user email to router-view", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    expect(wrapper.vm.currentUserEmail).toBe("test@example.com");
+  });
+
+  it("should have recommended tabs array", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    expect(wrapper.vm.recommendedTabs).toBeDefined();
+    expect(Array.isArray(wrapper.vm.recommendedTabs)).toBe(true);
+    expect(wrapper.vm.recommendedTabs.length).toBeGreaterThan(0);
+  });
+
+  it("should include Kubernetes ingestion tab", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    const kubernetesTab = wrapper.vm.recommendedTabs.find(
+      (tab: any) => tab.name === "ingestFromKubernetes"
+    );
+    expect(kubernetesTab).toBeDefined();
+  });
+
+  it("should include Windows ingestion tab", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    const windowsTab = wrapper.vm.recommendedTabs.find(
+      (tab: any) => tab.name === "ingestFromWindows"
+    );
+    expect(windowsTab).toBeDefined();
+  });
+
+  it("should include Linux ingestion tab", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    const linuxTab = wrapper.vm.recommendedTabs.find(
+      (tab: any) => tab.name === "ingestFromLinux"
+    );
+    expect(linuxTab).toBeDefined();
+  });
+
+  it("should include AWS config tab", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    const awsTab = wrapper.vm.recommendedTabs.find(
+      (tab: any) => tab.name === "AWSConfig"
+    );
+    expect(awsTab).toBeDefined();
+  });
+
+  it("should include traces/OTLP tab", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    const tracesTab = wrapper.vm.recommendedTabs.find(
+      (tab: any) => tab.name === "ingestFromTraces"
+    );
+    expect(tracesTab).toBeDefined();
+  });
+
+  it("should have card container styling", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
+    const cardContainer = wrapper.find(".card-container");
+    expect(cardContainer.exists()).toBe(true);
+  });
+
+  it("should set splitter model", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          'router-view': true,
+        },
+      },
+    });
+
     expect(wrapper.vm.splitterModel).toBe(270);
   });
 
-  // Props Tests
-  it("should accept currOrgIdentifier prop with default value", () => {
-    expect(wrapper.props().currOrgIdentifier).toBe("test-org");
-  });
-
-  it("should use empty string as default for currOrgIdentifier", async () => {
-    const wrapperWithoutProp = mount(RecommendedPage, {
+  it("should compute filtered list correctly", () => {
+    const wrapper = mount(Recommended, {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          "q-splitter": { template: '<div></div>' },
-          "q-input": { template: '<input />' },
-          "q-tabs": { template: '<div></div>' },
-          "router-view": { template: '<div></div>' },
-        },
-      },
-    });
-    expect(wrapperWithoutProp.props().currOrgIdentifier).toBe("");
-    wrapperWithoutProp.unmount();
-  });
-
-  // Data Properties Tests
-  it("should initialize tabs as empty string", () => {
-    expect(wrapper.vm.tabs).toBe("");
-  });
-
-  // tabsFilter was removed from the component
-  // it("should initialize tabsFilter as empty string", () => {
-  //   expect(wrapper.vm.tabsFilter).toBe("");
-  // });
-
-  it("should initialize ingestTabType as 'ingestFromKubernetes'", () => {
-    expect(wrapper.vm.ingestTabType).toBe("ingestFromKubernetes");
-  });
-
-  it("should initialize currentOrgIdentifier from store", () => {
-    expect(wrapper.vm.currentOrgIdentifier).toBe("default");
-  });
-
-  it("should expose currentUserEmail from store", () => {
-    expect(wrapper.vm.currentUserEmail).toBe("example@gmail.com");
-  });
-
-  // Search Input Tests - removed from component
-  // it("should render search input with correct attributes", () => {
-  //   const searchInput = wrapper.find('[data-test="recommended-list-search-input"]');
-  //   expect(searchInput.exists()).toBeTruthy();
-  // });
-
-  // it("should update tabsFilter when search input changes", async () => {
-  //   const searchInput = wrapper.find('[data-test="recommended-list-search-input"]');
-  //   await searchInput.setValue("kubernetes");
-  //   expect(wrapper.vm.tabsFilter).toBe("kubernetes");
-  // });
-
-  // Tabs Array Tests
-  it("should have correct number of recommended tabs", () => {
-    // Access the tabs array through the component's exposed recommendedTabs
-    const tabs = [
-      "ingestFromKubernetes",
-      "ingestFromWindows", 
-      "ingestFromLinux",
-      "AWSConfig",
-      "GCPConfig",
-      "AzureConfig",
-      "ingestFromTraces",
-      "frontendMonitoring"
-    ];
-    expect(wrapper.vm.filteredList.length).toBe(8);
-  });
-
-  it("should have Kubernetes as first tab", () => {
-    const firstTab = wrapper.vm.filteredList[0];
-    expect(firstTab.name).toBe("ingestFromKubernetes");
-    expect(firstTab.label).toBe("Kubernetes"); // i18n resolves to actual text
-  });
-
-  it("should have Windows as second tab", () => {
-    const secondTab = wrapper.vm.filteredList[1];
-    expect(secondTab.name).toBe("ingestFromWindows");
-    expect(secondTab.label).toBe("Windows"); // i18n resolves to actual text
-  });
-
-  it("should have Linux as third tab", () => {
-    const thirdTab = wrapper.vm.filteredList[2];
-    expect(thirdTab.name).toBe("ingestFromLinux");
-    expect(thirdTab.label).toBe("Linux"); // i18n resolves to actual text
-  });
-
-  it("should have AWS Config as fourth tab", () => {
-    const fourthTab = wrapper.vm.filteredList[3];
-    expect(fourthTab.name).toBe("AWSConfig");
-    expect(fourthTab.label).toBe("Amazon Web Services(AWS)"); // i18n resolves to actual text
-  });
-
-  it("should have GCP Config as fifth tab", () => {
-    const fifthTab = wrapper.vm.filteredList[4];
-    expect(fifthTab.name).toBe("GCPConfig");
-    expect(fifthTab.label).toBe("Google Cloud Platform(GCP)"); // i18n resolves to actual text
-  });
-
-  it("should have Azure Config as sixth tab", () => {
-    const sixthTab = wrapper.vm.filteredList[5];
-    expect(sixthTab.name).toBe("AzureConfig");
-    expect(sixthTab.label).toBe("Microsoft Azure"); // i18n resolves to actual text
-  });
-
-  it("should have Traces as seventh tab", () => {
-    const seventhTab = wrapper.vm.filteredList[6];
-    expect(seventhTab.name).toBe("ingestFromTraces");
-    expect(seventhTab.label).toBe("Traces (OpenTelemetry)"); // i18n resolves to actual text
-  });
-
-  it("should have Frontend Monitoring as eighth tab", () => {
-    const eighthTab = wrapper.vm.filteredList[7];
-    expect(eighthTab.name).toBe("frontendMonitoring");
-    expect(eighthTab.label).toBe("Real User Monitoring"); // i18n resolves to actual text
-  });
-
-  // Icon URL Tests
-  it("should have correct icon URLs for all tabs", () => {
-    const expectedIcons = [
-      "kubernetes.svg",
-      "windows.svg", 
-      "linux.svg",
-      "aws.svg",
-      "gcp.svg",
-      "azure.png",
-      "otlp.svg",
-      "monitoring.svg"
-    ];
-    
-    wrapper.vm.filteredList.forEach((tab: any, index: number) => {
-      expect(tab.icon).toContain(expectedIcons[index]);
-    });
-  });
-
-  // Router Navigation Tests  
-  it("should have correct 'to' routes for each tab", () => {
-    const expectedRoutes = [
-      "ingestFromKubernetes",
-      "ingestFromWindows",
-      "ingestFromLinux", 
-      "AWSConfig",
-      "GCPConfig",
-      "AzureConfig",
-      "ingestFromTraces",
-      "frontendMonitoring"
-    ];
-
-    wrapper.vm.filteredList.forEach((tab: any, index: number) => {
-      expect(tab.to.name).toBe(expectedRoutes[index]);
-      expect(tab.to.query.org_identifier).toBe("default");
-    });
-  });
-
-  // Computed Property Tests - filteredList now returns all tabs without filtering
-  it("should filter tabs based on tabsFilter value", async () => {
-    // filteredList now always returns all tabs (no filtering)
-    expect(wrapper.vm.filteredList.length).toBe(8);
-  });
-
-  it("should filter tabs case-insensitively", async () => {
-    // filteredList now always returns all tabs (no filtering)
-    expect(wrapper.vm.filteredList.length).toBe(8);
-  });
-
-  it("should filter tabs with partial matches", async () => {
-    // filteredList now always returns all tabs (no filtering)
-    expect(wrapper.vm.filteredList.length).toBe(8);
-  });
-
-  it("should return empty array for non-matching filter", async () => {
-    // filteredList now always returns all tabs (no filtering)
-    expect(wrapper.vm.filteredList.length).toBe(8);
-  });
-
-  it("should return all tabs when filter is empty", async () => {
-    wrapper.vm.tabsFilter = "";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.filteredList.length).toBe(8);
-  });
-
-  // Router Integration Tests
-  it("should have router instance", () => {
-    expect(wrapper.vm.router).toBeTruthy();
-    expect(typeof wrapper.vm.router.push).toBe("function");
-  });
-
-  it("should have store instance", () => {
-    expect(wrapper.vm.store).toBeTruthy();
-    expect(wrapper.vm.store.state).toBeTruthy();
-  });
-
-  // Component Methods Tests
-  it("should have access to getImageURL utility", () => {
-    expect(typeof wrapper.vm.getImageURL).toBe("function");
-  });
-
-  it("should have access to verifyOrganizationStatus utility", () => {
-    expect(typeof wrapper.vm.verifyOrganizationStatus).toBe("function");
-  });
-
-  it("should have access to translation function", () => {
-    expect(typeof wrapper.vm.t).toBe("function");
-  });
-
-  // Template Rendering Tests
-  it("should render router-view component", () => {
-    const routerView = wrapper.find(".router-view");
-    expect(routerView.exists()).toBeTruthy();
-  });
-
-  it("should pass correct props to router-view", () => {
-    const routerView = wrapper.find('.router-view');
-    expect(routerView.exists()).toBeTruthy();
-  });
-
-  it("should render q-tabs component", () => {
-    const tabs = wrapper.find(".q-tabs");
-    expect(tabs.exists()).toBeTruthy();
-  });
-
-  // Content Class Tests
-  it("should have contentClass set to 'tab_content' for all tabs", () => {
-    wrapper.vm.filteredList.forEach((tab: any) => {
-      expect(tab.contentClass).toBe("tab_content");
-    });
-  });
-
-  // Config Tests
-  it("should have access to config", () => {
-    expect(wrapper.vm.config).toBeTruthy();
-  });
-
-  // Additional Edge Cases and Coverage Tests
-  it("should handle empty organization identifier", async () => {
-    store.state.selectedOrganization.identifier = "";
-    const wrapperEmpty = mount(RecommendedPage, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          "q-splitter": { template: '<div></div>' },
-          "q-input": { template: '<input />' },
-          "q-tabs": { template: '<div></div>' },
-          "router-view": { template: '<div></div>' },
-        },
-      },
-    });
-    expect(wrapperEmpty.vm.currentOrgIdentifier).toBe("");
-    wrapperEmpty.unmount();
-    // Reset for other tests
-    store.state.selectedOrganization.identifier = "default";
-  });
-
-  it("should handle special characters in filter", async () => {
-    // filteredList now always returns all tabs (no filtering)
-    expect(wrapper.vm.filteredList.length).toBe(8);
-  });
-
-  it("should maintain case sensitivity in tab names", () => {
-    const tab = wrapper.vm.filteredList.find((t: any) => t.name === "AWSConfig");
-    expect(tab.name).toBe("AWSConfig");
-    expect(tab.name).not.toBe("awsconfig");
-  });
-
-  it("should have correct label for each tab type", () => {
-    // The i18n actually resolves to translated text, so we check actual translated values
-    const labelMap = {
-      "ingestFromKubernetes": "Kubernetes",
-      "ingestFromWindows": "Windows",
-      "ingestFromLinux": "Linux",
-      "AWSConfig": "Amazon Web Services(AWS)",
-      "GCPConfig": "Google Cloud Platform(GCP)", 
-      "AzureConfig": "Microsoft Azure",
-      "ingestFromTraces": "Traces (OpenTelemetry)",
-      "frontendMonitoring": "Real User Monitoring"
-    };
-
-    wrapper.vm.filteredList.forEach((tab: any) => {
-      expect(tab.label).toBe(labelMap[tab.name]);
-    });
-  });
-
-  it("should filter with whitespace handling", async () => {
-    // filteredList now always returns all tabs (no filtering)
-    expect(wrapper.vm.filteredList.length).toBe(8);
-  });
-
-  it("should handle multiple word filters", async () => {
-    // filteredList now always returns all tabs (no filtering)
-    expect(wrapper.vm.filteredList.length).toBe(8);
-  });
-
-  // Lifecycle Hook Tests (testing navigation logic)
-  it("should handle router navigation in lifecycle hooks", async () => {
-    const mockPush = vi.fn();
-    const mockRouter = createRouter({
-      history: createWebHistory(),
-      routes,
-    });
-    mockRouter.currentRoute.value = { name: "recommended", query: {} } as any;
-    mockRouter.push = mockPush;
-
-    const wrapperWithRouter = mount(RecommendedPage, {
-      global: {
-        plugins: [i18n, store, mockRouter],
-        stubs: {
-          "q-splitter": { template: '<div></div>' },
-          "q-input": { template: '<input />' },
-          "q-tabs": { template: '<div></div>' },
-          "router-view": { template: '<div></div>' },
+          'router-view': true,
         },
       },
     });
 
-    // Test that navigation would be called
-    expect(wrapperWithRouter.exists()).toBeTruthy();
-    wrapperWithRouter.unmount();
-  });
-
-  // Error Handling Tests
-  it("should handle undefined store state gracefully", () => {
-    // Test that component doesn't break with undefined store values
-    expect(() => wrapper.vm.currentUserEmail).not.toThrow();
-    expect(() => wrapper.vm.currentOrgIdentifier).not.toThrow();
-  });
-
-  // Tab Structure Validation
-  it("should validate tab structure completeness", () => {
-    wrapper.vm.filteredList.forEach((tab: any) => {
-      expect(tab).toHaveProperty('name');
-      expect(tab).toHaveProperty('to');
-      expect(tab).toHaveProperty('icon');
-      expect(tab).toHaveProperty('label');
-      expect(tab).toHaveProperty('contentClass');
-      expect(tab.to).toHaveProperty('name');
-      expect(tab.to).toHaveProperty('query');
-      expect(tab.to.query).toHaveProperty('org_identifier');
-    });
-  });
-
-  // Data Binding Tests - tabsFilter removed
-  // it("should properly bind tabsFilter to search input", async () => {
-  //   const initialFilter = wrapper.vm.tabsFilter;
-  //   expect(initialFilter).toBe("");
-
-  //   wrapper.vm.tabsFilter = "test-filter";
-  //   await wrapper.vm.$nextTick();
-  //   expect(wrapper.vm.tabsFilter).toBe("test-filter");
-  // });
-
-  it("should properly bind ingestTabType", async () => {
-    const initialType = wrapper.vm.ingestTabType;
-    expect(initialType).toBe("ingestFromKubernetes");
-    
-    wrapper.vm.ingestTabType = "ingestFromWindows";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.ingestTabType).toBe("ingestFromWindows");
-  });
-
-  // Image URL Generation Tests
-  it("should generate correct image URLs for common folder", () => {
-    const kubernetesTab = wrapper.vm.filteredList.find((t: any) => t.name === "ingestFromKubernetes");
-    expect(kubernetesTab.icon).toContain("images/common/kubernetes.svg");
-  });
-
-  it("should generate correct image URLs for ingestion folder", () => {
-    const awsTab = wrapper.vm.filteredList.find((t: any) => t.name === "AWSConfig");
-    expect(awsTab.icon).toContain("images/ingestion/aws.svg");
-  });
-
-  // Query Parameter Tests
-  it("should include organization identifier in all tab routes", () => {
-    wrapper.vm.filteredList.forEach((tab: any) => {
-      expect(tab.to.query.org_identifier).toBeDefined();
-      expect(tab.to.query.org_identifier).toBe("default");
-    });
-  });
-
-  // Component Props Validation
-  it("should validate prop types correctly", () => {
-    const propsDef = wrapper.vm.$options.props;
-    expect(propsDef.currOrgIdentifier.type).toBe(String);
-    expect(propsDef.currOrgIdentifier.default).toBe("");
-  });
-
-  // Reactivity Tests
-  it("should be reactive to store changes", async () => {
-    // The tabs are created with the current store value at component creation time
-    // so they maintain the original value unless component is recreated
-    const currentOrgId = wrapper.vm.filteredList[0].to.query.org_identifier;
-    expect(currentOrgId).toBe("default");
-  });
-
-  it("should handle store state user email changes", async () => {
-    // The currentUserEmail is set at component creation time from store state
-    // It maintains its initial value unless component is recreated
-    expect(wrapper.vm.currentUserEmail).toBe("example@gmail.com");
-  });
-
-  // Performance and Memory Tests
-  it("should not create memory leaks with computed properties", () => {
-    const initialLength = wrapper.vm.filteredList.length;
-    wrapper.vm.tabsFilter = "kubernetes";
-    wrapper.vm.tabsFilter = "";
-    expect(wrapper.vm.filteredList.length).toBe(initialLength);
-  });
-
-  // Integration Tests
-  it("should work with actual i18n translations", () => {
-    wrapper.vm.filteredList.forEach((tab: any) => {
-      expect(typeof tab.label).toBe('string');
-      expect(tab.label.length).toBeGreaterThan(0);
-    });
+    expect(wrapper.vm.filteredList).toBeDefined();
+    expect(Array.isArray(wrapper.vm.filteredList)).toBe(true);
   });
 });

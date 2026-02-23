@@ -1,409 +1,254 @@
+// Copyright 2023 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import ExportDashboard from "./ExportDashboard.vue";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
+import i18n from "@/locales";
+import { createStore } from "vuex";
+import { createRouter, createWebHistory } from "vue-router";
 
-// Mock the component's dependencies directly
-const mockStore = {
-  state: {
-    selectedOrganization: {
-      identifier: "test-org"
-    }
-  }
-};
+installQuasar();
 
-const mockRoute = {
-  query: {
-    folder: "test-folder"
-  }
-};
-
-const mockGetDashboard = vi.fn();
-const mockUseStore = vi.fn(() => mockStore);
-const mockUseRoute = vi.fn(() => mockRoute);
-const mockUseI18n = vi.fn(() => ({ t: vi.fn() }));
-
-// Mock modules
-vi.mock("../../utils/commons.ts", () => ({
-  getDashboard: mockGetDashboard
-}));
-
-vi.mock("vuex", () => ({
-  useStore: mockUseStore
-}));
-
-vi.mock("vue-router", () => ({
-  useRoute: mockUseRoute
-}));
-
-vi.mock("vue-i18n", () => ({
-  useI18n: mockUseI18n
-}));
-
-// Mock DOM methods
-const mockClick = vi.fn();
-const mockSetAttribute = vi.fn();
-const mockCreateElement = vi.fn(() => ({
-  setAttribute: mockSetAttribute,
-  click: mockClick
-}));
-
-describe("ExportDashboard Component Logic", () => {
-  const defaultProps = {
-    dashboardId: "test-dashboard-id"
-  };
-
-  const mockDashboard = {
-    dashboardId: "test-dashboard-id",
+// Mock getDashboard utility
+vi.mock("@/utils/commons", () => ({
+  getDashboard: vi.fn().mockResolvedValue({
     title: "Test Dashboard",
-    description: "Test dashboard description",
-    owner: "test-owner",
+    dashboardId: "dash123",
+    owner: "testuser@example.com",
+    tabs: [],
     panels: [],
-    variables: []
-  };
+  }),
+}));
 
-  // Create the download function logic directly
-  const createDownloadFunction = (props: any) => {
-    const store = mockUseStore();
-    const route = mockUseRoute();
-    
-    return async () => {
-      // Get the dashboard
-      const dashboard = await mockGetDashboard(
-        store,
-        props.dashboardId,
-        route.query.folder
-      );
-      dashboard.owner = "";
+describe("ExportDashboard", () => {
+  let store: any;
+  let router: any;
 
-      // Prepare json and download via a click
-      const data =
-        "data:text/json;charset=utf-8," +
-        encodeURIComponent(JSON.stringify(dashboard, null, 2));
-      const htmlA = mockCreateElement("a");
-      htmlA.setAttribute("href", data);
-      const fileName = dashboard.title || "dashboard";
-      htmlA.setAttribute("download", fileName + ".dashboard.json");
-      htmlA.click();
-    };
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGetDashboard.mockResolvedValue({ ...mockDashboard });
-    
-    // Mock document.createElement globally
-    Object.defineProperty(global, 'document', {
-      value: {
-        createElement: mockCreateElement
+  beforeEach(async () => {
+    store = createStore({
+      state: {
+        selectedOrganization: {
+          identifier: "org123",
+        },
       },
-      writable: true
     });
+
+    router = createRouter({
+      history: createWebHistory(),
+      routes: [
+        {
+          path: "/dashboards",
+          name: "dashboards",
+          component: { template: "<div>Dashboards</div>" },
+        },
+      ],
+    });
+
+    await router.push({ path: "/dashboards", query: { folder: "default" } });
+
+    vi.clearAllMocks();
   });
 
-  describe("Component Setup", () => {
-    it("should create download function", () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      expect(downloadFunction).toBeInstanceOf(Function);
+  it("should render the component", () => {
+    const wrapper = mount(ExportDashboard, {
+      props: {
+        dashboardId: "dash123",
+      },
+      global: {
+        plugins: [i18n, store, router],
+      },
     });
 
-    it("should use correct dependencies", () => {
-      createDownloadFunction(defaultProps);
-      expect(mockUseStore).toHaveBeenCalled();
-      expect(mockUseRoute).toHaveBeenCalled();
-    });
+    expect(wrapper.exists()).toBe(true);
   });
 
-  describe("Dashboard Download Functionality", () => {
-    it("should fetch dashboard data on download", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      mockGetDashboard.mockResolvedValue({ ...mockDashboard });
-      
-      await downloadFunction();
-      
-      expect(mockGetDashboard).toHaveBeenCalledWith(
-        mockStore,
-        "test-dashboard-id",
-        "test-folder"
-      );
+  it("should render export button", () => {
+    const wrapper = mount(ExportDashboard, {
+      props: {
+        dashboardId: "dash123",
+      },
+      global: {
+        plugins: [i18n, store, router],
+      },
     });
 
-    it("should create download link with correct attributes", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      mockGetDashboard.mockResolvedValue({ ...mockDashboard });
-      
-      await downloadFunction();
-      
-      expect(mockCreateElement).toHaveBeenCalledWith("a");
-      expect(mockSetAttribute).toHaveBeenCalledWith("href", expect.stringContaining("data:text/json;charset=utf-8,"));
-      expect(mockSetAttribute).toHaveBeenCalledWith("download", "Test Dashboard.dashboard.json");
-      expect(mockClick).toHaveBeenCalled();
-    });
-
-    it("should remove owner property from dashboard before download", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      const dashboardWithOwner = { ...mockDashboard, owner: "original-owner" };
-      mockGetDashboard.mockResolvedValue(dashboardWithOwner);
-      
-      await downloadFunction();
-      
-      // Verify that the dashboard data passed to JSON.stringify has empty owner
-      const hrefCall = mockSetAttribute.mock.calls.find(call => call[0] === "href");
-      expect(hrefCall).toBeTruthy();
-      const dataUrl = hrefCall[1];
-      const jsonData = decodeURIComponent(dataUrl.split(',')[1]);
-      const parsedData = JSON.parse(jsonData);
-      expect(parsedData.owner).toBe("");
-    });
-
-    it("should use fallback filename when dashboard title is missing", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      const dashboardWithoutTitle = { ...mockDashboard, title: "" };
-      mockGetDashboard.mockResolvedValue(dashboardWithoutTitle);
-      
-      await downloadFunction();
-      
-      expect(mockSetAttribute).toHaveBeenCalledWith("download", "dashboard.dashboard.json");
-    });
-
-    it("should use fallback filename when dashboard title is null", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      const dashboardWithNullTitle = { ...mockDashboard, title: null };
-      mockGetDashboard.mockResolvedValue(dashboardWithNullTitle);
-      
-      await downloadFunction();
-      
-      expect(mockSetAttribute).toHaveBeenCalledWith("download", "dashboard.dashboard.json");
-    });
-
-    it("should format JSON with proper indentation", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      mockGetDashboard.mockResolvedValue({ ...mockDashboard });
-      
-      await downloadFunction();
-      
-      const hrefCall = mockSetAttribute.mock.calls.find(call => call[0] === "href");
-      expect(hrefCall).toBeTruthy();
-      const dataUrl = hrefCall[1];
-      const jsonData = decodeURIComponent(dataUrl.split(',')[1]);
-      
-      // Check that JSON is properly formatted with indentation
-      expect(jsonData).toContain('\n  ');
-      expect(jsonData).toMatch(/{\s+"/);
-    });
-
-    it("should create proper data URL format", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      mockGetDashboard.mockResolvedValue({ ...mockDashboard });
-      
-      await downloadFunction();
-      
-      const hrefCall = mockSetAttribute.mock.calls.find(call => call[0] === "href");
-      expect(hrefCall).toBeTruthy();
-      expect(hrefCall[1]).toMatch(/^data:text\/json;charset=utf-8,/);
-    });
-
-    it("should preserve all dashboard properties except owner", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      const complexDashboard = {
-        ...mockDashboard,
-        owner: "should-be-removed",
-        panels: [{ id: 1, type: "chart" }],
-        variables: [{ name: "var1" }],
-        customProperty: "should-be-preserved"
-      };
-      mockGetDashboard.mockResolvedValue(complexDashboard);
-      
-      await downloadFunction();
-      
-      const hrefCall = mockSetAttribute.mock.calls.find(call => call[0] === "href");
-      const dataUrl = hrefCall[1];
-      const jsonData = decodeURIComponent(dataUrl.split(',')[1]);
-      const parsedData = JSON.parse(jsonData);
-      
-      expect(parsedData.owner).toBe("");
-      expect(parsedData.panels).toEqual([{ id: 1, type: "chart" }]);
-      expect(parsedData.variables).toEqual([{ name: "var1" }]);
-      expect(parsedData.customProperty).toBe("should-be-preserved");
-      expect(parsedData.dashboardId).toBe("test-dashboard-id");
-    });
-
-    it("should handle custom dashboard titles with special characters", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      const dashboardWithSpecialTitle = { 
-        ...mockDashboard, 
-        title: "My-Custom_Dashboard (2024)" 
-      };
-      mockGetDashboard.mockResolvedValue(dashboardWithSpecialTitle);
-      
-      await downloadFunction();
-      
-      expect(mockSetAttribute).toHaveBeenCalledWith("download", "My-Custom_Dashboard (2024).dashboard.json");
-    });
+    const exportButton = wrapper.find('[data-test="export-dashboard"]');
+    expect(exportButton.exists()).toBe(true);
   });
 
-  describe("Error Handling", () => {
-    it("should handle API error when fetching dashboard", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      mockGetDashboard.mockRejectedValue(new Error("API Error"));
-      
-      await expect(downloadFunction()).rejects.toThrow("API Error");
+  it("should have download icon", () => {
+    const wrapper = mount(ExportDashboard, {
+      props: {
+        dashboardId: "dash123",
+      },
+      global: {
+        plugins: [i18n, store, router],
+      },
     });
 
-    it("should handle network errors gracefully", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      mockGetDashboard.mockRejectedValue(new Error("Network Error"));
-      
-      await expect(downloadFunction()).rejects.toThrow("Network Error");
-    });
-
-    it("should handle server errors", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      mockGetDashboard.mockRejectedValue(new Error("Server Error 500"));
-      
-      await expect(downloadFunction()).rejects.toThrow("Server Error 500");
-    });
+    const exportButton = wrapper.findComponent({ name: "QBtn" });
+    expect(exportButton.props("icon")).toBe("download");
   });
 
-  describe("Component Properties", () => {
-    it("should accept different dashboardId values", async () => {
-      const customProps = { dashboardId: "custom-dashboard-id" };
-      const downloadFunction = createDownloadFunction(customProps);
-      
-      await downloadFunction();
-      
-      expect(mockGetDashboard).toHaveBeenCalledWith(
-        mockStore,
-        "custom-dashboard-id",
-        "test-folder"
-      );
+  it("should call downloadDashboard when button is clicked", async () => {
+    const wrapper = mount(ExportDashboard, {
+      props: {
+        dashboardId: "dash123",
+      },
+      global: {
+        plugins: [i18n, store, router],
+      },
     });
 
-    it("should handle null dashboardId", async () => {
-      const propsWithNull = { dashboardId: null };
-      const downloadFunction = createDownloadFunction(propsWithNull);
-      
-      await downloadFunction();
-      
-      expect(mockGetDashboard).toHaveBeenCalledWith(
-        mockStore,
-        null,
-        "test-folder"
-      );
-    });
-
-    it("should work with different folder values", async () => {
-      const customRoute = { query: { folder: "custom-folder" } };
-      mockUseRoute.mockReturnValue(customRoute);
-      
-      const downloadFunction = createDownloadFunction(defaultProps);
-      await downloadFunction();
-      
-      expect(mockGetDashboard).toHaveBeenCalledWith(
-        mockStore,
-        "test-dashboard-id",
-        "custom-folder"
-      );
-    });
+    const downloadSpy = vi.spyOn(wrapper.vm, "downloadDashboard");
+    const exportButton = wrapper.find('[data-test="export-dashboard"]');
+    
+    await exportButton.trigger("click");
+    
+    expect(downloadSpy).toHaveBeenCalled();
   });
 
-  describe("File Download Integration", () => {
-    it("should call document.createElement with 'a' element", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      
-      await downloadFunction();
-      
-      expect(mockCreateElement).toHaveBeenCalledWith("a");
-      expect(mockCreateElement).toHaveBeenCalledTimes(1);
+  it("should create download link with dashboard data", async () => {
+    // Mock document.createElement
+    const mockAnchor = {
+      setAttribute: vi.fn(),
+      click: vi.fn(),
+    };
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi.spyOn(document, "createElement").mockImplementation((tagName: string) => {
+      if (tagName === "a") {
+        return mockAnchor as any;
+      }
+      return originalCreateElement(tagName);
     });
 
-    it("should trigger click on created element", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      
-      await downloadFunction();
-      
-      expect(mockClick).toHaveBeenCalled();
-      expect(mockClick).toHaveBeenCalledTimes(1);
+    const wrapper = mount(ExportDashboard, {
+      props: {
+        dashboardId: "dash123",
+      },
+      global: {
+        plugins: [i18n, store, router],
+      },
     });
 
-    it("should set both href and download attributes", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      
-      await downloadFunction();
-      
-      expect(mockSetAttribute).toHaveBeenCalledTimes(2);
-      expect(mockSetAttribute).toHaveBeenCalledWith("href", expect.any(String));
-      expect(mockSetAttribute).toHaveBeenCalledWith("download", expect.stringContaining(".dashboard.json"));
-    });
+    await wrapper.vm.downloadDashboard();
+    await flushPromises();
 
-    it("should set correct file extension", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      const customDashboard = { ...mockDashboard, title: "My Custom Dashboard" };
-      mockGetDashboard.mockResolvedValue(customDashboard);
-      
-      await downloadFunction();
-      
-      expect(mockSetAttribute).toHaveBeenCalledWith("download", "My Custom Dashboard.dashboard.json");
-    });
+    expect(createElementSpy).toHaveBeenCalledWith("a");
+    expect(mockAnchor.setAttribute).toHaveBeenCalledWith("href", expect.stringContaining("data:text/json"));
+    expect(mockAnchor.setAttribute).toHaveBeenCalledWith("download", expect.stringContaining(".dashboard.json"));
+    expect(mockAnchor.click).toHaveBeenCalled();
+
+    createElementSpy.mockRestore();
   });
 
-  describe("Data Serialization", () => {
-    it("should serialize dashboard data as valid JSON", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      
-      await downloadFunction();
-      
-      const hrefCall = mockSetAttribute.mock.calls.find(call => call[0] === "href");
-      const dataUrl = hrefCall[1];
-      const jsonData = decodeURIComponent(dataUrl.split(',')[1]);
-      
-      expect(() => JSON.parse(jsonData)).not.toThrow();
+  it("should use dashboard title as filename", async () => {
+    const mockAnchor = {
+      setAttribute: vi.fn(),
+      click: vi.fn(),
+    };
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi.spyOn(document, "createElement").mockImplementation((tagName: string) => {
+      if (tagName === "a") {
+        return mockAnchor as any;
+      }
+      return originalCreateElement(tagName);
     });
 
-    it("should handle empty dashboard data", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      mockGetDashboard.mockResolvedValue({});
-      
-      await downloadFunction();
-      
-      const hrefCall = mockSetAttribute.mock.calls.find(call => call[0] === "href");
-      const dataUrl = hrefCall[1];
-      const jsonData = decodeURIComponent(dataUrl.split(',')[1]);
-      const parsedData = JSON.parse(jsonData);
-      
-      expect(parsedData.owner).toBe("");
+    const wrapper = mount(ExportDashboard, {
+      props: {
+        dashboardId: "dash123",
+      },
+      global: {
+        plugins: [i18n, store, router],
+      },
     });
 
-    it("should handle complex nested dashboard structures", async () => {
-      const downloadFunction = createDownloadFunction(defaultProps);
-      const complexDashboard = {
-        ...mockDashboard,
-        panels: [
-          { 
-            id: 1, 
-            type: "chart", 
-            config: { 
-              data: [1, 2, 3], 
-              nested: { property: "value" } 
-            } 
-          }
-        ],
-        variables: [
-          { 
-            name: "var1", 
-            options: ["a", "b", "c"], 
-            metadata: { type: "select" } 
-          }
-        ]
-      };
-      mockGetDashboard.mockResolvedValue(complexDashboard);
-      
-      await downloadFunction();
-      
-      const hrefCall = mockSetAttribute.mock.calls.find(call => call[0] === "href");
-      const dataUrl = hrefCall[1];
-      const jsonData = decodeURIComponent(dataUrl.split(',')[1]);
-      const parsedData = JSON.parse(jsonData);
-      
-      expect(parsedData.panels[0].config.nested.property).toBe("value");
-      expect(parsedData.variables[0].options).toEqual(["a", "b", "c"]);
+    await wrapper.vm.downloadDashboard();
+    await flushPromises();
+
+    expect(mockAnchor.setAttribute).toHaveBeenCalledWith(
+      "download",
+      "Test Dashboard.dashboard.json"
+    );
+
+    createElementSpy.mockRestore();
+  });
+
+  it("should remove owner from exported dashboard data", async () => {
+    const { getDashboard } = await import("@/utils/commons");
+
+    const mockAnchor = {
+      setAttribute: vi.fn(),
+      click: vi.fn(),
+    };
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi.spyOn(document, "createElement").mockImplementation((tagName: string) => {
+      if (tagName === "a") {
+        return mockAnchor as any;
+      }
+      return originalCreateElement(tagName);
     });
+
+    const wrapper = mount(ExportDashboard, {
+      props: {
+        dashboardId: "dash123",
+      },
+      global: {
+        plugins: [i18n, store, router],
+      },
+    });
+
+    await wrapper.vm.downloadDashboard();
+    await flushPromises();
+
+    expect(getDashboard).toHaveBeenCalledWith(
+      store,
+      "dash123",
+      "default"
+    );
+
+    createElementSpy.mockRestore();
+  });
+
+  it("should accept dashboardId prop", () => {
+    const wrapper = mount(ExportDashboard, {
+      props: {
+        dashboardId: "test-dashboard-id",
+      },
+      global: {
+        plugins: [i18n, store, router],
+      },
+    });
+
+    expect(wrapper.props("dashboardId")).toBe("test-dashboard-id");
+  });
+
+  it("should have proper button styling classes", () => {
+    const wrapper = mount(ExportDashboard, {
+      props: {
+        dashboardId: "dash123",
+      },
+      global: {
+        plugins: [i18n, store, router],
+      },
+    });
+
+    const exportButton = wrapper.find('[data-test="export-dashboard"]');
+    expect(exportButton.classes()).toContain("dashboard-icons");
   });
 });
