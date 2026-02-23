@@ -32,22 +32,21 @@ export interface FillMissingValuesParams {
 }
 
 /**
- * Sparse gap-fill strategy for time-series data.
+ * Bounded dense gap-fill for time-series data.
  *
- * Instead of generating a row for every time slot in the entire time range
- * (which can produce 100K+ rows for wide ranges with small intervals),
- * this function only inserts null-marker entries at the boundaries of gaps
- * in the actual data. For each gap between consecutive data points, we
- * insert at most 2 null entries (one at the gap start, one at the gap end).
+ * Instead of filling the ENTIRE query time range (binnedStart → endTime) with
+ * rows — which can produce 100K+ entries for wide ranges with small intervals —
+ * this function:
  *
- * This produces output that is functionally equivalent for ECharts time-series
- * rendering (xAxis.type="time" with [timestamp, value] pairs) because:
- * 1. Real data points are preserved exactly as-is.
- * 2. Gaps are correctly represented by null boundary markers.
- * 3. The start/end of the time range are anchored with boundary entries.
+ * 1. Finds the actual data range (min → max timestamp from streamed data).
+ * 2. Dense-fills ONLY within that range so gaps between real data points
+ *    correctly show as zero/null in the chart.
+ * 3. Adds just 2 boundary entries (at binnedStart and endTime) so the chart
+ *    x-axis spans the full query range without generating thousands of empty rows
+ *    where streaming data hasn't arrived yet.
  *
- * Performance: For 1000 actual data points with 5 gaps, this produces ~1010
- * rows instead of 100K rows from the dense approach.
+ * Performance: For 1000 data points spanning 10 min in a 24h query range,
+ * this produces ~600 rows (10 min dense) instead of 86,400 (24h dense).
  */
 export const fillMissingValues = (
   params: FillMissingValuesParams,
@@ -188,9 +187,85 @@ export const fillMissingValues = (
 };
 
 /**
- * Sparse fill for data WITHOUT breakdown dimensions.
- * Sorts data by time, walks through sorted data, and inserts null markers
- * only at gap boundaries.
+ * Dense fill within data range, boundary-only outside.
+ *
+ * 1. Find min/max timestamps from actual data.
+ * 2. Add boundary null entry at binnedStart (if before data range).
+ * 3. Dense-fill from dataMin to dataMax at every interval step.
+ * 4. Add boundary null entry at endTime (if after data range).
+ */
+function denseFillRange(
+  searchDataMap: Map<string, any>,
+  dataMinMs: number,
+  dataMaxMs: number,
+  intervalMillis: number,
+  binnedStartMs: number,
+  endMs: number,
+  formatTime: (d: Date) => string,
+  createNullEntry: (time: string, uniqueValue?: any) => any,
+  breakdownValue?: any,
+  hasBreakdown?: boolean,
+): any[] {
+  const result: any[] = [];
+
+  // Boundary entry at binnedStart if it's before the data range
+  if (binnedStartMs < dataMinMs - intervalMillis) {
+    result.push(
+      hasBreakdown
+        ? createNullEntry(formatTime(new Date(binnedStartMs)), breakdownValue)
+        : createNullEntry(formatTime(new Date(binnedStartMs))),
+    );
+  }
+
+  // Align dataMin to the interval grid
+  const alignedStartMs =
+    Math.floor((dataMinMs - binnedStartMs) / intervalMillis) * intervalMillis +
+    binnedStartMs;
+
+  // Align dataMax to the next interval boundary
+  const alignedEndMs =
+    Math.ceil((dataMaxMs - binnedStartMs) / intervalMillis) * intervalMillis +
+    binnedStartMs;
+
+  // Dense fill from aligned start to aligned end
+  let currentMs = alignedStartMs;
+  while (currentMs <= alignedEndMs) {
+    const formattedTime = formatTime(new Date(currentMs));
+
+    if (hasBreakdown) {
+      const key = `${formattedTime}-${breakdownValue}`;
+      const existing = searchDataMap.get(key);
+      if (existing) {
+        result.push(existing);
+      } else {
+        result.push(createNullEntry(formattedTime, breakdownValue));
+      }
+    } else {
+      const existing = searchDataMap.get(formattedTime);
+      if (existing) {
+        result.push(existing);
+      } else {
+        result.push(createNullEntry(formattedTime));
+      }
+    }
+
+    currentMs += intervalMillis;
+  }
+
+  // Boundary entry at endTime if it's after the data range
+  if (endMs > dataMaxMs + intervalMillis) {
+    result.push(
+      hasBreakdown
+        ? createNullEntry(formatTime(new Date(endMs)), breakdownValue)
+        : createNullEntry(formatTime(new Date(endMs))),
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Bounded dense fill for data WITHOUT breakdown dimensions.
  */
 function fillWithoutBreakdown(
   processedData: any[],
@@ -202,75 +277,37 @@ function fillWithoutBreakdown(
   createNullEntry: (time: string, uniqueValue?: any) => any,
   parseTimeToMs: (time: string) => number,
 ): any[] {
-  // Sort data by time
-  const sorted = [...processedData].sort((a, b) => {
-    const ta = parseTimeToMs(getDataValue(a, timeKey));
-    const tb = parseTimeToMs(getDataValue(b, timeKey));
-    return ta - tb;
-  });
+  // Build a map of existing data for O(1) lookups
+  const searchDataMap = new Map<string, any>();
+  let dataMinMs = Infinity;
+  let dataMaxMs = -Infinity;
 
-  const result: any[] = [];
-  // Gap threshold: if the gap between two data points exceeds 1 interval,
-  // insert null markers. We use 1.5x interval as the threshold to account
-  // for floating-point rounding in date arithmetic.
-  const gapThreshold = intervalMillis * 1.5;
-
-  // Insert boundary null at binnedStart if first data point is after it
-  const firstDataMs = parseTimeToMs(getDataValue(sorted[0], timeKey));
-  if (firstDataMs - binnedStartMs > gapThreshold) {
-    result.push(createNullEntry(formatTime(new Date(binnedStartMs))));
-    // Null marker at one interval before first data point
-    const preFirstMs = firstDataMs - intervalMillis;
-    if (preFirstMs > binnedStartMs) {
-      result.push(createNullEntry(formatTime(new Date(preFirstMs))));
-    }
+  for (const d of processedData) {
+    const timeVal = getDataValue(d, timeKey);
+    const ms = parseTimeToMs(timeVal);
+    if (ms < dataMinMs) dataMinMs = ms;
+    if (ms > dataMaxMs) dataMaxMs = ms;
+    searchDataMap.set(timeVal, d);
   }
 
-  // Walk through sorted data and detect gaps
-  for (let i = 0; i < sorted.length; i++) {
-    const currentMs = parseTimeToMs(getDataValue(sorted[i], timeKey));
-
-    // Insert gap markers between consecutive points
-    if (i > 0) {
-      const prevMs = parseTimeToMs(getDataValue(sorted[i - 1], timeKey));
-      if (currentMs - prevMs > gapThreshold) {
-        // Null at one interval after previous data point (gap start)
-        const postPrevMs = prevMs + intervalMillis;
-        if (postPrevMs < currentMs) {
-          result.push(createNullEntry(formatTime(new Date(postPrevMs))));
-        }
-        // Null at one interval before current data point (gap end)
-        const preCurrentMs = currentMs - intervalMillis;
-        if (preCurrentMs > prevMs + intervalMillis) {
-          result.push(createNullEntry(formatTime(new Date(preCurrentMs))));
-        }
-      }
-    }
-
-    // Push the actual data row
-    result.push(sorted[i]);
-  }
-
-  // Insert boundary null at end if last data point is before endMs
-  const lastDataMs = parseTimeToMs(
-    getDataValue(sorted[sorted.length - 1], timeKey),
+  return denseFillRange(
+    searchDataMap,
+    dataMinMs,
+    dataMaxMs,
+    intervalMillis,
+    binnedStartMs,
+    endMs,
+    formatTime,
+    createNullEntry,
+    undefined,
+    false,
   );
-  if (endMs - lastDataMs > gapThreshold) {
-    // Null marker at one interval after last data point
-    const postLastMs = lastDataMs + intervalMillis;
-    if (postLastMs < endMs) {
-      result.push(createNullEntry(formatTime(new Date(postLastMs))));
-    }
-    result.push(createNullEntry(formatTime(new Date(endMs))));
-  }
-
-  return result;
 }
 
 /**
- * Sparse fill for data WITH breakdown dimensions.
- * Groups data by breakdown value, applies sparse fill per group,
- * then merges all groups back.
+ * Bounded dense fill for data WITH breakdown dimensions.
+ * Groups data by breakdown value, dense-fills each group within its own
+ * data range, then merges all groups.
  */
 function fillWithBreakdown(
   processedData: any[],
@@ -283,91 +320,50 @@ function fillWithBreakdown(
   createNullEntry: (time: string, uniqueValue?: any) => any,
   parseTimeToMs: (time: string) => number,
 ): any[] {
-  // Group data by breakdown value
-  const groups = new Map<any, any[]>();
+  // Group data by breakdown value and track min/max per group
+  const groups = new Map<
+    any,
+    { rows: Map<string, any>; minMs: number; maxMs: number }
+  >();
+
   for (const row of processedData) {
     const breakdownValue = getDataValue(row, uniqueKey);
+    const timeVal = getDataValue(row, timeKey);
+    const ms = parseTimeToMs(timeVal);
+
     let group = groups.get(breakdownValue);
     if (!group) {
-      group = [];
+      group = { rows: new Map(), minMs: Infinity, maxMs: -Infinity };
       groups.set(breakdownValue, group);
     }
-    group.push(row);
+
+    const key = `${timeVal}-${breakdownValue}`;
+    if (!group.rows.has(key)) {
+      group.rows.set(key, row);
+    }
+    if (ms < group.minMs) group.minMs = ms;
+    if (ms > group.maxMs) group.maxMs = ms;
   }
 
   const result: any[] = [];
-  const gapThreshold = intervalMillis * 1.5;
 
-  // Process each breakdown group independently
-  for (const [breakdownValue, groupData] of groups) {
-    // Sort group by time
-    const sorted = groupData.sort((a, b) => {
-      const ta = parseTimeToMs(getDataValue(a, timeKey));
-      const tb = parseTimeToMs(getDataValue(b, timeKey));
-      return ta - tb;
-    });
-
-    // Insert boundary null at binnedStart if first data point is after it
-    const firstDataMs = parseTimeToMs(getDataValue(sorted[0], timeKey));
-    if (firstDataMs - binnedStartMs > gapThreshold) {
-      result.push(
-        createNullEntry(formatTime(new Date(binnedStartMs)), breakdownValue),
-      );
-      const preFirstMs = firstDataMs - intervalMillis;
-      if (preFirstMs > binnedStartMs) {
-        result.push(
-          createNullEntry(formatTime(new Date(preFirstMs)), breakdownValue),
-        );
-      }
-    }
-
-    // Walk through sorted data and detect gaps
-    for (let i = 0; i < sorted.length; i++) {
-      const currentMs = parseTimeToMs(getDataValue(sorted[i], timeKey));
-
-      if (i > 0) {
-        const prevMs = parseTimeToMs(getDataValue(sorted[i - 1], timeKey));
-        if (currentMs - prevMs > gapThreshold) {
-          const postPrevMs = prevMs + intervalMillis;
-          if (postPrevMs < currentMs) {
-            result.push(
-              createNullEntry(
-                formatTime(new Date(postPrevMs)),
-                breakdownValue,
-              ),
-            );
-          }
-          const preCurrentMs = currentMs - intervalMillis;
-          if (preCurrentMs > prevMs + intervalMillis) {
-            result.push(
-              createNullEntry(
-                formatTime(new Date(preCurrentMs)),
-                breakdownValue,
-              ),
-            );
-          }
-        }
-      }
-
-      result.push(sorted[i]);
-    }
-
-    // Insert boundary null at end if last data point is before endMs
-    const lastDataMs = parseTimeToMs(
-      getDataValue(sorted[sorted.length - 1], timeKey),
+  groups.forEach((group, breakdownValue) => {
+    const groupResult = denseFillRange(
+      group.rows,
+      group.minMs,
+      group.maxMs,
+      intervalMillis,
+      binnedStartMs,
+      endMs,
+      formatTime,
+      createNullEntry,
+      breakdownValue,
+      true,
     );
-    if (endMs - lastDataMs > gapThreshold) {
-      const postLastMs = lastDataMs + intervalMillis;
-      if (postLastMs < endMs) {
-        result.push(
-          createNullEntry(formatTime(new Date(postLastMs)), breakdownValue),
-        );
-      }
-      result.push(
-        createNullEntry(formatTime(new Date(endMs)), breakdownValue),
-      );
+    for (const row of groupResult) {
+      result.push(row);
     }
-  }
+  });
 
   return result;
 }
