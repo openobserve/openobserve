@@ -2614,7 +2614,7 @@ export default defineComponent({
 
                   // searchObj.data.stream.selectedStream = itemObj;
                   searchObj.data.stream.selectedStream.push(itemObj.value);
-                  onStreamChange(searchObj.data.query);
+                  onStreamChange(value);
                 }
               });
 
