@@ -294,12 +294,13 @@ describe("useVariablesManager", () => {
 
       await manager.initialize(config, {});
 
-      // Parent (constant type) should be immediately ready
+      // Parent (constant type) should be immediately ready and marked as pending to load
       expect(manager.variablesData.global[0].isVariablePartialLoaded).toBe(true);
+      expect(manager.variablesData.global[0].isVariableLoadingPending).toBe(true);
 
-      // Child (query_values type) has a dependency so it won't be marked as pending initially
-      // Only independent query_values variables are marked as pending during initialization
-      expect(manager.variablesData.global[1].isVariableLoadingPending).toBe(false);
+      // Child (query_values type) depends on a non-API type parent (constant)
+      // With the fix, children of non-API parents are now marked as pending during initialization
+      expect(manager.variablesData.global[1].isVariableLoadingPending).toBe(true);
       expect(manager.variablesData.global[1].isVariablePartialLoaded).toBe(false);
 
       // Verify dependency graph is correct

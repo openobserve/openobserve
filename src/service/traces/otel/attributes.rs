@@ -229,6 +229,9 @@ impl LangfuseAttributes {
     // Source metadata attribute
     pub const METADATA_SOURCE: &'static str = "langfuse.observation.metadata.source";
 
+    // Provider metadata attribute
+    pub const METADATA_LS_PROVIDER: &'static str = "langfuse.observation.metadata.ls_provider";
+
     // Completion start time (ISO 8601 format)
     // Note: Uses underscore format since dots are converted to underscores during ingestion
     pub const COMPLETION_START_TIME: &'static str = "langfuse.observation.completion_start_time";

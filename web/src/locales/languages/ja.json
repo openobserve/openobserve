@@ -232,8 +232,10 @@
     "patternColumnHeader": "パターン",
     "occurrenceColumnHeader": "発生",
     "percentageColumnHeader": "パーセンテージ",
+    "anomalyColumnHeader": "異常",
     "actionsColumnHeader": "[アクション]",
     "anomalyLabel": "異常",
+    "anomalyDetected": "異常を検出",
     "includePatternInSearch": "検索にパターンを含める",
     "excludePatternFromSearch": "検索からパターンを除外",
     "showPatternDetails": "詳細を表示 ({変数} 変数、{例} 例)",
@@ -307,7 +309,10 @@
     "show": "ショー",
     "editor": "エディター",
     "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。",
-    "showHideColumns": "列を表示/非表示"
+    "showHideColumns": "列を表示/非表示",
+    "autoRefresh": "自動更新",
+    "createSavedView": "保存済みビューを作成",
+    "listSavedViews": "保存済みビューを一覧表示"
   },
   "menu": {
     "home": "ホーム",
@@ -1197,6 +1202,9 @@
     "wraptext": "ラップテーブルセル",
     "tableTranspose": "トランスポーズ",
     "tableDynamicColumns": "動的列を許可",
+    "pagination": "ページネーション",
+    "rowsPerPage": "ページあたりの行数",
+    "rowsPerPageTooltip": "ページごとに表示するレコードのデフォルト数を設定します",
     "showBorder": "軸境界を表示",
     "currencyDollar": "通貨-ドル ($)",
     "currencyEuro": "通貨-ユーロ (€)",
@@ -1905,7 +1913,101 @@
     "msteams": "マイクロソフトチーム",
     "pagerduty": "ポケットベル・デューティ",
     "opsgenie": "オプスゲニー",
-    "servicenow": "サービスナウ"
+    "servicenow": "サービスナウ",
+    "saveAlert": "アラートを保存",
+    "aggregation_threshold": "グループがある場合はアラート",
+    "thresholdDynamic": {
+      "alertMeWhen": "次の場合に通知する",
+      "metricTypes": {
+        "resultsPassedFilter": "フィルターを通過した結果",
+        "distinctGroupsAffected": "個別のグループが影響を受ける",
+        "metricsMatchCriteria": "メトリックス一致基準",
+        "matchingLogsFound": "一致するログが見つかりました",
+        "groupsPassFilter": "グループはフィルター条件に合格します",
+        "distinctGroups": "異なるグループが見つかりました",
+        "resultRows": "結果行が返されました",
+        "timeSeries": "アクティブな時系列が見つかりました",
+        "matchingRecords": "一致するレコードが見つかりました",
+        "groupsWithHaving": "グループ一致条件",
+        "uniqueGroups": "ユニークグループ",
+        "events": "イベント一致条件",
+        "aggregatedValue": "マッチ条件"
+      },
+      "contextLabels": {
+        "groupedBy": "グループ化:",
+        "havingConditions": "条件がある:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "アラート名",
+      "sqlQuery": "SQL クエリー",
+      "promqlQuery": "プロムQL クエリ",
+      "conditions": "条件",
+      "copy": "[コピー]",
+      "noCondition": "条件なし",
+      "noDescription": "説明なし",
+      "evaluationHistory": "評価履歴",
+      "loadingHistory": "履歴をロード中...",
+      "noHistoryAvailable": "このアラートの評価履歴はありません",
+      "results": "結果"
+    },
+    "historyTable": {
+      "timestamp": "タイムスタンプ",
+      "status": "ステータス",
+      "evaluationTime": "評価 (s)",
+      "queryTime": "クエリ (ミリ秒)",
+      "error": "[エラー]"
+    },
+    "back": "戻る",
+    "continue": "続行",
+    "wouldTrigger": "トリガーする",
+    "wouldNotTrigger": "トリガーされない",
+    "queryBuilder": "ビルダー",
+    "groupByHelp": {
+      "description": "集計されたデータを特定のフィールドでグループ化し、一意の値ごとに個別のアラートを作成します。",
+      "example": "例:「hostname」でグループ化してサーバーごとに個別のアラートを取得するか、「status_code」でグループ化してエラーを個別に追跡します。"
+    },
+    "conditions": {
+      "condition": "コンディション",
+      "conditionGroup": "条件グループ",
+      "addConditionTooltip": "このグループに新しい条件を追加",
+      "addConditionGroupTooltip": "ネストされた条件グループの追加 (最大深度:2)",
+      "maxDepthReachedTooltip": "最大ネスティング深度に達しました"
+    },
+    "compareWithPast": {
+      "alertSetFor": "アラート設定",
+      "currentWindow": "現在のウィンドウ",
+      "cycle": "サイクル",
+      "cycleTooltip": "結果を前のサイクルの同じ時間と比較します。",
+      "runningFor": "毎回 {頻度} の間隔で {period} 実行中",
+      "currentWindowCannotBeDeleted": "現在のウィンドウは削除できません",
+      "comparingWith": "との比較",
+      "referenceWindow": "リファレンスウィンドウ",
+      "timeFrame": "タイムフレーム",
+      "timeFrameTooltip": "クエリの時間範囲。",
+      "comparingText": "現在のウィンドウのクエリ結果と前の {offset} のクエリ結果を比較します。",
+      "addComparisonWindow": "比較ウィンドウを追加",
+      "goToConditions": "条件に移動",
+      "goToConditionsTooltip": "「条件に移動」をクリックして、選択した比較ウィンドウのイベントを確認してください"
+    },
+    "alertSettings": {
+      "cronSchedule": "クローンスケジュール",
+      "addNewDestination": "新しい目的地を追加",
+      "cooldownTooltip": "アラートがトリガーされた場合、次の通知を送信するまでどのくらい待つ必要があります。たとえば、アラートが午後 4 時にトリガーされ、サイレンス通知が 10 分に設定されている場合、アラートが 1 分経っても午後 4 時 10 分まで別の通知は送信されません。これは、ユーザーに迷惑メールが送信されないようにするためです。",
+      "thresholdTooltip": "イベント数または集計値に基づいて、アラートをトリガーするタイミングを定義します。例:「> 100」に設定すると、イベント数が 100 イベントを超えたときにアラートがトリガーされます。",
+      "periodTooltip": "クエリの実行期間。たとえば、10 分ということは、クエリが実行されるたびに、直近の 10 分間のデータが使用されることを意味します。",
+      "frequencyTooltipMinutes": "タスクを実行する頻度 (例:5 分ごと)",
+      "frequencyTooltipCron": "5 つのフィールドをスペースで区切った標準 UNIX cron 形式:[分 0 ～ 59 分] [時間 0 ～ 23] [月 1 ～ 31 日] [月 1 ～ 12 月、または 1 月から 12 月] [曜日 0 ～ 7 日、日曜日は 0 と 7 日]。",
+      "timezoneWarning": "警告:表示されているタイムゾーンはおおよそのものです。正しいタイムゾーンを手動で確認して選択してください。",
+      "destinationsTooltip": "アラート通知を送信する宛先を 1 つ以上選択します。",
+      "templateTooltip": "オプション:このアラートのすべての宛先に使用するテンプレートを選択してください。テンプレートを使用すると、アラートメッセージの形式をカスタマイズできます。選択しない場合、各宛先は独自の構成済みテンプレートを使用します。"
+    },
+    "advanced": {
+      "addVariable": "[変数を追加]",
+      "variablesTooltip": "変数は、アラートから宛先にデータを渡すために使用されます。",
+      "rowTemplateTooltip": "行テンプレートはアラートメッセージのフォーマットに使用されます。",
+      "templateType": "テンプレートタイプ:"
+    }
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -1956,7 +2058,10 @@
     "customWebhook": "カスタム (ウェブフック)",
     "customEmail": "カスタム (電子メール)",
     "customAction": "カスタム (アクション)",
-    "custom": "カスタム"
+    "custom": "カスタム",
+    "separator": "セパレーター",
+    "separator_placeholder": "セパレータを入力してください (例:|、\\n、\\ t、スペース)",
+    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)"
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",
@@ -2164,7 +2269,6 @@
       "groupsLabel": "グループ",
       "noMatchingGroups": "一致するグループがありません",
       "fqnFormulaTitle": "識別子フォーミュラ",
-      "fqnFormulaTooltip": "サービス識別子の計算方法を示します。スコープディメンション（青）は '/' で連結されます。最初の非NULLワークロードディメンション（緑）がサービス名になります。",
       "scopeDimension": "スコープディメンション",
       "workloadDimension": "ワークロードディメンション",
       "noFormulaConfigured": "識別子フォーミュラが設定されていません。上でディメンションを追加してください。",
@@ -2597,7 +2701,8 @@
     "showLegends": "レジェンドを表示"
   },
   "alert_list": {
-    "alert_details": "アラートの詳細"
+    "alert_details": "アラートの詳細",
+    "alert_history": "アラート履歴"
   },
   "latencyInsights": {
     "title": "インサイト",
@@ -2750,7 +2855,13 @@
       }
     },
     "viewInTraces": "トレースで表示",
-    "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く"
+    "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く",
+    "exportToJson": "JSON へのエクスポート",
+    "noLogsDescription": "選択した時間範囲では、この相関関係のログは見つかりませんでした。",
+    "tracesErrorDetails": "トレースデータの取得中にエラーが発生しました。もう一度試してください。",
+    "metricsError": "メトリクスを読み込めません",
+    "metricsErrorDetails": "メトリックスデータの取得中にエラーが発生しました。もう一度試してください。",
+    "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",

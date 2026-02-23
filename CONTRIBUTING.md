@@ -2,15 +2,15 @@
 
 ## Setting up development environment
 
-### Prerequisite
+### Prerequisites
 
-OpenObserve uses Rust & embdeds sqlite (For server) & VueJS (For Web UI)
+OpenObserve uses Rust & embeds SQLite (For server) & VueJS (For Web UI)
 
 You must have following installed:
 
 1. Git
-2. Rust & Cargo 1.70+
-3. nodejs v14+ and npm v6+
+2. Rust & Cargo (nightly toolchain — the required version is pinned in `rust-toolchain.toml`)
+3. Node.js v20+ and npm v10+
 
 Alternatively you can use pre-configured devcontainer in VS code to get up and running quickly.
 
@@ -80,7 +80,7 @@ Once you have the source code cloned you can start development.
 There are 2 areas of development.
 
 1. UI
-1. Server
+2. Server
 
 ### Server
 

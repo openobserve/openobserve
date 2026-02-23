@@ -7,7 +7,7 @@ export default class DashboardCreate {
    */
   constructor(page) {
     this.page = page;
-    this.dashCreateBtn = this.page.locator('[data-test="dashboard-add"]');
+    this.dashCreateBtn = this.page.locator('[data-test="dashboard-new"]');
     this.dashName = this.page.locator('[data-test="add-dashboard-name"]');
     this.submitBtn = this.page.locator('[data-test="dashboard-add-submit"]');
     this.deleteIcon = this.page.locator('[data-test="dashboard-delete"]');
@@ -130,15 +130,66 @@ export default class DashboardCreate {
 
   //Add Panel to dashboard (when dashboard is empty)
   async addPanel() {
-    await this.addPanelIfEmptyBtn.waitFor({ state: "visible", timeout: 15000 });
-    await this.addPanelIfEmptyBtn.click();
+    // Retry pattern for clicking add panel button
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      await this.addPanelIfEmptyBtn.waitFor({ state: "visible", timeout: 15000 });
+      await this.addPanelIfEmptyBtn.scrollIntoViewIfNeeded();
+      await this.page.waitForTimeout(200); // Brief pause for stability
+
+      // Click the button
+      await this.addPanelIfEmptyBtn.click();
+
+      // Wait for URL to contain add_panel
+      try {
+        await this.page.waitForURL(/add_panel/, { timeout: 10000 });
+        break; // Success
+      } catch (e) {
+        if (attempt === maxRetries) {
+          throw new Error(`addPanel: Failed to navigate to add_panel after ${maxRetries} attempts. Last error: ${e.message}`);
+        }
+        // Retry - the click may not have worked
+        await this.page.waitForTimeout(500);
+      }
+    }
+
+    // Wait for panel editor to be ready
+    await this.page.locator('[data-test="dashboard-apply"]').or(
+      this.page.locator('[data-test^="selected-chart-"]').first()
+    ).first().waitFor({ state: "visible", timeout: 15000 });
   }
 
   //Add Panel to dashboard (when dashboard already has panels)
   async addPanelToExistingDashboard() {
     const addPanelBtn = this.page.locator('[data-test="dashboard-panel-add"]');
-    await addPanelBtn.waitFor({ state: "visible", timeout: 15000 });
-    await addPanelBtn.click();
+
+    // Retry pattern for clicking add panel button
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      await addPanelBtn.waitFor({ state: "visible", timeout: 15000 });
+      await addPanelBtn.scrollIntoViewIfNeeded();
+      await this.page.waitForTimeout(200); // Brief pause for stability
+
+      // Click the button
+      await addPanelBtn.click();
+
+      // Wait for URL to contain add_panel
+      try {
+        await this.page.waitForURL(/add_panel/, { timeout: 10000 });
+        break; // Success
+      } catch (e) {
+        if (attempt === maxRetries) {
+          throw new Error(`addPanelToExistingDashboard: Failed to navigate to add_panel after ${maxRetries} attempts. Last error: ${e.message}`);
+        }
+        // Retry - the click may not have worked
+        await this.page.waitForTimeout(500);
+      }
+    }
+
+    // Wait for panel editor to be ready
+    await this.page.locator('[data-test="dashboard-apply"]').or(
+      this.page.locator('[data-test^="selected-chart-"]').first()
+    ).first().waitFor({ state: "visible", timeout: 15000 });
   }
 
   //Add Panel - works for both empty and non-empty dashboards
@@ -146,16 +197,37 @@ export default class DashboardCreate {
     const addPanelBtn = this.page.locator('[data-test="dashboard-panel-add"]');
     const addPanelIfEmptyBtn = this.addPanelIfEmptyBtn;
 
-    // Try the "add panel" button first (for dashboards with panels)
+    // Determine which button to click
     const addBtnVisible = await addPanelBtn.isVisible({ timeout: 2000 }).catch(() => false);
-    if (addBtnVisible) {
-      await addPanelBtn.click();
-      return;
+    const targetBtn = addBtnVisible ? addPanelBtn : addPanelIfEmptyBtn;
+
+    // Retry pattern for clicking add panel button
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      await targetBtn.waitFor({ state: "visible", timeout: 15000 });
+      await targetBtn.scrollIntoViewIfNeeded();
+      await this.page.waitForTimeout(200); // Brief pause for stability
+
+      // Click the button
+      await targetBtn.click();
+
+      // Wait for URL to contain add_panel
+      try {
+        await this.page.waitForURL(/add_panel/, { timeout: 10000 });
+        break; // Success
+      } catch (e) {
+        if (attempt === maxRetries) {
+          throw new Error(`addPanelSmart: Failed to navigate to add_panel after ${maxRetries} attempts. Last error: ${e.message}`);
+        }
+        // Retry - the click may not have worked
+        await this.page.waitForTimeout(500);
+      }
     }
 
-    // Fall back to "add panel if empty" button
-    await addPanelIfEmptyBtn.waitFor({ state: "visible", timeout: 15000 });
-    await addPanelIfEmptyBtn.click();
+    // Wait for panel editor to be ready
+    await this.page.locator('[data-test="dashboard-apply"]').or(
+      this.page.locator('[data-test^="selected-chart-"]').first()
+    ).first().waitFor({ state: "visible", timeout: 15000 });
   }
 
   //Apply dashboard button

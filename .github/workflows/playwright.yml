@@ -143,6 +143,7 @@ jobs:
                 "logstable.spec.js",
                 "shareLink.spec.js",
                 "monaco-query-prefill.spec.js",
+                "logsAnalyzeDimensions.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
@@ -176,6 +177,7 @@ jobs:
                 "dashboard-import.spec.js",
                 "maxquery.spec.js",
                 "dashboard-chartJson.spec.js",
+                "dashboard-promql-suggestions.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
@@ -184,10 +186,11 @@ jobs:
                 "dashboard-filter.spec.js",
                 "dashboard-general-setting.spec.js",
                 "dashboard-tabs-setting.spec.js",
-                "dashboard-variables-setting.spec.js",
                 "dashboard-transpose.spec.js",
                 "dashboard-join.spec.js",
                 "dashboard-nested-functions.spec.js",
+                "dashboard-legends-copy.spec.js",
+                "dashboard-raw-query.spec.js",
               ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
@@ -198,6 +201,7 @@ jobs:
                 "dashboard-multi-y-axis.spec.js",
                 "dashboard-html-chart.spec.js",
                 "visualize.spec.js",
+                "visualize-vrl.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
@@ -210,6 +214,10 @@ jobs:
                 "pipelines.spec.js",
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
+                "pipeline-traces.spec.js",
+                "pipeline-metrics.spec.js",
+                "pipeline-backfill.spec.js",
+                "pipeline-history.spec.js",
                 "scheduled-pipeline-query-builder.spec.js",
                 # "remotepipeline.spec.js"
               ]
@@ -244,6 +252,7 @@ jobs:
                 "traceErrorFilter.spec.js",
                 "traceDetails.spec.js",
                 "traceAdvancedFiltering.spec.js",
+                "tracesAnalyzeDimensions.spec.js",
               ]
 
           - testfolder: "RegressionSet"
@@ -272,38 +281,26 @@ jobs:
                 "metrics-promql-query-persistence.spec.js",
                 "metrics-table-column-order.spec.js"
               ]
-          - testfolder: "Dashboards-Variables-Scoped"
+          - testfolder: "Dashboards-Variables"
             browser: "chrome"
             run_files:
               [
+                "dashboard-variables-setting.spec.js",
                 "dashboard-variables-global.spec.js",
                 "dashboard-variables-tab-level.spec.js",
                 "dashboard-variables-panel-level.spec.js",
-              ]
-          - testfolder: "Dashboards-Variables-Dependency"
-            browser: "chrome"
-            run_files:
-              [
                 "dashboard-variables-dependency.spec.js",
-              ]
-          - testfolder: "Dashboards-Variables-Refresh"
-            browser: "chrome"
-            run_files:
-              [
                 "dashboard-variables-refresh.spec.js",
-              ]
-          - testfolder: "Dashboards-Variables-URL"
-            browser: "chrome"
-            run_files:
-              [
                 "dashboard-variables-url-sync.spec.js",
-              ]
-          - testfolder: "Dashboards-Variables-Creation"
-            browser: "chrome"
-            run_files:
-              [
                 "dashboard-variables-creation-scopes.spec.js",
-                "dashboard-variables-null-handling.spec.js",
+                "dashboard-variables-default-values-chain.spec.js",
+                "dashboard-variables-custom-parents.spec.js"
+              ]
+          - testfolder: "Dashboard-Table-Pagination"
+            browser: "chrome"
+            run_files: 
+              [
+                "dashboard-table-pagination.spec.js"
               ]
     steps:
       - name: Clone the current repo
@@ -464,7 +461,7 @@ jobs:
               "Logs-Core"|"Logs-Queries")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables-Scoped"|"Dashboards-Variables-Dependency"|"Dashboards-Variables-Refresh"|"Dashboards-Variables-URL"|"Dashboards-Variables-Creation")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination")
                 ACTUAL_FOLDER="Dashboards"
                 ;;
               *)

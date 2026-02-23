@@ -51,7 +51,7 @@ export class AboutPage {
             } else {
                 await this.page.getByRole('option', { name: orgName }).locator('div').nth(2).click();
             }
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         } catch (error) {
             throw new Error(`Failed to select organization: ${orgName}`);
         }

@@ -713,7 +713,7 @@ const columns = ref([
     name: "status",
     label: "Status",
     field: "status",
-    align: "center",
+    align: "left",
     sortable: true,
     style: "width: 150px;",
   },
@@ -848,8 +848,6 @@ const fetchAlertHistory = async () => {
       query.sort_by = pagination.value.sortBy;
       query.sort_order = pagination.value.descending ? "desc" : "asc";
     }
-
-    console.log("Fetching alert history with query:", query);
 
     const response = await alertsService.getHistory(org, query);
     if (response.data) {

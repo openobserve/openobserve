@@ -1,33 +1,31 @@
 <template>
   <q-card flat class="tw:h-full">
-    <q-card-section class="tw:p-[0.375rem] tw:h-full card-container">
+    <q-card-section class="tw:p-[0.375rem] tw:h-full card-container service-graph-container">
       <!-- Top row with search and control buttons -->
       <div class="row items-center q-col-gutter-sm q-mb-md">
         <div class="col-12 col-md-5 tw:flex tw:gap-[0.5rem]">
-          <!-- Stream selector - always show, populated once streams are discovered -->
+          <!-- Stream selector - synced from traces page, no "All Streams" -->
           <q-select
             v-model="streamFilter"
             :options="
-              searchObj.data.stream.streamLists && searchObj.data.stream.streamLists.length > 0
-                ? [
-                    { label: 'All Streams', value: 'all' },
-                    ...searchObj.data.stream.streamLists,
-                  ]
-                : [{ label: 'All Streams', value: 'all' }]
+              availableStreams.length > 0
+                ? availableStreams.map((s) => ({ label: s, value: s }))
+                : []
             "
             dense
-            outlined
+            borderless
             emit-value
             map-options
             class="tw:w-[180px] tw:flex-shrink-0"
             @update:model-value="onStreamFilterChange"
-            :disable="!searchObj.data.stream.streamLists || searchObj.data.stream.streamLists.length === 0"
+            :disable="availableStreams.length === 0"
           >
             <template #prepend>
               <q-icon name="storage" size="xs" />
             </template>
-            <q-tooltip v-if="!searchObj.data.stream.streamLists || searchObj.data.stream.streamLists.length === 0">
-              No streams detected. Loading streams from parent...
+            <q-tooltip v-if="availableStreams.length === 0">
+              No streams detected. Ensure service graph metrics include
+              stream_name labels.
             </q-tooltip>
           </q-select>
 
@@ -36,10 +34,11 @@
             v-model="searchFilter"
             borderless
             dense
-            class="no-border tw:h-[36px] tw:flex-grow"
+            class="no-border tw:h-[36px]"
             placeholder="Search services..."
             debounce="300"
             @update:model-value="applyFilters"
+            clearable
           >
             <template #prepend>
               <q-icon class="o2-search-input-icon" name="search" />
@@ -69,39 +68,35 @@
             data-test="service-graph-refresh-btn"
             no-caps
             flat
-            dense
-            icon="refresh"
-            class="tw:border tw:border-solid tw:border-[var(--o2-border-color)] q-px-sm element-box-shadow hover:tw:bg-[var(--o2-hover-accent)]"
+            class="o2-secondary-button"
             @click="loadServiceGraph"
             :loading="loading"
           >
-            <q-tooltip>Refresh Service Graph</q-tooltip>
+          Refresh
           </q-btn>
 
-          <!-- 3. Graph/Tree view toggle buttons -->
-          <q-btn-toggle
-            v-model="visualizationType"
-            toggle-color="primary"
-            :options="[
-              { label: 'Graph View', value: 'graph', icon: 'hub' },
-              { label: 'Tree View', value: 'tree', icon: 'account_tree' },
-            ]"
-            dense
-            no-caps
-            class="view-toggle-buttons"
-            @update:model-value="setVisualizationType"
-          />
+          <!-- 3. Graph/Tree view toggle -->
+          <div class="app-tabs-container tw:h-[36px]">
+            <app-tabs
+              data-test="service-graph-view-tabs"
+              class="tabs-selection-container"
+              :tabs="visualizationTabs"
+              v-model:active-tab="visualizationType"
+              @update:active-tab="setVisualizationType"
+            />
+          </div>
 
-          <!-- 4. Layout dropdown -->
+          <!-- 4. Layout dropdown (only meaningful for tree view) -->
           <q-select
             v-model="layoutType"
             :options="layoutOptions"
             dense
-            filled
+            borderless
             class="tw:w-[160px]"
             emit-value
             map-options
             @update:model-value="setLayout"
+            :disable="visualizationType === 'graph'"
           />
         </div>
       </div>
@@ -150,13 +145,35 @@
                 </div>
               </div>
             </div>
-            <div v-else class="tw:h-full">
+            <div v-else class="tw:h-full graph-with-panel-container">
               <ChartRenderer
                 ref="chartRendererRef"
                 data-test="service-graph-chart"
                 :data="chartData"
                 :key="chartKey"
                 class="tw:h-full"
+                @click="handleNodeClick"
+              />
+
+              <!-- Service Graph Side Panel -->
+              <ServiceGraphSidePanel
+                v-if="selectedNode"
+                :selected-node="selectedNode"
+                :graph-data="graphData"
+                :time-range="searchObj.data.datetime"
+                :visible="showSidePanel"
+                :stream-filter="streamFilter"
+                @close="handleCloseSidePanel"
+              />
+
+              <!-- Service Graph Edge Panel -->
+              <ServiceGraphEdgePanel
+                v-if="selectedEdge"
+                :selected-edge="selectedEdge"
+                :graph-data="graphData"
+                :time-range="searchObj.data.datetime"
+                :visible="showEdgePanel"
+                @close="handleCloseEdgePanel"
               />
             </div>
           </div>
@@ -205,18 +222,32 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed } from "vue";
+import { defineComponent, ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { useQuasar } from "quasar";
 import serviceGraphService from "@/services/service_graph";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import DateTime from "@/components/DateTime.vue";
+import ServiceGraphSidePanel from "./ServiceGraphSidePanel.vue";
+import ServiceGraphEdgePanel from "./ServiceGraphEdgePanel.vue";
 import {
   convertServiceGraphToTree,
   convertServiceGraphToNetwork,
 } from "@/utils/traces/convertTraceData";
+import {
+  formatNumber,
+  formatLatency,
+  pointToBezierDistance,
+  generateNodeTooltipContent,
+  generateEdgeTooltipContent,
+  findIncomingEdgeForNode,
+  calculateRootNodeMetrics,
+} from "@/utils/traces/treeTooltipHelpers";
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
+
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -224,9 +255,14 @@ export default defineComponent({
     AppTabs,
     ChartRenderer,
     DateTime,
+    ServiceGraphSidePanel,
+    ServiceGraphEdgePanel,
   },
-  setup() {
+  emits: [],
+  setup(props, { emit }) {
     const store = useStore();
+    const $q = useQuasar();
+    const router = useRouter();
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();
 
@@ -235,13 +271,27 @@ export default defineComponent({
     const showSettings = ref(false);
     const lastUpdated = ref("");
 
+    // Side panel state
+    const selectedNode = ref<any>(null);
+    const showSidePanel = ref(false);
+
+    // Edge panel state
+    const selectedEdge = ref<any>(null);
+    const showEdgePanel = ref(false);
+
     // Persist visualization type in localStorage
     const storedVisualizationType = localStorage.getItem(
       "serviceGraph_visualizationType",
     );
     const visualizationType = ref<"tree" | "graph">(
-      (storedVisualizationType as "tree" | "graph") || "graph",
+      (storedVisualizationType as "tree" | "graph") || "tree",
     );
+
+    // Visualization tabs configuration
+    const visualizationTabs = [
+      { label: "Tree View", value: "tree" },
+      { label: "Graph View", value: "graph" },
+    ];
 
     // Initialize layout type based on visualization type
     const storedLayoutType = localStorage.getItem("serviceGraph_layoutType");
@@ -253,36 +303,18 @@ export default defineComponent({
     const chartRendererRef = ref<any>(null);
 
     const searchFilter = ref("");
-    const connectionTypeFilter = ref("all");
 
-    // Stream filter - use computed property to read from and write to shared state
-    const streamFilter = computed({
-      get: () => {
-        const selectedValue = searchObj.data.stream.selectedStream?.value;
-        return selectedValue || "all";
-      },
-      set: (value) => {
-        searchObj.data.stream.selectedStream = {
-          label: value === "all" ? "" : value,
-          value: value === "all" ? "" : value,
-        };
-      },
-    });
-    // availableStreams removed - now using searchObj.data.stream.streamLists directly
-
-    // Connection type tabs configuration
-    const connectionTypeTabs = [
-      { label: "All", value: "all" },
-      { label: "Standard", value: "standard" },
-      { label: "Database", value: "database" },
-      { label: "Messaging", value: "messaging" },
-      { label: "Virtual", value: "virtual" },
-    ];
+    // Stream filter — synced from traces page selected stream
+    const tracesStream = searchObj.data.stream?.selectedStream?.value || '';
+    const storedStreamFilter = localStorage.getItem(
+      "serviceGraph_streamFilter",
+    );
+    const streamFilter = ref(tracesStream || storedStreamFilter || "default");
+    const availableStreams = ref<string[]>([]);
 
     const graphData = ref<any>({
       nodes: [],
       edges: [],
-      availableStreams: [],
     });
 
     const filteredGraphData = ref<any>({
@@ -297,10 +329,6 @@ export default defineComponent({
 
     const dateTimeRef = ref<any>(null);
 
-    // Store node positions for graph view to prevent re-layout on updates
-    const graphNodePositions = ref<Map<string, { x: number; y: number }>>(
-      new Map(),
-    );
 
     // Key to control chart recreation - only change when layout/visualization type changes
     const chartKey = ref(0);
@@ -314,12 +342,10 @@ export default defineComponent({
         return [
           { label: "Horizontal", value: "horizontal" },
           { label: "Vertical", value: "vertical" },
-          { label: "Radial", value: "radial" },
         ];
       } else {
         return [
           { label: "Force Directed", value: "force" },
-          { label: "Circular", value: "circular" },
         ];
       }
     });
@@ -329,49 +355,520 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      // Disabled caching to ensure fresh edges with __original property
-      // Position stability maintained through graphNodePositions passed to conversion
-      // if (visualizationType.value === "graph" && lastChartOptions.value && chartKey.value === lastChartOptions.value.key) {
-      //   console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
-      //   return {
-      //     options: lastChartOptions.value.data.options,
-      //     notMerge: false,
-      //     lazyUpdate: true
-      //   };
-      // }
+      // Don't use cache if filters are active (search filter)
+      const hasActiveFilters = searchFilter.value?.trim();
 
-      console.log(
-        "[ServiceGraph] Generating new chart options, chartKey:",
-        chartKey.value,
-        "visualizationType:",
-        visualizationType.value,
-      );
+      // Use cached options if chartKey hasn't changed (prevents double rendering)
+      // BUT only if no filters are active
+      if (visualizationType.value === "graph" &&
+          lastChartOptions.value &&
+          chartKey.value === lastChartOptions.value.key &&
+          !hasActiveFilters) {
+        return {
+          options: lastChartOptions.value.data.options,
+          notMerge: false,
+          lazyUpdate: true,
+          silent: true,
+        };
+      }
+
       const newOptions =
         visualizationType.value === "tree"
-          ? convertServiceGraphToTree(filteredGraphData.value, layoutType.value)
+          ? convertServiceGraphToTree(
+              filteredGraphData.value,
+              layoutType.value,
+              $q.dark.isActive // Pass dark mode state
+            )
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
               layoutType.value,
-              graphNodePositions.value,
+              new Map(), // Empty position cache to allow free movement
+              $q.dark.isActive, // Pass dark mode state
+              undefined, // Don't pass selected node - we'll use dispatchAction instead
             );
 
-      // Cache the options with the current key for graph view
-      if (visualizationType.value === "graph") {
+      // Cache the options for graph view
+      // BUT only if no filters are active (to avoid caching filtered states)
+      if (visualizationType.value === "graph" && !hasActiveFilters) {
         lastChartOptions.value = {
           key: chartKey.value,
           data: newOptions,
         };
+      } else if (hasActiveFilters) {
+        // Clear cache when filtering to ensure fresh render on filter removal
+        lastChartOptions.value = null;
       }
 
       return {
         ...newOptions,
         notMerge: visualizationType.value === "graph" ? false : true, // Merge for graph, replace for tree
+        lazyUpdate: true, // Prevent viewport reset when only styles change
+        silent: true, // Disable animations during update to prevent position jumps
       };
+    });
+
+    // Use ECharts select action to persistently highlight selected node
+    watch(
+      () => selectedNode.value?.id,
+      async (newId, oldId) => {
+        await nextTick();
+
+        if (!chartRendererRef.value?.chart) {
+          return;
+        }
+
+        const chart = chartRendererRef.value.chart;
+
+        // Unselect the old node (if any)
+        if (oldId) {
+          chart.dispatchAction({
+            type: 'unselect',
+            seriesIndex: 0,
+            name: oldId,
+          });
+        }
+
+        // Select the new node (if any)
+        if (newId) {
+          chart.dispatchAction({
+            type: 'select',
+            seriesIndex: 0,
+            name: newId,
+          });
+        }
+      },
+      { flush: 'post' }
+    );
+
+    // Watch for theme changes and re-apply selection
+    watch(
+      () => store.state.theme,
+      async () => {
+        // Increment chartKey to force regeneration with new theme colors
+        chartKey.value++;
+
+        // Save the current selected node ID (in case it changes during the delay)
+        const nodeIdToReselect = selectedNode.value?.id;
+
+        // Use setTimeout to wait for chart to be fully regenerated after theme change
+        setTimeout(() => {
+          if (!chartRendererRef.value?.chart || !nodeIdToReselect) {
+            return;
+          }
+
+          const chart = chartRendererRef.value.chart;
+
+          // Re-apply node selection
+          chart.dispatchAction({
+            type: 'select',
+            seriesIndex: 0,
+            name: nodeIdToReselect,
+          });
+        }, 500); // 500ms delay to ensure chart has fully regenerated
+      }
+    );
+
+    // Watch for stream filter changes and restore chart viewport
+    watch(
+      () => streamFilter.value,
+      async () => {
+        // Wait for chart to update with new data
+        await nextTick();
+        setTimeout(() => {
+          if (!chartRendererRef.value?.chart) {
+            return;
+          }
+
+          const chart = chartRendererRef.value.chart;
+
+          // Restore chart to default zoom/pan to fit all content
+          chart.dispatchAction({
+            type: 'restore',
+          });
+        }, 500); // Longer delay to ensure chart has recalculated positions
+      }
+    );
+
+    // --- Tree edge tooltip: show node tooltip when hovering edge lines ---
+    let edgeTooltipCleanup: (() => void) | null = null;
+
+    const setupTreeEdgeTooltips = (chart: any) => {
+      const zr = chart.getZr();
+      let hideTimer: ReturnType<typeof setTimeout> | null = null;
+
+      // Custom tooltip element (matches ECharts default tooltip style)
+      const tooltipEl = document.createElement('div');
+      tooltipEl.style.cssText = `
+        position: absolute; pointer-events: none; z-index: 9999;
+        background: rgba(50, 50, 50, 0.95); color: #fff;
+        border: 1px solid #777; border-radius: 4px;
+        padding: 8px 12px; font-size: 13px; line-height: 1.6;
+        display: none; white-space: nowrap;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      `;
+      const chartDom = chart.getDom();
+      if (!chartDom.style.position || chartDom.style.position === 'static') {
+        chartDom.style.position = 'relative';
+      }
+      chartDom.appendChild(tooltipEl);
+
+      // Cached edge data: bezier shapes + parent/child names
+      let edgesGroupEl: any = null;
+      let bezierEdges: Array<{
+        shape: any;
+        childName: string;
+        parentName: string;
+      }> = [];
+      let nodePositions: Array<{ idx: number; x: number; y: number; name: string }> = [];
+
+      // Robust child access — handles children(), _children, or childAt/childCount
+      const getChildren = (group: any): any[] => {
+        if (typeof group.children === 'function') return group.children();
+        if (Array.isArray(group._children)) return group._children;
+        const count = typeof group.childCount === 'function' ? group.childCount() : 0;
+        const result: any[] = [];
+        for (let i = 0; i < count; i++) {
+          const c = group.childAt?.(i);
+          if (c) result.push(c);
+        }
+        return result;
+      };
+
+      // Check if a group contains bezier-curve children
+      const hasBezierChildren = (group: any): boolean => {
+        const kids = getChildren(group);
+        return kids.some((c: any) => c.type === 'bezier-curve');
+      };
+
+      // Recursively search for a group containing bezier-curve elements
+      const findBezierGroup = (el: any, depth = 0): any => {
+        if (!el || depth > 6) return null;
+        if (el.type === 'group' && hasBezierChildren(el)) return el;
+        for (const child of getChildren(el)) {
+          const found = findBezierGroup(child, depth + 1);
+          if (found) return found;
+        }
+        return null;
+      };
+
+      // Build into local vars, then atomic-swap so onMouseMove never sees partial state
+      const buildEdgeData = () => {
+        const newBezierEdges: typeof bezierEdges = [];
+        const newNodePositions: typeof nodePositions = [];
+        let newEdgesGroupEl: any = null;
+
+        try {
+          const series = chart.getModel()?.getSeriesByIndex(0);
+          if (!series) return;
+          const data = series.getData();
+          const count = data.count();
+
+          // Collect node layout positions + names
+          for (let i = 0; i < count; i++) {
+            const layout = data.getItemLayout(i);
+            if (layout) {
+              newNodePositions.push({ idx: i, x: layout.x, y: layout.y, name: data.getName(i) });
+            }
+          }
+
+          // Find first node with a graphic element (node 0 may be invisible virtual root)
+          let firstNodeEl = null;
+          for (let i = 0; i < count; i++) {
+            firstNodeEl = data.getItemGraphicEl(i);
+            if (firstNodeEl) break;
+          }
+          if (!firstNodeEl) return;
+
+          // Walk up from node, search siblings at each level for bezier-curve group
+          let current = firstNodeEl;
+          while (current?.parent && !newEdgesGroupEl) {
+            const parent = current.parent;
+            for (const sibling of getChildren(parent)) {
+              if (sibling === current) continue;
+              if (sibling.type === 'group' && hasBezierChildren(sibling)) {
+                newEdgesGroupEl = sibling;
+                break;
+              }
+            }
+            current = parent;
+          }
+
+          // Fallback: recursive search from ZRender root
+          if (!newEdgesGroupEl) {
+            const zrStorage = zr.storage;
+            const roots = zrStorage?.getRoots?.() || zrStorage?._roots || [];
+            for (const root of roots) {
+              newEdgesGroupEl = findBezierGroup(root);
+              if (newEdgesGroupEl) break;
+            }
+          }
+
+          if (!newEdgesGroupEl) return;
+
+          // Collect bezier shapes + match endpoints to node names
+          for (const bezier of getChildren(newEdgesGroupEl)) {
+            if (bezier.type !== 'bezier-curve' || !bezier.shape) continue;
+            const { x1, y1, x2, y2 } = bezier.shape;
+
+            let parentName = '';
+            let pDist = Infinity;
+            let childName = '';
+            let cDist = Infinity;
+            for (const np of newNodePositions) {
+              const dp = Math.hypot(np.x - x1, np.y - y1);
+              if (dp < pDist) { pDist = dp; parentName = np.name; }
+              const dc = Math.hypot(np.x - x2, np.y - y2);
+              if (dc < cDist) { cDist = dc; childName = np.name; }
+            }
+            newBezierEdges.push({ shape: { ...bezier.shape }, childName, parentName });
+          }
+        } catch {
+          return; // Keep previous good data on error
+        }
+
+        // Only swap if we got valid data — never clear good data with empty
+        if (newEdgesGroupEl && newBezierEdges.length > 0) {
+          edgesGroupEl = newEdgesGroupEl;
+          bezierEdges = newBezierEdges;
+          nodePositions = newNodePositions;
+        }
+      };
+
+      // Debounce: only rebuild 200ms after the last `finished` event
+      // (avoids rebuilding during animation frames where shapes are intermediate)
+      let buildTimer: ReturnType<typeof setTimeout> | null = null;
+      const debouncedBuild = () => {
+        if (buildTimer) clearTimeout(buildTimer);
+        buildTimer = setTimeout(buildEdgeData, 200);
+      };
+      chart.on('finished', debouncedBuild);
+      // Also try immediately (works if chart already rendered)
+      buildEdgeData();
+
+      // Use imported helper functions for testability
+
+      // Position and show the tooltip at mouse coords
+      const positionTooltip = (mouseX: number, mouseY: number) => {
+        const cw = chartDom.clientWidth;
+        const ch = chartDom.clientHeight;
+        let left = mouseX + 15;
+        let top = mouseY + 15;
+        tooltipEl.style.display = 'block';
+        if (left + tooltipEl.offsetWidth > cw) left = mouseX - tooltipEl.offsetWidth - 10;
+        if (top + tooltipEl.offsetHeight > ch) top = mouseY - tooltipEl.offsetHeight - 10;
+        tooltipEl.style.left = left + 'px';
+        tooltipEl.style.top = top + 'px';
+      };
+
+      const showNodeTooltip = (mouseX: number, mouseY: number, nodeName: string) => {
+        const edges = graphData.value?.edges || [];
+
+        // Find incoming edge for this node (direction-aware, matches tree label)
+        const incomingBezier = bezierEdges.find(b => b.childName === nodeName);
+        if (incomingBezier) {
+          const edge = findIncomingEdgeForNode(nodeName, incomingBezier.parentName, edges);
+          if (edge) {
+            const total = edge.total_requests || 0;
+            const failed = edge.failed_requests || 0;
+            const errRate = edge.error_rate ?? (total > 0 ? (failed / total) * 100 : 0);
+            tooltipEl.innerHTML = generateNodeTooltipContent(nodeName, total, failed, errRate);
+            positionTooltip(mouseX, mouseY);
+            return;
+          }
+        }
+
+        // Root node or no incoming edge: sum outgoing edges
+        const metrics = calculateRootNodeMetrics(nodeName, edges);
+        if (metrics.requests > 0) {
+          tooltipEl.innerHTML = generateNodeTooltipContent(
+            nodeName,
+            metrics.requests,
+            metrics.errors,
+            metrics.errorRate
+          );
+          positionTooltip(mouseX, mouseY);
+          return;
+        }
+
+        // Fallback: use node aggregate
+        const nodes = graphData.value?.nodes || [];
+        const node = nodes.find((n: any) => (n.label || n.id) === nodeName);
+        if (!node) { tooltipEl.style.display = 'none'; return; }
+
+        const requests = node.requests || 0;
+        const errors = node.errors || 0;
+        const errRate = node.error_rate ?? (requests > 0 ? (errors / requests) * 100 : 0);
+        tooltipEl.innerHTML = generateNodeTooltipContent(nodeName, requests, errors, errRate);
+        positionTooltip(mouseX, mouseY);
+      };
+
+      const showEdgeTooltip = (mouseX: number, mouseY: number, parentName: string, childName: string) => {
+        const edges = graphData.value?.edges || [];
+        const edge = findIncomingEdgeForNode(childName, parentName, edges);
+
+        if (!edge) { tooltipEl.style.display = 'none'; return; }
+
+        const total = edge.total_requests || 0;
+        const failed = edge.failed_requests || 0;
+        const errRate = edge.error_rate ?? (total > 0 ? (failed / total) * 100 : 0);
+
+        tooltipEl.innerHTML = generateEdgeTooltipContent(
+          total,
+          failed,
+          errRate,
+          edge.p50_latency_ns,
+          edge.p95_latency_ns,
+          edge.p99_latency_ns
+        );
+        positionTooltip(mouseX, mouseY);
+      };
+
+      const hideTooltip = () => {
+        tooltipEl.style.display = 'none';
+      };
+
+      let activeKey: string | null = null; // tracks current tooltip target
+      const HIT_PIXELS = 12; // edge hit area in screen pixels
+
+      const onMouseMove = (e: any) => {
+        if (!edgesGroupEl || bezierEdges.length === 0) return;
+        if (!edgesGroupEl.transformCoordToLocal) return;
+
+        // Convert mouse pixel coords → edges group local coords
+        const [mx, my] = edgesGroupEl.transformCoordToLocal(e.offsetX, e.offsetY);
+
+        // Compute pixel-to-layout scale so hit area is consistent across zoom levels
+        const [ox] = edgesGroupEl.transformCoordToLocal(0, 0);
+        const [ox1] = edgesGroupEl.transformCoordToLocal(1, 0);
+        const pxToLayout = Math.abs(ox1 - ox) || 1;
+        const hitThreshold = HIT_PIXELS * pxToLayout;
+        const nodeRadius = 42 * pxToLayout; // half of max symbolSize=80 + small margin
+
+        // Check if mouse is near a node center
+        let nearestNode: typeof nodePositions[0] | null = null;
+        let nearestNodeDist = Infinity;
+        for (const np of nodePositions) {
+          const d = Math.hypot(np.x - mx, np.y - my);
+          if (d < nodeRadius && d < nearestNodeDist) {
+            nearestNodeDist = d;
+            nearestNode = np;
+          }
+        }
+
+        if (nearestNode) {
+          // Show node tooltip
+          if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+          const key = `node:${nearestNode.name}`;
+          activeKey = key;
+          showNodeTooltip(e.offsetX, e.offsetY, nearestNode.name);
+          return;
+        }
+
+        // Find nearest bezier edge
+        let bestDist = Infinity;
+        let bestIdx = -1;
+        for (let i = 0; i < bezierEdges.length; i++) {
+          const d = pointToBezierDistance(mx, my, bezierEdges[i].shape);
+          if (d < bestDist) { bestDist = d; bestIdx = i; }
+        }
+
+        if (bestIdx >= 0 && bestDist < hitThreshold) {
+          if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+          const edge = bezierEdges[bestIdx];
+          const key = `edge:${edge.parentName}->${edge.childName}`;
+          activeKey = key;
+          showEdgeTooltip(e.offsetX, e.offsetY, edge.parentName, edge.childName);
+        } else if (activeKey) {
+          if (!hideTimer) {
+            hideTimer = setTimeout(() => {
+              activeKey = null;
+              hideTooltip();
+              hideTimer = null;
+            }, 100);
+          }
+        }
+      };
+
+      const onGlobalOut = () => {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        activeKey = null;
+        hideTooltip();
+      };
+
+      zr.on('mousemove', onMouseMove);
+      zr.on('globalout', onGlobalOut);
+
+      return () => {
+        zr.off('mousemove', onMouseMove);
+        zr.off('globalout', onGlobalOut);
+        chart.off('finished', debouncedBuild);
+        if (buildTimer) clearTimeout(buildTimer);
+        if (hideTimer) clearTimeout(hideTimer);
+        tooltipEl.remove();
+      };
+    };
+
+    // Set up edge tooltips whenever chart is (re)created for tree view
+    watch(
+      chartKey,
+      async () => {
+        // Clean up previous handlers
+        if (edgeTooltipCleanup) {
+          edgeTooltipCleanup();
+          edgeTooltipCleanup = null;
+        }
+        if (visualizationType.value !== 'tree') return;
+
+        await nextTick();
+        setTimeout(() => {
+          const chart = chartRendererRef.value?.chart;
+          if (chart) {
+            edgeTooltipCleanup = setupTreeEdgeTooltips(chart);
+          }
+        }, 300);
+      },
+      { flush: 'post' }
+    );
+
+    // Watch for data loading completion to set up tooltips on initial load
+    // This handles the case where chartKey changes before the chart is rendered
+    watch(
+      () => loading.value,
+      async (isLoading, wasLoading) => {
+        // Only trigger when loading changes from true to false (data just loaded)
+        if (wasLoading && !isLoading && visualizationType.value === 'tree') {
+          // Clean up previous handlers first
+          if (edgeTooltipCleanup) {
+            edgeTooltipCleanup();
+            edgeTooltipCleanup = null;
+          }
+
+          await nextTick();
+          // Longer delay to ensure chart is fully rendered with new data
+          setTimeout(() => {
+            const chart = chartRendererRef.value?.chart;
+            if (chart) {
+              edgeTooltipCleanup = setupTreeEdgeTooltips(chart);
+            }
+          }, 500);
+        }
+      }
+    );
+
+    onBeforeUnmount(() => {
+      if (edgeTooltipCleanup) {
+        edgeTooltipCleanup();
+        edgeTooltipCleanup = null;
+      }
     });
 
     const loadServiceGraph = async () => {
       loading.value = true;
       error.value = null;
+
+      // Clear cache to force chart regeneration with fresh data
+      lastChartOptions.value = null;
+      chartKey.value++;
 
       try {
         const orgId = store.state.selectedOrganization.identifier;
@@ -380,7 +877,24 @@ export default defineComponent({
           throw new Error("No organization selected");
         }
 
-        // Streams are loaded by parent Index.vue and available in searchObj.data.stream.streamLists
+        // If a specific stream is selected but we don't have available streams yet,
+        // first fetch all streams to populate the dropdown
+        if (
+          availableStreams.value.length === 0 &&
+          streamFilter.value !== "all"
+        ) {
+          const allStreamsResponse =
+            await serviceGraphService.getCurrentTopology(orgId, {
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            });
+          if (
+            allStreamsResponse.data.availableStreams &&
+            allStreamsResponse.data.availableStreams.length > 0
+          ) {
+            availableStreams.value = allStreamsResponse.data.availableStreams;
+          }
+        }
 
         // Stream-only implementation - no store stats needed
         // Use JSON topology endpoint with time range
@@ -428,7 +942,6 @@ export default defineComponent({
             id: `${edge.from}->${edge.to}`,
             from: edge.from,
             to: edge.to,
-            connection_type: edge.connection_type || "standard",
             total_requests: edge.total_requests || 0,
             failed_requests: edge.failed_requests || 0,
             error_rate: edge.error_rate || 0,
@@ -440,7 +953,6 @@ export default defineComponent({
         graphData.value = {
           nodes,
           edges,
-          availableStreams: rawData.availableStreams || [],
         };
 
         // Calculate stats
@@ -497,7 +1009,6 @@ export default defineComponent({
     const parsePrometheusMetrics = (metricsText: string) => {
       const nodes = new Map<string, any>();
       const edges: any[] = [];
-      const availableStreams = new Set<string>();
 
       const lines = metricsText.split("\n");
 
@@ -518,11 +1029,6 @@ export default defineComponent({
         }
 
         if (!labels.client || !labels.server) continue;
-
-        // Track available stream names for the stream selector
-        if (labels.stream_name) {
-          availableStreams.add(labels.stream_name);
-        }
 
         // Add nodes
         if (!nodes.has(labels.client)) {
@@ -550,7 +1056,6 @@ export default defineComponent({
               id: edgeId,
               from: labels.client,
               to: labels.server,
-              connection_type: labels.connection_type || "standard",
               total_requests: 0,
               failed_requests: 0,
             };
@@ -570,7 +1075,6 @@ export default defineComponent({
               id: edgeId,
               from: labels.client,
               to: labels.server,
-              connection_type: labels.connection_type || "standard",
               total_requests: 0,
               failed_requests: 0,
             };
@@ -584,16 +1088,11 @@ export default defineComponent({
       return {
         nodes: Array.from(nodes.values()),
         edges,
-        availableStreams: Array.from(availableStreams).sort(),
       };
     };
 
     const onStreamFilterChange = (stream: string) => {
-      // Update shared stream selection
-      searchObj.data.stream.selectedStream = {
-        label: stream === "all" ? "" : stream,
-        value: stream === "all" ? "" : stream,
-      };
+      streamFilter.value = stream;
       localStorage.setItem("serviceGraph_streamFilter", stream);
 
       // Reload service graph with new stream filter
@@ -605,8 +1104,9 @@ export default defineComponent({
       let edges = [...graphData.value.edges];
 
       // Filter by search
-      if (searchFilter.value) {
-        const search = searchFilter.value.toLowerCase();
+      const trimmedSearch = searchFilter.value?.trim();
+      if (trimmedSearch) {
+        const search = trimmedSearch.toLowerCase();
         const matchingNodeIds = new Set(
           nodes
             .filter((n) => n.label.toLowerCase().includes(search))
@@ -615,19 +1115,6 @@ export default defineComponent({
 
         edges = edges.filter(
           (e) => matchingNodeIds.has(e.from) || matchingNodeIds.has(e.to),
-        );
-
-        const usedNodeIds = new Set([
-          ...edges.map((e) => e.from),
-          ...edges.map((e) => e.to),
-        ]);
-        nodes = nodes.filter((n) => usedNodeIds.has(n.id));
-      }
-
-      // Filter by connection type
-      if (connectionTypeFilter.value !== "all") {
-        edges = edges.filter(
-          (e) => e.connection_type === connectionTypeFilter.value,
         );
 
         const usedNodeIds = new Set([
@@ -657,8 +1144,6 @@ export default defineComponent({
         layoutType.value = "horizontal";
       } else {
         layoutType.value = "force";
-        // Clear cached positions when switching to graph view to allow fresh layout
-        graphNodePositions.value = new Map();
       }
       // Force chart recreation when visualization type changes
       chartKey.value++;
@@ -671,25 +1156,116 @@ export default defineComponent({
     };
 
     const updateTimeRange = (value: any) => {
-      // Update shared datetime state
       searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
         relativeTimePeriod:
           value.relativeTimePeriod || searchObj.data.datetime.relativeTimePeriod,
         type: value.relativeTimePeriod ? "relative" : "absolute",
-        queryRangeRestrictionMsg: searchObj.data.datetime?.queryRangeRestrictionMsg || "",
-        queryRangeRestrictionInHour: searchObj.data.datetime?.queryRangeRestrictionInHour || 0,
       };
       // Reload service graph with new time range
       loadServiceGraph();
     };
 
     // Load trace streams using the same method as the Traces search page
-    // Streams are loaded by parent Index.vue into searchObj.data.stream.streamLists
-    // No need to load them again here
+    const loadTraceStreams = async () => {
+      try {
+        const res = await getStreams("traces", false, false);
+        if (res?.list?.length > 0) {
+          availableStreams.value = res.list.map((stream: any) => stream.name);
+        }
+      } catch (e) {
+        console.error("Error loading trace streams:", e);
+      }
+    };
 
-    onMounted(() => {
+    // Settings handler
+    const resetSettings = () => {
+      // Reset to default settings if needed
+      showSettings.value = false;
+    };
+
+    // Side Panel Handlers
+    const handleNodeClick = (params: any) => {
+      // Check if it's an edge click (for graph visualization)
+      if (params.dataType === 'edge' && params.data) {
+        // Close node panel when opening edge panel
+        showSidePanel.value = false;
+        selectedNode.value = null;
+
+        // Find the full edge data from graphData
+        const edgeData = graphData.value.edges.find(
+          (e: any) => e.from === params.data.source && e.to === params.data.target
+        );
+        if (edgeData) {
+          selectedEdge.value = edgeData;
+          showEdgePanel.value = true;
+        } else {
+          console.warn('[ServiceGraph] Could not find edge data for:', params.data.source, '->', params.data.target);
+        }
+      }
+      // Check if it's a node click (for graph visualization)
+      else if (params.dataType === 'node' && params.data) {
+        // Check if clicking the same node - if so, close the panel
+        if (selectedNode.value && selectedNode.value.id === params.data.id) {
+          showSidePanel.value = false;
+          selectedNode.value = null;
+        } else {
+          // Close edge panel when opening node panel
+          showEdgePanel.value = false;
+          selectedEdge.value = null;
+
+          selectedNode.value = params.data;
+          showSidePanel.value = true;
+        }
+      }
+      // For tree visualization, check if it's a tree node
+      else if (params.componentType === 'series' && params.data && params.data.name) {
+        // Find the actual node data from graphData
+        const nodeData = graphData.value.nodes.find(
+          (n: any) => n.label === params.data.name || n.id === params.data.name
+        );
+
+        if (nodeData) {
+          // Check if clicking the same node - if so, close the panel
+          if (selectedNode.value && selectedNode.value.id === nodeData.id) {
+            showSidePanel.value = false;
+            selectedNode.value = null;
+          } else {
+            // Close edge panel when opening node panel
+            showEdgePanel.value = false;
+            selectedEdge.value = null;
+
+            selectedNode.value = nodeData;
+            showSidePanel.value = true;
+          }
+        } else {
+          console.warn('[ServiceGraph] Could not find node data for:', params.data.name);
+        }
+      } else {
+        console.log('[ServiceGraph] Click not on a node or edge, ignoring');
+      }
+    };
+
+    const handleCloseSidePanel = () => {
+      showSidePanel.value = false;
+      // Don't clear selectedNode immediately to allow smooth close animation
+      setTimeout(() => {
+        selectedNode.value = null;
+      }, 300);
+    };
+
+    // Edge Panel Handlers
+    const handleCloseEdgePanel = () => {
+      showEdgePanel.value = false;
+      // Don't clear selectedEdge immediately to allow smooth close animation
+      setTimeout(() => {
+        selectedEdge.value = null;
+      }, 300);
+    };
+
+    onMounted(async () => {
+      await loadTraceStreams();
       loadServiceGraph();
     });
 
@@ -703,9 +1279,9 @@ export default defineComponent({
       lastUpdated,
       searchFilter,
       streamFilter,
-      connectionTypeFilter,
-      connectionTypeTabs,
+      availableStreams,
       visualizationType,
+      visualizationTabs,
       layoutType,
       layoutOptions,
       chartData,
@@ -720,6 +1296,16 @@ export default defineComponent({
       setLayout,
       setVisualizationType,
       updateTimeRange,
+      resetSettings,
+      // Side panel
+      selectedNode,
+      showSidePanel,
+      handleNodeClick,
+      handleCloseSidePanel,
+      // Edge panel
+      selectedEdge,
+      showEdgePanel,
+      handleCloseEdgePanel,
     };
   },
 });
@@ -747,33 +1333,26 @@ export default defineComponent({
   overflow: hidden;
 }
 
+.service-graph-container {
+  position: relative;
+  overflow: hidden;
+  background: #0f1419 !important;
+}
+
+.body--light .service-graph-container {
+  background: #ffffff !important; // White background for light mode
+}
+
+.graph-with-panel-container {
+  position: relative;
+  overflow: visible;
+}
+
 code {
   background: #f0f0f0;
   padding: 2px 6px;
   border-radius: 3px;
   font-family: "Courier New", monospace;
   font-size: 0.9em;
-  font-weight: 600;
-  color: #333;
-}
-
-.view-toggle-buttons {
-  :deep(.q-btn) {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-
-  :deep(.q-btn-item) {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-
-  :deep(.q-btn__content) {
-    gap: 0.5rem;
-  }
-
-  :deep(.q-separator) {
-    margin: 0.25rem 0;
-  }
 }
 </style>

@@ -232,8 +232,10 @@
     "patternColumnHeader": "Padrão",
     "occurrenceColumnHeader": "Ocorrência",
     "percentageColumnHeader": "Porcentagem",
+    "anomalyColumnHeader": "Anomalia",
     "actionsColumnHeader": "Ações",
     "anomalyLabel": "ANOMALIA",
+    "anomalyDetected": "Anomalia detectada",
     "includePatternInSearch": "Incluir padrão na pesquisa",
     "excludePatternFromSearch": "Excluir padrão da pesquisa",
     "showPatternDetails": "Mostrar detalhes ({variáveis} variáveis, {exemplos} exemplos)",
@@ -307,7 +309,10 @@
     "show": "Mostra",
     "editor": "Editor",
     "webUrlNotConfigured": "O URL de compartilhamento é desativado até que ZO_WEB_URL seja configurado pelo administrador.",
-    "showHideColumns": "Mostrar/ocultar colunas"
+    "showHideColumns": "Mostrar/ocultar colunas",
+    "autoRefresh": "Atualização automática",
+    "createSavedView": "Criar visualização salva",
+    "listSavedViews": "Listar visualizações salvas"
   },
   "menu": {
     "home": "Início",
@@ -1179,6 +1184,9 @@
     "wraptext": "Envolva as células da tabela",
     "tableTranspose": "Transpor",
     "tableDynamicColumns": "Permitir colunas dinâmicas",
+    "pagination": "Paginação",
+    "rowsPerPage": "Linhas por página",
+    "rowsPerPageTooltip": "Defina o número padrão de registros a serem exibidos por página",
     "showBorder": "Mostrar borda do eixo",
     "currencyDollar": "Moeda - Dólar ($)",
     "currencyEuro": "Moeda - Euro (€)",
@@ -1888,7 +1896,101 @@
     "msteams": "Equipes da Microsoft",
     "pagerduty": "Dever de pager",
     "opsgenie": "Opsgenie",
-    "servicenow": "Atenda agora"
+    "servicenow": "Atenda agora",
+    "saveAlert": "Salvar alerta",
+    "aggregation_threshold": "Alerte se houver algum grupo",
+    "thresholdDynamic": {
+      "alertMeWhen": "Avise-me quando",
+      "metricTypes": {
+        "resultsPassedFilter": "filtros de resultados aprovados",
+        "distinctGroupsAffected": "grupos distintos são afetados",
+        "metricsMatchCriteria": "as métricas correspondem aos critérios",
+        "matchingLogsFound": "registros correspondentes encontrados",
+        "groupsPassFilter": "grupos passam por critérios de filtro",
+        "distinctGroups": "grupos distintos encontrados",
+        "resultRows": "linhas de resultados retornadas",
+        "timeSeries": "série temporal ativa encontrada",
+        "matchingRecords": "registros correspondentes encontrados",
+        "groupsWithHaving": "condições de partida de grupos",
+        "uniqueGroups": "grupos exclusivos",
+        "events": "condições de jogo de eventos",
+        "aggregatedValue": "condições da partida"
+      },
+      "contextLabels": {
+        "groupedBy": "Agrupados por:",
+        "havingConditions": "TENDO condições:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Nome do alerta",
+      "sqlQuery": "Consulta SQL",
+      "promqlQuery": "Consulta ProMQL",
+      "conditions": "Condições",
+      "copy": "Copiar",
+      "noCondition": "Sem condição",
+      "noDescription": "Sem descrição",
+      "evaluationHistory": "Histórico de avaliação",
+      "loadingHistory": "Carregando histórico...",
+      "noHistoryAvailable": "Não há histórico de avaliação disponível para este alerta",
+      "results": "Resultados"
+    },
+    "historyTable": {
+      "timestamp": "Carimbo de data/hora",
+      "status": "Status",
+      "evaluationTime": "Avaliação (ões)",
+      "queryTime": "Consulta (ms)",
+      "error": "Erro"
+    },
+    "back": "Voltar",
+    "continue": "Continuar",
+    "wouldTrigger": "DESENCADEARIA",
+    "wouldNotTrigger": "NÃO ACIONARIA",
+    "queryBuilder": "Construtor",
+    "groupByHelp": {
+      "description": "Agrupe os dados agregados por campos específicos para criar alertas separados para cada valor exclusivo.",
+      "example": "Exemplo: agrupe por “nome de host” para receber alertas individuais por servidor ou por “status_code” para rastrear erros separadamente."
+    },
+    "conditions": {
+      "condition": "Condição",
+      "conditionGroup": "Grupo de condições",
+      "addConditionTooltip": "Adicionar uma nova condição a este grupo",
+      "addConditionGroupTooltip": "Adicionar um grupo de condições aninhado (profundidade máxima: 2)",
+      "maxDepthReachedTooltip": "Profundidade máxima de aninhamento alcançada"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Alerta definido para",
+      "currentWindow": "Janela atual",
+      "cycle": "Ciclo",
+      "cycleTooltip": "Compare os resultados com o mesmo horário no ciclo anterior.",
+      "runningFor": "Executando por {período} no intervalo de cada {frequência}",
+      "currentWindowCannotBeDeleted": "A janela atual não pode ser excluída",
+      "comparingWith": "Comparando com",
+      "referenceWindow": "Janela de referência",
+      "timeFrame": "Período de tempo",
+      "timeFrameTooltip": "Intervalo de tempo para sua consulta.",
+      "comparingText": "Comparando o resultado da consulta da janela atual com o resultado da consulta do {offset} anterior.",
+      "addComparisonWindow": "Adicionar janela de comparação",
+      "goToConditions": "Vá para Condições",
+      "goToConditionsTooltip": "Clique em “Ir para as condições” para verificar os eventos nas janelas de comparação selecionadas"
+    },
+    "alertSettings": {
+      "cronSchedule": "Programação Cron",
+      "addNewDestination": "Adicionar novo destino",
+      "cooldownTooltip": "Se o alerta for acionado, quanto tempo ele deve esperar antes de enviar outra notificação. Por exemplo, se o alerta for acionado às 16h e a notificação de silêncio estiver definida para 10 minutos, ele não enviará outra notificação até as 16h10, mesmo que o alerta ainda esteja após 1 minuto. Isso é para evitar enviar spam ao usuário com notificações.",
+      "thresholdTooltip": "Define quando o alerta deve ser acionado com base na contagem de eventos ou no valor agregado. Exemplo: Se definido como “> 100\", o alerta é acionado quando a contagem excede 100 eventos.",
+      "periodTooltip": "Período durante o qual a consulta deve ser executada. Por exemplo, 10 minutos significa que sempre que a consulta for executada, ela usará os últimos 10 minutos de dados.",
+      "frequencyTooltipMinutes": "Com que frequência a tarefa deve ser executada. Por exemplo, a cada 5 minutos.",
+      "frequencyTooltipCron": "Formato cron padrão do UNIX com 5 campos separados por espaço: [Minuto 0-59] [Hora 0-23] [Dia do mês 1-31] [Mês 1-12 ou JAN-DEZ] [Dia da semana 0-7 ou '1L-7L', 0 e 7 para domingo].",
+      "timezoneWarning": "Aviso: O fuso horário exibido é aproximado. Verifique e selecione o fuso horário correto manualmente.",
+      "destinationsTooltip": "Selecione um ou mais destinos para enviar notificações de alerta.",
+      "templateTooltip": "Opcional: selecione um modelo para usar em todos os destinos neste alerta. Os modelos permitem que você personalize o formato das mensagens de alerta. Se não for selecionado, cada destino usará seu próprio modelo configurado."
+    },
+    "advanced": {
+      "addVariable": "Adicionar variável",
+      "variablesTooltip": "As variáveis são usadas para passar dados do alerta para o destino.",
+      "rowTemplateTooltip": "O modelo de linha é usado para formatar a mensagem de alerta.",
+      "templateType": "Tipo de modelo:"
+    }
   },
   "alert_templates": {
     "header": "Modelos",
@@ -1939,7 +2041,10 @@
     "customWebhook": "Personalizado (Webhook)",
     "customEmail": "Personalizado (e-mail)",
     "customAction": "Personalizado (Ação)",
-    "custom": "Personalizado"
+    "custom": "Personalizado",
+    "separator": "Separador",
+    "separator_placeholder": "Insira o separador (por exemplo, |,\\n,\\ t, espaço)",
+    "separator_hint": "Cadeia de caracteres separadora a ser usada entre registros (espaços permitidos)"
   },
   "metrics": {
     "searchMetric": "Pesquisar uma métrica",
@@ -2143,7 +2248,6 @@
       "groupsLabel": "grupos",
       "noMatchingGroups": "Nenhum grupo correspondente",
       "fqnFormulaTitle": "Fórmula de identidade",
-      "fqnFormulaTooltip": "Mostra como a identidade do serviço será calculada. As dimensões de escopo (azul) são concatenadas com '/'. A primeira dimensão de carga de trabalho não nula (verde) se torna o nome do serviço.",
       "scopeDimension": "Dimensão de escopo",
       "workloadDimension": "Dimensão de carga de trabalho",
       "noFormulaConfigured": "Nenhuma fórmula de identidade configurada. Adicione dimensões acima.",
@@ -2597,7 +2701,8 @@
     "showLegends": "Mostrar lendas"
   },
   "alert_list": {
-    "alert_details": "Detalhes do alerta"
+    "alert_details": "Detalhes do alerta",
+    "alert_history": "Histórico de alertas"
   },
   "latencyInsights": {
     "title": "Percepções",
@@ -2750,7 +2855,13 @@
       }
     },
     "viewInTraces": "Exibir em traços",
-    "viewInTracesTooltip": "Abra a página de rastreamentos com o painel de métricas RED e todos os rastreamentos correlacionados"
+    "viewInTracesTooltip": "Abra a página de rastreamentos com o painel de métricas RED e todos os rastreamentos correlacionados",
+    "exportToJson": "Exportar para JSON",
+    "noLogsDescription": "Nenhum registro encontrado para essa correlação no intervalo de tempo selecionado.",
+    "tracesErrorDetails": "Ocorreu um erro ao buscar dados de rastreamento. Por favor, tente novamente.",
+    "metricsError": "Não é possível carregar métricas",
+    "metricsErrorDetails": "Ocorreu um erro ao buscar dados de métricas. Por favor, tente novamente.",
+    "noMetricsDescription": "Nenhuma métrica encontrada para essa correlação no intervalo de tempo selecionado."
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",

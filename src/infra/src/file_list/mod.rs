@@ -28,7 +28,6 @@ use once_cell::sync::Lazy;
 
 use crate::errors::{Error, Result};
 
-pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
@@ -39,7 +38,6 @@ pub fn connect_default() -> Box<dyn FileList> {
     match get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteFileList>::default(),
-        MetaStore::MySQL => Box::<mysql::MysqlFileList>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresFileList>::default(),
     }
 }
@@ -660,8 +658,6 @@ pub struct FileRecord {
     pub index_size: i64,
     #[sqlx(default)]
     pub flattened: bool,
-    #[sqlx(default)]
-    pub created_at: i64,
     #[sqlx(default)]
     pub updated_at: i64,
 }

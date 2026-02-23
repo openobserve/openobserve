@@ -140,7 +140,7 @@ pub async fn create_role(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a role", "category": "authorization"}))
+        ("x-o2-mcp" = json!({"description": "Delete a role", "category": "authorization", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_role(Path((org_id, role_name)): Path<(String, String)>) -> Response {

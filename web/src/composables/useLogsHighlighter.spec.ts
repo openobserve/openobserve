@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -62,22 +62,28 @@ vi.mock("@/utils/logs/keyValueParser", () => ({
   })),
 }));
 
+// Mock html utils
+vi.mock("@/utils/html", () => ({
+  escapeHtml: vi.fn((text) => text.replace(/</g, "&lt;").replace(/>/g, "&gt;")),
+}));
+
 // Mock textHighlighter composable
 vi.mock("@/composables/useTextHighlighter", () => ({
   useTextHighlighter: () => ({
-    processTextWithHighlights: vi.fn((text, query, colors, quotes) =>
-      `<span class="log-string">${text}</span>`
+    processTextWithHighlights: vi.fn(
+      (text, query, colors, quotes) =>
+        `<span class="log-string">${text}</span>`,
     ),
-    extractKeywords: vi.fn((query) => query ? ["test"] : []),
+    extractKeywords: vi.fn((query) => (query ? ["test"] : [])),
     splitTextByKeywords: vi.fn((text, keywords) =>
-      keywords.length ? [
-        { text: text, isHighlighted: true }
-      ] : [
-        { text: text, isHighlighted: false }
-      ]
+      keywords.length
+        ? [{ text: text, isHighlighted: true }]
+        : [{ text: text, isHighlighted: false }],
     ),
-    escapeHtml: vi.fn((text) => text.replace(/</g, "&lt;").replace(/>/g, "&gt;")),
-    isFTSColumn: vi.fn((columnId, value, keys) => keys.includes(columnId) && typeof value === "string"),
+    isFTSColumn: vi.fn(
+      (columnId, value, keys) =>
+        keys.includes(columnId) && typeof value === "string",
+    ),
   }),
 }));
 
@@ -108,8 +114,16 @@ describe("useLogsHighlighter", () => {
 
   describe("processHitsInChunks", () => {
     const mockHits = [
-      { message: "Error occurred", level: "error", _p_timestamp: 1640995200000 },
-      { message: "Warning message", level: "warn", _p_timestamp: 1640995300000 },
+      {
+        message: "Error occurred",
+        level: "error",
+        _p_timestamp: 1640995200000,
+      },
+      {
+        message: "Warning message",
+        level: "warn",
+        _p_timestamp: 1640995300000,
+      },
       { message: "Info message", level: "info", _p_timestamp: 1640995400000 },
     ];
 
@@ -128,7 +142,7 @@ describe("useLogsHighlighter", () => {
         false,
         "match_all('error')",
         2,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -142,7 +156,7 @@ describe("useLogsHighlighter", () => {
         false,
         "",
         50,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -155,7 +169,7 @@ describe("useLogsHighlighter", () => {
         false,
         "",
         50,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -168,7 +182,7 @@ describe("useLogsHighlighter", () => {
         true,
         "",
         50,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -181,7 +195,7 @@ describe("useLogsHighlighter", () => {
         false,
         "",
         1, // Very small chunk size
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -194,7 +208,7 @@ describe("useLogsHighlighter", () => {
         false,
         "match_all('error')",
         50,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -204,7 +218,7 @@ describe("useLogsHighlighter", () => {
       const columnsWithAccessor = [
         {
           id: "custom",
-          accessorFn: (row: any) => `${row.level}: ${row.message}`
+          accessorFn: (row: any) => `${row.level}: ${row.message}`,
         },
       ];
 
@@ -214,7 +228,7 @@ describe("useLogsHighlighter", () => {
         false,
         "",
         50,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -227,7 +241,7 @@ describe("useLogsHighlighter", () => {
         false,
         "",
         1, // Small chunk size to trigger multiple async operations
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       // Should process all hits successfully
@@ -365,17 +379,14 @@ describe("useLogsHighlighter", () => {
     it("should highlight matching keywords", () => {
       const result = logsHighlighter.simpleHighlight(
         "error in system",
-        "match_all('error')"
+        "match_all('error')",
       );
 
       expect(result).toContain("error in system");
     });
 
     it("should handle text without keywords", () => {
-      const result = logsHighlighter.simpleHighlight(
-        "normal text",
-        ""
-      );
+      const result = logsHighlighter.simpleHighlight("normal text", "");
 
       expect(result).toContain("normal text");
     });
@@ -383,7 +394,7 @@ describe("useLogsHighlighter", () => {
     it("should escape HTML in text", () => {
       const result = logsHighlighter.simpleHighlight(
         "<script>alert('xss')</script>",
-        ""
+        "",
       );
 
       expect(result).toContain("&lt;script&gt;");
@@ -449,7 +460,7 @@ describe("useLogsHighlighter", () => {
 
     it("should detect UUIDs", () => {
       const result = logsHighlighter.detectSemanticType(
-        "550e8400-e29b-41d4-a716-446655440000"
+        "550e8400-e29b-41d4-a716-446655440000",
       );
       expect(result).toBe("uuid");
     });
@@ -460,7 +471,9 @@ describe("useLogsHighlighter", () => {
     });
 
     it("should detect Windows file paths", () => {
-      const result = logsHighlighter.detectSemanticType("C:\\Windows\\System32");
+      const result = logsHighlighter.detectSemanticType(
+        "C:\\Windows\\System32",
+      );
       expect(result).toBe("path");
     });
 
@@ -477,7 +490,9 @@ describe("useLogsHighlighter", () => {
     it("should handle empty or invalid input", () => {
       expect(logsHighlighter.detectSemanticType("")).toBe("default");
       expect(logsHighlighter.detectSemanticType(null as any)).toBe("default");
-      expect(logsHighlighter.detectSemanticType(undefined as any)).toBe("default");
+      expect(logsHighlighter.detectSemanticType(undefined as any)).toBe(
+        "default",
+      );
     });
   });
 
@@ -487,7 +502,7 @@ describe("useLogsHighlighter", () => {
         "192.168.1.1",
         "ip",
         "",
-        false
+        false,
       );
 
       expect(result).toContain("log-ip");
@@ -499,7 +514,7 @@ describe("useLogsHighlighter", () => {
         "test text",
         "string",
         "",
-        true
+        true,
       );
 
       expect(result).toContain('"');
@@ -510,7 +525,7 @@ describe("useLogsHighlighter", () => {
         "error message",
         "string",
         "match_all('error')",
-        false
+        false,
       );
 
       expect(result).toContain("error message");
@@ -519,7 +534,8 @@ describe("useLogsHighlighter", () => {
 
   describe("isLogLineWithMixedContent", () => {
     it("should detect HTTP log lines with mixed content", () => {
-      const logLine = '192.168.1.1 - - [01/Jan/2023:12:00:00 +0000] "GET /api/users HTTP/1.1" 200';
+      const logLine =
+        '192.168.1.1 - - [01/Jan/2023:12:00:00 +0000] "GET /api/users HTTP/1.1" 200';
       const result = logsHighlighter.isLogLineWithMixedContent(logLine);
       expect(result).toBe(true);
     });
@@ -557,7 +573,12 @@ describe("useLogsHighlighter", () => {
   describe("colorizeObjectWithClasses", () => {
     it("should colorize simple object", () => {
       const obj = { level: "error", message: "Something wrong" };
-      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, true, "");
+      const result = logsHighlighter.colorizeObjectWithClasses(
+        obj,
+        true,
+        true,
+        "",
+      );
 
       expect(result).toContain("level");
       expect(result).toContain("error");
@@ -567,7 +588,12 @@ describe("useLogsHighlighter", () => {
 
     it("should handle objects without braces", () => {
       const obj = { level: "error" };
-      const result = logsHighlighter.colorizeObjectWithClasses(obj, false, true, "");
+      const result = logsHighlighter.colorizeObjectWithClasses(
+        obj,
+        false,
+        true,
+        "",
+      );
 
       expect(result).toContain("level");
       expect(result).not.toContain("log-object-brace");
@@ -575,7 +601,12 @@ describe("useLogsHighlighter", () => {
 
     it("should handle objects without quotes", () => {
       const obj = { level: "error" };
-      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, false, "");
+      const result = logsHighlighter.colorizeObjectWithClasses(
+        obj,
+        true,
+        false,
+        "",
+      );
 
       expect(result).toContain("level");
       expect(result).not.toContain('"level"');
@@ -585,10 +616,15 @@ describe("useLogsHighlighter", () => {
       const obj = {
         user: {
           id: 123,
-          email: "user@example.com"
-        }
+          email: "user@example.com",
+        },
       };
-      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, true, "");
+      const result = logsHighlighter.colorizeObjectWithClasses(
+        obj,
+        true,
+        true,
+        "",
+      );
 
       expect(result).toContain("user");
       expect(result).toContain("id");
@@ -597,7 +633,12 @@ describe("useLogsHighlighter", () => {
 
     it("should handle arrays in objects", () => {
       const obj = { items: [1, 2, 3] };
-      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, true, "");
+      const result = logsHighlighter.colorizeObjectWithClasses(
+        obj,
+        true,
+        true,
+        "",
+      );
 
       expect(result).toContain("items");
       expect(result).toContain("[1,2,3]");
@@ -611,7 +652,12 @@ describe("useLogsHighlighter", () => {
         null: null,
         timestamp: 1640995200000,
       };
-      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, true, "");
+      const result = logsHighlighter.colorizeObjectWithClasses(
+        obj,
+        true,
+        true,
+        "",
+      );
 
       expect(result).toContain("text");
       expect(result).toContain("42");
@@ -637,7 +683,13 @@ describe("useLogsHighlighter", () => {
       const obj = { level: "error", message: "test" };
       const colors = { keyName: "#000", stringValue: "#333" };
 
-      const result = logsHighlighter.colorizeObject(obj, colors, true, true, "");
+      const result = logsHighlighter.colorizeObject(
+        obj,
+        colors,
+        true,
+        true,
+        "",
+      );
       expect(result).toContain("level");
       expect(result).toContain("error");
     });
@@ -647,7 +699,7 @@ describe("useLogsHighlighter", () => {
         "192.168.1.1",
         "#1976d2",
         "",
-        false
+        false,
       );
 
       expect(result).toContain("192.168.1.1");
@@ -674,7 +726,7 @@ describe("useLogsHighlighter", () => {
         false,
         "",
         100,
-        ["message"]
+        ["message"],
       );
       const endTime = Date.now();
 
@@ -708,7 +760,12 @@ describe("useLogsHighlighter", () => {
         "key@with@symbols": "value4",
       };
 
-      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, true, "");
+      const result = logsHighlighter.colorizeObjectWithClasses(
+        obj,
+        true,
+        true,
+        "",
+      );
       expect(result).toContain("key with spaces");
       expect(result).toContain("key-with-dashes");
       expect(result).toContain("key.with.dots");

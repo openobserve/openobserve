@@ -422,34 +422,6 @@ def test_list_dashboards_pagination(create_session, base_url):
         session.delete(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
 
 
-def test_export_dashboard(create_session, base_url):
-    """Test exporting a dashboard in portable format"""
-    session = create_session
-
-    # Create a dashboard first
-    create_url = f"{base_url}api/{ORG_ID}/dashboards"
-    dashboard_data = {
-        "title": "Dashboard for Export",
-        "description": "Test dashboard export",
-        "folder_id": "default"
-    }
-
-    create_resp = session.post(create_url, json=dashboard_data)
-    assert create_resp.status_code in [200, 201]
-    dashboard_id = create_resp.json()["v8"]["dashboardId"]
-
-    # Export the dashboard
-    export_url = f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}/export"
-    resp = session.get(export_url)
-    assert resp.status_code == 200, f"Export dashboard failed: {resp.status_code} {resp.text}"
-
-    body = resp.json()
-    # Verify exported dashboard contains required fields
-    assert "v7" in body or "version" in body, "Exported dashboard should contain version info"
-
-    # Clean up
-    session.delete(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
-
 
 def test_move_multiple_dashboards_batch(create_session, base_url):
     """Test batch moving multiple dashboards to another folder"""

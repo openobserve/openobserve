@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -33,7 +33,10 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use rayon::slice::ParallelSliceMut;
 
-use crate::service::search::datafusion::exec::{DataFusionContextBuilder, TableBuilder};
+use crate::service::search::datafusion::{
+    exec::{DataFusionContextBuilder, TableBuilder},
+    table_provider::uniontable::NewUnionTable,
+};
 
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
     Arc::new(Schema::new(vec![
@@ -51,7 +54,6 @@ pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
         Field::new("original_size", DataType::Int64, false),
         Field::new("compressed_size", DataType::Int64, false),
         Field::new("index_size", DataType::Int64, false),
-        Field::new("created_at", DataType::Int64, false),
         Field::new("updated_at", DataType::Int64, false),
     ]))
 });
@@ -87,7 +89,6 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(original_size_col, "original_size", Int64Array, rb);
     get_col!(compressed_size_col, "compressed_size", Int64Array, rb);
     get_col!(index_size_col, "index_size", Int64Array, rb);
-    get_col!(created_at_col, "created_at", Int64Array, rb);
     get_col!(updated_at_col, "updated_at", Int64Array, rb);
     let mut ret = Vec::with_capacity(rb.num_rows());
     for idx in 0..rb.num_rows() {
@@ -106,7 +107,6 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
             original_size: original_size_col.value(idx),
             compressed_size: compressed_size_col.value(idx),
             index_size: index_size_col.value(idx),
-            created_at: created_at_col.value(idx),
             updated_at: updated_at_col.value(idx),
         };
         ret.push(t);
@@ -244,7 +244,8 @@ async fn inner_exec(
         .trace_id(trace_id)
         .build(partitions)
         .await?;
-    ctx.register_table("file_list", table)?;
+    let union_table = Arc::new(NewUnionTable::new(schema, table));
+    ctx.register_table("file_list", union_table)?;
     let df = ctx.sql(query).await?;
     let ret = df.collect().await?;
     Ok(ret)
@@ -822,7 +823,7 @@ mod tests {
         // Verify the schema has the expected fields
         let schema = FILE_LIST_SCHEMA.clone();
 
-        assert_eq!(schema.fields().len(), 16);
+        assert_eq!(schema.fields().len(), 15);
 
         // Check key field names and types
         assert_eq!(schema.field(0).name(), "id");
@@ -937,7 +938,6 @@ mod tests {
         assert_eq!(first.original_size, 1000);
         assert_eq!(first.compressed_size, 500);
         assert_eq!(first.index_size, 50);
-        assert_eq!(first.created_at, 1000);
         assert_eq!(first.updated_at, 1100);
     }
 
@@ -976,7 +976,6 @@ mod tests {
             ("original_size", DataType::Int64),
             ("compressed_size", DataType::Int64),
             ("index_size", DataType::Int64),
-            ("created_at", DataType::Int64),
             ("updated_at", DataType::Int64),
         ];
 

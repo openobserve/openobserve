@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -89,6 +89,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         file_list::LOCAL_CACHE.create_table_index().await?;
     }
     file_list::local_cache_gc().await?;
+    if cfg.common.meta_store == "postgres" {
+        file_list::postgres::spawn_maintenance_task().await?;
+    }
     if !config::is_local_disk_storage() {
         storage::test_remote_config().await?;
     }
@@ -97,18 +100,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     log::info!("Shutting down DDL connection pool");
     // Shutdown DDL connection pool after all migrations are complete
-    match cfg.common.meta_store.as_str() {
-        "postgres" => {
-            if let Err(e) = crate::db::postgres::shutdown_ddl_pool().await {
-                log::warn!("Failed to shutdown PostgreSQL DDL connection pool: {}", e);
-            }
-        }
-        "mysql" => {
-            if let Err(e) = crate::db::mysql::shutdown_ddl_pool().await {
-                log::warn!("Failed to shutdown MySQL DDL connection pool: {}", e);
-            }
-        }
-        _ => {} // SQLite doesn't have separate DDL pool
+    if cfg.common.meta_store.as_str() == "postgres"
+        && let Err(e) = crate::db::postgres::shutdown_ddl_pool().await
+    {
+        log::warn!("Failed to shutdown PostgreSQL DDL connection pool: {}", e);
     }
 
     Ok(())

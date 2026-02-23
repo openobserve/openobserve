@@ -70,10 +70,6 @@ export default function useRoutePrefetch() {
         // Trigger the dynamic import
         // The browser will cache this module, making subsequent navigation instant
         await moduleLoader();
-
-        console.debug(
-          `[Prefetch] Successfully prefetched module for route: ${routePath}`,
-        );
       } catch (error) {
         // If prefetch fails, remove from cache so it can be retried
         prefetchedRoutes.value.delete(routePath);

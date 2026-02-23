@@ -22,7 +22,6 @@ use std::collections::HashMap;
 use config::{
     meta::alerts::{
         alert::Alert,
-        deduplication::GlobalDeduplicationConfig,
         incidents::{
             AlertEdge, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
             IncidentTopology, IncidentWithAlerts,
@@ -30,7 +29,6 @@ use config::{
     },
     utils::json::{Map, Value},
 };
-use itertools::Itertools;
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -80,52 +78,16 @@ pub async fn correlate_alert_to_incident(
     _service_name_hint: Option<&str>,
     trace_id: Option<&str>,
 ) -> Result<Option<(String, String)>, anyhow::Error> {
-    // Get org-level deduplication config for semantic groups
-    let org_config = match super::org_config::get_deduplication_config(&alert.org_id).await {
-        Ok(Some(config)) if config.enabled => config,
-        Ok(Some(_)) | Ok(None) => {
-            // No org config or disabled - use enterprise default semantic groups
-            #[cfg(feature = "enterprise")]
-            {
-                GlobalDeduplicationConfig {
-                    enabled: false,
-                    alert_dedup_enabled: false,
-                    semantic_field_groups:
-                        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file(
-                        ),
-                    time_window_minutes: None,
-                    alert_fingerprint_groups: vec![],
-                    fqn_priority_dimensions: vec![],
-                    upgrade_window_minutes: 30,
-                }
-            }
-            #[cfg(not(feature = "enterprise"))]
-            {
-                GlobalDeduplicationConfig::default()
-            }
-        }
-        Err(e) => {
-            log::warn!("Failed to fetch org config for incident correlation: {e}, using defaults",);
-            #[cfg(feature = "enterprise")]
-            {
-                GlobalDeduplicationConfig {
-                    enabled: false,
-                    alert_dedup_enabled: false,
-                    semantic_field_groups:
-                        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file(
-                        ),
-                    time_window_minutes: None,
-                    alert_fingerprint_groups: vec![],
-                    fqn_priority_dimensions: vec![],
-                    upgrade_window_minutes: 30,
-                }
-            }
-            #[cfg(not(feature = "enterprise"))]
-            {
-                GlobalDeduplicationConfig::default()
-            }
-        }
-    };
+    // Semantic groups from system_settings — the single source of truth,
+    // configured via /settings/v2/semantic_field_groups API.
+    let semantic_groups =
+        crate::service::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+
+    let upgrade_window_minutes =
+        match super::org_config::get_deduplication_config(&alert.org_id).await {
+            Ok(Some(config)) => config.upgrade_window_minutes,
+            _ => 30,
+        };
 
     // Extract labels from result row as HashMap
     let mut labels: HashMap<String, String> = result_row
@@ -148,7 +110,7 @@ pub async fn correlate_alert_to_incident(
         let condition_dims =
             o2_enterprise::enterprise::alerts::sql_parser::extract_dimensions_from_alert_conditions(
                 &alert.query_condition,
-                &org_config.semantic_field_groups,
+                &semantic_groups,
             );
 
         if !condition_dims.is_empty() {
@@ -187,7 +149,7 @@ pub async fn correlate_alert_to_incident(
             .as_ref()
             .map(|r| r.correlation_key.as_str()),
         trace_id,
-        &org_config,
+        &semantic_groups,
     );
 
     // BUGFIX: If stable_dimensions is empty, use alert_id as correlation_key
@@ -199,7 +161,7 @@ pub async fn correlate_alert_to_incident(
             "[incidents] Alert {} has no stable dimensions - using alert_id as correlation_key to prevent incorrect grouping",
             alert.name
         );
-        correlation_result.correlation_key = alert_id;
+        correlation_result.correlation_key = format!("ALERT:{alert_id}");
     }
 
     // Guarantee service_name extraction
@@ -240,7 +202,7 @@ pub async fn correlate_alert_to_incident(
         triggered_at,
         &correlation_result.reason.to_string(),
         &service_name,
-        org_config.upgrade_window_minutes,
+        upgrade_window_minutes,
     )
     .await?;
 
@@ -552,7 +514,7 @@ async fn find_or_create_incident(
                 &alert.get_unique_key(),
                 &alert.name,
                 triggered_at,
-                "hierarchical_upgrade",
+                correlation_reason,
             )
             .await?;
 
@@ -749,7 +711,7 @@ pub async fn get_incident_with_alerts(
                 .correlation_reason
                 .as_ref()
                 .and_then(|r| CorrelationReason::try_from(r.as_str()).ok())
-                .unwrap_or(CorrelationReason::ManualExtraction),
+                .unwrap_or(CorrelationReason::AlertId),
             created_at: a.created_at,
         })
         .collect();
@@ -895,170 +857,78 @@ pub async fn enrich_with_topology(
         (idx, true)
     };
 
-    // Build temporal edges only for NEW nodes (based on node's first_fired_at, not current alert
-    // time)
+    // Build exactly one edge for each NEW node: connect to its immediate predecessor in the
+    // global timeline. This guarantees the graph is a minimal DAG (no transitive edges).
     if is_new_node {
         let current_node_first_fired = topology.nodes[current_node_index].first_fired_at;
 
-        // Find the most recent previous node from same service
+        // Find the single immediate predecessor across ALL nodes (any service)
         // Use node index as tiebreaker when timestamps are equal (handles simultaneous alerts)
-        let most_recent_previous = topology
+        let predecessor_idx = topology
             .nodes
             .iter()
             .enumerate()
             .filter(|(idx, node)| {
                 *idx != current_node_index
-                    && node.service_name == service_name
                     && (node.first_fired_at < current_node_first_fired
                         || (node.first_fired_at == current_node_first_fired
                             && *idx < current_node_index))
             })
-            .max_by_key(|(idx, node)| (node.first_fired_at, *idx));
+            .max_by_key(|(idx, node)| (node.first_fired_at, *idx))
+            .map(|(idx, _)| idx);
 
-        if let Some((prev_idx, _)) = most_recent_previous {
-            // Check if edge already exists
-            let edge_exists = topology.edges.iter().any(|e| {
-                e.from_node_index == prev_idx
-                    && e.to_node_index == current_node_index
-                    && matches!(e.edge_type, EdgeType::Temporal)
-            });
+        if let Some(prev_idx) = predecessor_idx {
+            let is_same_service = topology.nodes[prev_idx].service_name
+                == topology.nodes[current_node_index].service_name;
 
-            if !edge_exists {
-                topology.edges.push(AlertEdge {
-                    from_node_index: prev_idx,
-                    to_node_index: current_node_index,
-                    edge_type: EdgeType::Temporal,
-                });
-                log::debug!(
-                    "[incidents] Added temporal edge: {} -> {} (most recent from same service)",
-                    prev_idx,
-                    current_node_index
-                );
-            }
-        }
-    }
-
-    // Build service dependency edges (different services, from Service Graph)
-    let sg_edges = match service_graph::query_edges_from_stream_internal(org_id, None, None, None)
-        .await
-    {
-        Ok(e) => e,
-        Err(e) => {
-            log::debug!(
-                "[incidents] Service graph query failed: {e}, will use temporal edges for cross-service correlation"
-            );
-            vec![] // Empty vec to continue with temporal edges
-        }
-    };
-
-    // Build Service Graph topology (even if empty, we need to create temporal edges)
-    let (_sg_nodes, sg_edges, _) = if !sg_edges.is_empty() {
-        o2_enterprise::enterprise::service_graph::build_topology(sg_edges)
-    } else {
-        log::debug!(
-            "[incidents] Service graph has no edges, will use temporal edges for cross-service correlation"
-        );
-        (vec![], vec![], vec![])
-    };
-
-    // Create service-to-node mapping for quick lookup
-    let mut service_nodes: HashMap<&str, Vec<usize>> = HashMap::new();
-    for (idx, node) in topology.nodes.iter().enumerate() {
-        service_nodes
-            .entry(&node.service_name)
-            .or_default()
-            .push(idx);
-    }
-
-    // For each pair of services in the graph, check if there's a Service Graph edge
-    for ((from_service, from_indices), (to_service, to_indices)) in service_nodes
-        .iter()
-        .cartesian_product(service_nodes.iter())
-        .filter(|((from_svc, _), (to_svc, _))| from_svc != to_svc)
-    {
-        // Check if Service Graph has edge from_service -> to_service
-        let has_sg_edge = sg_edges
-            .iter()
-            .any(|e| &e.from == from_service && &e.to == to_service);
-
-        if has_sg_edge {
-            // Service dependency: connect ALL nodes (full causality)
-            for &from_idx in from_indices {
-                for &to_idx in to_indices {
-                    let from_node = &topology.nodes[from_idx];
-                    let to_node = &topology.nodes[to_idx];
-
-                    // Only add if from happened before to (chronological)
-                    // Use node index as tiebreaker when timestamps are equal (handles simultaneous
-                    // alerts)
-                    if from_node.first_fired_at < to_node.first_fired_at
-                        || (from_node.first_fired_at == to_node.first_fired_at && from_idx < to_idx)
-                    {
-                        // Check if edge already exists
-                        let edge_exists = topology.edges.iter().any(|e| {
-                            e.from_node_index == from_idx
-                                && e.to_node_index == to_idx
-                                && matches!(e.edge_type, EdgeType::ServiceDependency)
-                        });
-
-                        if !edge_exists {
-                            topology.edges.push(AlertEdge {
-                                from_node_index: from_idx,
-                                to_node_index: to_idx,
-                                edge_type: EdgeType::ServiceDependency,
-                            });
-                            log::debug!(
-                                "[incidents] Added ServiceDependency edge: {from_idx} ({from_service}) -> {to_idx} ({to_service})"
-                            );
-                        }
-                    }
-                }
-            }
-        } else {
-            // Temporal only: connect to most recent node in target service
-            // For each node in from_service, find the most recent
-            // chronologically-after node in to_service
-            for &from_idx in from_indices {
-                let from_node = &topology.nodes[from_idx];
-
-                // Find most recent node in to_service that fired after from_node
-                // Use node index as tiebreaker when timestamps are equal (handles simultaneous
-                // alerts)
-                let most_recent_to = to_indices
-                    .iter()
-                    .filter_map(|&to_idx| {
-                        let to_node = &topology.nodes[to_idx];
-                        if to_node.first_fired_at > from_node.first_fired_at
-                            || (to_node.first_fired_at == from_node.first_fired_at
-                                && to_idx > from_idx)
-                        {
-                            Some((to_idx, to_node.first_fired_at))
-                        } else {
-                            None
-                        }
-                    })
-                    .min_by_key(|(to_idx, fired_at)| (*fired_at, *to_idx)); // Closest in time, then by index
-
-                if let Some((to_idx, _)) = most_recent_to {
-                    // Check if edge already exists
-                    let edge_exists = topology.edges.iter().any(|e| {
-                        e.from_node_index == from_idx
-                            && e.to_node_index == to_idx
-                            && matches!(e.edge_type, EdgeType::Temporal)
-                    });
-
-                    if !edge_exists {
-                        topology.edges.push(AlertEdge {
-                            from_node_index: from_idx,
-                            to_node_index: to_idx,
-                            edge_type: EdgeType::Temporal,
-                        });
+            // Determine edge type: ServiceDependency if service graph confirms the
+            // relationship, otherwise Temporal
+            let edge_type = if is_same_service {
+                EdgeType::Temporal
+            } else {
+                // Query service graph to check for a known dependency
+                let raw_sg_edges = match service_graph::query_edges_from_stream_internal(
+                    org_id, None, None, None,
+                )
+                .await
+                {
+                    Ok(e) => e,
+                    Err(e) => {
                         log::debug!(
-                            "[incidents] Added Temporal edge: {from_idx} ({from_service}) -> {to_idx} ({to_service}, most recent)"
+                            "[incidents] Service graph query failed: {e}, defaulting to temporal edge"
                         );
+                        vec![]
                     }
+                };
+
+                let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
+                    o2_enterprise::enterprise::service_graph::build_topology(raw_sg_edges)
+                } else {
+                    (vec![], vec![])
+                };
+
+                let has_sg_edge = sg_topo_edges.iter().any(|e| {
+                    e.from.as_deref() == Some(&*topology.nodes[prev_idx].service_name)
+                        && e.to == topology.nodes[current_node_index].service_name
+                });
+
+                if has_sg_edge {
+                    EdgeType::ServiceDependency
+                } else {
+                    EdgeType::Temporal
                 }
-            }
+            };
+
+            topology.edges.push(AlertEdge {
+                from_node_index: prev_idx,
+                to_node_index: current_node_index,
+                edge_type,
+            });
+            log::debug!(
+                "[incidents] Added {edge_type:?} edge: {prev_idx} ({}) -> {current_node_index} ({})",
+                topology.nodes[prev_idx].service_name,
+                topology.nodes[current_node_index].service_name
+            );
         }
     }
 
@@ -1108,7 +978,7 @@ pub async fn trigger_rca_for_incident(
         return Ok(()); // Not an error - just not configured
     }
 
-    if config.incidents.rca_agent_url.is_empty() {
+    if config.ai.agent_url.is_empty() {
         log::debug!("[INCIDENTS::RCA] RCA agent URL not set, skipping immediate trigger");
         return Ok(());
     }
@@ -1138,7 +1008,7 @@ pub async fn trigger_rca_for_incident(
     let username = &zo_config.auth.root_user_email;
     let password = &zo_config.auth.root_user_password;
 
-    let client = RcaAgentClient::new(&config.incidents.rca_agent_url, username, password)?;
+    let client = RcaAgentClient::new(&config.ai.agent_url, username, password)?;
 
     // Quick health check
     if let Err(e) = client.health().await {

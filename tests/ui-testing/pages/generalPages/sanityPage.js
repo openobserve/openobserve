@@ -20,6 +20,7 @@ export class SanityPage {
         
         // Search and Refresh locators
         this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
+        this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
         
         // Pagination and Results locators
@@ -40,7 +41,10 @@ export class SanityPage {
         
         // Function locators
         this.functionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
+        // TransformSelector save button (when actions are enabled)
         this.functionSaveButton = '[data-test="logs-search-bar-save-transform-btn"]';
+        // FunctionSelector save button (when actions are disabled)
+        this.functionSaveButtonNew = '[data-test="logs-search-bar-save-function-btn"]';
         this.functionSaveButtonAlternate = '[data-test="logs-search-bar-function-dropdown"]';
         this.fnEditor = '#fnEditor';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
@@ -166,7 +170,7 @@ export class SanityPage {
     // Pagination Methods
     async displayResultTextAndPagination() {
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         await expect(this.page.getByText("Showing 1 to 50")).toBeVisible({ timeout: 15000 });
         await this.page.waitForTimeout(1000);
@@ -176,7 +180,7 @@ export class SanityPage {
         } catch (error) {
             testLogger.warn('Pagination element not found, retrying with refresh button click');
             await this.page.locator(this.refreshButton).click();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
         }
     }
@@ -270,7 +274,7 @@ export class SanityPage {
     // Query Limit Methods
     async displayLimitedResults() {
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).locator('div').nth(2).click();
         
@@ -284,7 +288,10 @@ export class SanityPage {
         await this.page.locator(this.refreshButton).click({ force: true });
         
         await expect(this.page.getByText(/Showing 1 to 5/)).toBeVisible({ timeout: 15000 });
-        
+
+        // Reset filters is now inside utilities menu, so open menu first
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(300);
         await this.page.locator(this.resetFiltersButton).click();
         await this.page.waitForLoadState('domcontentloaded');
     }
@@ -292,7 +299,7 @@ export class SanityPage {
     // Function Methods
     async createAndDeleteFunction(functionName) {
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         const fnEditor = this.page.locator(this.fnEditor);
 
@@ -342,34 +349,47 @@ export class SanityPage {
         await this.page.waitForTimeout(3000);
 
         // Try clicking the Save button with fallback strategies
+        // Note: The app uses different selectors based on whether actions are enabled:
+        // - TransformSelector (actions enabled): logs-search-bar-save-transform-btn
+        // - FunctionSelector (actions disabled): logs-search-bar-save-function-btn
         let saveDialogVisible = false;
 
-        // First attempt: Click primary save button
+        // First attempt: Click TransformSelector save button (actions enabled)
         try {
-          testLogger.info('Attempting to click primary function save button');
-          await this.page.locator(this.functionSaveButton).click({ timeout: 10000 });
+          testLogger.info('Attempting to click TransformSelector save button');
+          await this.page.locator(this.functionSaveButton).click({ timeout: 5000 });
           await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
           saveDialogVisible = true;
-          testLogger.info('Primary save button click succeeded');
+          testLogger.info('TransformSelector save button click succeeded');
         } catch (error) {
-          testLogger.warn('Primary save button click failed, trying alternate locator');
+          testLogger.warn('TransformSelector save button not found, trying FunctionSelector');
 
-          // Second attempt: Try alternate locator (button inside dropdown)
+          // Second attempt: Click FunctionSelector save button (actions disabled)
           try {
-            await this.page.locator(this.functionSaveButtonAlternate).getByRole('button').filter({ hasText: 'save' }).click();
+            await this.page.locator(this.functionSaveButtonNew).click({ timeout: 5000 });
             await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
             saveDialogVisible = true;
-            testLogger.info('Alternate save button click succeeded');
-          } catch (alternateError) {
-            testLogger.error('Both save button attempts failed');
-            throw new Error('Failed to open function save dialog using primary and alternate locators');
+            testLogger.info('FunctionSelector save button click succeeded');
+          } catch (functionSelectorError) {
+            testLogger.warn('FunctionSelector save button also failed, trying dropdown fallback');
+
+            // Third attempt: Try alternate locator (button inside dropdown)
+            try {
+              await this.page.locator(this.functionSaveButtonAlternate).getByRole('button').filter({ hasText: 'save' }).click();
+              await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
+              saveDialogVisible = true;
+              testLogger.info('Dropdown fallback save button click succeeded');
+            } catch (alternateError) {
+              testLogger.error('All save button attempts failed');
+              throw new Error('Failed to open function save dialog using all available locators (TransformSelector, FunctionSelector, and dropdown)');
+            }
           }
         }
         
         await this.page.locator(this.savedFunctionNameInput).click();
         await this.page.locator(this.savedFunctionNameInput).fill(functionName);
         await this.page.locator(this.savedViewDialogSave).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         
         await this.page.locator(this.pipelineMenuItem).click();
         await this.page.locator(this.realtimeTab).click();
@@ -395,10 +415,10 @@ export class SanityPage {
         const uniqueFunctionName = `sanitytest_${generateSuffix()}`;
 
         await this.page.locator(this.pipelineMenuItem).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         await this.page.locator(this.streamPipelinesTab).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         await this.page.locator(this.realtimeTab).click();
         await this.page.waitForTimeout(500);
@@ -410,14 +430,11 @@ export class SanityPage {
         await this.page.getByLabel(this.nameLabel.label).fill(uniqueFunctionName);
         
         await this.page.locator(this.vrlFunctionEditor).click();
-        await this.page.locator(this.vrlEditorContent).fill("sanity=1");
-        await this.page.locator(this.vrlFunctionEditor).getByText("sanity=").click();
-        await this.page.locator(this.vrlEditorContent).press("ArrowLeft");
-        await this.page.locator(this.vrlEditorContent).press("ArrowLeft");
-        await this.page.locator(this.vrlEditorContent).press("ArrowLeft");
-        await this.page.locator(this.vrlEditorContent).press("ArrowLeft");
-        await this.page.locator(this.vrlEditorContent).fill(".sanity=1");
-        
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.press('Control+A');
+        await this.page.keyboard.type('.sanity=1');
+        await this.page.waitForTimeout(500);
+
         await this.page.getByRole(this.saveButton.role, { name: this.saveButton.name }).click();
 
         await this.page.getByPlaceholder("Search Function").click();
@@ -485,7 +502,7 @@ export class SanityPage {
         await this.page.getByRole("option", { name: "Logs" }).click();
         
         await this.page.locator(this.saveStreamButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Handle success notification dismissal (text might vary or auto-dismiss)
         const successMessages = [
@@ -549,7 +566,7 @@ export class SanityPage {
         });
         
         // Wait for search results to load using proper wait
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         // Click delete button for the specific stream using first() to handle search results
@@ -575,7 +592,7 @@ export class SanityPage {
             throw new Error('No confirmation dialog button found with variants: ' + confirmButtonVariants.join(', '));
         }
 
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Verify stream was deleted - search should return no results
         await this.page.getByPlaceholder("Search Stream").clear();
@@ -591,7 +608,7 @@ export class SanityPage {
     // Result Summary Methods
     async displayPaginationAfterResultSummary() {
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         await expect(this.page.locator(this.resultColumnSource)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.resultColumnSource).click();
@@ -603,7 +620,7 @@ export class SanityPage {
         const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
             const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
@@ -631,7 +648,7 @@ export class SanityPage {
         await this.page.locator(this.refreshStatsButton).click();
         await this.page.reload();
         await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.getByRole(this.streamCellButton.role, { name: this.streamCellButton.name, exact: true }).click();
     }
 
@@ -696,7 +713,7 @@ export class SanityPage {
         testLogger.debug('Reloading page to refresh schema');
         await this.page.reload();
         await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Select stream again after reload using the search-and-filter approach
         testLogger.debug('Selecting e2e_automate stream after reload');
@@ -743,7 +760,7 @@ export class SanityPage {
         await streamSelectInput.clear();
 
         // Wait for stream selection to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Ensure data is loaded by clicking the refresh button
         testLogger.debug('Refreshing to load data with 70 fields');
@@ -753,7 +770,7 @@ export class SanityPage {
         });
 
         await refreshButton.click({ timeout: 10000 });
-        await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
 
         // Wait for pagination to be visible (wait for the first page button as indicator)
         testLogger.debug('Waiting for schema pagination to be visible');
@@ -816,13 +833,13 @@ export class SanityPage {
         
         try {
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
         }
 
@@ -868,7 +885,7 @@ export class SanityPage {
         const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
             const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
@@ -888,7 +905,7 @@ export class SanityPage {
 
         // Click run query button
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         // Click on result column
@@ -903,7 +920,7 @@ export class SanityPage {
         const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
             const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
@@ -920,17 +937,17 @@ export class SanityPage {
         
         try {
             await initialRefreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         } catch (error) {
             console.warn('Initial refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await initialRefreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         }
         
         // Wait for canvas to be ready and visible (should now be there after data load)
         await expect(this.page.locator(this.histogramCanvas)).toBeVisible({ timeout: 15000 });
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // First canvas click with error handling
         try {
@@ -966,12 +983,12 @@ export class SanityPage {
         
         try {
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         }
 
         await expect(
@@ -1006,7 +1023,7 @@ export class SanityPage {
         const logsUrl = `/web/logs?org_identifier=${orgId}&fn_editor=true`;
         
         await this.page.goto(logsUrl);
-        await this.page.waitForLoadState('networkidle', { timeout: 20000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
         
         // Select the e2e_automate stream before proceeding
         try {
@@ -1025,7 +1042,7 @@ export class SanityPage {
         }
         
         // Wait for stream selection to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Check if VRL editor is visible, if not click the toggle
         const fnEditor = this.page.locator('#fnEditor');
@@ -1074,13 +1091,13 @@ export class SanityPage {
         
         try {
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
             await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
         }
 

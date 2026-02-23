@@ -513,27 +513,17 @@ fn build_scope_conflict_sql(
                 params.push(value.clone().into());
                 let param_idx = params.len();
                 checks.push(format!(
-                    "(dimensions::jsonb ? '{key}' AND (dimensions::jsonb->>'{key}') != ${param_idx})"
+                    "(jsonb_exists(dimensions::jsonb, '{key}') AND (dimensions::jsonb->>'{key}') != ${param_idx})"
                 ));
             }
             checks
         }
-        sea_orm::DatabaseBackend::Sqlite => {
+        _ => {
             let mut checks = Vec::new();
             for (key, value) in scope_filters {
                 params.push(value.clone().into());
                 checks.push(format!(
                     "(json_extract(dimensions, '$.{key}') IS NOT NULL AND json_extract(dimensions, '$.{key}') != ?)"
-                ));
-            }
-            checks
-        }
-        sea_orm::DatabaseBackend::MySql => {
-            let mut checks = Vec::new();
-            for (key, value) in scope_filters {
-                params.push(value.clone().into());
-                checks.push(format!(
-                    "(JSON_EXTRACT(dimensions, '$.{key}') IS NOT NULL AND JSON_EXTRACT(dimensions, '$.{key}') != ?)"
                 ));
             }
             checks
@@ -584,7 +574,7 @@ mod tests {
 
         assert!(sql.contains("org_id = $1"));
         assert!(sql.contains("AND NOT"));
-        assert!(sql.contains("dimensions::jsonb ? 'k8s-cluster'"));
+        assert!(sql.contains("jsonb_exists(dimensions::jsonb, 'k8s-cluster')"));
         assert!(sql.contains("dimensions::jsonb->>'k8s-cluster'") && sql.contains("!= $2"));
         assert_eq!(params.len(), 2); // org_id + cluster value
     }
@@ -603,8 +593,8 @@ mod tests {
 
         assert!(sql.contains("org_id = $1"));
         assert!(sql.contains("AND NOT"));
-        assert!(sql.contains("dimensions::jsonb ? 'k8s-cluster'"));
-        assert!(sql.contains("dimensions::jsonb ? 'k8s-namespace'"));
+        assert!(sql.contains("jsonb_exists(dimensions::jsonb, 'k8s-cluster')"));
+        assert!(sql.contains("jsonb_exists(dimensions::jsonb, 'k8s-namespace')"));
         assert!(sql.contains(" OR ")); // Multiple conflict checks OR'd together
         assert_eq!(params.len(), 3); // org_id + 2 dimension values
     }

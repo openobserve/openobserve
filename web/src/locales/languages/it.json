@@ -232,8 +232,10 @@
     "patternColumnHeader": "Motivo",
     "occurrenceColumnHeader": "Evento",
     "percentageColumnHeader": "Percentuale",
+    "anomalyColumnHeader": "Anomalia",
     "actionsColumnHeader": "Azioni",
     "anomalyLabel": "ANOMALIA",
+    "anomalyDetected": "Anomalia rilevata",
     "includePatternInSearch": "Includi modello nella ricerca",
     "excludePatternFromSearch": "Escludi il pattern dalla ricerca",
     "showPatternDetails": "Mostra dettagli ({variabili}, {esempi} esempi)",
@@ -307,7 +309,10 @@
     "show": "Mostra",
     "editor": "Redattore",
     "webUrlNotConfigured": "L'URL di condivisione è disabilitato finché ZO_WEB_URL non viene configurato dall'amministratore.",
-    "showHideColumns": "Mostra/nascondi colonne"
+    "showHideColumns": "Mostra/nascondi colonne",
+    "autoRefresh": "Aggiornamento automatico",
+    "createSavedView": "Crea visualizzazione salvata",
+    "listSavedViews": "Elenca visualizzazioni salvate"
   },
   "menu": {
     "home": "Home",
@@ -1179,6 +1184,9 @@
     "wraptext": "Avvolgi le celle della tabella",
     "tableTranspose": "Trasporre",
     "tableDynamicColumns": "Consenti colonne dinamiche",
+    "pagination": "Paginazione",
+    "rowsPerPage": "Righe per pagina",
+    "rowsPerPageTooltip": "Imposta il numero predefinito di record da visualizzare per pagina",
     "showBorder": "Mostra bordo dell'asse",
     "currencyDollar": "Valuta - Dollaro ($)",
     "currencyEuro": "Valuta - Euro (€)",
@@ -1888,7 +1896,101 @@
     "msteams": "Microsoft Teams",
     "pagerduty": "Pager Duty",
     "opsgenie": "Opsgenie",
-    "servicenow": "Assistenza ora"
+    "servicenow": "Assistenza ora",
+    "saveAlert": "Salva avviso",
+    "aggregation_threshold": "Avvisa se ci sono gruppi",
+    "thresholdDynamic": {
+      "alertMeWhen": "Avvisami quando",
+      "metricTypes": {
+        "resultsPassedFilter": "i risultati hanno superato i filtri",
+        "distinctGroupsAffected": "sono interessati gruppi distinti",
+        "metricsMatchCriteria": "le metriche corrispondono ai criteri",
+        "matchingLogsFound": "registri corrispondenti trovati",
+        "groupsPassFilter": "i gruppi superano i criteri di filtro",
+        "distinctGroups": "sono stati trovati gruppi distinti",
+        "resultRows": "righe dei risultati restituite",
+        "timeSeries": "serie temporali attive trovate",
+        "matchingRecords": "record corrispondenti trovati",
+        "groupsWithHaving": "i gruppi soddisfano le condizioni",
+        "uniqueGroups": "gruppi unici",
+        "events": "gli eventi soddisfano le condizioni",
+        "aggregatedValue": "condizioni della partita"
+      },
+      "contextLabels": {
+        "groupedBy": "Raggruppati per:",
+        "havingConditions": "AVENDO condizioni:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Nome dell'avviso",
+      "sqlQuery": "Interrogazione SQL",
+      "promqlQuery": "Query ProMQL",
+      "conditions": "Condizioni",
+      "copy": "Copia",
+      "noCondition": "Nessuna condizione",
+      "noDescription": "Nessuna descrizione",
+      "evaluationHistory": "Cronologia delle valutazioni",
+      "loadingHistory": "Caricamento della cronologia...",
+      "noHistoryAvailable": "Nessuna cronologia delle valutazioni disponibile per questo avviso",
+      "results": "Risultati"
+    },
+    "historyTable": {
+      "timestamp": "Timestamp",
+      "status": "Status",
+      "evaluationTime": "Valutazione/i",
+      "queryTime": "Interrogazione (ms)",
+      "error": "Errore"
+    },
+    "back": "Indietro",
+    "continue": "Continua",
+    "wouldTrigger": "INNESCHEREBBE",
+    "wouldNotTrigger": "NON SI INNESCHEREBBE",
+    "queryBuilder": "Costruttore",
+    "groupByHelp": {
+      "description": "Raggruppa i dati aggregati per campi specifici per creare avvisi separati per ogni valore univoco.",
+      "example": "Esempio: raggruppa per «nome host» per ricevere avvisi individuali per server o per «status_code» per tenere traccia degli errori separatamente."
+    },
+    "conditions": {
+      "condition": "Condizione",
+      "conditionGroup": "Gruppo di condizioni",
+      "addConditionTooltip": "Aggiungi una nuova condizione a questo gruppo",
+      "addConditionGroupTooltip": "Aggiungi un gruppo di condizioni annidato (profondità massima: 2)",
+      "maxDepthReachedTooltip": "Profondità massima di nidificazione raggiunta"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Avviso impostato per",
+      "currentWindow": "Finestra corrente",
+      "cycle": "Ciclo",
+      "cycleTooltip": "Confronta i risultati con quelli dello stesso periodo del ciclo precedente.",
+      "runningFor": "In corso per {periodo} nell'intervallo di ogni {frequenza}",
+      "currentWindowCannotBeDeleted": "La finestra corrente non può essere eliminata",
+      "comparingWith": "Confrontando con",
+      "referenceWindow": "Finestra di riferimento",
+      "timeFrame": "Intervallo di tempo",
+      "timeFrameTooltip": "Intervallo di tempo per la tua richiesta.",
+      "comparingText": "Confronto del risultato della query della finestra corrente con il risultato della query del precedente {offset}.",
+      "addComparisonWindow": "Aggiungi finestra di confronto",
+      "goToConditions": "Vai a Condizioni",
+      "goToConditionsTooltip": "Fai clic su «Vai alle condizioni» per verificare gli eventi per le finestre di confronto selezionate"
+    },
+    "alertSettings": {
+      "cronSchedule": "Pianificazione Cron",
+      "addNewDestination": "Aggiungi nuova destinazione",
+      "cooldownTooltip": "Se l'avviso si attiva, quanto tempo deve attendere prima di inviare un'altra notifica. Ad esempio, se l'avviso si attiva alle 16:00 e la notifica di silenzio è impostata su 10 minuti, non invierà un'altra notifica fino alle 16:10 anche se l'avviso è ancora dopo 1 minuto. Questo serve per evitare di inviare notifiche all'utente come spam.",
+      "thresholdTooltip": "Definisce quando deve essere attivato l'avviso in base al numero di eventi o al valore aggregato. Esempio: se impostato su «> 100\", l'avviso si attiva quando il conteggio supera i 100 eventi.",
+      "periodTooltip": "Periodo per il quale la query deve essere eseguita. Ad esempio, 10 minuti significa che ogni volta che la query verrà eseguita utilizzerà gli ultimi 10 minuti di dati.",
+      "frequencyTooltipMinutes": "Con quale frequenza deve essere eseguita l'attività, ad esempio ogni 5 minuti.",
+      "frequencyTooltipCron": "Formato cron UNIX standard con 5 campi separati da spazi: [Minuti 0-59] [Ore 0-23] [Giorno del mese 1-31] [Mese 1-12 o JAN-DEC] [Giorno della settimana 0-7 o '1L-7L', 0 e 7 per domenica].",
+      "timezoneWarning": "Avvertenza: il fuso orario visualizzato è approssimativo. Verifica e seleziona manualmente il fuso orario corretto.",
+      "destinationsTooltip": "Seleziona una o più destinazioni per inviare notifiche di avviso.",
+      "templateTooltip": "Facoltativo: seleziona un modello da utilizzare per tutte le destinazioni in questo avviso. I modelli consentono di personalizzare il formato dei messaggi di avviso. Se non è selezionata, ogni destinazione utilizzerà il proprio modello configurato."
+    },
+    "advanced": {
+      "addVariable": "Aggiungi variabile",
+      "variablesTooltip": "Le variabili vengono utilizzate per passare i dati dall'avviso alla destinazione.",
+      "rowTemplateTooltip": "Il modello di riga viene utilizzato per formattare il messaggio di avviso.",
+      "templateType": "Tipo di modello:"
+    }
   },
   "alert_templates": {
     "header": "Modelli",
@@ -1939,7 +2041,10 @@
     "customWebhook": "Personalizzato (Webhook)",
     "customEmail": "Personalizzato (email)",
     "customAction": "Personalizzato (azione)",
-    "custom": "Personalizzato"
+    "custom": "Personalizzato",
+    "separator": "Separatore",
+    "separator_placeholder": "Inserisci un separatore (ad esempio, |,\\n,\\ t, spazio)",
+    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)"
   },
   "metrics": {
     "searchMetric": "Cerca una metrica",
@@ -2141,7 +2246,6 @@
       "groupsLabel": "gruppi",
       "noMatchingGroups": "Nessun gruppo corrispondente",
       "fqnFormulaTitle": "Formula identità",
-      "fqnFormulaTooltip": "Mostra come verrà calcolata l'identità del servizio. Le dimensioni di ambito (blu) sono concatenate con '/'. La prima dimensione di workload non nulla (verde) diventa il nome del servizio.",
       "scopeDimension": "Dimensione di ambito",
       "workloadDimension": "Dimensione di workload",
       "noFormulaConfigured": "Nessuna formula di identità configurata. Aggiungi dimensioni sopra.",
@@ -2595,7 +2699,8 @@
     "showLegends": "Mostra leggende"
   },
   "alert_list": {
-    "alert_details": "Dettagli dell'avviso"
+    "alert_details": "Dettagli dell'avviso",
+    "alert_history": "Cronologia avvisi"
   },
   "latencyInsights": {
     "title": "Approfondimenti",
@@ -2748,7 +2853,13 @@
       }
     },
     "viewInTraces": "Visualizza in Tracce",
-    "viewInTracesTooltip": "Apri la pagina delle tracce con il dashboard delle metriche RED e tutte le tracce correlate"
+    "viewInTracesTooltip": "Apri la pagina delle tracce con il dashboard delle metriche RED e tutte le tracce correlate",
+    "exportToJson": "Esporta in JSON",
+    "noLogsDescription": "Nessun registro trovato per questa correlazione nell'intervallo di tempo selezionato.",
+    "tracesErrorDetails": "Si è verificato un errore durante il recupero dei dati di traccia. Per favore riprova.",
+    "metricsError": "Impossibile caricare le metriche",
+    "metricsErrorDetails": "Si è verificato un errore durante il recupero dei dati delle metriche. Riprova.",
+    "noMetricsDescription": "Nessuna metrica trovata per questa correlazione nell'intervallo di tempo selezionato."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

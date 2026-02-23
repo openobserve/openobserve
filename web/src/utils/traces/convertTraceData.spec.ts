@@ -280,10 +280,10 @@ describe("convertTraceData", () => {
       const result = convertTraceServiceMapData(data);
 
       expect(result.options.tooltip.show).toBe(false);
-      expect(result.options.series[0].symbolSize).toBe(20);
+      expect(result.options.series[0].symbolSize).toBe(30);
       expect(result.options.series[0].label.position).toBe("bottom");
       expect(result.options.series[0].label.verticalAlign).toBe("bottom");
-      expect(result.options.series[0].label.distance).toBe(25);
+      expect(result.options.series[0].label.distance).toBe(26);
       expect(result.options.series[0].label.fontSize).toBe(12);
     });
 
@@ -340,7 +340,7 @@ describe("convertTraceData", () => {
       expect(result.options.series[0].orient).toBe("TB"); // vertical = TB
     });
 
-    it("should convert service graph to tree with radial layout", () => {
+    it("should convert service graph to tree (radial removed, defaults to orthogonal)", () => {
       const graphData = {
         nodes: [{ id: "service-a", label: "Service A" }],
         edges: [],
@@ -349,7 +349,8 @@ describe("convertTraceData", () => {
 
       const result = convertServiceGraphToTree(graphData, layoutType);
 
-      expect(result.options.series[0].layout).toBe("radial");
+      // Radial layout removed — always uses orthogonal now
+      expect(result.options.series[0].layout).toBe("orthogonal");
     });
 
     it("should handle empty graph data", () => {
@@ -567,9 +568,9 @@ describe("convertTraceData", () => {
     expect(result.options).toBeDefined();
     const data = result.options.series[0].data[0].children;
 
-    expect(data[0].itemStyle.color).toBe('#4CAF50'); // Green for healthy
-    expect(data[1].itemStyle.color).toBe('#FFC107'); // Yellow for warning (>1%)
-    expect(data[2].itemStyle.color).toBe('#F44336'); // Red for critical (>10%)
+    expect(data[0].itemStyle.color).toBe('#1a1f2e'); // Green for healthy
+    expect(data[1].itemStyle.color).toBe('#1a1f2e'); // Yellow for warning (>1%)
+    expect(data[2].itemStyle.color).toBe('#1a1f2e'); // Red for critical (>10%)
   });
 
   it('should handle vertical layout orientation', () => {
@@ -583,7 +584,7 @@ describe("convertTraceData", () => {
     expect(result.options.series[0].orient).toBe('TB');
   });
 
-  it('should handle radial layout', () => {
+  it('should handle radial layout (removed, falls back to orthogonal)', () => {
     const graphData = {
       nodes: [{ id: 'node', label: 'node', requests: 100, errors: 0, error_rate: 0 }],
       edges: []
@@ -591,7 +592,8 @@ describe("convertTraceData", () => {
 
     const result = convertServiceGraphToTree(graphData, 'radial');
 
-    expect(result.options.series[0].layout).toBe('radial');
+    // Radial layout removed in favor of orthogonal only
+    expect(result.options.series[0].layout).toBe('orthogonal');
   });
 
   it('should handle empty data gracefully', () => {

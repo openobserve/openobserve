@@ -15,8 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="alert-triggers-table tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+  <div data-test="alert-triggers-table" class="alert-triggers-table tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
     <q-table
+      data-test="triggers-qtable"
       ref="qTableRef"
       :rows="triggers"
       :columns="columns"
@@ -28,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="onRowClick"
     >
       <template #no-data>
-        <div class="tw:text-center tw:py-8">
+        <div data-test="no-triggers-message" class="tw:text-center tw:py-8">
           <span :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm">
             No triggers loaded
           </span>
@@ -36,28 +37,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #body-cell-alert_name="props">
-        <q-td :props="props">
-          <span :class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'" class="tw:text-xs tw:font-medium">
+        <q-td :props="props" data-test="alert-name-cell">
+          <span data-test="alert-name-text" :class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'" class="tw:text-xs tw:font-medium">
             {{ props.row.alert_name }}
           </span>
         </q-td>
       </template>
 
       <template #body-cell-alert_fired_at="props">
-        <q-td :props="props">
-          <span class="tw:text-xs">
+        <q-td :props="props" data-test="fired-at-cell">
+          <span data-test="fired-at-timestamp" class="tw:text-xs">
             {{ formatTimestamp(props.row.alert_fired_at) }}
           </span>
         </q-td>
       </template>
 
       <template #body-cell-correlation_reason="props">
-        <q-td :props="props" class="tw:text-right">
+        <q-td :props="props" class="tw:text-right" data-test="correlation-reason-cell">
           <q-badge
+            data-test="correlation-reason-badge"
             :color="getReasonColor(props.row.correlation_reason)"
             :label="getReasonLabel(props.row.correlation_reason)"
             outline
-          />
+          >
+            <q-tooltip>{{ getReasonTooltip(props.row.correlation_reason) }}</q-tooltip>
+          </q-badge>
         </q-td>
       </template>
 
@@ -86,7 +90,7 @@ interface IncidentAlert {
   alert_id: string;
   alert_name: string;
   alert_fired_at: number;
-  correlation_reason: "service_discovery" | "manual_extraction" | "temporal";
+  correlation_reason: "service_discovery" | "trace_based" | "scope_match" | "workload_match" | "alert_id";
   created_at: number;
 }
 
@@ -142,7 +146,7 @@ export default defineComponent({
       {
         name: "correlation_reason",
         field: "correlation_reason",
-        label: "Corelation Reason",
+        label: "Correlation Reason",
         align: "right",
         sortable: false,
         style: "width: 150px",
@@ -158,10 +162,14 @@ export default defineComponent({
       switch (reason) {
         case "service_discovery":
           return "blue";
-        case "manual_extraction":
-          return "purple";
-        case "temporal":
+        case "trace_based":
           return "teal";
+        case "scope_match":
+          return "purple";
+        case "workload_match":
+          return "orange";
+        case "alert_id":
+          return "grey";
         default:
           return "grey";
       }
@@ -171,12 +179,33 @@ export default defineComponent({
       switch (reason) {
         case "service_discovery":
           return t("alerts.incidents.correlationServiceDiscovery");
-        case "manual_extraction":
-          return t("alerts.incidents.correlationManualExtraction");
-        case "temporal":
-          return t("alerts.incidents.correlationTemporal");
+        case "trace_based":
+          return t("alerts.incidents.correlationTraceBased");
+        case "scope_match":
+          return t("alerts.incidents.correlationScopeMatch");
+        case "workload_match":
+          return t("alerts.incidents.correlationWorkloadMatch");
+        case "alert_id":
+          return t("alerts.incidents.correlationAlertId");
         default:
           return reason;
+      }
+    };
+
+    const getReasonTooltip = (reason: string) => {
+      switch (reason) {
+        case "service_discovery":
+          return t("alerts.incidents.correlationServiceDiscoveryTooltip");
+        case "trace_based":
+          return t("alerts.incidents.correlationTraceBasedTooltip");
+        case "scope_match":
+          return t("alerts.incidents.correlationScopeMatchTooltip");
+        case "workload_match":
+          return t("alerts.incidents.correlationWorkloadMatchTooltip");
+        case "alert_id":
+          return t("alerts.incidents.correlationAlertIdTooltip");
+        default:
+          return "";
       }
     };
 
@@ -197,6 +226,7 @@ export default defineComponent({
       formatTimestamp,
       getReasonColor,
       getReasonLabel,
+      getReasonTooltip,
       changePagination,
       onRowClick,
     };

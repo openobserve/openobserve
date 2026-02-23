@@ -287,6 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :index="calculateActualIndex(virtualRow.index - 1)"
                 :highlight-query="highlightQuery"
                 :hide-view-related="hideViewRelatedButton"
+                :hide-search-term-actions="hideSearchTermActions"
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
@@ -567,9 +568,9 @@ watch(
 
     await nextTick();
 
-    if (props.columns?.length && tableRows.value?.length) {
+    if (props.columns?.length && props.rows?.length) {
       processHitsInChunks(
-        tableRows.value,
+        props.rows,
         props.columns,
         true,
         props.highlightQuery,
@@ -593,9 +594,9 @@ watch(
 
     await nextTick();
 
-    if (props.columns?.length && tableRows.value?.length) {
+    if (props.columns?.length && props.rows?.length) {
       processHitsInChunks(
-        tableRows.value,
+        props.rows,
         props.columns,
         false,
         props.highlightQuery,
@@ -1089,4 +1090,13 @@ defineExpose({
 </style>
 <style scoped lang="scss">
 @import "@/styles/logs/tenstack-table.scss";
+
+// Add explicit hover styles for log rows
+.table-row-hover {
+  transition: background-color 0.15s ease-in-out;
+
+  &:hover {
+    background-color: var(--o2-hover-gray) !important;
+  }
+}
 </style>

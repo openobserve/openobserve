@@ -518,9 +518,7 @@ export const validateSqlQuery = async (
   query.query.sql = formData.query_condition.sql;
 
   if (formData.query_condition.vrl_function)
-    query.query.query_fn = b64EncodeUnicode(
-      formData.query_condition.vrl_function,
-    );
+    query.query.query_fn = formData.query_condition.vrl_function
 
   validateSqlQueryPromise.value = new Promise((resolve, reject) => {
     searchService

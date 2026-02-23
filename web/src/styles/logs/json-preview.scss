@@ -21,3 +21,48 @@
   border: 1px solid var(--o2-border-color);
   font-weight: normal;
 }
+
+// Styling for JSON key-value pairs
+.log-key {
+  color: #b71c1c; // Red color for keys in light theme
+  font-weight: normal;
+}
+
+.dark .log-key {
+  color: #f67a7aff; // Light red color for keys in dark theme
+}
+
+.log-separator {
+  color: #666; // Gray color for separator
+  font-weight: normal;
+}
+
+.dark .log-separator {
+  color: #999; // Lighter gray for separator in dark theme
+}
+
+// Load more button styling for better visibility
+.load-more-container {
+  margin-top: 12px;
+  padding: 12px;
+  border-top: 1px solid var(--o2-border-color);
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+}
+
+.dark .load-more-container {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.load-more-btn {
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  min-height: 32px !important;
+  padding: 6px 16px !important;
+  border-width: 1.5px !important;
+
+  &:hover {
+    background-color: rgba(var(--q-primary-rgb), 0.1) !important;
+    border-width: 2px !important;
+  }
+}

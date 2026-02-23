@@ -761,6 +761,15 @@ where
                         .map_or(path_columns[1], |model| model.key),
                     path_columns[0]
                 )
+            } else if method.eq("POST") && path.ends_with("alerts/destinations/test") {
+                // Test destination API RBAC control
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
+                    path_columns[0]
+                )
             } else {
                 // Handles the backfill job creation, which is considered an UPDATE
                 // to the pipeline from the rbac perspective.
@@ -1019,6 +1028,7 @@ where
             || path.contains("/prometheus/api/v1/series")
             || path.contains("/traces/latest")
             || path.contains("/traces/session")
+            || path.contains("/traces/user")
             || (path.contains("/traces/") && path.ends_with("/dag"))
             || path.contains("clusters")
             || path.contains("query_manager")
