@@ -45,7 +45,7 @@ import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, b64DecodeUnicode } from "@/utils/zincutils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 const getDefaultDashboardPanelData: any = () => ({
@@ -88,6 +88,7 @@ const getDefaultDashboardPanelData: any = () => ({
       {
         query: "",
         customQuery: false,
+        query_fn: null,
         fields: {
           stream: "",
           stream_type: "logs",
@@ -181,12 +182,31 @@ const props = defineProps({
 
   const { hasAggregation, fnParsedSQL } = logsUtils();
 
+// Helper function to get decoded VRL function
+const getDecodedVrlFunction = (): string | null => {
+  if (!props.formData.query_condition?.vrl_function) {
+    return null;
+  }
+  try {
+    return b64DecodeUnicode(props.formData.query_condition.vrl_function);
+  } catch (e) {
+    return props.formData.query_condition.vrl_function;
+  }
+};
+
 onBeforeMount(() => {
   dashboardPanelData = reactive({ ...getDefaultDashboardPanelData() });
   dashboardPanelData.data.type = "line";
   dashboardPanelData.data.queryType =
     props.selectedTab === "promql" ? "promql" : "sql";
   dashboardPanelData.data.queries[0].query = props.query;
+  // VRL function is only supported in SQL mode
+  dashboardPanelData.data.queries[0].vrlFunctionQuery = props.selectedTab === "sql"
+    ? getDecodedVrlFunction()
+    : null;
+  // Enable dynamic columns when VRL function is present
+  dashboardPanelData.data.config.table_dynamic_columns =
+    props.selectedTab === "sql" && props.formData.query_condition?.vrl_function ? true : false;
   dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
   dashboardPanelData.data.queries[0].fields.stream_type =
     props.formData.stream_type;
@@ -395,6 +415,9 @@ const fetchQuerySchema = async () => {
     // Set up the query
     dashboardPanelData.data.queries[0].customQuery = true;
     dashboardPanelData.data.queries[0].query = props.query;
+    dashboardPanelData.data.queries[0].vrlFunctionQuery = getDecodedVrlFunction();
+    // Enable dynamic columns when VRL function is present
+    dashboardPanelData.data.config.table_dynamic_columns = props.formData.query_condition?.vrl_function ? true : false;
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
@@ -433,6 +456,9 @@ const fetchQuerySchema = async () => {
     dashboardPanelData.data.type = "table";
     dashboardPanelData.data.queries[0].customQuery = true;
     dashboardPanelData.data.queries[0].query = props.query;
+    dashboardPanelData.data.queries[0].vrlFunctionQuery = getDecodedVrlFunction();
+    // Enable dynamic columns when VRL function is present
+    dashboardPanelData.data.config.table_dynamic_columns = props.formData.query_condition?.vrl_function ? true : false;
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
@@ -732,6 +758,8 @@ const refreshData = () => {
   if (props.selectedTab === "promql") {
     // PromQL mode: query should be a string, not an object
     dashboardPanelData.data.queries[0].query = props.query || "";
+    dashboardPanelData.data.queries[0].vrlFunctionQuery = null; // VRL not supported in PromQL mode
+    dashboardPanelData.data.config.table_dynamic_columns = false; // VRL not supported in PromQL mode
     dashboardPanelData.data.queries[0].customQuery = false;
     dashboardPanelData.data.queries[0].fields.x = [];
     dashboardPanelData.data.queries[0].fields.y = [];
@@ -783,6 +811,8 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].fields.breakdown = [];
     dashboardPanelData.data.queries[0].customQuery = true;
     dashboardPanelData.data.queries[0].query = props.query;
+    dashboardPanelData.data.queries[0].vrlFunctionQuery = null; // VRL not supported in custom mode
+    dashboardPanelData.data.config.table_dynamic_columns = false; // VRL not supported in custom mode
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
@@ -805,6 +835,13 @@ const refreshData = () => {
 
   dashboardPanelData.data.queries[0].customQuery = props.selectedTab === "custom";
   dashboardPanelData.data.queries[0].query = props.query;
+  // VRL function is only supported in SQL mode
+  dashboardPanelData.data.queries[0].vrlFunctionQuery = props.selectedTab === "sql"
+    ? getDecodedVrlFunction()
+    : null;
+  // Enable dynamic columns when VRL function is present
+  dashboardPanelData.data.config.table_dynamic_columns =
+    props.selectedTab === "sql" && props.formData.query_condition?.vrl_function ? true : false;
   dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
   dashboardPanelData.data.queries[0].fields.stream_type =
     props.formData.stream_type;
