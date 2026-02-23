@@ -231,6 +231,4 @@ test.describe("Logs Quickmode testcases", () => {
     
     testLogger.info('Timestamp field click and kubernetes_pod_id field search completed');
   });
-
-
 });
