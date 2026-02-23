@@ -309,7 +309,10 @@
     "show": "Mostra",
     "editor": "Redattore",
     "webUrlNotConfigured": "L'URL di condivisione è disabilitato finché ZO_WEB_URL non viene configurato dall'amministratore.",
-    "showHideColumns": "Mostra/nascondi colonne"
+    "showHideColumns": "Mostra/nascondi colonne",
+    "autoRefresh": "Aggiornamento automatico",
+    "createSavedView": "Crea visualizzazione salvata",
+    "listSavedViews": "Elenca visualizzazioni salvate"
   },
   "menu": {
     "home": "Home",
