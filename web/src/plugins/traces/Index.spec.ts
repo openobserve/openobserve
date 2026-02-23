@@ -207,9 +207,13 @@ vi.mock("@/composables/useTraces", () => ({
   }),
 }));
 
+const { mockGetStreams } = vi.hoisted(() => ({
+  mockGetStreams: vi.fn(),
+}));
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    getStreams: vi.fn(() => Promise.resolve(mockStreamList)),
+    getStreams: mockGetStreams,
     getStream: vi.fn((streamName) =>
       Promise.resolve(mockStreamList.list.find((s) => s.name === streamName))
     ),
@@ -261,6 +265,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
   beforeEach(async () => {
     // Reset mock data
+    mockGetStreams.mockResolvedValue(mockStreamList);
     mockSearchObj.loading = false;
     mockSearchObj.loadingStream = false;
     mockSearchObj.data.stream.streamLists = [];
@@ -1114,14 +1119,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
   describe("Edge Cases", () => {
     it("should handle empty stream list gracefully", async () => {
-      const mockGetStreams = vi.fn(() => Promise.resolve({ list: [] }));
-
-      vi.doMock("@/composables/useStreams", () => ({
-        default: () => ({
-          getStreams: mockGetStreams,
-          getStream: vi.fn(),
-        }),
-      }));
+      mockGetStreams.mockResolvedValueOnce({ list: [] });
 
       wrapper = mount(Index, {
         attachTo: node,
