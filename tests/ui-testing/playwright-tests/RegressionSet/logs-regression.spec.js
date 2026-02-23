@@ -1224,6 +1224,7 @@ test.describe("Logs Regression Bugs", () => {
     // Capture initial logs state (first N row texts as array)
     await pm.logsPage.waitForLogsTable(10000);
     const initialRowTexts = await pm.logsPage.getLogsTableRowTexts(5);
+    expect(initialRowTexts.length, 'Initial table should have rows before opening query inspector').toBeGreaterThan(0);
     testLogger.info(`Initial rows captured: ${initialRowTexts.length}`);
 
     // Store initial row count
@@ -1486,6 +1487,9 @@ test.describe("Logs Regression Bugs", () => {
       highlightPatterns.some(pattern => cls.toLowerCase().includes(pattern))
     );
 
+    // Guard: Ensure we have meaningful classes to verify (prevents vacuous pass)
+    expect(originalClassSet.size, 'Row should have selection/styling classes after being clicked and closed').toBeGreaterThan(0);
+
     // If the row has specific highlight classes, verify they're preserved
     if (originalHighlightClasses.length > 0) {
       const preservedHighlightClasses = originalHighlightClasses.filter(cls => finalClassSet.has(cls));
@@ -1493,14 +1497,11 @@ test.describe("Logs Regression Bugs", () => {
         `Row lost highlight classes after expanding different row. Lost: ${originalHighlightClasses.filter(c => !finalClassSet.has(c)).join(', ')}`
       ).toBe(originalHighlightClasses.length);
       testLogger.info(`✓ Row preserved ${preservedHighlightClasses.length} highlight classes: ${preservedHighlightClasses.join(', ')}`);
-    } else if (originalClassSet.size > 0) {
+    } else {
       // No specific highlight classes, but row has other styling - verify those are preserved
       const classesPreserved = [...originalClassSet].every(cls => finalClassSet.has(cls));
       expect(classesPreserved, `Last row lost classes after expanding different row. Missing: ${missingClasses.join(', ')}`).toBe(true);
       testLogger.info(`✓ Last row preserved all ${originalClassSet.size} styling classes`);
-    } else {
-      // Row has no special classes beyond generic ones - this is acceptable, just log it
-      testLogger.info('ℹ Row has no special styling classes to verify (only generic table classes)');
     }
 
     // Close the expanded row
