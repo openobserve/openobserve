@@ -1213,6 +1213,16 @@ export default defineComponent({
           };
         }
 
+        // Initialize stream-specific values if not exists
+        if (!streamFieldValues.value[fieldName]) {
+          streamFieldValues.value[fieldName] = {};
+        }
+
+        if (!streamFieldValues.value[fieldName][streamName])
+          streamFieldValues.value[fieldName][streamName] = {
+            values: [],
+          };
+
         // Process the results
         if (response.content.results.hits.length) {
           // Store stream-specific values
