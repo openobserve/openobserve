@@ -15,24 +15,10 @@ vi.mock('@/services/stream', () => ({
   },
 }));
 
-// Mock HTTP Streaming composable
-const mockFetchQueryDataWithHttpStream = vi.fn();
-vi.mock("@/composables/useStreamingSearch", () => ({
-  default: () => ({
-    fetchQueryDataWithHttpStream: mockFetchQueryDataWithHttpStream,
-  }),
-}));
-
 // Mock zincutils
 vi.mock('@/utils/zincutils', () => ({
   formatLargeNumber: vi.fn((num) => num.toString()),
   getImageURL: vi.fn(() => 'test-image-url'),
-  useLocalOrganization: vi.fn(() => ({})),
-  useLocalCurrentUser: vi.fn(() => ({})),
-  useLocalTimezone: vi.fn(() => "UTC"),
-  b64EncodeUnicode: vi.fn((str) => str),
-  b64DecodeUnicode: vi.fn((str) => str),
-  generateTraceContext: vi.fn(() => ({ traceId: "test-trace-id" })),
 }));
 
 // Mock quasar
@@ -313,7 +299,6 @@ describe('FieldList.vue Comprehensive Coverage', () => {
 
   describe('OpenFilterCreator Function Tests', () => {
     beforeEach(() => {
-      mockFetchQueryDataWithHttpStream.mockClear();
       mockStreamService.mockResolvedValue({
         data: {
           hits: [
@@ -341,7 +326,7 @@ describe('FieldList.vue Comprehensive Coverage', () => {
 
       expect(mockEvent.stopPropagation).toHaveBeenCalled();
       expect(mockEvent.preventDefault).toHaveBeenCalled();
-      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(mockStreamService).not.toHaveBeenCalled();
     });
 
     it('should fetch field values for non-fts fields', async () => {
@@ -349,12 +334,17 @@ describe('FieldList.vue Comprehensive Coverage', () => {
       const vm = wrapper.vm as any;
       const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
+      await vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
 
-      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
-      expect(vm.fieldValues['test_field']).toBeDefined();
-      expect(vm.fieldValues['test_field'].isLoading).toBe(true);
-      expect(vm.fieldValues['test_field'].values).toEqual([]);
+      expect(mockStreamService).toHaveBeenCalledWith({
+        org_identifier: 'test-org',
+        stream_name: 'test-stream',
+        start_time: '2023-01-01',
+        end_time: '2023-01-02',
+        fields: ['test_field'],
+        size: 10,
+        type: 'logs',
+      });
     });
 
     it('should use custom stream name if provided', async () => {
@@ -362,15 +352,17 @@ describe('FieldList.vue Comprehensive Coverage', () => {
       const vm = wrapper.vm as any;
       const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      vm.openFilterCreator(mockEvent, {
-        name: 'test_field',
-        ftsKey: false,
-        stream_name: 'custom_stream'
+      await vm.openFilterCreator(mockEvent, { 
+        name: 'test_field', 
+        ftsKey: false, 
+        stream_name: 'custom_stream' 
       });
 
-      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
-      const callArgs = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
-      expect(callArgs.queryReq.stream_name).toBe('custom_stream');
+      expect(mockStreamService).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stream_name: 'custom_stream',
+        })
+      );
     });
 
     it('should set loading state correctly', async () => {
@@ -382,7 +374,12 @@ describe('FieldList.vue Comprehensive Coverage', () => {
 
       expect(vm.fieldValues['test_field'].isLoading).toBe(true);
       expect(vm.fieldValues['test_field'].values).toEqual([]);
-      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+
+      // Wait for the promise to resolve
+      await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(vm.fieldValues['test_field'].isLoading).toBe(false);
     });
 
     it('should handle successful API response', async () => {
@@ -390,32 +387,7 @@ describe('FieldList.vue Comprehensive Coverage', () => {
       const vm = wrapper.vm as any;
       const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
-
-      // Simulate the data callback with HTTP stream response
-      const callArgs = mockFetchQueryDataWithHttpStream.mock.calls[0];
-      const callbacks = callArgs[1];
-
-      // Simulate data response with correct structure
-      const payload = callArgs[0];
-      callbacks.data(payload, {
-        type: "search_response_hits",
-        content: {
-          results: {
-            hits: [
-              {
-                field: "test_field",
-                values: [
-                  { zo_sql_key: "value1", zo_sql_num: 100 },
-                  { zo_sql_key: "value2", zo_sql_num: 200 },
-                ],
-              },
-            ],
-          },
-        },
-      });
-
-      await nextTick();
+      await vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
 
       expect(vm.fieldValues['test_field'].values).toHaveLength(2);
       expect(vm.fieldValues['test_field'].values[0]).toEqual({
@@ -425,78 +397,70 @@ describe('FieldList.vue Comprehensive Coverage', () => {
     });
 
     it('should handle null values in API response', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
-
-      vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
-
-      const callArgs = mockFetchQueryDataWithHttpStream.mock.calls[0];
-      const callbacks = callArgs[1];
-
-      // Simulate data response with null values
-      const payload = callArgs[0];
-      callbacks.data(payload, {
-        type: "search_response_hits",
-        content: {
-          results: {
-            hits: [
-              {
-                field: "test_field",
-                values: [
-                  { zo_sql_key: null, zo_sql_num: 50 },
-                  { zo_sql_key: undefined, zo_sql_num: 75 },
-                ],
-              },
-            ],
-          },
+      mockStreamService.mockResolvedValue({
+        data: {
+          hits: [
+            {
+              field: 'test_field',
+              values: [
+                { zo_sql_key: null, zo_sql_num: 50 },
+                { zo_sql_key: undefined, zo_sql_num: 75 },
+              ],
+            },
+          ],
         },
       });
 
-      await nextTick();
-
-      expect(vm.fieldValues['test_field'].values[0].key).toBe(null);
-      expect(vm.fieldValues['test_field'].values[1].key).toBe(undefined);
-    });
-
-    it('should handle empty API response', async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
+      await vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
 
-      const callArgs = mockFetchQueryDataWithHttpStream.mock.calls[0];
-      const callbacks = callArgs[1];
+      expect(vm.fieldValues['test_field'].values[0].key).toBe('null');
+      expect(vm.fieldValues['test_field'].values[1].key).toBe('null');
+    });
 
-      // Simulate empty data response
-      callbacks.data({ field: 'test_field' }, { hits: [] });
+    it('should handle empty API response', async () => {
+      mockStreamService.mockResolvedValue({
+        data: {
+          hits: [],
+        },
+      });
 
-      await nextTick();
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
+
+      await vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
 
       expect(vm.fieldValues['test_field'].values).toEqual([]);
     });
 
     it('should handle API error and show notification', async () => {
+      mockStreamService.mockRejectedValue(new Error('API Error'));
+
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
-
-      const callArgs = mockFetchQueryDataWithHttpStream.mock.calls[0];
-      const callbacks = callArgs[1];
-
-      // Simulate error callback
-      const payload = callArgs[0];
-      callbacks.error(payload, new Error('API Error'));
+      try {
+        await vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
+      } catch (error) {
+        // Expected to catch the error
+      }
 
       await nextTick();
 
-      expect(vm.fieldValues['test_field'].errMsg).toBe('Failed to fetch field values');
+      expect(mockNotify).toHaveBeenCalledWith({
+        type: 'negative',
+        message: 'Error while fetching values for test_field',
+      });
     });
 
-    it('should always set loading to false in complete callback', async () => {
+    it('should always set loading to false in finally block', async () => {
+      mockStreamService.mockRejectedValue(new Error('API Error'));
+
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
@@ -505,14 +469,9 @@ describe('FieldList.vue Comprehensive Coverage', () => {
 
       expect(vm.fieldValues['test_field'].isLoading).toBe(true);
 
-      const callArgs = mockFetchQueryDataWithHttpStream.mock.calls[0];
-      const callbacks = callArgs[1];
-
-      // Simulate complete callback
-      const payload = callArgs[0];
-      callbacks.complete(payload, {});
-
+      // Wait for the promise to resolve
       await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(vm.fieldValues['test_field'].isLoading).toBe(false);
     });
@@ -764,6 +723,28 @@ describe('FieldList.vue Comprehensive Coverage', () => {
     });
 
     it('should handle concurrent field value requests', async () => {
+      mockStreamService
+        .mockResolvedValueOnce({
+          data: {
+            hits: [
+              {
+                field: 'field1',
+                values: [{ zo_sql_key: 'value1', zo_sql_num: 100 }],
+              },
+            ],
+          },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            hits: [
+              {
+                field: 'field2',
+                values: [{ zo_sql_key: 'value2', zo_sql_num: 200 }],
+              },
+            ],
+          },
+        });
+
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
@@ -773,7 +754,13 @@ describe('FieldList.vue Comprehensive Coverage', () => {
 
       expect(vm.fieldValues.field1.isLoading).toBe(true);
       expect(vm.fieldValues.field2.isLoading).toBe(true);
-      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2);
+
+      // Wait for the promises to resolve
+      await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(vm.fieldValues.field1.isLoading).toBe(false);
+      expect(vm.fieldValues.field2.isLoading).toBe(false);
     });
   });
 
@@ -823,22 +810,24 @@ describe('FieldList.vue Comprehensive Coverage', () => {
     });
 
     it('should handle network timeout errors', async () => {
+      mockStreamService.mockRejectedValue(new Error('Network timeout'));
+
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
-
-      const callArgs = mockFetchQueryDataWithHttpStream.mock.calls[0];
-      const callbacks = callArgs[1];
-
-      // Simulate network timeout error
-      const payload = callArgs[0];
-      callbacks.error(payload, new Error('Network timeout'));
+      try {
+        await vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
+      } catch (error) {
+        // Expected to catch the error
+      }
 
       await nextTick();
 
-      expect(vm.fieldValues['test_field'].errMsg).toBe('Failed to fetch field values');
+      expect(mockNotify).toHaveBeenCalledWith({
+        type: 'negative',
+        message: 'Error while fetching values for test_field',
+      });
     });
 
     it('should handle malformed API responses', async () => {
