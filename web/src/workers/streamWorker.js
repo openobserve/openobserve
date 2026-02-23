@@ -44,7 +44,39 @@ self.onmessage = async (event) => {
   }
 };
 
+// Parse a single SSE message block and return {type, data} or null
+function parseSseMessage(messageBlock) {
+  const msgLines = messageBlock.split('\n');
+
+  // Multi-line: event + data
+  if (msgLines.length > 1) {
+    const eventType = msgLines[0].startsWith('event:') ? msgLines[0].slice(7).trim() : msgLines[0].slice(6).trim();
+
+    if (msgLines[1]?.startsWith('data:') || msgLines[1]?.startsWith('data: ')) {
+      const data = extractData(msgLines[1]);
+      try {
+        return { type: eventType, data: JSON.parse(data) };
+      } catch (parseErr) {
+        return { type: 'error', data: { message: 'Error parsing data', error: parseErr.toString() } };
+      }
+    }
+  }
+
+  // Single-line: data only
+  if (msgLines[0]?.startsWith('data:') || msgLines[0]?.startsWith('data: ')) {
+    const data = extractData(msgLines[0]);
+    try {
+      return { type: 'data', data: JSON.parse(data) };
+    } catch (parseErr) {
+      return { type: 'data', data: data };
+    }
+  }
+
+  return null;
+}
+
 // Process a chunk for a given traceId
+// Batches all parsed SSE events from one network chunk into a single postMessage
 function processChunk(traceId, chunk) {
   let buffer = activeBuffers[traceId] || '';
 
@@ -60,68 +92,40 @@ function processChunk(traceId, chunk) {
 
     const lines = messages.filter(line => line.trim());
 
-    // Process each complete line
+    if (lines.length === 0) return;
+
+    // Collect all parsed events from this network chunk
+    const batch = [];
+
     for (let i = 0; i < lines.length; i++) {
       try {
-        const msgLines = lines[i].split('\n');
-        // Check if this is an event line
-
-        if(msgLines.length > 1){
-          const eventType = msgLines[0].startsWith('event:') ? msgLines[0].slice(7).trim() : msgLines[0].slice(6).trim();
-
-          //TODO: Logic is duplicated for event:search_response and event:search_response_hits
-          // Create method to handle this
-          if (msgLines[1]?.startsWith('data:') || msgLines[1]?.startsWith('data: ')) {
-            const data = extractData(msgLines[1]);
-
-            try {
-              // Try to parse as JSON
-              const json = JSON.parse(data);
-
-              // Send message based on event type
-              self.postMessage({
-                type: eventType,
-                traceId,
-                data: json,
-              });
-            } catch (parseErr) {
-              // If JSON parsing fails, send raw data
-              self.postMessage({
-                type: 'error',
-                traceId,
-                data: { message: 'Error parsing data', error: parseErr.toString() },
-              });
-            }
-          }
-        }
-
-        if (msgLines[0]?.startsWith('data:') || msgLines[0]?.startsWith('data: ')) {
-          const data = extractData(msgLines[0]);
-          try {
-            // Try to parse as JSON
-            const json = JSON.parse(data);
-            // Send message based on event type
-            self.postMessage({
-              type: 'data',
-              traceId,
-              data: json,
-            });
-          } catch (parseErr) {
-            // If JSON parsing fails, send raw data
-            self.postMessage({
-              type: 'data',
-              traceId,
-              data: data,
-            });
-          }
+        const parsed = parseSseMessage(lines[i]);
+        if (parsed) {
+          batch.push(parsed);
         }
       } catch (e) {
-        self.postMessage({
+        batch.push({
           type: 'error',
-          traceId,
           data: { message: 'Error processing message', error: e.toString() },
         });
       }
+    }
+
+    // Send all events in one postMessage to reduce main-thread interruptions
+    if (batch.length === 1) {
+      // Single event — send as before for backwards compatibility
+      self.postMessage({
+        type: batch[0].type,
+        traceId,
+        data: batch[0].data,
+      });
+    } else if (batch.length > 1) {
+      // Multiple events — send as a batch
+      self.postMessage({
+        type: 'batch',
+        traceId,
+        events: batch,
+      });
     }
   } catch (error) {
     // Send error to main thread

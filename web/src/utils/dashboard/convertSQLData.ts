@@ -22,8 +22,7 @@
  * @return {Object} - the options object for rendering the chart
  */
 import { toZonedTime } from "date-fns-tz";
-import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
-import { format } from "date-fns";
+import { fillMissingValues } from "./fillMissingValues";
 import {
   calculateOptimalFontSize,
   calculateWidthText,
@@ -119,6 +118,7 @@ export const convertMultiSQLData = async (
   metadata: any,
   chartPanelStyle: any,
   annotations: any,
+  isStreaming: boolean = false,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
     // this sets a blank object until it loads
@@ -141,6 +141,7 @@ export const convertMultiSQLData = async (
         { queries: [metadata.queries[i]] },
         chartPanelStyle,
         annotations,
+        isStreaming,
       ),
     );
   }
@@ -184,6 +185,7 @@ export const convertSQLData = async (
   metadata: any,
   chartPanelStyle: any,
   annotations: any,
+  isStreaming: boolean = false,
 ) => {
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
@@ -358,7 +360,7 @@ export const convertSQLData = async (
         "Limiting the displayed series to ensure optimal performance";
     }
 
-    const topKeys = allKeys.slice(0, limitSeries).map(([key]) => key);
+    const topKeys = new Set(allKeys.slice(0, limitSeries).map(([key]) => key));
 
     // Step 3: Initialize result array and others object for aggregation
     const resultArray: any[] = [];
@@ -376,7 +378,7 @@ export const convertSQLData = async (
         breakdownValue = "";
       }
 
-      if (topKeys.includes(breakdownValue.toString())) {
+      if (topKeys.has(breakdownValue.toString())) {
         resultArray.push({ ...item, [breakdownKey]: breakdownValue });
       } else if (top_results_others) {
         const xAxisValue = String(getDataValue(item, xAxisKey));
@@ -420,165 +422,63 @@ export const convertSQLData = async (
 
   const processedData = processData(searchQueryData, panelSchema);
 
-  const missingValue = () => {
-    // Get the interval in minutes
-    const interval = resultMetaData?.map(
-      (it: any) => it?.histogram_interval,
-    )?.[0];
-
-    if (
-      !interval ||
-      !metadata.queries ||
-      !["area-stacked", "line", "area", "bar", "stacked", "scatter"].includes(
-        panelSchema.type,
-      )
-    ) {
-      return JSON.parse(JSON.stringify(processedData));
-    }
-
-    // Extract and process metaDataStartTime
-    const metaDataStartTime = metadata?.queries[0]?.startTime?.toString() ?? 0;
-    const startTime = new Date(parseInt(metaDataStartTime) / 1000);
-
-    // Calculate the binnedDate
-    const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
-    const binnedDate = dateBin(interval, startTime, origin);
-
-    // Convert interval to milliseconds
-    const intervalMillis = interval * 1000;
-
-    // Identify the time-based key
-    const searchQueryDataFirstEntry = processedData[0];
-
-    const keys = [
-      ...getXAxisKeys(),
-      ...getYAxisKeys(),
-      ...getZAxisKeys(),
-      ...getBreakDownKeys(),
-    ];
-    const timeBasedKey = keys?.find((key) =>
-      isTimeSeries([getDataValue(searchQueryDataFirstEntry, key)]),
-    );
-
-    if (!timeBasedKey) {
-      return JSON.parse(JSON.stringify(processedData));
-    }
-
-    // Extract and process metaDataEndTime
-    const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
-    const endTime = new Date(parseInt(metaDataEndTime) / 1000);
-
-    const xAxisKeysWithoutTimeStamp = getXAxisKeys().filter(
-      (key: any) => key !== timeBasedKey,
-    );
-    const breakdownAxisKeysWithoutTimeStamp = getBreakDownKeys().filter(
-      (key: any) => key !== timeBasedKey,
-    );
-
-    const timeKey = timeBasedKey;
-    const uniqueKey =
-      xAxisKeysWithoutTimeStamp[0] !== undefined
-        ? xAxisKeysWithoutTimeStamp[0]
-        : breakdownAxisKeysWithoutTimeStamp[0];
-
-    // Create a set of unique xAxis values
-    const uniqueXAxisValues = new Set(
-      processedData.map((d: any) => getDataValue(d, uniqueKey)),
-    );
-
-    const filledData: any = [];
-    let currentTime = binnedDate;
-    // Create a map of existing data
-    const searchDataMap = new Map();
-    processedData?.forEach((d: any) => {
-      const key =
-        xAxisKeysWithoutTimeStamp.length > 0 ||
-        breakdownAxisKeysWithoutTimeStamp.length > 0
-          ? `${getDataValue(d, timeKey)}-${getDataValue(d, uniqueKey)}`
-          : `${getDataValue(d, timeKey)}`;
-
-      searchDataMap.set(key, d);
-    });
-
-    while (currentTime <= endTime) {
-      const currentFormattedTime = format(
-        toZonedTime(currentTime, "UTC"),
-        "yyyy-MM-dd'T'HH:mm:ss",
-      );
-
-      if (
-        xAxisKeysWithoutTimeStamp.length === 0 &&
-        breakdownAxisKeysWithoutTimeStamp.length === 0
-      ) {
-        const key = `${currentFormattedTime}`;
-        const currentData = searchDataMap.get(key);
-        const nullEntry = {
-          [timeKey]: currentFormattedTime,
-          ...currentData,
-        };
-        if (!currentData) {
-          keys.forEach((key) => {
-            if (key !== timeKey) nullEntry[key] = noValueConfigOption;
-          });
-        }
-
-        filledData.push(nullEntry);
-      } else {
-        uniqueXAxisValues.forEach((uniqueValue: any) => {
-          const key = `${currentFormattedTime}-${uniqueValue}`;
-          const currentData = searchDataMap.get(key);
-          if (currentData) {
-            filledData.push(currentData);
-          } else {
-            const nullEntry = {
-              [timeKey]: currentFormattedTime,
-              [uniqueKey]: uniqueValue,
-            };
-
-            keys.forEach((key) => {
-              if (key !== timeKey && key !== uniqueKey) {
-                nullEntry[key] = noValueConfigOption;
-              }
-            });
-
-            filledData.push(nullEntry);
-          }
-        });
-      }
-
-      currentTime = new Date(currentTime.getTime() + intervalMillis);
-    }
-
-    return filledData;
-  };
-
-  const missingValueData = missingValue();
+  // PERF: During streaming, skip gap-filling entirely. processedData has only
+  // actual data rows. For time-series charts (xAxis.type="time"), ECharts
+  // handles sparse [timestamp, value] pairs natively. On the final render
+  // (isStreaming=false), full gap-filling runs to produce the accurate chart.
+  //
+  // PERF: Sparse gap-fill strategy — instead of generating a row for every
+  // time slot in the entire range (which produced 100K+ rows), we only insert
+  // null-marker entries at the boundaries of gaps in actual data. This produces
+  // identical ECharts output since time-series charts use [timestamp, value]
+  // pairs and handle sparse data natively.
+  const missingValueData = isStreaming
+    ? processedData
+    : fillMissingValues({
+        processedData,
+        resultMetaData,
+        metadata,
+        panelType: panelSchema.type,
+        noValueConfigOption,
+        xAxisKeys: getXAxisKeys(),
+        yAxisKeys: getYAxisKeys(),
+        zAxisKeys: getZAxisKeys(),
+        breakDownKeys: getBreakDownKeys(),
+      });
   // flag to check if the data is time series
   let isTimeSeriesFlag = false;
 
-  // get the axis data using key
-  const getAxisDataFromKey = (key: string) => {
-    const data =
-      missingValueData?.filter((item: any) => {
-        return (
-          xAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
-          yAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
-          breakDownKeys.every((key: any) => getDataValue(item, key) != null)
-        );
-      }) || [];
+  // PERF: Filter data ONCE and extract ALL columns in a single pass.
+  // Previously getAxisDataFromKey() was called 17+ times, each time
+  // re-filtering the entire dataset (100k+ rows) and rebuilding all columns.
+  // This reduces total work from O(17 * n * keys) to O(n * keys).
+  const _filteredData: any[] = (() => {
+    if (!missingValueData || missingValueData.length === 0) return [];
+    return missingValueData.filter((item: any) =>
+      xAxisKeys.every((k: any) => getDataValue(item, k) != null) &&
+      yAxisKeys.every((k: any) => getDataValue(item, k) != null) &&
+      breakDownKeys.every((k: any) => getDataValue(item, k) != null),
+    );
+  })();
 
-    // if data is not there use {} as a default value
-    const keys = Object.keys((data.length && data[0]) || {}); // Assuming there's at least one object
-
-    const keyArrays: any = {};
-
-    for (const key of keys) {
-      keyArrays[key] = data.map((obj: any) => getDataValue(obj, key));
+  const _columnCache: Map<string, any[]> = (() => {
+    const cache = new Map<string, any[]>();
+    if (_filteredData.length === 0) return cache;
+    const allKeys = Object.keys(_filteredData[0]);
+    for (let i = 0; i < allKeys.length; i++) {
+      const col = allKeys[i];
+      const arr = new Array(_filteredData.length);
+      for (let j = 0; j < _filteredData.length; j++) {
+        arr[j] = getDataValue(_filteredData[j], col);
+      }
+      cache.set(col, arr);
     }
+    return cache;
+  })();
 
-    const result = getDataValue(keyArrays, key) || [];
-
-    return result;
+  // O(1) column lookup from pre-computed cache
+  const getAxisDataFromKey = (key: string): any[] => {
+    return _columnCache.get(key) || [];
   };
 
   function getLargestLabel() {
@@ -604,18 +504,10 @@ export const convertSQLData = async (
    * @returns {number} - the largest value
    */
   const largestStackLabel = (axisKey: string, breakDownkey: string) => {
-    const data =
-      missingValueData?.filter((item: any) => {
-        return (
-          xAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
-          yAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
-          breakDownKeys.every((key: any) => getDataValue(item, key) != null)
-        );
-      }) || [];
-
+    // PERF: Reuse _filteredData instead of re-filtering missingValueData
     const maxValues: any = {};
 
-    data.forEach((obj: any) => {
+    _filteredData.forEach((obj: any) => {
       const breakDownValue = getDataValue(obj, breakDownkey);
       const axisValue = getDataValue(obj, axisKey);
 
@@ -1418,11 +1310,11 @@ export const convertSQLData = async (
 
     // Extract unique values for the second x-axis key
     // NOTE: while filter, we can't compare type as well because set will have string values
-    const uniqueValues = [
-      ...new Set(
+    const uniqueValues = Array.from(
+      new Set(
         missingValueData.map((obj: any) => getDataValue(obj, breakDownKey)),
       ),
-    ].filter((value: any) => value != null || value != undefined);
+    ).filter((value: any) => value != null || value != undefined);
 
     return uniqueValues;
   }
@@ -2702,6 +2594,25 @@ export const convertSQLData = async (
 
       options.xAxis[0].data = [];
 
+      // During streaming, set explicit time bounds so the chart shows the full
+      // query time range even with partial data (progressive "fill up" effect).
+      if (isStreaming && metadata?.queries?.[0]) {
+        const metaStart = metadata.queries[0].startTime;
+        const metaEnd = metadata.queries[0].endTime;
+        if (metaStart && metaEnd) {
+          options.xAxis[0].min = toZonedTime(
+            parseInt(metaStart.toString()) / 1000
+              + (metadata?.queries[0]?.timeRangeGap.seconds ?? 0),
+            store.state.timezone,
+          ).getTime();
+          options.xAxis[0].max = toZonedTime(
+            parseInt(metaEnd.toString()) / 1000
+              + (metadata?.queries[0]?.timeRangeGap.seconds ?? 0),
+            store.state.timezone,
+          ).getTime();
+        }
+      }
+
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
 
@@ -2900,6 +2811,25 @@ export const convertSQLData = async (
       }
 
       options.xAxis[0].data = [];
+
+      // During streaming, set explicit time bounds for custom SQL time-series
+      if (isStreaming && metadata?.queries?.[0]) {
+        const metaStart = metadata.queries[0].startTime;
+        const metaEnd = metadata.queries[0].endTime;
+        if (metaStart && metaEnd) {
+          options.xAxis[0].min = toZonedTime(
+            parseInt(metaStart.toString()) / 1000
+              + (metadata?.queries[0]?.timeRangeGap.seconds ?? 0),
+            store.state.timezone,
+          ).getTime();
+          options.xAxis[0].max = toZonedTime(
+            parseInt(metaEnd.toString()) / 1000
+              + (metadata?.queries[0]?.timeRangeGap.seconds ?? 0),
+            store.state.timezone,
+          ).getTime();
+        }
+      }
+
       options.tooltip.formatter = function (name: any) {
         try {
           // if (
@@ -3171,13 +3101,17 @@ export const convertSQLData = async (
  * @return {any} The largest label in the data array.
  */
 const largestLabel = (data: any) => {
-  const largestlabel = data.reduce((largest: any, label: any) => {
-    return label?.toString().length > largest?.toString().length
-      ? label
-      : largest;
-  }, "");
-
-  return largestlabel;
+  if (!data || data.length === 0) return "";
+  let largest = data[0];
+  let largestLen = String(largest ?? "").length;
+  for (let i = 1; i < data.length; i++) {
+    const len = String(data[i] ?? "").length;
+    if (len > largestLen) {
+      largest = data[i];
+      largestLen = len;
+    }
+  }
+  return largest ?? "";
 };
 
 

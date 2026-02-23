@@ -201,6 +201,18 @@ export const usePanelDataLoader = (
     );
   };
 
+  // Coalesced version — multiple mid-stream cache save requests within the same
+  // microtask checkpoint collapse into a single save. Zero artificial delay.
+  let cacheSaveScheduled = false;
+  const coalescedSaveCache = () => {
+    if (cacheSaveScheduled) return;
+    cacheSaveScheduled = true;
+    queueMicrotask(() => {
+      cacheSaveScheduled = false;
+      saveCurrentStateToCache();
+    });
+  };
+
   // currently dependent variables data
   let currentDependentVariablesData = variablesData?.value?.values
     ? JSON.parse(
@@ -410,42 +422,39 @@ export const usePanelDataLoader = (
       code: "",
     };
 
+    const queryIndex = payload?.meta?.currentQueryIndex;
     // is streaming aggs
     const streaming_aggs = searchRes?.content?.streaming_aggs ?? false;
 
     // Initialize data array if not exists
-    if (!state.data[payload?.meta?.currentQueryIndex]) {
-      state.data[payload?.meta?.currentQueryIndex] = [];
+    if (!state.data[queryIndex]) {
+      state.data[queryIndex] = [];
     }
 
-    // if streaming aggs, replace the state data
-    if (streaming_aggs) {
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(searchRes?.content?.results?.hits ?? {}),
-      ];
-    }
-    // if order by is desc, append new partition response at end
-    else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
-      // else append new partition response at start
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(searchRes?.content?.results?.hits ?? {}),
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
-      ];
+    const newHits = searchRes?.content?.results?.hits;
+    if (!Array.isArray(newHits) || newHits.length === 0) {
+      // No hits — skip array mutations
+    } else if (streaming_aggs) {
+      // Streaming aggs: replace entirely
+      state.data[queryIndex] = newHits.slice();
+    } else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
+      // Ascending: prepend
+      const existing = state.data[queryIndex];
+      state.data[queryIndex] = newHits.concat(existing);
     } else {
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
-        ...(searchRes?.content?.results?.hits ?? {}),
-      ];
+      // Descending (default): mutable append avoids O(n^2) spread
+      const existing = state.data[queryIndex];
+      existing.push(...newHits);
     }
 
     // Push metadata for each partition
-    state.resultMetaData[payload?.meta?.currentQueryIndex].push(
+    state.resultMetaData[queryIndex].push(
       searchRes?.content?.results ?? {},
     );
 
     // If we have data and loading is complete, set isPartialData to false
     if (
-      state.data[payload?.meta?.currentQueryIndex]?.length > 0 &&
+      state.data[queryIndex]?.length > 0 &&
       !state.loading
     ) {
       state.isPartialData = false;
@@ -475,57 +484,51 @@ export const usePanelDataLoader = (
       code: "",
     };
 
+    const queryIndex = payload?.meta?.currentQueryIndex;
     const lastPartitionIndex = Math.max(
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.length - 1,
+      state?.resultMetaData?.[queryIndex]?.length - 1,
       0,
     );
     // is streaming aggs
     const streaming_aggs =
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+      state?.resultMetaData?.[queryIndex]?.[
         lastPartitionIndex
       ]?.streaming_aggs ?? false;
 
     // Initialize data array if not exists
-    if (!state.data[payload?.meta?.currentQueryIndex]) {
-      state.data[payload?.meta?.currentQueryIndex] = [];
+    if (!state.data[queryIndex]) {
+      state.data[queryIndex] = [];
     }
 
-    // if streaming aggs, replace the state data
-    if (streaming_aggs) {
-      // handle empty hits case
-      if (searchRes?.content?.results?.hits?.length > 0) {
-        state.data[payload?.meta?.currentQueryIndex] = [
-          ...(searchRes?.content?.results?.hits ?? {}),
-        ];
-      }
-    }
-    // if order by is desc, append new partition response at end
-    else if (
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+    const newHits = searchRes?.content?.results?.hits;
+    if (!Array.isArray(newHits) || newHits.length === 0) {
+      // No hits to process — skip array mutations
+    } else if (streaming_aggs) {
+      // Streaming aggs: replace entirely
+      state.data[queryIndex] = newHits.slice();
+    } else if (
+      state?.resultMetaData?.[queryIndex]?.[
         lastPartitionIndex
       ]?.order_by?.toLowerCase() === "asc"
     ) {
-      // else append new partition response at start
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(searchRes?.content?.results?.hits ?? {}),
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
-      ];
+      // Ascending: prepend new hits — use concat to avoid full copy
+      const existing = state.data[queryIndex];
+      state.data[queryIndex] = newHits.concat(existing);
     } else {
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
-        ...(searchRes?.content?.results?.hits ?? {}),
-      ];
+      // Descending (default): mutable append avoids O(n^2) spread
+      const existing = state.data[queryIndex];
+      existing.push(...newHits);
     }
 
     // update result metadata - update the first partition result
     if (
-      state.resultMetaData[payload?.meta?.currentQueryIndex]?.[
+      state.resultMetaData[queryIndex]?.[
         lastPartitionIndex
       ]
     ) {
-      state.resultMetaData[payload?.meta?.currentQueryIndex][
+      state.resultMetaData[queryIndex][
         lastPartitionIndex
-      ].hits = searchRes?.content?.results?.hits ?? {};
+      ].hits = newHits ?? {};
     }
   };
 
@@ -534,17 +537,17 @@ export const usePanelDataLoader = (
     try {
       if (response.type === "search_response_metadata") {
         handleStreamingHistogramMetadata(payload, response);
-        saveCurrentStateToCache();
+        coalescedSaveCache();
       }
 
       if (response.type === "search_response_hits") {
         handleStreamingHistogramHits(payload, response);
-        saveCurrentStateToCache();
+        coalescedSaveCache();
       }
 
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
-        saveCurrentStateToCache();
+        coalescedSaveCache();
       }
 
       if (response.type === "error") {
@@ -564,13 +567,13 @@ export const usePanelDataLoader = (
         state.loadingProgressPercentage = 100; // Set to 100% when complete
         state.isOperationCancelled = false;
         state.isPartialData = false; // Explicitly set to false when complete
-        saveCurrentStateToCache();
+        saveCurrentStateToCache(); // Immediate save on stream end
       }
 
       if (response.type === "event_progress") {
         state.loadingProgressPercentage = response?.content?.percent ?? 0;
         state.isPartialData = true;
-        saveCurrentStateToCache();
+        coalescedSaveCache();
       }
     } catch (error: any) {
       state.loading = false;
@@ -1009,7 +1012,7 @@ export const usePanelDataLoader = (
                 if (res.type === "event_progress") {
                   state.loadingProgressPercentage = res?.content?.percent ?? 0;
                   state.isPartialData = true;
-                  saveCurrentStateToCache();
+                  coalescedSaveCache();
                 }
                 if (res?.type === "promql_response") {
                   const newData = res?.content?.results;
@@ -1020,11 +1023,15 @@ export const usePanelDataLoader = (
                     newData
                   );
 
-                  // Update state with accumulated results
-                  state.data = [...queryResults];
-                  state.metadata = {
-                    queries: queryMetadata,
-                  };
+                  // Update state in-place — mutate the array slot instead of
+                  // spreading the whole queryResults array on every chunk
+                  state.data[queryIndex] = queryResults[queryIndex];
+                  // Only update metadata reference when it actually changes
+                  if (state.metadata.queries !== queryMetadata) {
+                    state.metadata = {
+                      queries: queryMetadata,
+                    };
+                  }
 
                   // Clear error on successful response
                   state.errorDetail = {
@@ -1068,8 +1075,8 @@ export const usePanelDataLoader = (
                 // Get statistics from chunk processor
                 const stats = chunkProcessor.getStats();
 
-                // Final update with complete results
-                state.data = [...queryResults];
+                // Final update — assign slot directly instead of spreading
+                state.data[queryIndex] = queryResults[queryIndex];
                 state.metadata = {
                   queries: queryMetadata,
                   // Add series limiting information for warning message
@@ -1365,29 +1372,26 @@ export const usePanelDataLoader = (
                           state.resultMetaData[queryIndex]?.[0]
                             ?.streaming_aggs ?? false;
 
-                        // If streaming_aggs, replace the data (aggregation query)
                         if (streaming_aggs) {
-                          state.data[queryIndex] = [...hits];
-                        }
-                        // Otherwise, append/prepend based on order_by (multiple partitions)
-                        else {
+                          // Streaming aggs: replace entirely
+                          state.data[queryIndex] = hits.slice();
+                        } else {
                           const orderBy =
                             state.resultMetaData[
                               queryIndex
                             ]?.order_by?.toLowerCase();
 
                           if (orderBy === "asc") {
-                            // For ascending order, prepend new data at start
-                            state.data[queryIndex] = [
-                              ...hits,
-                              ...(state.data[queryIndex] ?? []),
-                            ];
+                            // Ascending: prepend
+                            state.data[queryIndex] = hits.concat(state.data[queryIndex] ?? []);
                           } else {
-                            // For descending order, append new data at end
-                            state.data[queryIndex] = [
-                              ...(state.data[queryIndex] ?? []),
-                              ...hits,
-                            ];
+                            // Descending: mutable append avoids O(n^2) spread
+                            const existing = state.data[queryIndex];
+                            if (existing) {
+                              existing.push(...hits);
+                            } else {
+                              state.data[queryIndex] = hits.slice();
+                            }
                           }
                         }
 
@@ -1397,7 +1401,7 @@ export const usePanelDataLoader = (
                         }
                       }
                       state.errorDetail = { message: "", code: "" };
-                      saveCurrentStateToCache();
+                      coalescedSaveCache();
                     }
 
                     if (response.type === "search_response") {
@@ -1413,7 +1417,7 @@ export const usePanelDataLoader = (
                         };
                       }
                       state.errorDetail = { message: "", code: "" };
-                      saveCurrentStateToCache();
+                      coalescedSaveCache();
                     }
 
                     if (response.type === "error") {

@@ -91,6 +91,7 @@ export const convertPanelData = async (
               metadata,
               chartPanelStyle,
               annotations,
+              loading,
             )),
           };
         } catch (error) {
