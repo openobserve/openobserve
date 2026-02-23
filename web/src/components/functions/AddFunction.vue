@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
+                      data-test="logs-vrl-function-editor"
                       data-test-prefix="function-vrl"
                       ref="editorRef"
                       :languages="['vrl', 'javascript']"

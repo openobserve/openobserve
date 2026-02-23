@@ -46,7 +46,7 @@ export class SanityPage {
         // FunctionSelector save button (when actions are disabled)
         this.functionSaveButtonNew = '[data-test="logs-search-bar-save-function-btn"]';
         this.functionSaveButtonAlternate = '[data-test="logs-search-bar-function-dropdown"]';
-        this.fnEditor = '#fnEditor';
+        this.fnEditor = '[data-test="logs-vrl-function-editor"]';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         
         // Menu Navigation locators
@@ -281,12 +281,15 @@ export class SanityPage {
         const queryEditor = this.page.locator(this.queryEditorContent);
         await expect(queryEditor).toBeVisible({ timeout: 10000 });
         
-        await queryEditor.locator('.monaco-editor').click();
+        await queryEditor.getByRole('code').click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.waitForTimeout(300);
         await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
-        
+
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.locator(this.refreshButton).click({ force: true });
-        
+
         await expect(this.page.getByText(/Showing 1 to 5/)).toBeVisible({ timeout: 15000 });
 
         // Reset filters is now inside utilities menu, so open menu first
@@ -300,7 +303,7 @@ export class SanityPage {
     async createAndDeleteFunction(functionName) {
         await this.page.locator(this.refreshButton).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        
+
         const fnEditor = this.page.locator(this.fnEditor);
 
         // Check if VRL editor is visible, if not try to enable it via toggle
@@ -314,7 +317,7 @@ export class SanityPage {
             }
         }
 
-        const fnEditorTextbox = this.page.locator(this.fnEditor).locator('.monaco-editor');
+        const fnEditorTextbox = this.page.locator(this.fnEditor).getByRole('code');
 
         try {
             await expect(fnEditorTextbox).toBeVisible({ timeout: 5000 });
@@ -1045,21 +1048,21 @@ export class SanityPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Check if VRL editor is visible, if not click the toggle
-        const fnEditor = this.page.locator('#fnEditor');
+        const fnEditor = this.page.locator('[data-test="logs-vrl-function-editor"]').first();
         const isFnEditorVisible = await fnEditor.isVisible();
-        
+
         if (!isFnEditorVisible) {
             // Click VRL toggle button only if editor is not displayed
             await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').nth(2).click();
-            
+
             // Wait for VRL editor to appear after toggle
             await expect(fnEditor).toBeVisible({ timeout: 15000 });
         }
-        
+
         // Verify VRL editor is now available
-        const fnEditorCount = await this.page.locator('#fnEditor').count();
+        const fnEditorCount = await this.page.locator('[data-test="logs-vrl-function-editor"]').count();
         if (fnEditorCount === 0) {
-            throw new Error('SQL+Histogram test: VRL editor (#fnEditor) not found after toggle');
+            throw new Error('SQL+Histogram test: VRL editor not found after toggle');
         }
         
         // Enable SQL mode with error handling
@@ -1079,7 +1082,10 @@ export class SanityPage {
         const queryEditor = this.page.locator(this.queryEditorContent);
         await expect(queryEditor).toBeVisible({ timeout: 15000 });
 
-        await queryEditor.locator('.monaco-editor').click();
+        await queryEditor.getByRole('code').click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.waitForTimeout(300);
         await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.waitForTimeout(1000);
