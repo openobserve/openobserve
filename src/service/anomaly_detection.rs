@@ -223,30 +223,88 @@ pub async fn train_model(org_id: &str, config_id: &str) -> Result<serde_json::Va
         let start_time_us =
             end_time_us - (anomaly_config.training_window_days as i64 * 86_400 * 1_000_000);
 
+        log::info!(
+            "[anomaly_detection {}] training started: window={} days, start_time_us={}, end_time_us={}, query={}",
+            config_id,
+            anomaly_config.training_window_days,
+            start_time_us,
+            end_time_us,
+            training_query
+        );
+
         tokio::spawn(async move {
-            // Fetch training data via OSS search service
-            match execute_anomaly_query(&org_id_owned, &training_query, start_time_us, end_time_us)
-                .await
+            log::info!(
+                "[anomaly_detection {}] background training task spawned",
+                config_id_owned
+            );
+
+            match execute_anomaly_query(
+                &org_id_owned,
+                &training_query,
+                start_time_us,
+                end_time_us,
+                &config_id_owned,
+            )
+            .await
             {
                 Ok(data_points) => {
-                    // Train with fetched data
+                    log::info!(
+                        "[anomaly_detection {}] fetched {} data points for training",
+                        config_id_owned,
+                        data_points.len(),
+                    );
                     let start_time = std::time::Instant::now();
                     match trainer.train_with_data(&data_points, start_time).await {
                         Ok(result) => {
                             log::info!(
-                                "Training completed for config {}: {} data points trained",
+                                "[anomaly_detection {}] training complete: data_points={}, model_version={}, success={}",
                                 config_id_owned,
-                                result.data_points_trained
+                                result.data_points_trained,
+                                result.model_version,
+                                result.success,
                             );
+                            if !result.success {
+                                log::warn!(
+                                    "[anomaly_detection {}] training reported failure: {}",
+                                    config_id_owned,
+                                    result.message,
+                                );
+                            }
+                            // Update status to active now that training succeeded
+                            if result.success {
+                                if let Some(db) = infra::db::ORM_CLIENT.get() {
+                                    use infra::table::entity::anomaly_detection_config;
+                                    use sea_orm::{EntityTrait, IntoActiveModel};
+                                    if let Ok(Some(cfg)) =
+                                        anomaly_detection_config::Entity::find_by_id(
+                                            &config_id_owned,
+                                        )
+                                        .one(db)
+                                        .await
+                                    {
+                                        let mut active = cfg.into_active_model();
+                                        active.status = sea_orm::Set("active".to_string());
+                                        let _ = sea_orm::ActiveModelTrait::update(active, db).await;
+                                        log::info!(
+                                            "[anomaly_detection {}] status updated to active",
+                                            config_id_owned
+                                        );
+                                    }
+                                }
+                            }
                         }
                         Err(e) => {
-                            log::error!("Training failed for config {}: {}", config_id_owned, e);
+                            log::error!(
+                                "[anomaly_detection {}] training error: {}",
+                                config_id_owned,
+                                e
+                            );
                         }
                     }
                 }
                 Err(e) => {
                     log::error!(
-                        "Failed to fetch training data for config {}: {}",
+                        "[anomaly_detection {}] failed to fetch training data: {}",
                         config_id_owned,
                         e
                     );
@@ -295,15 +353,39 @@ pub async fn detect_anomalies(org_id: &str, config_id: &str) -> Result<serde_jso
         // Build detection query
         let detection_query = query_builder::build_detection_query(&anomaly_config)?;
 
-        // Detection window: last_processed_timestamp .. now (microseconds)
+        // Detection window: always look back training_window_days from now.
+        // We do NOT use last_processed_timestamp here because this is the
+        // on-demand /detect endpoint — it should always score the full
+        // recent window so repeated calls are useful for testing.
+        // The scheduler's incremental detection uses last_processed_timestamp
+        // separately to avoid re-scoring already-processed data.
         let end_time_us = Utc::now().timestamp_micros();
-        let start_time_us = anomaly_config
-            .last_processed_timestamp
-            .unwrap_or(end_time_us - 86_400 * 1_000_000); // default: last 24h
+        let lookback_us = anomaly_config.training_window_days as i64 * 86_400 * 1_000_000;
+        let start_time_us = end_time_us - lookback_us;
+
+        log::info!(
+            "[anomaly_detection {}] detection started: start_time_us={}, end_time_us={}, query={}",
+            config_id,
+            start_time_us,
+            end_time_us,
+            detection_query
+        );
 
         // Fetch detection data via OSS search service
-        let data_points =
-            execute_anomaly_query(org_id, &detection_query, start_time_us, end_time_us).await?;
+        let data_points = execute_anomaly_query(
+            org_id,
+            &detection_query,
+            start_time_us,
+            end_time_us,
+            config_id,
+        )
+        .await?;
+
+        log::info!(
+            "[anomaly_detection {}] fetched {} data points for detection",
+            config_id,
+            data_points.len()
+        );
 
         // Initialize detector
         let detector = Detector::new(anomaly_config.clone()).await?;
@@ -312,8 +394,20 @@ pub async fn detect_anomalies(org_id: &str, config_id: &str) -> Result<serde_jso
         let start_time = std::time::Instant::now();
         let result = detector.detect_with_data(&data_points, start_time).await?;
 
+        log::info!(
+            "[anomaly_detection {}] detection complete: points_scored={}, anomalies_found={}",
+            config_id,
+            result.data_points_processed,
+            result.anomaly_count
+        );
+
         // Write anomalies to stream
         if !result.anomalies.is_empty() {
+            log::info!(
+                "[anomaly_detection {}] writing {} anomalies to _anomalies stream",
+                config_id,
+                result.anomalies.len()
+            );
             let anomaly_records: Vec<serde_json::Value> = result
                 .anomalies
                 .iter()
@@ -458,10 +552,19 @@ pub async fn execute_anomaly_query(
     query_sql: &str,
     start_time: i64,
     end_time: i64,
+    config_id: &str,
 ) -> Result<Vec<(i64, f64)>> {
     use config::meta::stream::StreamType;
 
     use crate::service::search;
+
+    log::info!(
+        "[anomaly_detection {}] executing query: sql={}, start_time_us={}, end_time_us={}",
+        config_id,
+        query_sql,
+        start_time,
+        end_time
+    );
 
     let search_req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -489,9 +592,16 @@ pub async fn execute_anomaly_query(
     let trace_id = config::ider::generate_trace_id();
     let search_result = search::search(&trace_id, org_id, StreamType::Logs, None, &search_req)
         .await
-        .map_err(|e| anyhow::anyhow!("Search failed: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("[anomaly_detection {}] search failed: {}", config_id, e))?;
 
-    let data_points = parse_search_results_to_timeseries(&search_result)?;
+    log::info!(
+        "[anomaly_detection {}] search returned {} hits (total={})",
+        config_id,
+        search_result.hits.len(),
+        search_result.total
+    );
+
+    let data_points = parse_search_results_to_timeseries(&search_result, config_id)?;
 
     Ok(data_points)
 }
@@ -503,23 +613,64 @@ pub async fn execute_anomaly_query(
 #[cfg(feature = "enterprise")]
 fn parse_search_results_to_timeseries(
     results: &config::meta::search::Response,
+    config_id: &str,
 ) -> Result<Vec<(i64, f64)>> {
     let mut data_points = Vec::new();
+    let mut skipped = 0usize;
 
-    // Iterate through hits
+    // Log the first hit so we can see the actual field names returned
+    if let Some(first) = results.hits.first() {
+        if let Some(obj) = first.as_object() {
+            let keys: Vec<&str> = obj.keys().map(|s| s.as_str()).collect();
+            log::info!(
+                "[anomaly_detection {}] result fields: {:?}",
+                config_id,
+                keys
+            );
+            log::info!("[anomaly_detection {}] first hit: {}", config_id, first);
+        }
+    }
+
     for hit in &results.hits {
-        // Try to extract timestamp and value from the hit
-        // The exact field names depend on the query, but common patterns are:
-        // - "_timestamp" or "timestamp" for time
-        // - "value", "count", or the aggregation name for the metric
-
-        let timestamp = extract_timestamp_from_hit(hit)?;
-        let value = extract_value_from_hit(hit)?;
-
+        let timestamp = match extract_timestamp_from_hit(hit) {
+            Ok(ts) => ts,
+            Err(e) => {
+                log::warn!(
+                    "[anomaly_detection {}] skipping hit — timestamp parse failed: {} | hit={}",
+                    config_id,
+                    e,
+                    hit
+                );
+                skipped += 1;
+                continue;
+            }
+        };
+        let value = match extract_value_from_hit(hit) {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!(
+                    "[anomaly_detection {}] skipping hit — value parse failed: {} | hit={}",
+                    config_id,
+                    e,
+                    hit
+                );
+                skipped += 1;
+                continue;
+            }
+        };
         data_points.push((timestamp, value));
     }
 
-    // Sort by timestamp
+    if skipped > 0 {
+        log::warn!(
+            "[anomaly_detection {}] parsed {}/{} hits ({} skipped — missing timestamp or value field)",
+            config_id,
+            data_points.len(),
+            results.hits.len(),
+            skipped
+        );
+    }
+
     data_points.sort_by_key(|&(ts, _)| ts);
 
     Ok(data_points)
@@ -531,14 +682,33 @@ fn extract_timestamp_from_hit(hit: &serde_json::Value) -> Result<i64> {
     // Try different timestamp field names
     for field_name in &["_timestamp", "timestamp", "time", "time_bucket"] {
         if let Some(ts_value) = hit.get(field_name) {
-            // Handle different timestamp formats
+            // Numeric microseconds
             if let Some(ts_num) = ts_value.as_i64() {
                 return Ok(ts_num);
             }
             if let Some(ts_str) = ts_value.as_str() {
-                // Parse ISO8601 timestamp
+                // RFC3339 with timezone: "2026-02-20T13:15:00Z" or "2026-02-20T13:15:00+00:00"
                 if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts_str) {
                     return Ok(dt.timestamp_micros());
+                }
+                // Naive datetime without timezone (OpenObserve histogram output):
+                // "2026-02-20T13:15:00" — treat as UTC.
+                //
+                // TODO(timezone): OpenObserve histogram() always outputs UTC (origin
+                // hardcoded to "2001-01-01T00:00:00", no timezone field in SearchQuery
+                // proto). Arrow JSON serializer emits Timestamp(Microsecond, None) as
+                // ISO 8601 strings without a "Z" or "+00:00" suffix, so we parse as
+                // NaiveDateTime and attach UTC. If OpenObserve ever adds per-query
+                // timezone support, update this to use the configured timezone.
+                if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S")
+                {
+                    return Ok(ndt.and_utc().timestamp_micros());
+                }
+                // With fractional seconds: "2026-02-20T13:15:00.000"
+                if let Ok(ndt) =
+                    chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S%.f")
+                {
+                    return Ok(ndt.and_utc().timestamp_micros());
                 }
             }
         }
