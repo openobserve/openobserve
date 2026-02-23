@@ -1273,7 +1273,7 @@ export default defineComponent({
 
     const resetFieldValues = (
       fieldName: string,
-      isLoading: Boolean = false,
+      isLoading: boolean = false,
     ) => {
       // Reset the main fieldValues state
       fieldValues.value[fieldName] = {
