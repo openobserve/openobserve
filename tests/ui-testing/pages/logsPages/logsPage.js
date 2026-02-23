@@ -6084,4 +6084,40 @@ export class LogsPage {
     async expectLogsTableVisible() {
         await expect(this.page.locator(this.logsTable)).toBeVisible({ timeout: 30000 });
     }
+
+    /**
+     * Wait for logs table to be visible
+     * @param {number} timeout - Timeout in milliseconds
+     */
+    async waitForLogsTable(timeout = 30000) {
+        await this.page.locator(this.logsSearchResultLogsTable).waitFor({ state: 'visible', timeout });
+        testLogger.info('Logs table is visible');
+    }
+
+    /**
+     * Get the count of log rows in the table
+     * @returns {Promise<number>} - Number of log rows
+     */
+    async getLogRowCount() {
+        const rows = this.page.locator(`${this.logsTable} tbody tr`);
+        const count = await rows.count();
+        testLogger.info(`Log row count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get the last row from the logs table
+     * @returns {Locator} - Locator for the last row
+     */
+    async getLastRow() {
+        return this.page.locator(`${this.logsTable} tbody tr`).last();
+    }
+
+    /**
+     * Press Escape to close any dialog
+     */
+    async pressEscapeToCloseDialog() {
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
+    }
 }
