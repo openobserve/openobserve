@@ -232,8 +232,10 @@
     "patternColumnHeader": "Motif",
     "occurrenceColumnHeader": "Événement",
     "percentageColumnHeader": "Pourcentage",
+    "anomalyColumnHeader": "Anomalie",
     "actionsColumnHeader": "Actions",
     "anomalyLabel": "ANOMALIE",
+    "anomalyDetected": "Anomalie détectée",
     "includePatternInSearch": "Inclure un motif dans la recherche",
     "excludePatternFromSearch": "Exclure le modèle de la recherche",
     "showPatternDetails": "Afficher les détails ({variables} variables, {exemples} exemples)",
@@ -307,7 +309,10 @@
     "show": "Afficher",
     "editor": "Rédacteur",
     "webUrlNotConfigured": "L'URL de partage est désactivée jusqu'à ce que ZO_WEB_URL soit configuré par votre administrateur.",
-    "showHideColumns": "Afficher/masquer les colonnes"
+    "showHideColumns": "Afficher/masquer les colonnes",
+    "autoRefresh": "Actualisation automatique",
+    "createSavedView": "Créer une vue enregistrée",
+    "listSavedViews": "Répertorier les vues enregistrées"
   },
   "menu": {
     "home": "Accueil",
@@ -2036,7 +2041,10 @@
     "customWebhook": "Personnalisé (Webhook)",
     "customEmail": "Personnalisé (e-mail)",
     "customAction": "Personnalisé (Action)",
-    "custom": "Personnalisé"
+    "custom": "Personnalisé",
+    "separator": "Séparateur",
+    "separator_placeholder": "Entrez un séparateur (par exemple, |,\\n, \\ t, espace)",
+    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)"
   },
   "metrics": {
     "searchMetric": "Rechercher une métrique",

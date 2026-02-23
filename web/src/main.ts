@@ -105,6 +105,29 @@ const getConfig = async () => {
             propagatorTypes: ["openobserve", "tracecontext"],
           },
         ],
+        beforeSend: (event) => {
+          // Filter out specific errors before sending to RUM
+          if (event.type === "error") {
+            const errorMessage = event.error?.message || "";
+            const errorStack = event.error?.stack || "";
+
+            // List of error patterns to ignore
+            const ignoredErrorPatterns = [/ResizeObserver loop/i];
+
+            // Check if error matches any ignored pattern
+            const shouldIgnore = ignoredErrorPatterns.some(
+              (pattern) =>
+                pattern.test(errorMessage) || pattern.test(errorStack),
+            );
+
+            if (shouldIgnore) {
+              return false; // Don't send this error
+            }
+          }
+
+          // Allow all other events to be sent
+          return true;
+        },
       });
 
       openobserveLogs.init({
@@ -117,6 +140,25 @@ const getConfig = async () => {
         forwardErrorsToLogs: true,
         insecureHTTP: options.insecureHTTP,
         apiVersion: options.apiVersion,
+        beforeSend: (log) => {
+          // Filter out specific logs before sending
+          const logMessage = log.message || "";
+
+          // List of log patterns to ignore
+          const ignoredLogPatterns = [/ResizeObserver loop/i];
+
+          // Check if log matches any ignored pattern
+          const shouldIgnore = ignoredLogPatterns.some((pattern) =>
+            pattern.test(logMessage),
+          );
+
+          if (shouldIgnore) {
+            return false; // Don't send this log
+          }
+
+          // Allow all other logs to be sent
+          return true;
+        },
       });
 
       // Don't start session replay automatically - it will be started after login

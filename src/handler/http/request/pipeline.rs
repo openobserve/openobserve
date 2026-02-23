@@ -135,11 +135,14 @@ pub async fn save_pipeline(
     if !overwrite {
         pipeline.id = ider::generate();
     }
+    let pipeline_id = pipeline.id.to_string();
+    let pipeline_name = pipeline.name.clone();
     match pipeline::save_pipeline(pipeline).await {
-        Ok(()) => MetaHttpResponse::json(MetaHttpResponse::message(
-            StatusCode::OK,
-            "Pipeline created successfully",
-        )),
+        Ok(()) => MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Pipeline created successfully")
+                .with_id(pipeline_id)
+                .with_name(pipeline_name),
+        ),
         Err(e) => e.into(),
     }
 }

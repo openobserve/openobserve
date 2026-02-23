@@ -22,6 +22,7 @@ import {
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
+import { getSpanColorHex } from "@/utils/traces/traceColors";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -329,37 +330,15 @@ const useTraces = () => {
     return shareURL;
   });
 
-  // Color palette for service visualization
-  const colorPalette = [
-    "#b7885e",
-    "#1ab8be",
-    "#ffcb99",
-    "#f89570",
-    "#839ae2",
-  ];
-
-  /**
-   * Generate a new color in HSL format
-   * Used when the color palette is exhausted
-   */
-  const generateNewColor = (currentColorCount: number): string => {
-    const hue = currentColorCount * (360 / 50);
-    const lightness = 50 + (currentColorCount % 2) * 15;
-    return `hsl(${hue}, 100%, ${lightness}%)`;
-  };
-
   /**
    * Format raw trace hits from API into structured trace metadata
-   * Assigns service colors and formats timestamps
+   * Assigns service colors using hash-based consistent coloring from traceColors utility
    * @param traces - Raw trace hits from the API
    * @returns Formatted trace metadata array
    */
   const formatTracesMetaData = (traces: any[]): any[] => {
     if (!traces.length) return [];
-
-    // Track color palette locally if not using shared colors
-    const localColors = [...colorPalette];
-    let colorIndex = Object.keys(searchObj.meta.serviceColors).length;
+    let colorIndex = 0;
 
     return traces.map((trace) => {
       const _trace = {
@@ -382,18 +361,16 @@ const useTraces = () => {
 
       // Assign colors to services
       if (trace.service_name && Array.isArray(trace.service_name)) {
-        trace.service_name.forEach((service: any) => {
+        trace.service_name.forEach((service: any, index: number) => {
           const serviceName =
             typeof service === "string" ? service : service.service_name;
 
           if (!searchObj.meta.serviceColors[serviceName]) {
-            // Generate new color if palette is exhausted
-            if (colorIndex >= localColors.length) {
-              localColors.push(generateNewColor(localColors.length));
-            }
+            // Use hash-based color assignment for consistency
+            searchObj.meta.serviceColors[serviceName] =
+              getSpanColorHex(colorIndex);
 
-            searchObj.meta.serviceColors[serviceName] = localColors[colorIndex];
-            colorIndex++;
+            colorIndex += 1;
           }
 
           // Track service span count

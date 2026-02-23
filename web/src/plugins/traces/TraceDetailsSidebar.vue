@@ -17,736 +17,911 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div
-      class="flex justify-start items-center q-px-sm tw:bg-[var(--o2-hover-accent)] tw:h-[2rem] tw:border tw:border-solid tw:border-t-[var(--o2-border-color)]"
+      class="flex justify-start items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)]"
       data-test="trace-details-sidebar-header"
+      :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
     >
-    <div
-      :title="span.operation_name"
-      :style="{ width: 'calc(100% - 24px)' }"
-      class="q-pb-none ellipsis flex items-center"
-      data-test="trace-details-sidebar-header-operation-name"
-    >
-      <!-- Observation Type Badge (for LLM spans) -->
-      <q-badge
-        v-if="isLLMSpan"
-        :label="span._o2_llm_observation_type"
-        :color="getObservationTypeColor(span._o2_llm_observation_type)"
-        class="q-mr-xs"
-        data-test="trace-details-sidebar-observation-badge"
-      />
-
-      <span class="ellipsis">{{ span.operation_name }}</span>
-    </div>
-
-    <q-btn
-      dense
-      icon="close"
-      class="align-right no-border q-pa-xs"
-      size="xs"
-      @click="closeSidebar"
-      data-test="trace-details-sidebar-header-close-btn"
-    ></q-btn>
-  </div>
-  <div
-    class="q-pb-sm q-pt-xs flex flex-wrap justify-between trace-details-toolbar-container"
-    data-test="trace-details-sidebar-header-toolbar"
-  >
-    <div class="flex flex-wrap">
       <div
-        class="q-px-sm ellipsis non-selectable"
-        :title="span.service_name"
-        style="border-right: 1px solid #cccccc; font-size: 14px"
-        data-test="trace-details-sidebar-header-toolbar-service"
+        :title="span.operation_name"
+        :style="{ width: 'calc(100% - 24px)' }"
+        class="q-pb-none ellipsis flex items-center"
+        data-test="trace-details-sidebar-header-operation-name"
       >
-        <span class="text-grey-7">Service: </span>
-        <span data-test="trace-details-sidebar-header-toolbar-service-name">{{
-          span.service_name
-        }}</span>
-      </div>
-      <div
-        class="q-px-sm ellipsis non-selectable"
-        :title="getDuration"
-        style="border-right: 1px solid #cccccc; font-size: 14px"
-        data-test="trace-details-sidebar-header-toolbar-duration"
-      >
-        <span class="text-grey-7">Duration: </span>
-        <span>{{ getDuration }}</span>
-      </div>
-
-      <div
-        v-if="getTTFT"
-        class="q-px-sm ellipsis non-selectable"
-        :title="getTTFT"
-        style="border-right: 1px solid #cccccc; font-size: 14px"
-        data-test="trace-details-sidebar-header-toolbar-ttft"
-      >
-        <span class="text-grey-7">TTFT: </span>
-        <span>{{ getTTFT }}</span>
-      </div>
-
-      <div
-        class="q-px-sm ellipsis non-selectable"
-        :title="getStartTime"
-        style="font-size: 14px"
-        data-test="trace-details-sidebar-header-toolbar-start-time"
-      >
-        <span class="text-grey-7">Start Time: </span>
-        <span>{{ getStartTime }}</span>
-      </div>
-    </div>
-
-    <div class="flex">
-      <div class="text-right flex items-center justify-end q-mx-sm">
-        <div
-          class="flex items-center justify-end"
-          data-test="trace-details-sidebar-header-toolbar-span-id"
-        >
-          <span class="text-grey-7 q-mr-xs">Span ID: </span
-          ><span class="">{{ span.span_id }}</span>
-        </div>
-        <q-icon
-          class="q-ml-xs text-grey-8 cursor-pointer trace-copy-icon"
-          size="12px"
-          name="content_copy"
-          title="Copy"
-          @click="copySpanId"
-          data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
+        <!-- Observation Type Badge (for LLM spans) -->
+        <q-badge
+          v-if="isLLMSpan"
+          :label="
+            span._o2_llm_observation_type?.charAt(0) +
+            span._o2_llm_observation_type?.slice(1).toLowerCase()
+          "
+          :color="getObservationTypeColor(span._o2_llm_observation_type)"
+          class="q-mr-xs observation-type-badge"
+          data-test="trace-details-sidebar-observation-badge"
         />
+
+        <span class="ellipsis">{{ span.operation_name }}</span>
       </div>
 
       <q-btn
-        v-if="parentMode === 'standalone'"
-        class="q-mx-xs view-span-logs-btn tw:border tw:py-[0.3rem]!"
-        size="10px"
-        icon="search"
         dense
-        padding="xs sm"
-        no-caps
-        color="primary"
-        :title="t('traces.viewLogs')"
-        @click.stop="viewSpanLogs"
-        data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
-      >
-        View Logs</q-btn
-      >
+        icon="cancel"
+        class="align-right no-border q-pa-xs"
+        size="xs"
+        @click="closeSidebar"
+        data-test="trace-details-sidebar-header-close-btn"
+      ></q-btn>
     </div>
-  </div>
+    <div
+      class="trace-details-toolbar-container"
+      data-test="trace-details-sidebar-header-toolbar"
+    >
+      <!-- Row 1: Trace Details -->
+      <div
+        class="flex items-center justify-between q-pa-xs"
+        style="overflow-x: auto; flex-wrap: nowrap"
+      >
+        <div class="flex items-center" style="flex-wrap: nowrap">
+          <!-- Service Badge -->
+          <q-chip
+            dense
+            square
+            class="toolbar-chip service-chip"
+            :title="span.service_name"
+            data-test="trace-details-sidebar-header-toolbar-service"
+          >
+            <q-icon name="cloud_queue" size="12px" class="q-mr-xs" />
+            <span class="chip-label">Service</span>
+            <span
+              class="chip-value"
+              data-test="trace-details-sidebar-header-toolbar-service-name"
+            >
+              {{ span.service_name }}
+            </span>
+          </q-chip>
 
-  <!-- LLM Metrics Toolbar (conditional) -->
-  <div
-    v-if="isLLMSpan && llmMetrics"
-    class="llm-metrics-toolbar q-px-sm q-py-xs q-mb-xs"
-    style="border-top: 1px solid #cccccc; border-bottom: 1px solid #cccccc"
-    data-test="trace-details-sidebar-llm-metrics-toolbar"
-  >
-    <div class="flex items-center justify-between text-body2">
-      <div class="flex items-center flex-wrap">
-        <!-- Model -->
-        <div class="metric-item q-mr-md">
-          <span class="text-grey-7">Model: </span>
-          <span class="text-bold">{{ span._o2_llm_model_name }}</span>
+          <!-- Duration Badge -->
+          <q-chip
+            dense
+            square
+            class="toolbar-chip duration-chip"
+            :title="getDuration"
+            data-test="trace-details-sidebar-header-toolbar-duration"
+          >
+            <q-icon name="schedule" size="12px" class="q-mr-xs" />
+            <span class="chip-label">Duration</span>
+            <span class="chip-value">{{ getDuration }}</span>
+          </q-chip>
+
+          <!-- TTFT Badge -->
+          <q-chip
+            v-if="getTTFT"
+            dense
+            square
+            class="toolbar-chip ttft-chip"
+            :title="getTTFT"
+            data-test="trace-details-sidebar-header-toolbar-ttft"
+          >
+            <q-icon name="speed" size="12px" class="q-mr-xs" />
+            <span class="chip-label">TTFT</span>
+            <span class="chip-value">{{ getTTFT }}</span>
+          </q-chip>
+
+          <!-- Start Time Badge -->
+          <q-chip
+            dense
+            square
+            class="toolbar-chip time-chip"
+            :title="getStartTime"
+            data-test="trace-details-sidebar-header-toolbar-start-time"
+          >
+            <q-icon name="access_time" size="12px" class="q-mr-xs" />
+            <span class="chip-label">Start</span>
+            <span class="chip-value">{{ getStartTime }}</span>
+          </q-chip>
         </div>
 
-        <!-- Tokens -->
-        <div class="metric-item q-mr-md">
-          <q-icon name="arrow_upward" size="xs" class="text-blue" />
-          <span class="text-grey-7">In: </span>
-          <span>{{ llmMetrics.usage.input }}</span>
-        </div>
-        <div class="metric-item q-mr-md">
-          <q-icon name="arrow_downward" size="xs" class="text-green" />
-          <span class="text-grey-7">Out: </span>
-          <span>{{ llmMetrics.usage.output }}</span>
-        </div>
+        <div class="flex items-center">
+          <!-- Span ID Badge -->
+          <q-chip
+            dense
+            square
+            clickable
+            class="toolbar-chip span-id-chip"
+            :title="`Span ID: ${span.span_id}`"
+            @click="copySpanId"
+            data-test="trace-details-sidebar-header-toolbar-span-id"
+          >
+            <q-icon name="tag" size="12px" class="q-mr-xs" />
+            <span class="chip-value">{{ span.span_id }}</span>
+            <q-icon
+              name="content_copy"
+              size="10px"
+              class="q-ml-xs copy-icon"
+              data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
+            />
+          </q-chip>
 
-        <!-- Cost -->
-        <div class="metric-item">
-          <q-icon name="attach_money" size="xs" class="text-orange" />
-          <span class="text-grey-7">Cost: </span>
-          <span class="text-bold">${{ llmMetrics.cost.total }}</span>
+          <!-- View Logs Button -->
+          <q-btn
+            v-if="parentMode === 'standalone'"
+            class="view-logs-btn o2-secondary-button"
+            dense
+            unelevated
+            no-caps
+            size="sm"
+            :title="t('traces.viewLogs')"
+            @click.stop="viewSpanLogs"
+            data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+          >
+            View Logs
+          </q-btn>
         </div>
       </div>
 
-      <!-- Provider Badge -->
-      <q-badge :label="span._o2_llm_provider_name" color="primary" />
+      <!-- Row 2: LLM Metrics (conditional) -->
+      <div
+        v-if="isLLMSpan && llmMetrics && span._o2_llm_model_name"
+        class="flex items-center justify-between q-pa-xs llm-metrics-row"
+        style="
+          overflow-x: auto;
+          flex-wrap: nowrap;
+          border-top: 1px solid #e9ecef;
+        "
+      >
+        <div class="flex items-center" style="flex-wrap: nowrap">
+          <!-- Model Chip -->
+          <q-chip
+            dense
+            square
+            class="llm-chip model-chip"
+            icon="psychology"
+            :title="span._o2_llm_model_name"
+          >
+            <span class="chip-value text-bold">{{
+              span._o2_llm_model_name
+            }}</span>
+          </q-chip>
+
+          <!-- Token Usage Group -->
+          <div class="tokens-group">
+            <!-- Input Tokens -->
+            <q-chip
+              dense
+              square
+              class="llm-chip token-chip input-token-chip"
+              title="Input Tokens"
+            >
+              <q-icon name="arrow_upward" size="10px" class="q-mr-xs" />
+              <span class="chip-label">In</span>
+              <span class="chip-value">{{ llmMetrics.usage.input }}</span>
+            </q-chip>
+
+            <!-- Output Tokens -->
+            <q-chip
+              dense
+              square
+              class="llm-chip token-chip output-token-chip"
+              title="Output Tokens"
+            >
+              <q-icon name="arrow_downward" size="10px" class="q-mr-xs" />
+              <span class="chip-label">Out</span>
+              <span class="chip-value">{{ llmMetrics.usage.output }}</span>
+            </q-chip>
+          </div>
+
+          <!-- Cost Chip -->
+          <q-chip
+            dense
+            square
+            class="llm-chip cost-chip"
+            icon="attach_money"
+            title="Total Cost"
+          >
+            <span class="chip-value text-bold"
+              >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
+            >
+          </q-chip>
+        </div>
+
+        <div class="flex items-center">
+          <!-- Provider Badge -->
+          <q-badge
+            v-if="span._o2_llm_provider_name"
+            :label="span._o2_llm_provider_name"
+            class="provider-badge"
+          />
+        </div>
+      </div>
     </div>
-  </div>
 
-  <q-tabs
-    v-model="activeTab"
-    dense
-    inline-label
-    class="text-bold q-mx-sm span_details_tabs"
-    data-test="trace-details-sidebar-tabs"
-  >
-    <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
-    <q-tab
-      v-if="isLLMSpan"
-      name="preview"
-      label="Preview"
-      style="text-transform: capitalize"
-      data-test="trace-details-sidebar-tabs-preview"
-    />
+    <q-tabs
+      v-model="activeTab"
+      dense
+      inline-label
+      align="left"
+      class="text-bold q-mx-sm span_details_tabs"
+      data-test="trace-details-sidebar-tabs"
+    >
+      <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
+      <q-tab
+        v-if="isLLMSpan"
+        name="preview"
+        label="Preview"
+        style="text-transform: capitalize"
+        data-test="trace-details-sidebar-tabs-preview"
+      />
 
-    <q-tab
-      name="tags"
-      :label="t('common.tags')"
-      style="text-transform: capitalize"
-      data-test="trace-details-sidebar-tabs-tags"
-    />
-    <q-tab
-      name="process"
-      :label="t('common.process')"
-      style="text-transform: capitalize"
-      data-test="trace-details-sidebar-tabs-process"
-    />
-    <q-tab
-      name="events"
-      :label="t('common.events')"
-      style="text-transform: capitalize"
-      data-test="trace-details-sidebar-tabs-events"
-    />
-    <q-tab
-      name="exceptions"
-      :label="t('common.exceptions')"
-      style="text-transform: capitalize"
-      data-test="trace-details-sidebar-tabs-exceptions"
-    />
-    <q-tab
-      name="links"
-      :label="t('common.links')"
-      style="text-transform: capitalize"
-      data-test="trace-details-sidebar-tabs-links"
-    />
-    <q-tab
-      name="attributes"
-      :label="t('common.attributes')"
-      style="text-transform: capitalize"
-      data-test="trace-details-sidebar-tabs-attributes"
-    />
-    <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
-    <q-tab
-      v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-      name="correlated-logs"
-      :label="t('correlation.correlatedLogs')"
-      style="text-transform: capitalize"
-      data-test="trace-details-sidebar-tabs-correlated-logs"
-    />
-    <q-tab
-      v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-      name="correlated-metrics"
-      :label="t('correlation.correlatedMetrics')"
-      style="text-transform: capitalize"
-      data-test="trace-details-sidebar-tabs-correlated-metrics"
-    />
-  </q-tabs>
-  <q-separator style="width: 100%" />
-  <q-tab-panels
-    v-model="activeTab"
-    class="span_details_tab-panels tw:pb-[0.375rem]"
-  >
-    <!-- LLM Preview Tab Panel -->
-    <q-tab-panel v-if="isLLMSpan" name="preview" class="llm-preview-panel q-pa-md">
-      <div class="llm-preview-container">
-        <!-- Input Section -->
-        <div class="q-mb-md">
-          <div class="section-label text-bold q-mb-xs flex items-center justify-between">
-            <div>Input</div>
-            <div class="flex items-center gap-xs">
-              <q-btn-toggle
-                v-model="inputViewMode"
-                dense
-                no-caps
-                size="sm"
-                toggle-color="primary"
-                :options="[
-                  { label: 'Formatted', value: 'formatted' },
-                  { label: 'JSON', value: 'json' }
-                ]"
-              />
-              <q-btn
-                flat
-                dense
-                size="sm"
-                icon="content_copy"
-                @click="copyContent(span._o2_llm_input, 'input')"
-                title="Copy input"
-              >
-                <q-tooltip>Copy Input</q-tooltip>
-              </q-btn>
-            </div>
-          </div>
-          <div class="llm-content-box" :class="{ 'expanded': inputExpanded }">
-            <LLMContentRenderer
-              :content="span._o2_llm_input"
-              :observation-type="span._o2_llm_observation_type"
-              :span="span"
-              content-type="input"
-              :view-mode="inputViewMode"
-            />
-          </div>
+      <q-tab
+        name="tags"
+        :label="t('common.tags')"
+        style="text-transform: capitalize"
+        data-test="trace-details-sidebar-tabs-tags"
+      />
+      <q-tab
+        name="process"
+        :label="t('common.process')"
+        style="text-transform: capitalize"
+        data-test="trace-details-sidebar-tabs-process"
+      />
+      <q-tab
+        name="events"
+        :label="t('common.events')"
+        style="text-transform: capitalize"
+        data-test="trace-details-sidebar-tabs-events"
+      />
+      <q-tab
+        name="exceptions"
+        :label="t('common.exceptions')"
+        style="text-transform: capitalize"
+        data-test="trace-details-sidebar-tabs-exceptions"
+      />
+      <q-tab
+        name="links"
+        :label="t('common.links')"
+        style="text-transform: capitalize"
+        data-test="trace-details-sidebar-tabs-links"
+      />
+      <q-tab
+        name="attributes"
+        :label="t('common.attributes')"
+        style="text-transform: capitalize"
+        data-test="trace-details-sidebar-tabs-attributes"
+      />
+      <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
+      <q-tab
+        v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+        name="correlated-logs"
+        :label="t('correlation.correlatedLogs')"
+        style="text-transform: capitalize"
+        data-test="trace-details-sidebar-tabs-correlated-logs"
+      />
+      <q-tab
+        v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+        name="correlated-metrics"
+        :label="t('correlation.correlatedMetrics')"
+        style="text-transform: capitalize"
+        data-test="trace-details-sidebar-tabs-correlated-metrics"
+      />
+    </q-tabs>
+    <q-separator style="width: 100%" />
+    <q-tab-panels v-model="activeTab" class="span_details_tab-panels">
+      <!-- LLM Preview Tab Panel -->
+      <q-tab-panel
+        v-if="isLLMSpan"
+        name="preview"
+        class="llm-preview-panel q-pa-md"
+      >
+        <div class="llm-preview-container">
+          <!-- Input and Output Side by Side -->
           <div
-            v-if="getInputCharCount() > 0"
-            class="expand-toggle q-mt-xs text-left opacity-50 cursor-pointer"
-            @click="inputExpanded = !inputExpanded"
+            class="flex q-col-gutter-md io-container"
+            :class="{ 'io-container-dark': isDarkMode }"
+            ref="ioContainerRef"
           >
-            {{ inputExpanded ? '...collapse' : `...expand (${getInputCharCount()} more characters)` }}
-          </div>
-        </div>
-
-        <!-- Output Section -->
-        <div>
-          <div class="section-label text-bold q-mb-xs flex items-center justify-between">
-            <div>Output</div>
-            <div class="flex items-center gap-xs">
-              <q-btn-toggle
-                v-model="outputViewMode"
-                dense
-                no-caps
-                size="sm"
-                toggle-color="primary"
-                :options="[
-                  { label: 'Formatted', value: 'formatted' },
-                  { label: 'JSON', value: 'json' }
-                ]"
-              />
-              <q-btn
-                flat
-                dense
-                size="sm"
-                icon="content_copy"
-                @click="copyContent(span._o2_llm_output, 'output')"
-                title="Copy output"
+            <!-- Input Section -->
+            <div class="col-6 io-section">
+              <div
+                class="section-label text-bold q-mb-xs flex items-center justify-between"
               >
-                <q-tooltip>Copy Output</q-tooltip>
-              </q-btn>
-            </div>
-          </div>
-          <div class="llm-content-box" :class="{ 'expanded': outputExpanded }">
-            <LLMContentRenderer
-              :content="span._o2_llm_output"
-              :observation-type="span._o2_llm_observation_type"
-              :span="span"
-              content-type="output"
-              :view-mode="outputViewMode"
-            />
-          </div>
-          <div
-            v-if="getOutputCharCount() > 0"
-            class="expand-toggle q-mt-xs text-left opacity-50 cursor-pointer"
-            @click="outputExpanded = !outputExpanded"
-          >
-            {{ outputExpanded ? '...collapse' : `...expand (${getOutputCharCount()} more characters)` }}
-          </div>
-        </div>
-
-        <!-- Model Parameters (collapsible) -->
-        <q-expansion-item
-          v-if="span._o2_llm_model_parameters"
-          label="Model Parameters"
-          class="q-mt-md"
-        >
-          <pre class="model-params-json q-pa-sm">{{ formatModelParams(span._o2_llm_model_parameters) }}</pre>
-        </q-expansion-item>
-      </div>
-    </q-tab-panel>
-
-    <q-tab-panel name="tags">
-      <q-table
-        ref="qTable"
-        data-test="schema-log-stream-field-mapping-table"
-        :rows="getTagRows"
-        :columns="tagColumns"
-        :row-key="(row) => 'tr_' + row.name"
-        :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
-        id="schemaFieldList"
-        dense
-      >
-        <template v-slot:body-cell="props">
-          <q-td
-            class="text-left tw:text-[0.85rem]!"
-            :class="
-              props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
-            "
-          >
-            <span
-              v-if="props.col.name === 'value'"
-              v-html="
-                highlightTextMatch(props.row[props.col.name], searchQuery)
-              "
-            />
-            <span v-else>
-              {{ props.row[props.col.name] }}
-            </span>
-          </q-td>
-        </template>
-      </q-table>
-    </q-tab-panel>
-    <q-tab-panel name="process">
-      <q-table
-        ref="qTable"
-        data-test="trace-details-sidebar-process-table"
-        :rows="getProcessRows"
-        :columns="processColumns"
-        :row-key="(row) => 'tr_' + row.name"
-        :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
-        dense
-      >
-        <template v-slot:body-cell="props">
-          <q-td
-            class="text-left tw:text-[0.85rem]!"
-            :class="
-              props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
-            "
-          >
-            <span
-              v-if="props.col.name === 'value'"
-              v-html="
-                highlightTextMatch(props.row[props.col.name], searchQuery)
-              "
-            />
-            <span v-else>
-              {{ props.row[props.col.name] }}
-            </span>
-          </q-td>
-        </template>
-      </q-table>
-    </q-tab-panel>
-    <q-tab-panel name="attributes">
-      <pre
-        class="attr-text"
-        v-html="highlightedAttributes"
-        data-test="trace-details-sidebar-attributes-table"
-      ></pre>
-    </q-tab-panel>
-    <q-tab-panel name="events">
-      <q-table
-        v-if="spanDetails.events.length"
-        ref="qTable"
-        data-test="trace-details-sidebar-events-table"
-        :rows="spanDetails.events"
-        :columns="eventColumns"
-        row-key="name"
-        :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
-        dense
-        style="max-height: 400px"
-      >
-        <template v-slot:body="props">
-          <q-tr
-            :data-test="`trace-event-details-${
-              props.row[store.state.zoConfig.timestamp_column]
-            }`"
-            :key="props.key"
-            @click="expandEvent(props.rowIndex)"
-            style="cursor: pointer"
-            class="pointer"
-          >
-            <q-td
-              v-for="(column, columnIndex) in eventColumns"
-              :key="props.rowIndex + '-' + column.name"
-              class="field_list text-left"
-              style="cursor: pointer"
-              :style="
-                columnIndex > 0
-                  ? { whiteSpace: 'normal', wordBreak: 'break-word' }
-                  : {}
-              "
-            >
-              <div class="flex row items-center no-wrap">
-                <q-btn
-                  v-if="column.name === '@timestamp'"
-                  :icon="
-                    expandedEvents[props.rowIndex.toString()]
-                      ? 'expand_more'
-                      : 'chevron_right'
-                  "
-                  dense
-                  size="xs"
-                  flat
-                  class="q-mr-xs"
-                  @click.stop="expandEvent(props.rowIndex)"
-                ></q-btn>
-                <span
-                  v-if="column.name !== '@timestamp'"
-                  v-html="
-                    highlightTextMatch(column.prop(props.row), searchQuery)
-                  "
-                />
-                <span v-else> {{ column.prop(props.row) }}</span>
-              </div>
-            </q-td>
-          </q-tr>
-          <q-tr v-if="expandedEvents[props.rowIndex.toString()]">
-            <q-td colspan="2">
-              <pre
-                class="log_json_content"
-                v-html="highlightedJSON(props.row)"
-              />
-            </q-td>
-          </q-tr>
-        </template>
-      </q-table>
-      <div
-        class="full-width text-center q-pt-lg text-bold"
-        v-else
-        data-test="trace-details-sidebar-no-events"
-      >
-        No events present for this span
-      </div>
-    </q-tab-panel>
-    <q-tab-panel name="exceptions">
-      <q-table
-        v-if="getExceptionEvents.length"
-        ref="qTable"
-        data-test="trace-details-sidebar-exceptions-table"
-        :rows="getExceptionEvents"
-        :columns="exceptionEventColumns"
-        row-key="name"
-        :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
-        dense
-        style="max-height: 400px"
-      >
-        <template v-slot:body="props">
-          <q-tr
-            :data-test="`trace-event-detail-${
-              props.row[store.state.zoConfig.timestamp_column]
-            }`"
-            :key="props.key"
-            @click="expandEvent(props.rowIndex)"
-            style="cursor: pointer"
-            class="pointer"
-          >
-            <q-td
-              v-for="column in exceptionEventColumns"
-              :key="props.rowIndex + '-' + column.name"
-              class="field_list text-left"
-              style="cursor: pointer"
-            >
-              <div class="flex row items-center no-wrap">
-                <q-btn
-                  v-if="column.name === '@timestamp'"
-                  :icon="
-                    expandedEvents[props.rowIndex.toString()]
-                      ? 'expand_more'
-                      : 'chevron_right'
-                  "
-                  dense
-                  size="xs"
-                  flat
-                  class="q-mr-xs"
-                  @click.stop="expandEvent(props.rowIndex)"
-                  :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
-                ></q-btn>
-                <span
-                  v-if="column.name !== '@timestamp'"
-                  v-html="
-                    highlightTextMatch(column.prop(props.row), searchQuery)
-                  "
-                />
-                <span v-else> {{ column.prop(props.row) }}</span>
-              </div>
-            </q-td>
-          </q-tr>
-          <q-tr
-            v-if="expandedEvents[props.rowIndex.toString()]"
-            :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${props.rowIndex}`"
-          >
-            <q-td colspan="2" style="font-size: 12px; font-family: monospace">
-              <div class="q-pl-sm">
-                <div>
-                  <span>Type: </span>
-                  <span>"{{ props.row["exception.type"] }}"</span>
-                </div>
-
-                <div class="q-mt-xs">
-                  <span>Message: </span>
-                  <span>"{{ props.row["exception.message"] }}"</span>
-                </div>
-
-                <div class="q-mt-xs">
-                  <span>Escaped: </span>
-                  <span>"{{ props.row["exception.escaped"] }}"</span>
-                </div>
-
-                <div class="q-mt-xs">
-                  <span>Stacktrace: </span>
-                  <div
-                    class="q-px-sm q-mt-xs"
-                    style="border: 1px solid #c1c1c1; border-radius: 4px"
-                  >
-                    <pre
-                      style="font-size: 12px; text-wrap: wrap"
-                      class="q-mt-xs"
-                      >{{
-                        formatStackTrace(props.row["exception.stacktrace"])
-                      }}</pre
-                    >
-                  </div>
+                <div>Input</div>
+                <div class="flex items-center gap-xs">
+                  <q-btn
+                    outline
+                    class="q-px-sm q-ml-sm"
+                    size="sm"
+                    no-caps
+                    :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+                    :title="
+                      isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
+                    "
+                    @click="toggleFullscreen"
+                  />
+                  <q-btn
+                    flat
+                    dense
+                    size="sm"
+                    icon="content_copy"
+                    title="Copy input"
+                    @click="copyContent(span._o2_llm_input, 'input')"
+                    :disable="!hasContent(span._o2_llm_input)"
+                  />
                 </div>
               </div>
-            </q-td>
-          </q-tr>
-        </template>
-      </q-table>
-      <div
-        class="full-width text-center q-pt-lg text-bold"
-        v-else
-        data-test="trace-details-sidebar-no-exceptions"
-      >
-        No exceptions present for this span
-      </div>
-    </q-tab-panel>
-
-    <q-tab-panel name="links">
-      <div v-if="spanLinks.length">
-        <q-virtual-scroll
-          type="table"
-          ref="searchTableRef"
-          style="max-height: 20rem"
-          :items="spanLinks"
-          class="tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
-          data-test="trace-details-sidebar-links-table"
-        >
-          <template v-slot:before>
-            <thead
-              class="thead-sticky text-left tw:bg-[var(--o2-hover-accent)] o2-quasar-table"
-            >
-              <tr>
-                <th
-                  v-for="(col, index) in linkColumns"
-                  :key="'result_' + index"
-                  class="table-header"
-                  :data-test="`trace-events-table-th-${col.label}`"
+              <div class="llm-content-box">
+                <div
+                  v-if="!hasContent(span._o2_llm_input)"
+                  class="no-data-message"
                 >
-                  {{ col.label }}
-                </th>
-              </tr>
-            </thead>
-          </template>
+                  No data available
+                </div>
+                <LLMContentRenderer
+                  v-else
+                  :content="span._o2_llm_input"
+                  :observation-type="span._o2_llm_observation_type"
+                  content-type="input"
+                  :span="span"
+                  view-mode="formatted"
+                />
+              </div>
+            </div>
 
-          <template v-slot="{ item: row, index }">
-            <tr
-              :data-test="`trace-event-detail-link-${index}`"
-              :key="'expand_' + index"
-              @click="openReferenceTrace('span', row)"
+            <!-- Output Section -->
+            <div class="col-6 io-section">
+              <div
+                class="section-label text-bold q-mb-xs flex items-center justify-between"
+              >
+                <div>Output</div>
+                <div class="flex items-center gap-xs">
+                  <q-btn
+                    outline
+                    class="q-px-sm q-ml-sm"
+                    size="sm"
+                    no-caps
+                    :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+                    :title="
+                      isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
+                    "
+                    @click="toggleFullscreen"
+                  />
+                  <q-btn
+                    flat
+                    dense
+                    size="sm"
+                    icon="content_copy"
+                    title="Copy output"
+                    @click="copyContent(span._o2_llm_output, 'output')"
+                    :disable="!hasContent(span._o2_llm_output)"
+                  />
+                </div>
+              </div>
+              <div class="llm-content-box">
+                <div
+                  v-if="!hasContent(span._o2_llm_output)"
+                  class="no-data-message"
+                >
+                  No data available
+                </div>
+                <LLMContentRenderer
+                  v-else
+                  :content="span._o2_llm_output"
+                  :observation-type="span._o2_llm_observation_type"
+                  content-type="output"
+                  :span="span"
+                  view-mode="formatted"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Model Parameters (collapsible) -->
+          <q-expansion-item
+            v-if="span._o2_llm_model_parameters"
+            label="Model Parameters"
+            class="q-mt-md"
+          >
+            <pre class="model-params-json q-pa-sm">{{
+              formatModelParams(span._o2_llm_model_parameters)
+            }}</pre>
+          </q-expansion-item>
+        </div>
+      </q-tab-panel>
+
+      <q-tab-panel name="tags">
+        <q-table
+          ref="qTable"
+          data-test="schema-log-stream-field-mapping-table"
+          :rows="getTagRows"
+          :columns="tagColumns"
+          :row-key="(row) => 'tr_' + row.name"
+          :rows-per-page-options="[0]"
+          class="q-table trace-detail-tab-table o2-quasar-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
+          :class="
+            isLLMSpan && llmMetrics && span._o2_llm_model_name
+              ? 'tab-content-with-llm-metrics'
+              : 'tab-content-without-llm-metrics'
+          "
+          id="schemaFieldList"
+          dense
+        >
+          <template v-slot:body-cell="props">
+            <q-td
+              class="text-left tw:text-[0.85rem]! cell-with-max-height"
+              :class="
+                props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
+              "
+            >
+              <div class="cell-content">
+                <span
+                  v-if="props.col.name === 'value'"
+                  v-html="
+                    highlightTextMatch(props.row[props.col.name], searchQuery)
+                  "
+                />
+                <span v-else>
+                  {{ props.row[props.col.name] }}
+                </span>
+              </div>
+            </q-td>
+          </template>
+        </q-table>
+      </q-tab-panel>
+      <q-tab-panel name="process">
+        <q-table
+          ref="qTable"
+          data-test="trace-details-sidebar-process-table"
+          :rows="getProcessRows"
+          :columns="processColumns"
+          :row-key="(row) => 'tr_' + row.name"
+          :rows-per-page-options="[0]"
+          class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
+          :class="
+            isLLMSpan && llmMetrics && span._o2_llm_model_name
+              ? 'tab-content-with-llm-metrics'
+              : 'tab-content-without-llm-metrics'
+          "
+          dense
+        >
+          <template v-slot:body-cell="props">
+            <q-td
+              class="text-left tw:text-[0.85rem]! cell-with-max-height"
+              :class="
+                props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
+              "
+            >
+              <div class="cell-content">
+                <span
+                  v-if="props.col.name === 'value'"
+                  v-html="
+                    highlightTextMatch(props.row[props.col.name], searchQuery)
+                  "
+                />
+                <span v-else>
+                  {{ props.row[props.col.name] }}
+                </span>
+              </div>
+            </q-td>
+          </template>
+        </q-table>
+      </q-tab-panel>
+      <q-tab-panel name="attributes" class="q-pa-none">
+        <q-btn
+          :label="t('common.copyToClipboard')"
+          dense
+          size="sm"
+          no-caps
+          class="tw:mb-[0.375rem] q-px-sm copy-log-btn q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
+          icon="content_copy"
+          @click="copyAttributesToClipboard"
+        />
+        <pre
+          class="attr-text tab-content-dynamic-height-with-header"
+          :class="
+            isLLMSpan && llmMetrics && span._o2_llm_model_name
+              ? 'tab-content-with-llm-metrics'
+              : 'tab-content-without-llm-metrics'
+          "
+          v-html="highlightedAttributes"
+          data-test="trace-details-sidebar-attributes-table"
+        ></pre>
+      </q-tab-panel>
+      <q-tab-panel name="events">
+        <q-table
+          v-if="spanDetails.events.length"
+          ref="qTable"
+          data-test="trace-details-sidebar-events-table"
+          :rows="spanDetails.events"
+          :columns="eventColumns"
+          row-key="name"
+          :rows-per-page-options="[0]"
+          class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
+          :class="
+            isLLMSpan && llmMetrics && span._o2_llm_model_name
+              ? 'tab-content-with-llm-metrics'
+              : 'tab-content-without-llm-metrics'
+          "
+          dense
+        >
+          <template v-slot:body="props">
+            <q-tr
+              :data-test="`trace-event-details-${
+                props.row[store.state.zoConfig.timestamp_column]
+              }`"
+              :key="props.key"
+              @click="expandEvent(props.rowIndex)"
               style="cursor: pointer"
               class="pointer"
             >
-              <td
-                v-for="column in linkColumns"
-                :key="index + '-' + column.name"
-                class="field_list"
+              <q-td
+                v-for="(column, columnIndex) in eventColumns"
+                :key="props.rowIndex + '-' + column.name"
+                class="field_list text-left"
+                style="cursor: pointer"
+                :style="
+                  columnIndex > 0
+                    ? { whiteSpace: 'normal', wordBreak: 'break-word' }
+                    : {}
+                "
+              >
+                <div class="flex row items-center no-wrap">
+                  <q-btn
+                    v-if="column.name === '@timestamp'"
+                    :icon="
+                      expandedEvents[props.rowIndex.toString()]
+                        ? 'expand_more'
+                        : 'chevron_right'
+                    "
+                    dense
+                    size="xs"
+                    flat
+                    class="q-mr-xs"
+                    @click.stop="expandEvent(props.rowIndex)"
+                  ></q-btn>
+                  <span
+                    v-if="column.name !== '@timestamp'"
+                    v-html="
+                      highlightTextMatch(column.prop(props.row), searchQuery)
+                    "
+                  />
+                  <span v-else> {{ column.prop(props.row) }}</span>
+                </div>
+              </q-td>
+            </q-tr>
+            <q-tr v-if="expandedEvents[props.rowIndex.toString()]">
+              <q-td colspan="2">
+                <pre
+                  class="log_json_content"
+                  v-html="highlightedJSON(props.row)"
+                />
+              </q-td>
+            </q-tr>
+          </template>
+        </q-table>
+        <div
+          v-else
+          class="full-width text-center tw:flex tw:items-center tw:justify-center q-pt-lg text-bold tab-content-dynamic-height"
+          :class="
+            isLLMSpan && llmMetrics && span._o2_llm_model_name
+              ? 'tab-content-with-llm-metrics'
+              : 'tab-content-without-llm-metrics'
+          "
+          data-test="trace-details-sidebar-no-events"
+        >
+          No events present for this span
+        </div>
+      </q-tab-panel>
+      <q-tab-panel name="exceptions">
+        <q-table
+          v-if="getExceptionEvents.length"
+          ref="qTable"
+          data-test="trace-details-sidebar-exceptions-table"
+          :rows="getExceptionEvents"
+          :columns="exceptionEventColumns"
+          row-key="name"
+          :rows-per-page-options="[0]"
+          class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
+          :class="
+            isLLMSpan && llmMetrics && span._o2_llm_model_name
+              ? 'tab-content-with-llm-metrics'
+              : 'tab-content-without-llm-metrics'
+          "
+          dense
+        >
+          <template v-slot:body="props">
+            <q-tr
+              :data-test="`trace-event-detail-${
+                props.row[store.state.zoConfig.timestamp_column]
+              }`"
+              :key="props.key"
+              @click="expandEvent(props.rowIndex)"
+              style="cursor: pointer"
+              class="pointer"
+            >
+              <q-td
+                v-for="column in exceptionEventColumns"
+                :key="props.rowIndex + '-' + column.name"
+                class="field_list text-left"
                 style="cursor: pointer"
               >
                 <div class="flex row items-center no-wrap">
-                  {{ column.prop(row) }}
+                  <q-btn
+                    v-if="column.name === '@timestamp'"
+                    :icon="
+                      expandedEvents[props.rowIndex.toString()]
+                        ? 'expand_more'
+                        : 'chevron_right'
+                    "
+                    dense
+                    size="xs"
+                    flat
+                    class="q-mr-xs"
+                    @click.stop="expandEvent(props.rowIndex)"
+                    :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
+                  ></q-btn>
+                  <span
+                    v-if="column.name !== '@timestamp'"
+                    v-html="
+                      highlightTextMatch(column.prop(props.row), searchQuery)
+                    "
+                  />
+                  <span v-else> {{ column.prop(props.row) }}</span>
                 </div>
-              </td>
-            </tr>
+              </q-td>
+            </q-tr>
+            <q-tr
+              v-if="expandedEvents[props.rowIndex.toString()]"
+              :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${props.rowIndex}`"
+            >
+              <q-td colspan="2" class="exception-details-container">
+                <div class="exception-content">
+                  <!-- Exception Type -->
+                  <div class="exception-field">
+                    <span class="exception-label">Type:</span>
+                    <span class="exception-type">{{
+                      props.row["exception.type"]
+                    }}</span>
+                  </div>
+
+                  <!-- Exception Message -->
+                  <div class="exception-field">
+                    <span class="exception-label">Message:</span>
+                    <div class="exception-message">
+                      {{
+                        formatExceptionMessage(props.row["exception.message"])
+                      }}
+                    </div>
+                  </div>
+
+                  <!-- Escaped -->
+                  <div class="exception-field">
+                    <span class="exception-label">Escaped:</span>
+                    <span class="exception-value">{{
+                      props.row["exception.escaped"]
+                    }}</span>
+                  </div>
+
+                  <!-- Stacktrace -->
+                  <div class="exception-field">
+                    <div class="stacktrace-header">
+                      <span class="exception-label">Stacktrace:</span>
+                      <q-btn
+                        v-if="
+                          props.row['exception.stacktrace'] &&
+                          props.row['exception.stacktrace'].trim()
+                        "
+                        flat
+                        dense
+                        size="xs"
+                        icon="content_copy"
+                        class="copy-btn"
+                        @click.stop="
+                          copyStackTrace(props.row['exception.stacktrace'])
+                        "
+                        title="Copy stacktrace"
+                      >
+                        <q-tooltip>Copy stacktrace</q-tooltip>
+                      </q-btn>
+                    </div>
+                    <div
+                      v-if="
+                        props.row['exception.stacktrace'] &&
+                        props.row['exception.stacktrace'].trim()
+                      "
+                      class="stacktrace-container"
+                    >
+                      <pre
+                        class="stacktrace-content"
+                        v-html="
+                          DOMPurify.sanitize(
+                            formatStackTrace(props.row['exception.stacktrace']),
+                          )
+                        "
+                      ></pre>
+                    </div>
+                    <div v-else class="stacktrace-empty">
+                      <q-icon name="info" size="16px" class="q-mr-xs" />
+                      <span>No stacktrace available</span>
+                    </div>
+                  </div>
+                </div>
+              </q-td>
+            </q-tr>
           </template>
-        </q-virtual-scroll>
-      </div>
-      <div
-        v-else
-        class="full-width text-center q-pt-lg text-bold"
-        data-test="trace-details-sidebar-no-links"
-      >
-        No links present for this span
-      </div>
-    </q-tab-panel>
+        </q-table>
+        <div
+          v-else
+          class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
+          :class="
+            isLLMSpan && llmMetrics && span._o2_llm_model_name
+              ? 'tab-content-with-llm-metrics'
+              : 'tab-content-without-llm-metrics'
+          "
+          data-test="trace-details-sidebar-no-exceptions"
+        >
+          No exceptions present for this span
+        </div>
+      </q-tab-panel>
 
-    <!-- Correlated Logs Tab Panel -->
-    <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
-      <CorrelatedLogsTable
-        v-if="correlationProps"
-        :service-name="correlationProps.serviceName"
-        :matched-dimensions="correlationProps.matchedDimensions"
-        :additional-dimensions="correlationProps.additionalDimensions"
-        :log-streams="correlationProps.logStreams"
-        :source-stream="correlationProps.sourceStream"
-        :source-type="correlationProps.sourceType"
-        :available-dimensions="correlationProps.availableDimensions"
-        :fts-fields="correlationProps.ftsFields"
-        :time-range="correlationProps.timeRange"
-        :hide-view-related-button="true"
-        :hide-search-term-actions="false"
-        :hide-dimension-filters="true"
-        :hide-reset-filters-button="true"
-      />
-      <!-- Loading/Empty state when no data -->
-      <div
-        v-else
-        class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
-      >
-        <div class="tw:text-center">
-          <q-spinner-hourglass
-            v-if="correlationLoading"
-            color="primary"
-            size="3rem"
-            class="tw:mb-4"
-          />
-          <div
-            v-else-if="correlationError"
-            class="tw:text-base tw:text-red-500"
+      <q-tab-panel name="links">
+        <div v-if="spanLinks.length">
+          <q-virtual-scroll
+            type="table"
+            ref="searchTableRef"
+            style="max-height: 20rem"
+            :items="spanLinks"
+            class="tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+            data-test="trace-details-sidebar-links-table"
           >
-            {{ correlationError }}
-          </div>
-          <div v-else class="tw:text-base tw:text-gray-500">
-            {{ t("correlation.clickToLoadLogs") }}
+            <template v-slot:before>
+              <thead
+                class="thead-sticky text-left tw:bg-[var(--o2-hover-accent)] o2-quasar-table"
+              >
+                <tr>
+                  <th
+                    v-for="(col, index) in linkColumns"
+                    :key="'result_' + index"
+                    class="table-header"
+                    :data-test="`trace-events-table-th-${col.label}`"
+                  >
+                    {{ col.label }}
+                  </th>
+                </tr>
+              </thead>
+            </template>
+
+            <template v-slot="{ item: row, index }">
+              <tr
+                :data-test="`trace-event-detail-link-${index}`"
+                :key="'expand_' + index"
+                @click="openReferenceTrace('span', row)"
+                style="cursor: pointer"
+                class="pointer"
+              >
+                <td
+                  v-for="column in linkColumns"
+                  :key="index + '-' + column.name"
+                  class="field_list"
+                  style="cursor: pointer"
+                >
+                  <div class="flex row items-center no-wrap">
+                    {{ column.prop(row) }}
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </q-virtual-scroll>
+        </div>
+        <div
+          v-else
+          class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
+          :class="
+            isLLMSpan && llmMetrics && span._o2_llm_model_name
+              ? 'tab-content-with-llm-metrics'
+              : 'tab-content-without-llm-metrics'
+          "
+          data-test="trace-details-sidebar-no-links"
+        >
+          No links present for this span
+        </div>
+      </q-tab-panel>
+
+      <!-- Correlated Logs Tab Panel -->
+      <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
+        <CorrelatedLogsTable
+          v-if="correlationProps"
+          :service-name="correlationProps.serviceName"
+          :matched-dimensions="correlationProps.matchedDimensions"
+          :additional-dimensions="correlationProps.additionalDimensions"
+          :log-streams="correlationProps.logStreams"
+          :source-stream="correlationProps.sourceStream"
+          :source-type="correlationProps.sourceType"
+          :available-dimensions="correlationProps.availableDimensions"
+          :fts-fields="correlationProps.ftsFields"
+          :time-range="correlationProps.timeRange"
+          :hide-view-related-button="true"
+          :hide-search-term-actions="false"
+          :hide-dimension-filters="true"
+          :hide-reset-filters-button="true"
+        />
+        <!-- Loading/Empty state when no data -->
+        <div
+          v-else
+          class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
+          :class="
+            isLLMSpan && llmMetrics && span._o2_llm_model_name
+              ? 'tab-content-with-llm-metrics'
+              : 'tab-content-without-llm-metrics'
+          "
+        >
+          <div class="tw:text-center">
+            <q-spinner-hourglass
+              v-if="correlationLoading"
+              color="primary"
+              size="3rem"
+              class="tw:mb-4"
+            />
+            <div
+              v-else-if="correlationError"
+              class="tw:text-base tw:text-red-500"
+            >
+              {{ correlationError }}
+            </div>
+            <div v-else class="tw:text-base tw:text-gray-500">
+              {{ t("correlation.clickToLoadLogs") }}
+            </div>
           </div>
         </div>
-      </div>
-    </q-tab-panel>
+      </q-tab-panel>
 
-    <!-- Correlated Metrics Tab Panel -->
-    <q-tab-panel name="correlated-metrics" class="q-pa-none full-height">
-      <TelemetryCorrelationDashboard
-        v-if="correlationProps"
-        mode="embedded-tabs"
-        external-active-tab="metrics"
-        :service-name="correlationProps.serviceName"
-        :matched-dimensions="correlationProps.matchedDimensions"
-        :additional-dimensions="correlationProps.additionalDimensions"
-        :metric-streams="correlationProps.metricStreams"
-        :log-streams="correlationProps.logStreams"
-        :trace-streams="correlationProps.traceStreams"
-        :source-stream="correlationProps.sourceStream"
-        :source-type="correlationProps.sourceType"
-        :available-dimensions="correlationProps.availableDimensions"
-        :fts-fields="correlationProps.ftsFields"
-        :time-range="correlationProps.timeRange"
-        :hide-dimension-filters="true"
-        @close="activeTab = 'tags'"
-      />
-      <!-- Loading/Empty state when no data -->
-      <div
-        v-else
-        class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
-      >
-        <div class="tw:text-center">
-          <q-spinner-hourglass
-            v-if="correlationLoading"
-            color="primary"
-            size="3rem"
-            class="tw:mb-4"
-          />
-          <div
-            v-else-if="correlationError"
-            class="tw:text-base tw:text-red-500"
-          >
-            {{ correlationError }}
-          </div>
-          <div v-else class="tw:text-base tw:text-gray-500">
-            {{ t("correlation.clickToLoadMetrics") }}
+      <!-- Correlated Metrics Tab Panel -->
+      <q-tab-panel name="correlated-metrics" class="q-pa-none full-height">
+        <TelemetryCorrelationDashboard
+          v-if="correlationProps"
+          mode="embedded-tabs"
+          external-active-tab="metrics"
+          :service-name="correlationProps.serviceName"
+          :matched-dimensions="correlationProps.matchedDimensions"
+          :additional-dimensions="correlationProps.additionalDimensions"
+          :metric-streams="correlationProps.metricStreams"
+          :log-streams="correlationProps.logStreams"
+          :trace-streams="correlationProps.traceStreams"
+          :source-stream="correlationProps.sourceStream"
+          :source-type="correlationProps.sourceType"
+          :available-dimensions="correlationProps.availableDimensions"
+          :fts-fields="correlationProps.ftsFields"
+          :time-range="correlationProps.timeRange"
+          :hide-dimension-filters="true"
+          @close="activeTab = 'tags'"
+        />
+        <!-- Loading/Empty state when no data -->
+        <div
+          v-else
+          class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
+          :class="
+            isLLMSpan && llmMetrics && span._o2_llm_model_name
+              ? 'tab-content-with-llm-metrics'
+              : 'tab-content-without-llm-metrics'
+          "
+        >
+          <div class="tw:text-center">
+            <q-spinner-hourglass
+              v-if="correlationLoading"
+              color="primary"
+              size="3rem"
+              class="tw:mb-4"
+            />
+            <div
+              v-else-if="correlationError"
+              class="tw:text-base tw:text-red-500"
+            >
+              {{ correlationError }}
+            </div>
+            <div v-else class="tw:text-base tw:text-gray-500">
+              {{ t("correlation.clickToLoadMetrics") }}
+            </div>
           </div>
         </div>
-      </div>
-    </q-tab-panel>
-  </q-tab-panels>
+      </q-tab-panel>
+    </q-tab-panels>
   </div>
 </template>
 
@@ -760,7 +935,7 @@ import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToUs } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
-import { onMounted, defineAsyncComponent } from "vue";
+import { onMounted, onUnmounted, defineAsyncComponent, nextTick } from "vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -774,6 +949,8 @@ import {
   getObservationTypeColor,
   formatModelParameters,
 } from "@/utils/llmUtils";
+import DOMPurify from "dompurify";
+import { escapeHtml } from "@/utils/html";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -826,13 +1003,12 @@ export default defineComponent({
     const tags: Ref<{ [key: string]: string }> = ref({});
     const processes: Ref<{ [key: string]: string }> = ref({});
 
-    // LLM content expand/collapse state
-    const inputExpanded = ref(false);
-    const outputExpanded = ref(false);
+    // Ref for fullscreen container (parent container with both Input and Output)
+    const ioContainerRef = ref<HTMLElement | null>(null);
 
-    // LLM view mode state: 'formatted' (default) or 'json'
-    const inputViewMode = ref<'formatted' | 'json'>('formatted');
-    const outputViewMode = ref<'formatted' | 'json'>('formatted');
+    // Track fullscreen state
+    const isFullscreen = ref(false);
+
     const closeSidebar = () => {
       emit("close");
     };
@@ -855,12 +1031,6 @@ export default defineComponent({
       booleanValue: "var(--o2-json-boolean)",
       nullValue: "var(--o2-json-null)",
       objectValue: "var(--o2-json-object)",
-    };
-
-    const escapeHtml = (text: string): string => {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
     };
 
     const highlightTextMatch = (text: string, query: string): string => {
@@ -993,7 +1163,7 @@ export default defineComponent({
     const getTagRows = computed(() => {
       return Object.entries(tags.value).map(([key, value]) => ({
         field: key,
-        value: typeof value === 'string' ? value : JSON.stringify(value),
+        value: typeof value === "string" ? value : JSON.stringify(value),
       }));
     });
 
@@ -1017,7 +1187,7 @@ export default defineComponent({
     const getProcessRows = computed(() => {
       return Object.entries(processes.value).map(([key, value]) => ({
         field: key,
-        value: typeof value === 'string' ? value : JSON.stringify(value),
+        value: typeof value === "string" ? value : JSON.stringify(value),
       }));
     });
 
@@ -1043,6 +1213,10 @@ export default defineComponent({
     });
 
     const store = useStore();
+
+    // Get current theme from store
+    const isDarkMode = computed(() => store.state.theme === "dark");
+
     const expandedEvents: any = ref({});
     const eventColumns = ref([
       {
@@ -1198,21 +1372,129 @@ export default defineComponent({
       },
     );
     function formatStackTrace(trace: any) {
+      if (!trace) return "";
+
       // Split the trace into lines
       const lines = trace.split("\n");
 
-      // Process each line
+      // Process each line with syntax highlighting
       const formattedLines = lines.map((line: string) => {
-        // Apply formatting rules
-        // For example, indent lines that contain file paths
-        if (line.trim().startsWith("/")) {
-          return "" + line; // Indent the line
+        const trimmed = line.trim();
+
+        // Skip empty lines
+        if (!trimmed) return '<div class="stack-line stack-empty"></div>';
+
+        // Highlight file paths and line numbers (e.g., File "path", line 123, in function_name)
+        if (trimmed.startsWith("File ")) {
+          const fileMatch = line.match(
+            /(File\s+)"([^"]+)"(,\s+line\s+)(\d+)(,\s+in\s+)(.+)/,
+          );
+          if (fileMatch) {
+            return `<div class="stack-line stack-file">  ${escapeHtml(fileMatch[1])}<span class="stack-path">"${escapeHtml(fileMatch[2])}"</span>${escapeHtml(fileMatch[3])}<span class="stack-lineno">${escapeHtml(fileMatch[4])}</span>${escapeHtml(fileMatch[5])}<span class="stack-function">${escapeHtml(fileMatch[6])}</span></div>`;
+          }
         }
-        return line;
+
+        // Highlight exception raises (e.g., raise ContextWindowExceededError)
+        if (trimmed.startsWith("raise ") || trimmed.includes("raise ")) {
+          // Escape the entire line first, then add highlighting spans
+          const highlighted = escapeHtml(line).replace(
+            /(raise\s+)(\w+)/,
+            '<span class="stack-keyword">$1</span><span class="stack-exception">$2</span>',
+          );
+          return `<div class="stack-line stack-raise">${highlighted}</div>`;
+        }
+
+        // Highlight traceback headers
+        if (trimmed.startsWith("Traceback ")) {
+          return `<div class="stack-line stack-traceback"><span class="stack-traceback-header">${escapeHtml(line)}</span></div>`;
+        }
+
+        // Highlight "During handling" messages
+        if (trimmed.startsWith("During handling of")) {
+          return `<div class="stack-line stack-during"><span class="stack-during-text">${escapeHtml(line)}</span></div>`;
+        }
+
+        // Highlight code lines (indented lines that aren't file paths)
+        if (line.startsWith("    ") && !trimmed.startsWith("File ")) {
+          // Escape the entire line first, then add highlighting spans
+          let highlighted = escapeHtml(line)
+            .replace(
+              /(return|await|async|yield|raise|for|if|else|try|except|finally|with|as|import|from)\s/g,
+              '<span class="stack-keyword">$1</span> ',
+            )
+            .replace(/(\w+\()/g, '<span class="stack-call">$1</span>')
+            .replace(/(\.\.\.)/g, '<span class="stack-ellipsis">$1</span>');
+          return `<div class="stack-line stack-code">${highlighted}</div>`;
+        }
+
+        // Highlight error types at the end of stack (e.g., httpx.HTTPStatusError: ...)
+        if (trimmed.match(/^\w+\.\w+Error:/)) {
+          const errorMatch = line.match(/^(\s*)(\w+(?:\.\w+)*Error:)(.+)/);
+          if (errorMatch) {
+            return `<div class="stack-line stack-error">${escapeHtml(errorMatch[1])}<span class="stack-exception">${escapeHtml(errorMatch[2])}</span><span class="stack-error-msg">${escapeHtml(errorMatch[3])}</span></div>`;
+          }
+        }
+
+        // Default line
+        return `<div class="stack-line">${escapeHtml(line)}</div>`;
       });
 
-      // Reassemble the formatted trace
-      return formattedLines.join("\n");
+      return formattedLines.join("");
+    }
+
+    function formatExceptionMessage(message: any) {
+      if (!message) return "";
+
+      // Try to format as JSON if it looks like JSON
+      if (
+        typeof message === "string" &&
+        (message.includes("{") || message.includes("["))
+      ) {
+        try {
+          // Extract JSON parts and format them
+          const jsonMatch = message.match(/\{[^}]+\}/g);
+          if (jsonMatch) {
+            let formatted = message;
+            jsonMatch.forEach((json) => {
+              try {
+                const parsed = JSON.parse(json);
+                const pretty = JSON.stringify(parsed, null, 2);
+                formatted = formatted.replace(json, "\n" + pretty);
+              } catch {
+                // Keep original if can't parse
+              }
+            });
+            return formatted;
+          }
+        } catch {
+          // Keep original if parsing fails
+        }
+      }
+
+      return message;
+    }
+
+    function copyStackTrace(stacktrace: string) {
+      if (!stacktrace) return;
+
+      navigator.clipboard
+        .writeText(stacktrace)
+        .then(() => {
+          $q.notify({
+            message: "Stacktrace copied to clipboard",
+            color: "positive",
+            position: "top",
+            timeout: 2000,
+          });
+        })
+        .catch(() => {
+          $q.notify({
+            message: "Failed to copy stacktrace",
+            color: "negative",
+            position: "top",
+            timeout: 2000,
+          });
+        });
     }
 
     const viewSpanLogs = () => {
@@ -1233,6 +1515,19 @@ export default defineComponent({
       q?.notify?.({
         type: "positive",
         message: "Span ID copied to clipboard",
+        timeout: 2000,
+      });
+    };
+
+    const copyAttributesToClipboard = () => {
+      const attributes = props.span?.attributes || {};
+      const attributesText = JSON.stringify(attributes, null, 2);
+
+      copyToClipboard(attributesText);
+
+      q?.notify?.({
+        type: "positive",
+        message: "Attributes copied to clipboard",
         timeout: 2000,
       });
     };
@@ -1471,8 +1766,7 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
-        correlationError.value =
-          err.message || t("correlation.failedToLoad");
+        correlationError.value = err.message || t("correlation.failedToLoad");
       } finally {
         correlationLoading.value = false;
       }
@@ -1515,11 +1809,11 @@ export default defineComponent({
     });
 
     // Copy LLM content to clipboard
-    const copyContent = (content: any, type: 'input' | 'output') => {
+    const copyContent = (content: any, type: "input" | "output") => {
       try {
         // Convert content to string
-        let textToCopy = '';
-        if (typeof content === 'string') {
+        let textToCopy = "";
+        if (typeof content === "string") {
           textToCopy = content;
         } else if (content) {
           // Pretty-print JSON objects/arrays
@@ -1530,55 +1824,127 @@ export default defineComponent({
         copyToClipboard(textToCopy)
           .then(() => {
             q.notify({
-              type: 'positive',
+              type: "positive",
               message: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
-              position: 'top',
+              position: "top",
               timeout: 2000,
             });
           })
           .catch(() => {
             q.notify({
-              type: 'negative',
-              message: 'Failed to copy to clipboard',
-              position: 'top',
+              type: "negative",
+              message: "Failed to copy to clipboard",
+              position: "top",
               timeout: 2000,
             });
           });
       } catch (error) {
         q.notify({
-          type: 'negative',
-          message: 'Failed to copy content',
-          position: 'top',
+          type: "negative",
+          message: "Failed to copy content",
+          position: "top",
           timeout: 2000,
         });
       }
     };
 
+    // Helper function to check if content exists
+    const hasContent = (content: any) => {
+      // Check for null, undefined
+      if (content === null || content === undefined) return false;
+
+      // Check for empty or "null" string (case insensitive)
+      if (typeof content === "string") {
+        const trimmed = content.trim();
+        if (trimmed === "" || trimmed.toLowerCase() === "null") return false;
+      }
+
+      // Check for empty arrays
+      if (Array.isArray(content) && content.length === 0) return false;
+
+      // Check for empty objects (but not arrays or objects with properties)
+      if (
+        typeof content === "object" &&
+        !Array.isArray(content) &&
+        Object.keys(content).length === 0
+      )
+        return false;
+
+      // Check if JSON stringified content is null/empty
+      try {
+        const stringified = JSON.stringify(content);
+        if (
+          stringified === "null" ||
+          stringified === "{}" ||
+          stringified === "[]"
+        )
+          return false;
+      } catch (e) {
+        // If stringify fails, continue with other checks
+      }
+
+      return true;
+    };
+
+    // Toggle fullscreen for both Input and Output side by side
+    const toggleFullscreen = () => {
+      if (ioContainerRef.value) {
+        q.fullscreen
+          .toggle(ioContainerRef.value)
+          .then(() => {
+            // Check if this specific element is now fullscreen
+            nextTick(() => {
+              isFullscreen.value =
+                document.fullscreenElement === ioContainerRef.value;
+            });
+          })
+          .catch((err: any) => {
+            console.error("Failed to toggle fullscreen:", err);
+          });
+      }
+    };
+
+    // Listen for fullscreen changes (e.g., when user presses Escape)
+    onMounted(() => {
+      const handleFullscreenChange = () => {
+        // Check if the IO container is in fullscreen
+        isFullscreen.value =
+          document.fullscreenElement === ioContainerRef.value;
+      };
+
+      // Listen to fullscreen change events
+      document.addEventListener("fullscreenchange", handleFullscreenChange);
+      document.addEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenChange,
+      );
+      document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+
+      // Cleanup listeners on unmount
+      onUnmounted(() => {
+        document.removeEventListener(
+          "fullscreenchange",
+          handleFullscreenChange,
+        );
+        document.removeEventListener(
+          "webkitfullscreenchange",
+          handleFullscreenChange,
+        );
+        document.removeEventListener(
+          "mozfullscreenchange",
+          handleFullscreenChange,
+        );
+        document.removeEventListener(
+          "MSFullscreenChange",
+          handleFullscreenChange,
+        );
+      });
+    });
+
     // Format model parameters for display
     const formatModelParams = (params: any) => {
       return formatModelParameters(params);
-    };
-
-    // Get character count for input content
-    const getInputCharCount = () => {
-      if (!props.span._o2_llm_input) return 0;
-      const content = typeof props.span._o2_llm_input === 'string'
-        ? props.span._o2_llm_input
-        : JSON.stringify(props.span._o2_llm_input);
-      // Estimate ~20 chars per line, 15 lines visible = 300 chars visible
-      const visibleChars = 1500; // rough estimate
-      return Math.max(0, content.length - visibleChars);
-    };
-
-    // Get character count for output content
-    const getOutputCharCount = () => {
-      if (!props.span._o2_llm_output) return 0;
-      const content = typeof props.span._o2_llm_output === 'string'
-        ? props.span._o2_llm_output
-        : JSON.stringify(props.span._o2_llm_output);
-      // Estimate ~20 chars per line, 15 lines visible = 300 chars visible
-      const visibleChars = 1500; // rough estimate
-      return Math.max(0, content.length - visibleChars);
     };
 
     return {
@@ -1594,6 +1960,8 @@ export default defineComponent({
       tags,
       processes,
       formatStackTrace,
+      formatExceptionMessage,
+      copyStackTrace,
       getExceptionEvents,
       exceptionEventColumns,
       getDuration,
@@ -1601,6 +1969,7 @@ export default defineComponent({
       viewSpanLogs,
       getStartTime,
       copySpanId,
+      copyAttributesToClipboard,
       openReferenceTrace,
       spanLinks,
       linkColumns,
@@ -1622,12 +1991,12 @@ export default defineComponent({
       copyContent,
       formatModelParams,
       getObservationTypeColor,
-      inputExpanded,
-      outputExpanded,
-      inputViewMode,
-      outputViewMode,
-      getInputCharCount,
-      getOutputCharCount,
+      hasContent,
+      ioContainerRef,
+      isFullscreen,
+      toggleFullscreen,
+      isDarkMode,
+      DOMPurify,
     };
   },
 });
@@ -1652,14 +2021,13 @@ export default defineComponent({
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     border-right: 1px solid rgba(255, 255, 255, 0.15);
     text-align: left;
-    padding: 8px 12px !important;
+    padding: 4px !important;
     font-size: 13px;
     word-break: break-word;
     word-wrap: break-word;
     overflow-wrap: break-word;
     max-width: 600px;
   }
-
   td span {
     display: inline-block;
     width: 100%;
@@ -1795,6 +2163,21 @@ export default defineComponent({
   }
 }
 
+// Cell with max-height and scroll
+.cell-with-max-height {
+  vertical-align: top;
+
+  .cell-content {
+    max-height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: block;
+    word-break: break-word;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+}
+
 .thead-sticky tr > *,
 .tfoot-sticky tr > * {
   position: sticky;
@@ -1818,7 +2201,7 @@ export default defineComponent({
   cursor: default;
 }
 .span_details_tab-panels {
-  height: calc(100% - 6.75rem);
+  height: calc(100% - 6rem);
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -1827,41 +2210,452 @@ export default defineComponent({
 }
 
 // LLM-specific styles
-.llm-metrics-toolbar {
-  .metric-item {
+// Observation Type Badge
+.observation-type-badge {
+  text-transform: none !important;
+}
+
+// Trace Details Toolbar - Modern Styling
+.trace-details-toolbar-container {
+  background: rgba(248, 249, 250, 0.5);
+  // border-bottom: 1px solid #e9ecef;
+  white-space: nowrap;
+
+  .toolbar-chip {
+    font-size: 11px;
+    height: 22px;
+    padding: 0 6px;
+    background: white;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .chip-label {
+      color: #6c757d;
+      font-size: 10px;
+      font-weight: 500;
+      margin-right: 3px;
+    }
+
+    .chip-value {
+      color: #212529;
+      font-weight: 600;
+      font-size: 10px;
+    }
+
+    &.service-chip {
+      border-left: 3px solid #0d6efd;
+      .q-icon {
+        color: #0d6efd;
+      }
+    }
+
+    &.duration-chip {
+      border-left: 3px solid #6610f2;
+      .q-icon {
+        color: #6610f2;
+      }
+    }
+
+    &.ttft-chip {
+      border-left: 3px solid #6f42c1;
+      .q-icon {
+        color: #6f42c1;
+      }
+    }
+
+    &.time-chip {
+      border-left: 3px solid #d63384;
+      .q-icon {
+        color: #d63384;
+      }
+    }
+
+    &.span-id-chip {
+      border-left: 3px solid #20c997;
+      cursor: pointer;
+
+      .q-icon {
+        color: #20c997;
+      }
+
+      .copy-icon {
+        opacity: 0.6;
+        transition: opacity 0.2s;
+      }
+
+      &:hover .copy-icon {
+        opacity: 1;
+      }
+    }
+  }
+
+  .view-logs-btn {
+    height: 24px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 0 10px;
+    border-radius: 4px;
+    text-transform: none;
+    flex-shrink: 0;
+  }
+
+  // Scrollbar styling for horizontal scroll
+  > div::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  > div::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  > div::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 2px;
+  }
+
+  > div::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+  }
+}
+
+// LLM Chips - Modern Styling (now integrated into toolbar)
+.trace-details-toolbar-container {
+  .llm-chip {
+    font-size: 10px;
+    height: 20px;
+    padding: 0 6px;
+    background: white;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    .chip-value {
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    &.model-chip {
+      border-left: 3px solid #ab47bc;
+
+      .q-icon {
+        color: #7b1fa2;
+      }
+
+      .chip-value {
+        color: #4a148c;
+        font-weight: 600;
+      }
+    }
+
+    &.token-chip {
+      min-width: 60px;
+      justify-content: center;
+
+      .chip-label {
+        font-size: 9px;
+        font-weight: 500;
+        margin-right: 2px;
+      }
+
+      &.input-token-chip {
+        border-left: 3px solid #42a5f5;
+
+        .q-icon,
+        .chip-label,
+        .chip-value {
+          color: #1565c0;
+        }
+      }
+
+      &.output-token-chip {
+        border-left: 3px solid #66bb6a;
+
+        .q-icon,
+        .chip-label,
+        .chip-value {
+          color: #2e7d32;
+        }
+      }
+    }
+
+    &.cost-chip {
+      border-left: 3px solid #ef6c00;
+
+      .q-icon {
+        color: #ef6c00;
+      }
+
+      .chip-value {
+        color: #e65100;
+        font-weight: 600;
+      }
+    }
+  }
+
+  .tokens-group {
     display: inline-flex;
-    align-items: center;
-    gap: 4px;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+
+  .provider-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+  }
+
+  .llm-metrics-row {
+    // Scrollbar styling for horizontal scroll
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #cbd5e0;
+      border-radius: 2px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: #a0aec0;
+    }
+  }
+}
+
+// Dark Mode Styles
+body.body--dark {
+  .trace-details-toolbar-container {
+    background: rgba(45, 55, 72, 0.5);
+    border-bottom-color: #4a5568;
+
+    .llm-metrics-row {
+      border-top-color: #4a5568 !important;
+    }
+
+    .toolbar-chip {
+      background: #1a202c;
+      border-color: #4a5568;
+      color: #e2e8f0;
+
+      .chip-label {
+        color: #a0aec0;
+      }
+
+      .chip-value {
+        color: #e2e8f0;
+      }
+
+      &:hover {
+        background: #2d3748;
+      }
+    }
+  }
+
+  .trace-details-toolbar-container {
+    .llm-chip {
+      background: #1a202c;
+      border-color: #4a5568;
+
+      .chip-value {
+        color: #e2e8f0;
+      }
+
+      &.model-chip {
+        border-left: 3px solid #ab47bc;
+
+        .q-icon {
+          color: #ce93d8;
+        }
+
+        .chip-value {
+          color: #e9d8fd;
+        }
+      }
+
+      &.token-chip {
+        &.input-token-chip {
+          border-left: 3px solid #42a5f5;
+
+          .q-icon,
+          .chip-label,
+          .chip-value {
+            color: #90cdf4;
+          }
+        }
+
+        &.output-token-chip {
+          border-left: 3px solid #66bb6a;
+
+          .q-icon,
+          .chip-label,
+          .chip-value {
+            color: #9ae6b4;
+          }
+        }
+      }
+
+      &.cost-chip {
+        border-left: 3px solid #ef6c00;
+
+        .q-icon {
+          color: #ffcc80;
+        }
+
+        .chip-value {
+          color: #fed7aa;
+        }
+      }
+    }
+
+    .provider-badge {
+      background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
+    }
   }
 }
 
 .llm-preview-panel {
+  overflow: hidden; // Prevent scroll at panel level
+
   .section-label {
     color: var(--o2-text-primary);
     font-size: 14px;
     margin-bottom: 0.5rem;
   }
 
+  .io-container {
+    display: flex;
+    gap: 0.5rem;
+    width: calc(100vw - 350px);
+    height: calc(
+      100vh - 296px
+    ); // Fixed height for the container (with 2-row toolbar for LLM spans)
+    max-height: calc(100vh - 296px);
+    align-items: stretch; // Ensure equal heights
+    overflow: hidden; // Prevent scroll at outer level
+  }
+
+  .io-section {
+    flex: 0 0 calc(50% - 0.4rem); // Fixed 50% width minus half the gap
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
   .llm-content-box {
+    flex: 1; // Take all available space
+    height: 100%; // Take full height of parent
+    max-height: calc(
+      100vh - 338px
+    ); // Container height minus label/button height (with 2-row toolbar)
     border: 1px solid var(--o2-border-color);
     border-radius: 4px;
     padding: 0.75rem;
+    overflow-y: auto; // Enable scroll inside the box
+    overflow-x: hidden;
     background-color: var(--o2-code-bg);
-    max-height: 300px; // ~15 lines at 20px per line
-    overflow-y: auto;
-    transition: max-height 0.3s ease;
 
-    &.expanded {
-      max-height: 800px; // Larger height when expanded
+    // Enhance hover visibility for code/text content (exclude VueJsonPretty)
+    ::v-deep {
+      .plain-text-content {
+        &:hover {
+          background-color: rgba(0, 0, 0, 0.04) !important;
+        }
+      }
+
+      // Don't apply hover to VueJsonPretty elements
+      .vjs-tree {
+        * {
+          &:hover {
+            background-color: transparent !important;
+          }
+        }
+      }
     }
   }
 
-  .expand-toggle {
-    font-size: 12px;
-    transition: opacity 0.2s ease;
+  // No data message styling
+  .no-data-message {
+    color: var(--o2-text-secondary);
+    font-style: italic;
+    text-align: center;
+    padding: 2rem;
+    font-size: 14px;
+  }
 
-    &:hover {
-      opacity: 1 !important;
+  // Fullscreen styles for the entire IO container (both Input and Output side by side)
+  .io-container:fullscreen {
+    background-color: #f5f5f5;
+    padding-bottom: 1rem;
+    height: 100vh; // Full viewport height in fullscreen
+    max-height: 100vh;
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+
+    .io-section {
+      flex: 1; // Equal split in fullscreen
+      display: flex;
+      flex-direction: column;
+
+      .section-label {
+        background: #f5f5f5;
+        border-radius: 4px;
+      }
+
+      .llm-content-box {
+        height: calc(100vh - 80px); // Full height minus header in fullscreen
+        max-height: unset; // Remove max-height constraint in fullscreen
+        min-height: unset;
+      }
+    }
+  }
+
+  // Dark mode fullscreen
+  .io-container-dark:fullscreen {
+    background: #1e1e1e; // Dark background for dark mode
+
+    .io-section .section-label {
+      background: #1e1e1e;
+      color: #e0e0e0; // Ensure text is visible in dark mode
+    }
+  }
+
+  // Dark mode hover visibility
+  .io-container-dark .llm-content-box {
+    ::v-deep {
+      .plain-text-content {
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+      }
+
+      // Don't apply hover to VueJsonPretty elements in dark mode
+      .vjs-tree {
+        * {
+          &:hover {
+            background-color: transparent !important;
+          }
+        }
+      }
     }
   }
 
@@ -1941,6 +2735,332 @@ export default defineComponent({
       border-bottom: 1px solid rgba(100, 100, 120, 0.2);
       border-right: 1px solid rgba(100, 100, 120, 0.3);
     }
+  }
+}
+.tab-content-with-llm-metrics {
+  height: calc(100vh - 312px);
+}
+.tab-content-without-llm-metrics {
+  height: calc(100vh - 276px);
+}
+
+// Attributes tab with header button
+.attributes-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 32px;
+}
+.copy-clipboard-button {
+  min-width: 40px !important;
+}
+
+.tab-content-dynamic-height-with-header {
+  &.tab-content-with-llm-metrics {
+    height: calc(100vh - 348px); // 312px + 36px for button header
+  }
+
+  &.tab-content-without-llm-metrics {
+    height: calc(100vh - 312px); // 276px + 36px for button header
+  }
+}
+
+.copy-attributes-btn {
+  opacity: 0.7;
+  transition: all 0.2s;
+  background: var(--o2-hover-accent) !important;
+  border: 1px solid var(--o2-border-color);
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.trace-detail-tab-table {
+  th {
+    background-color: #f5f5f5 !important;
+  }
+}
+
+.body--dark {
+  .trace-detail-tab-table {
+    th {
+      background-color: #424242 !important;
+    }
+  }
+}
+
+// Exception Details Styling
+.exception-details-container {
+  padding: 0.75rem !important;
+  font-size: 12px;
+  font-family:
+    "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro", monospace;
+  background-color: var(--o2-code-bg);
+}
+
+.exception-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.exception-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.exception-label {
+  font-weight: 700;
+  color: var(--o2-text-primary);
+  font-size: 13px;
+  margin-bottom: 0;
+}
+
+.exception-type {
+  color: #d32f2f;
+  font-weight: 600;
+  background: rgba(211, 47, 47, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.exception-message {
+  color: var(--o2-text-secondary);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.5rem;
+  border-radius: 4px;
+  border-left: 3px solid #ff9800;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.5;
+}
+
+.exception-value {
+  color: var(--o2-text-secondary);
+}
+
+.stacktrace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+
+  .copy-btn {
+    margin-left: auto;
+    color: var(--o2-text-secondary);
+    opacity: 0.7;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
+
+.stacktrace-container {
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+  overflow: auto;
+  max-height: 600px;
+  padding: 0.75rem;
+}
+
+.stacktrace-content {
+  margin: 0;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #2c3e50;
+  font-family:
+    "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro", monospace;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+
+  .stack-line {
+    padding: 2px 0;
+  }
+
+  .stack-empty {
+    height: 0.5em;
+  }
+
+  .stack-file {
+    color: #0066cc;
+    font-weight: 500;
+  }
+
+  .stack-path {
+    color: #d63384;
+  }
+
+  .stack-lineno {
+    color: #087990;
+    font-weight: 600;
+  }
+
+  .stack-function {
+    color: #6f42c1;
+  }
+
+  .stack-keyword {
+    color: #8250df;
+    font-weight: 600;
+  }
+
+  .stack-exception {
+    color: #d73a49;
+    font-weight: 600;
+  }
+
+  .stack-traceback {
+    color: #6c757d;
+    font-style: italic;
+  }
+
+  .stack-traceback-header {
+    color: #6c757d;
+    font-weight: 600;
+  }
+
+  .stack-during {
+    color: #6c757d;
+    margin: 0.5em 0;
+  }
+
+  .stack-during-text {
+    font-style: italic;
+  }
+
+  .stack-code {
+    color: #2c3e50;
+    padding-left: 2em;
+  }
+
+  .stack-call {
+    color: #0969da;
+  }
+
+  .stack-ellipsis {
+    color: #6c757d;
+  }
+
+  .stack-error {
+    margin-top: 0.5em;
+  }
+
+  .stack-error-msg {
+    color: #2c3e50;
+  }
+
+  .stack-raise {
+    color: #d73a49;
+  }
+}
+
+.stacktrace-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border: 1px dashed #dee2e6;
+  border-radius: 4px;
+  color: #6c757d;
+  font-size: 12px;
+  font-style: italic;
+}
+
+// Dark Mode Adjustments
+body.body--dark {
+  .exception-details-container {
+    background-color: #1a1a1a;
+  }
+
+  .exception-type {
+    color: #ef5350;
+    background: rgba(239, 83, 80, 0.15);
+  }
+
+  .exception-message {
+    background: rgba(255, 255, 255, 0.05);
+    border-left-color: #ffb74d;
+    color: #e0e0e0;
+  }
+
+  .stacktrace-container {
+    background: #0d0d0d;
+    border-color: #2a2a2a;
+  }
+
+  .stacktrace-content {
+    color: #d4d4d4;
+
+    .stack-file {
+      color: #9cdcfe;
+    }
+
+    .stack-path {
+      color: #ce9178;
+    }
+
+    .stack-lineno {
+      color: #b5cea8;
+    }
+
+    .stack-function {
+      color: #dcdcaa;
+    }
+
+    .stack-keyword {
+      color: #c586c0;
+    }
+
+    .stack-exception {
+      color: #f48771;
+    }
+
+    .stack-traceback {
+      color: #808080;
+    }
+
+    .stack-traceback-header {
+      color: #808080;
+    }
+
+    .stack-during {
+      color: #808080;
+    }
+
+    .stack-code {
+      color: #d4d4d4;
+    }
+
+    .stack-call {
+      color: #4ec9b0;
+    }
+
+    .stack-ellipsis {
+      color: #808080;
+    }
+
+    .stack-error-msg {
+      color: #d4d4d4;
+    }
+
+    .stack-raise {
+      color: #f48771;
+    }
+  }
+
+  .stacktrace-empty {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: #4a5568;
+    color: #a0aec0;
   }
 }
 </style>

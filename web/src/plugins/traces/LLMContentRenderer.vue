@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="llm-content-renderer">
+  <div v-if="hasValidContent" class="llm-content-renderer">
     <!-- Tool-specific rendering -->
-    <div v-if="isToolObservation" class="tool-content">
+    <div v-if="isToolObservation && toolContent !== null" class="tool-content">
       <div v-if="toolMetadata" class="tool-metadata q-mb-sm">
         <q-badge v-if="toolMetadata.name" :label="`Tool: ${toolMetadata.name}`" color="orange" class="q-mr-sm" />
         <q-badge v-if="toolMetadata.callId" :label="`Call ID: ${toolMetadata.callId}`" color="grey" />
@@ -152,12 +152,72 @@ const toolMetadata = computed(() => {
 });
 
 const toolContent = computed(() => {
-  if (!isToolObservation.value || !props.span) return null;
-  if (props.contentType === 'input') {
-    return props.span._o2_llm_tool_call_arguments;
-  } else {
-    return props.span._o2_llm_tool_call_result;
+  if (!isToolObservation.value) return null;
+
+  let content = null;
+  if (props.span) {
+    if (props.contentType === 'input') {
+      content = props.span._o2_llm_tool_call_arguments;
+    } else {
+      content = props.span._o2_llm_tool_call_result;
+    }
   }
+
+  // If tool-specific field is null/undefined, fall back to props.content
+  if (content === null || content === undefined) {
+    content = props.content;
+  }
+
+  // Check if content is the string "null"
+  if (typeof content === 'string') {
+    const trimmed = content.trim();
+    if (trimmed.toLowerCase() === 'null' || trimmed === '') {
+      return null;
+    }
+    // Try to parse string content as JSON
+    try {
+      return JSON.parse(content);
+    } catch {
+      return content;
+    }
+  }
+
+  // Handle nested content structure: {content: [{type: "text", text: "..."}]}
+  if (content && typeof content === 'object') {
+    // Check if it has the Anthropic content format
+    if (content.content && Array.isArray(content.content) && content.content.length > 0) {
+      const firstContent = content.content[0];
+      if (firstContent.type === 'text' && firstContent.text) {
+        // Try to parse the inner text as JSON
+        try {
+          return JSON.parse(firstContent.text);
+        } catch {
+          // If parsing fails, return the text as-is
+          return firstContent.text;
+        }
+      }
+    }
+  }
+
+  return content;
+});
+
+// Check if we have valid content to render
+const hasValidContent = computed(() => {
+  // For tool observations, check toolContent instead
+  if (isToolObservation.value) {
+    return toolContent.value !== null && toolContent.value !== undefined;
+  }
+
+  // For regular content
+  if (!props.content) return false;
+
+  if (typeof props.content === 'string') {
+    const trimmed = props.content.trim();
+    if (trimmed === '' || trimmed.toLowerCase() === 'null') return false;
+  }
+
+  return true;
 });
 
 // Parse content
@@ -166,9 +226,38 @@ const parsedContent = computed(() => {
 
   try {
     if (typeof props.content === 'string') {
+      // Check for explicit "null" string before parsing
+      const trimmed = props.content.trim();
+      if (trimmed.toLowerCase() === 'null' || trimmed === '') {
+        return null;
+      }
       // Try to parse as JSON
-      return JSON.parse(props.content);
+      const parsed = JSON.parse(props.content);
+      // If parsing results in null, return null
+      if (parsed === null) {
+        return null;
+      }
+      return parsed;
     }
+
+    // Handle nested content structure: {content: [{type: "text", text: "..."}]}
+    if (props.content && typeof props.content === 'object') {
+      // Check if it has the Anthropic content format
+      if (props.content.content && Array.isArray(props.content.content) && props.content.content.length > 0) {
+        const firstContent = props.content.content[0];
+        if (firstContent.type === 'text' && firstContent.text) {
+          // Try to parse the inner text as JSON
+          try {
+            const innerParsed = JSON.parse(firstContent.text);
+            return innerParsed;
+          } catch {
+            // If parsing fails, return the text as-is
+            return firstContent.text;
+          }
+        }
+      }
+    }
+
     return props.content;
   } catch {
     // Plain text

@@ -15,8 +15,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pl-sm float-left">
+  <div :class="isCompact ? '' : 'q-pl-sm float-left'">
+    <!-- Compact mode: Simple toggle button with dropdown menu -->
+    <q-btn
+      v-if="isCompact"
+      data-test="logs-search-bar-refresh-interval-btn"
+      flat
+      dense
+      no-caps
+      :class="[
+        'compact-refresh-btn',
+        isAnimating ? 'active-refresh-btn' : ''
+      ]"
+    >
+      <q-icon
+        name="update"
+        :class="[
+          isAnimating ? 'rotating-icon' : '',
+          isAnimating ? 'text-white' : ''
+        ]"
+        size="18px"
+      />
+      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
+        {{ t('search.autoRefresh') }}: {{ selectedLabel }}
+      </q-tooltip>
+
+      <!-- Dropdown menu for interval selection -->
+      <q-menu content-style="z-index: 10001">
+        <div class="row">
+          <div class="col col-12 q-pa-sm" style="text-align: center; width: 300px">
+            <q-btn
+              data-test="logs-search-off-refresh-interval"
+              no-caps
+              :flat="modelValue.toString() !== '0'"
+              size="md"
+              :class="
+                'no-border full-width ' +
+                (modelValue.toString() === '0' ? 'selected' : '')
+              "
+              v-close-popup="true"
+              @click="onItemClick({ label: t('common.off'), value: 0 })"
+            >
+              {{ t("common.off") }}
+            </q-btn>
+          </div>
+        </div>
+        <q-separator />
+        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
+          <div
+            v-for="(item, j) in items"
+            :key="'col_' + i + '_' + j"
+            class="col col-4 q-pa-sm"
+            style="text-align: center"
+          >
+            <q-btn
+              :data-test="`logs-search-bar-refresh-time-${item.value}`"
+              no-caps
+              :flat="Number(modelValue) !== item.value"
+              size="md"
+              :class="[
+                'no-border ' +
+                  (Number(modelValue) === item.value ? 'selected' : ''),
+              ]"
+              @click="onItemClick(item)"
+              v-close-popup="true"
+              :disable="item.disabled"
+            >
+              <q-tooltip
+                v-if="item.disabled"
+                style="z-index: 10001; font-size: 14px"
+                anchor="center right"
+                self="center left"
+                max-width="300px"
+              >
+                {{ minRangeRestrictionMessageVal }}
+              </q-tooltip>
+              {{ item.label }}
+            </q-btn>
+          </div>
+        </div>
+      </q-menu>
+    </q-btn>
+
+    <!-- Full mode: Dropdown with label -->
     <q-btn-dropdown
+      v-else
       data-test="logs-search-bar-refresh-interval-btn-dropdown"
       v-model="btnRefreshInterval"
       no-caps
@@ -25,7 +108,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:label>
         <div class="row items-center no-wrap">
-          <q-icon left name="update" />
+          <q-icon
+            left
+            name="update"
+            :class="[
+              isAnimating ? 'rotating-icon' : '',
+              isAnimating ? 'text-primary' : ''
+            ]"
+          />
           <div class="text-center">{{ selectedLabel }}</div>
         </div>
       </template>
@@ -119,6 +209,10 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+    isCompact: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["update:modelValue", "trigger"],
   setup(props: any, { emit }) {
@@ -177,9 +271,38 @@ export default defineComponent({
       return found?.label || generateDurationLabel(selectedValue.value);
     });
 
+    // Check if animation should be active
+    const isAnimating = computed(() => {
+      return props.isCompact && selectedValue.value > 0;
+    });
+
+    // Default refresh interval (5 seconds)
+    const defaultRefreshInterval = 5;
+    let lastSelectedInterval = 5;
+
+    // Toggle refresh on/off
+    const toggleRefresh = () => {
+      if (selectedValue.value > 0) {
+        // Currently ON, turn it OFF
+        lastSelectedInterval = selectedValue.value;
+        selectedValue.value = 0;
+      } else {
+        // Currently OFF, turn it ON with last interval or default
+        selectedValue.value = lastSelectedInterval || defaultRefreshInterval;
+      }
+    };
+
+    // Open dropdown for selecting specific interval (for right-click or future use)
+    const openDropdown = () => {
+      btnRefreshInterval.value = true;
+    };
+
     // update model when the selection has changed
     const onItemClick = (item: any) => {
       selectedValue.value = item.value;
+      if (item.value > 0) {
+        lastSelectedInterval = item.value;
+      }
     };
 
     // watch on the selected value and update the timers
@@ -246,6 +369,10 @@ export default defineComponent({
       refreshTimes,
       onItemClick,
       minRangeRestrictionMessageVal,
+      isAnimating,
+      selectedValue,
+      toggleRefresh,
+      openDropdown,
     };
   },
 });
@@ -258,5 +385,45 @@ export default defineComponent({
   min-height: 30px;
   line-height: 30px;
   padding: 0px 5px;
+}
+
+.compact-refresh-btn {
+  min-width: 24px !important;
+  height: 28px !important;
+  padding: 2px 4px !important;
+  border: 1px solid var(--o2-border-color) !important;
+  border-radius: 4px !important;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.active-refresh-btn {
+  background-color: var(--q-primary) !important;
+  border-color: var(--q-primary) !important;
+}
+
+.active-refresh-btn:hover {
+  background-color: var(--q-primary) !important;
+  opacity: 0.9;
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+:deep(.rotating-icon) {
+  animation: rotate 2s linear infinite !important;
+  transform-origin: center center !important;
+  display: inline-block !important;
+}
+
+.rotating-icon {
+  animation: rotate 2s linear infinite !important;
+  transform-origin: center center !important;
+  display: inline-block !important;
 }
 </style>
