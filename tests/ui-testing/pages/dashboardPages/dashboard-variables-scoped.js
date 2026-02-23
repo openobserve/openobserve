@@ -127,11 +127,11 @@ export default class DashboardVariablesScoped {
 
     await varDropdown.click();
 
-    // Wait for dropdown menu to open
-    await this.page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout });
+    // Wait for dropdown menu to open - use last() to target the most recently opened menu
+    await this.page.locator(SELECTORS.MENU).last().waitFor({ state: "visible", timeout });
 
-    // Wait for options to populate with retry logic
-    const targetOption = this.page.locator(SELECTORS.OPTION).nth(optionIndex);
+    // Scope option selector to the visible menu to avoid matching stale/hidden options elsewhere on page
+    const targetOption = this.page.locator(SELECTORS.MENU).last().locator(SELECTORS.OPTION).nth(optionIndex);
     const optionTimeout = Math.max(timeout, 15000); // At least 15s for options under load
 
     // Retry mechanism: if option not visible, reopen dropdown
@@ -144,7 +144,7 @@ export default class DashboardVariablesScoped {
       await this.waitForMenuHidden({ timeout: 3000 });
       await this.page.waitForTimeout(500); // Brief pause
       await varDropdown.click();
-      await this.page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout });
+      await this.page.locator(SELECTORS.MENU).last().waitFor({ state: "visible", timeout });
       await targetOption.waitFor({ state: "visible", timeout: optionTimeout });
     }
 

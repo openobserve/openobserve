@@ -480,7 +480,10 @@ test.describe(
 
       // Cancel the edit form, go back to variable list
       await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
+      // Wait for edit form to close (save button hidden indicates form is gone)
+      await page.locator(SELECTORS.VARIABLE_SAVE_BTN).waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
+      await page.waitForTimeout(1000); // Extra stabilization for form reset
       await page
         .locator(SELECTORS.ADD_VARIABLE_BTN)
         .waitFor({ state: "visible", timeout: 10000 });
@@ -489,6 +492,8 @@ test.describe(
       // Change env from Constant to Query Values with stream=$pod
       await scopedVars.editVariable("env");
       await scopedVars.changeVariableType("Query Values");
+      // Wait for Query Values form fields to render after type change
+      await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).waitFor({ state: "visible", timeout: 10000 });
       await selectStreamType(page, "logs");
       await scopedVars.selectStream("$pod");
       await scopedVars.selectField("$region");
@@ -499,6 +504,7 @@ test.describe(
 
       // Cancel the edit form before cleanup
       await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
+      await page.locator(SELECTORS.VARIABLE_SAVE_BTN).waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
       // Cleanup
@@ -590,6 +596,10 @@ test.describe(
       await scopedVars.waitForVariableSelectorVisible("streamChild", { timeout: 40000 });
       await scopedVars.waitForVariableSelectorVisible("fieldChild", { timeout: 40000 });
 
+      // Allow all initial variable API calls to complete before cascade testing
+      await safeWaitForNetworkIdle(page, { timeout: 10000 });
+      await page.waitForTimeout(2000);
+
       // --- G3: Verify all variables are visible and loaded on dashboard ---
       await expect(page.locator(getVariableSelector("streamName"))).toBeVisible();
       await expect(page.locator(getVariableSelector("streamChild"))).toBeVisible();
@@ -603,12 +613,12 @@ test.describe(
       // resolved stream "default". Match on stream to avoid false positives.
       const streamMonitor = monitorVariableAPICalls(page, {
         expectedCount: 1,
-        timeout: 30000, // Increased from 15s to 30s 
+        timeout: 45000, // Increased for CI/CD stability
         matchFn: (call) =>
           call.url.includes("/_values_stream") &&
           (call.url.includes("/default/_values_stream") || call.stream === "default"),
       });
-      await scopedVars.changeVariableValue("streamName", { optionIndex: 1, timeout: 20000 });
+      await scopedVars.changeVariableValue("streamName", { optionIndex: 1, timeout: 25000 });
       const streamResult = await streamMonitor;
 
       expect(streamResult.matchedCount).toBeGreaterThanOrEqual(1);
@@ -624,7 +634,7 @@ test.describe(
       // ignoring any stale streamChild calls from G1.
       const fieldMonitor = monitorVariableAPICalls(page, {
         expectedCount: 1,
-        timeout: 30000, // Increased from 15s to 30s 
+        timeout: 45000, // Increased for CI/CD stability
         matchFn: (call) =>
           call.url.includes("/_values_stream") &&
           (call.url.includes("e2e_automate") ||
@@ -632,7 +642,7 @@ test.describe(
             call.url.includes("kubernetes_container_name") ||
             (call.field && call.field.includes("kubernetes_container_name"))),
       });
-      await scopedVars.changeVariableValue("fieldName", { optionIndex: 1, timeout: 20000 });
+      await scopedVars.changeVariableValue("fieldName", { optionIndex: 1, timeout: 25000 });
       const fieldResult = await fieldMonitor;
 
       expect(fieldResult.matchedCount).toBeGreaterThanOrEqual(1);
