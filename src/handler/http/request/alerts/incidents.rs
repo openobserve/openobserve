@@ -221,8 +221,13 @@ pub async fn update_incident(
                 return MetaHttpResponse::bad_request("Title cannot exceed 255 characters");
             }
 
-            match crate::service::alerts::incidents::update_title(&org_id, &incident_id, &title)
-                .await
+            match crate::service::alerts::incidents::update_title(
+                &org_id,
+                &incident_id,
+                &title,
+                &user_id,
+            )
+            .await
             {
                 Ok(incident) => MetaHttpResponse::json(incident),
                 Err(e) => {
@@ -479,6 +484,13 @@ pub async fn post_incident_comment(
     Json(body): Json<CommentRequest>,
 ) -> Response {
     use config::meta::alerts::incidents::IncidentEvent;
+
+    if body.comment.trim().is_empty() {
+        return MetaHttpResponse::bad_request("Comment cannot be blank");
+    }
+    if body.comment.len() > 10_000 {
+        return MetaHttpResponse::bad_request("Comment must be 10,000 characters or fewer");
+    }
 
     let event = IncidentEvent::comment(user_email.user_id, body.comment);
 

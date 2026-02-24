@@ -522,7 +522,15 @@ pub enum IncidentEventType {
     /// Correlation key strength upgraded (e.g. Workload -> Scope)
     DimensionsUpgraded { from_key: String, to_key: String },
 
+    /// Incident title edited by user
+    TitleChanged {
+        from: String,
+        to: String,
+        user_id: String,
+    },
+
     /// Incident assigned/unassigned
+    /// TODO: service-layer emission is not yet implemented; wired up on the frontend.
     AssignmentChanged {
         from: Option<String>,
         to: Option<String>,
@@ -614,6 +622,18 @@ impl IncidentEvent {
         })
     }
 
+    pub fn title_changed(
+        from: impl Into<String>,
+        to: impl Into<String>,
+        user_id: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::TitleChanged {
+            from: from.into(),
+            to: to.into(),
+            user_id: user_id.into(),
+        })
+    }
+
     pub fn comment(user_id: impl Into<String>, comment: impl Into<String>) -> Self {
         Self::now(IncidentEventType::Comment {
             user_id: user_id.into(),
@@ -638,14 +658,14 @@ impl IncidentEvent {
             last_at,
             ..
         } = &mut self.event_type
+            && id == alert_id
         {
-            if id == alert_id {
-                *count += 1;
-                *last_at = triggered_at;
-                self.timestamp = chrono::Utc::now().timestamp_micros();
-                return true;
-            }
+            *count += 1;
+            *last_at = triggered_at;
+            self.timestamp = chrono::Utc::now().timestamp_micros();
+            return true;
         }
+
         false
     }
 
@@ -718,6 +738,30 @@ mod tests {
         println!("Comment: {json}");
         let roundtrip: IncidentEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(roundtrip.timestamp, 3000000);
+    }
+
+    #[test]
+    fn test_incident_event_serde_title_changed() {
+        let event = IncidentEvent {
+            timestamp: 4000000,
+            event_type: IncidentEventType::TitleChanged {
+                from: "Old Title".into(),
+                to: "New Title".into(),
+                user_id: "user@test.com".into(),
+            },
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        println!("TitleChanged: {json}");
+        assert!(json.contains("\"type\":\"TitleChanged\""));
+        assert!(json.contains("\"from\":\"Old Title\""));
+        assert!(json.contains("\"to\":\"New Title\""));
+        let roundtrip: IncidentEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip.timestamp, 4000000);
+        assert!(matches!(
+            roundtrip.event_type,
+            IncidentEventType::TitleChanged { ref from, ref to, .. }
+            if from == "Old Title" && to == "New Title"
+        ));
     }
 
     #[test]

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::alerts::incidents::IncidentEvent;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
@@ -62,12 +62,12 @@ pub async fn append(
     event: IncidentEvent,
 ) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let txn = db.begin().await?;
 
-    // Read current events
     let row = incident_events::Entity::find()
         .filter(incident_events::Column::OrgId.eq(org_id))
         .filter(incident_events::Column::IncidentId.eq(incident_id))
-        .one(db)
+        .one(&txn)
         .await?;
 
     match row {
@@ -78,7 +78,7 @@ pub async fn append(
 
             let mut active: incident_events::ActiveModel = model.into();
             active.events = Set(serde_json::to_value(events).unwrap_or_default());
-            active.update(db).await?;
+            active.update(&txn).await?;
         }
         None => {
             // Row doesn't exist yet (incident created before events table)
@@ -88,9 +88,11 @@ pub async fn append(
                 incident_id: Set(incident_id.to_string()),
                 events: Set(events_json),
             };
-            model.insert(db).await?;
+            model.insert(&txn).await?;
         }
     }
+
+    txn.commit().await?;
     Ok(())
 }
 
@@ -105,11 +107,12 @@ pub async fn record_alert(
     triggered_at: i64,
 ) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let txn = db.begin().await?;
 
     let row = incident_events::Entity::find()
         .filter(incident_events::Column::OrgId.eq(org_id))
         .filter(incident_events::Column::IncidentId.eq(incident_id))
-        .one(db)
+        .one(&txn)
         .await?;
 
     match row {
@@ -129,7 +132,7 @@ pub async fn record_alert(
 
             let mut active: incident_events::ActiveModel = model.into();
             active.events = Set(serde_json::to_value(events).unwrap_or_default());
-            active.update(db).await?;
+            active.update(&txn).await?;
         }
         None => {
             // Row doesn't exist yet
@@ -139,19 +142,10 @@ pub async fn record_alert(
                 incident_id: Set(incident_id.to_string()),
                 events: Set(serde_json::to_value(events).unwrap_or_default()),
             };
-            model.insert(db).await?;
+            model.insert(&txn).await?;
         }
     }
-    Ok(())
-}
 
-/// Delete events row for an incident (used when incident is deleted)
-pub async fn delete(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    incident_events::Entity::delete_many()
-        .filter(incident_events::Column::OrgId.eq(org_id))
-        .filter(incident_events::Column::IncidentId.eq(incident_id))
-        .exec(db)
-        .await?;
+    txn.commit().await?;
     Ok(())
 }
