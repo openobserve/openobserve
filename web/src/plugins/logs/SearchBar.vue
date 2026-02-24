@@ -105,10 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <!-- moved to dropdown if ai chat is enabled -->
+        <!-- histogram toggle - always visible -->
         <div
           class="toolbar-toggle-container element-box-shadow"
-          v-if="!store.state.isAiChatEnabled"
         >
           <q-toggle
             data-test="logs-search-bar-show-histogram-toggle-btn"
@@ -153,319 +152,33 @@ alt="SQL Mode" class="toolbar-icon" />
             </q-tooltip>
           </q-toggle>
         </div>
-        <!-- Explain Query Button -->
-        <q-btn
-          v-if="!store.state.isAiChatEnabled && searchObj.meta.sqlMode"
-          data-test="logs-search-bar-explain-query-btn"
-          no-caps
-          flat
-          dense
-          icon="lightbulb"
-          class="toolbar-reset-btn"
-          :disable="!searchObj.data.query || searchObj.data.query.trim() === ''"
-          @click="openExplainDialog"
+        <!-- quick mode toggle - always visible -->
+        <div
+          class="toolbar-toggle-container element-box-shadow"
         >
-          <q-tooltip>
-            {{ t("search.explainTooltip") }}
-          </q-tooltip>
-        </q-btn>
-        <!-- moved to dropdown if ai chat is enabled -->
-        <q-btn
-          v-if="!store.state.isAiChatEnabled"
-          data-test="logs-search-bar-reset-filters-btn"
-          no-caps
-          flat
-          dense
-          icon="restart_alt"
-          class="toolbar-reset-btn element-box-shadow"
-          @click="resetFilters"
-        >
-          <q-tooltip>
-            {{ t("search.resetFilters") }}
-          </q-tooltip>
-        </q-btn>
-        <!-- moved to dropdown if ai chat is enabled -->
-        <syntax-guide
-          v-if="!store.state.isAiChatEnabled"
-          data-test="logs-search-bar-sql-mode-toggle-btn"
-          :sqlmode="searchObj.meta.sqlMode"
-          class="syntax-guide-in-toolbar element-box-shadow"
-        >
-        </syntax-guide>
-        <q-btn-group class="q-ml-xs q-pa-none element-box-shadow el-border">
-          <q-btn-dropdown
-            data-test="logs-search-saved-views-btn"
-            v-model="savedViewDropdownModel"
-            @click="fnSavedView"
-            @show="loadSavedView"
-            split
-            icon="save"
-            icon-right="saved_search"
-            class="saved-views-dropdown no-border"
-            content-class="saved-views-dropdown-menu"
+          <q-toggle
+            data-test="logs-search-bar-quick-mode-toggle-btn"
+            v-model="searchObj.meta.quickMode"
+            @click="handleQuickMode"
+            class="o2-toggle-button-xs"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
           >
-            <q-list
-              :style="
-                localSavedViews.length > 0 ? 'width: 500px' : 'width: 250px'
-              "
-              data-test="logs-search-saved-view-list"
-            >
-              <q-item style="padding: 0px 0px 0px 0px">
-                <q-item-section
-                  class="column"
-                  no-hover
-                  style="width: 60%; border-right: 1px solid lightgray"
-                >
-                  <q-table
-                    data-test="log-search-saved-view-list-fields-table"
-                    :visible-columns="['view_name']"
-                    :rows="searchObj.data.savedViews"
-                    :row-key="(row) => 'saved_view_' + row.view_id"
-                    :filter="searchObj.data.savedViewFilterFields"
-                    :filter-method="filterSavedViewFn"
-                    :pagination="{ rowsPerPage }"
-                    hide-header
-                    :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-                    class="saved-view-table full-height"
-                    no-hover
-                    id="savedViewList"
-                    :rows-per-page-options="[]"
-                    :hide-bottom="
-                      searchObj.data.savedViews.length <= rowsPerPage ||
-                      searchObj.data.savedViews.length == 0
-                    "
-                  >
-                    <template #top-right>
-                      <div class="full-width">
-                        <q-input
-                          data-test="log-search-saved-view-field-search-input"
-                          v-model="searchObj.data.savedViewFilterFields"
-                          data-cy="index-field-search-input"
-                          borderless
-                          dense
-                          clearable
-                          debounce="1"
-                          class="tw:mx-2 tw:my-2"
-                          :placeholder="t('search.searchSavedView')"
-                        >
-                          <template #prepend>
-                            <q-icon name="search"  />
-                          </template>
-                        </q-input>
-                      </div>
-                      <div
-                        v-if="searchObj.loadingSavedView == true"
-                        class="full-width float-left"
-                      >
-                        <div class="text-subtitle2 text-weight-bold float-left">
-                          <q-spinner-hourglass size="20px" />
-                          {{ t("confirmDialog.loading") }}
-                        </div>
-                      </div>
-                      <q-tr>
-                        <q-td
-                          v-if="
-                            searchObj.data.savedViews.length == 0 &&
-                            searchObj.loadingSavedView == false
-                          "
-                        >
-                          <q-item-label class="q-pl-sm q-pt-sm">{{
-                            t("search.savedViewsNotFound")
-                          }}</q-item-label>
-                        </q-td>
-                      </q-tr>
-                    </template>
-                    <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props"
-class="field_list" no-hover>
-                        <q-item
-                          class="q-pa-xs saved-view-item"
-                          clickable
-                          v-close-popup
-                        >
-                          <q-item-section
-                            @click.stop="applySavedView(props.row)"
-                            v-close-popup
-                            :title="props.row.view_name"
-                          >
-                            <q-item-label
-                              class="ellipsis"
-                              style="max-width: 140px"
-                              >{{ props.row.view_name }}</q-item-label
-                            >
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
-                            side
-                            @click.stop="
-                              handleFavoriteSavedView(
-                                props.row,
-                                favoriteViews.includes(props.row.view_id),
-                              )
-                            "
-                          >
-                            <q-btn
-                              :icon="
-                                favoriteViews.includes(props.row.view_id)
-                                  ? 'favorite'
-                                  : 'favorite_border'
-                              "
-                              :title="t('common.favourite')"
-                              class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-update-${props.row.view_name}-saved-view-btn`"
-                            side
-                            @click.stop="handleUpdateSavedView(props.row)"
-                          >
-                            <q-btn
-                              icon="edit"
-                              :title="t('common.edit')"
-                              class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
-                            side
-                            @click.stop="handleDeleteSavedView(props.row)"
-                          >
-                            <q-btn
-                              icon="delete"
-                              :title="t('common.delete')"
-                              class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
-                          </q-item-section>
-                        </q-item> </q-td
-                    ></template>
-                  </q-table>
-                </q-item-section>
-
-                <q-item-section
-                  class="column"
-                  style="width: 40%; margin-left: 0px"
-                  v-if="localSavedViews.length > 0"
-                >
-                  <q-table
-                    data-test="log-search-saved-view-favorite-list-fields-table"
-                    :visible-columns="['view_name']"
-                    :rows="localSavedViews"
-                    :row-key="(row) => 'favorite_saved_view_' + row.view_name"
-                    hide-header
-                    hide-bottom
-                    :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-                    class="saved-view-table full-height"
-                    id="savedViewFavoriteList"
-                    :rows-per-page-options="[0]"
-                  >
-                    <template #top-right>
-                      <q-item style="padding: 0px"
-                        ><q-item-label
-                          header
-                          class="q-pa-sm text-bold favorite-label"
-                          >{{ t("search.favoriteViews") }}</q-item-label
-                        ></q-item
-                      >
-                      <q-separator horizontal inset></q-separator>
-                    </template>
-                    <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list q-pa-xs">
-                        <q-item
-                          class="q-pa-xs saved-view-item"
-                          clickable
-                          v-close-popup
-                        >
-                          <q-item-section
-                            @click.stop="applySavedView(props.row)"
-                            v-close-popup
-                          >
-                            <q-item-label
-                              class="ellipsis"
-                              style="max-width: 90px"
-                              >{{ props.row.view_name }}</q-item-label
-                            >
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
-                            side
-                            @click.stop="
-                              handleFavoriteSavedView(
-                                props.row,
-                                favoriteViews.includes(props.row.view_id),
-                              )
-                            "
-                          >
-                            <q-icon
-                              :name="
-                                favoriteViews.includes(props.row.view_id)
-                                  ? 'favorite'
-                                  : 'favorite_border'
-                              "
-                              color="grey"
-                              size="xs"
-                            />
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-update-${props.row.view_name}-favorite-saved-view-btn`"
-                            side
-                            @click.stop="handleUpdateSavedView(props.row)"
-                          >
-                            <q-btn
-                              icon="edit"
-                              :title="t('common.edit')"
-                              class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-delete-${props.row.view_name}-favorite-saved-view-btn`"
-                            side
-                            @click.stop="handleDeleteSavedView(props.row)"
-                          >
-                            <q-btn
-                              icon="delete"
-                              :title="t('common.delete')"
-                              class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
-                          </q-item-section>
-                        </q-item> </q-td
-                    ></template>
-                  </q-table>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-          <q-tooltip>
-            {{ t("search.savedViewsLabel") }}
-          </q-tooltip>
-        </q-btn-group>
-        <!-- this is the button group responsible for showing all the utilities when ai chat is enabled -->
+            <img :src="quickModeIcon"
+alt="Quick Mode" class="toolbar-icon" />
+            <q-tooltip>
+              {{ t("search.quickModeLabel") }}
+            </q-tooltip>
+          </q-toggle>
+        </div>
+        <!-- this is the button group responsible for showing all the utilities -->
         <q-btn
-          v-if="store.state.isAiChatEnabled"
+          data-test="logs-search-bar-utilities-menu-btn"
           class="group-menu-btn element-box-shadow"
           no-caps
           menu-anchor="bottom left"
@@ -475,152 +188,6 @@ class="field_list" no-hover>
         >
           <q-menu>
             <q-list>
-              <!-- Histogram Toggle -->
-              <q-item
-                clickable
-                @click="
-                  searchObj.meta.showHistogram = !searchObj.meta.showHistogram
-                "
-                data-test="logs-search-bar-show-histogram-toggle-btn"
-                class="q-pa-sm saved-view-item"
-              >
-                <q-item-section>
-                  <q-item-label class="tw:flex tw:items-center">
-                    <div
-                      style="
-                        width: 28px;
-                        display: flex;
-                        align-items: center;
-                        margin-right: 12px;
-                      "
-                    >
-                      <q-toggle
-                        v-model="searchObj.meta.showHistogram"
-                        size="xs"
-                        flat
-                        class="o2-toggle-button-xs"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-toggle-button-xs-dark'
-                            : 'o2-toggle-button-xs-light'
-                        "
-                        @click.stop
-                      />
-                    </div>
-                    {{ t("search.showHistogramLabel") }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-
-              <q-separator />
-
-              <!-- Wrap Content Toggle -->
-              <q-item
-                clickable
-                @click="
-                  searchObj.meta.toggleSourceWrap =
-                    !searchObj.meta.toggleSourceWrap
-                "
-                data-test="logs-search-bar-wrap-table-content-toggle-btn"
-                class="q-pa-sm saved-view-item"
-              >
-                <q-item-section>
-                  <q-item-label class="tw:flex tw:items-center">
-                    <div
-                      style="
-                        width: 28px;
-                        display: flex;
-                        align-items: center;
-                        margin-right: 12px;
-                      "
-                    >
-                      <q-toggle
-                        v-model="searchObj.meta.toggleSourceWrap"
-                        size="xs"
-                        flat
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-toggle-button-xs-dark'
-                            : 'o2-toggle-button-xs-light'
-                        "
-                        class="o2-toggle-button-xs"
-                        @click.stop
-                      />
-                    </div>
-                    {{ t("search.wrapContent") }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-
-              <q-separator />
-
-              <!-- Quick Mode Toggle -->
-              <q-item
-                clickable
-                @click="
-                  searchObj.meta.quickMode = !searchObj.meta.quickMode;
-                  handleQuickMode();
-                "
-                data-test="logs-search-bar-quick-mode-toggle-btn"
-                class="q-pa-sm saved-view-item"
-              >
-                <q-item-section>
-                  <q-item-label class="tw:flex tw:items-center">
-                    <div
-                      style="
-                        width: 28px;
-                        display: flex;
-                        align-items: center;
-                        margin-right: 12px;
-                      "
-                    >
-                      <q-toggle
-                        v-model="searchObj.meta.quickMode"
-                        size="xs"
-                        flat
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-toggle-button-xs-dark'
-                            : 'o2-toggle-button-xs-light'
-                        "
-                        class="o2-toggle-button-xs"
-                        @click.stop="handleQuickMode"
-                      />
-                    </div>
-                    {{ t("search.quickModeLabel") }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-
-              <q-separator />
-
-              <!-- Syntax Guide -->
-              <q-item clickable class="q-pa-sm saved-view-item">
-                <q-item-section>
-                  <q-item-label class="tw:flex tw:items-center">
-                    <div
-                      style="
-                        width: 28px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        margin-right: 12px;
-                      "
-                    >
-                      <syntax-guide
-                        data-test="logs-search-bar-sql-mode-toggle-btn"
-                        :sqlmode="searchObj.meta.sqlMode"
-                        size="0.875rem"
-                        class="syntax-guide-in-menu"
-                      />
-                    </div>
-                    Syntax Guide
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-
-              <q-separator />
-
               <!-- Reset Filters -->
               <q-item
                 clickable
@@ -646,66 +213,86 @@ class="field_list" no-hover>
                   </q-item-label>
                 </q-item-section>
               </q-item>
+
+              <q-separator />
+
+              <!-- Syntax Guide -->
+              <q-item class="q-pa-sm saved-view-item">
+                <q-item-section>
+                  <q-item-label>
+                    <syntax-guide
+                      data-test="logs-search-bar-sql-mode-toggle-btn"
+                      :sqlmode="searchObj.meta.sqlMode"
+                      no-border
+                      :label="t('search.syntaxGuideLabel')"
+                    />
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <q-separator />
+
+              <!-- Create Saved View -->
+              <q-item
+                clickable
+                @click="fnSavedView"
+                data-test="logs-search-bar-create-saved-view-btn"
+                class="q-pa-sm saved-view-item"
+                v-close-popup
+              >
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-right: 8px;
+                        margin-left: 3px;
+                      "
+                    >
+                      <q-icon name="save" size="20px" />
+                    </div>
+                    {{ t("search.createSavedView") }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <q-separator />
+
+              <!-- List Saved Views -->
+              <q-item
+                clickable
+                @click="openSavedViewsList"
+                data-test="logs-search-bar-list-saved-views-btn"
+                class="q-pa-sm saved-view-item"
+                v-close-popup
+              >
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-right: 8px;
+                        margin-left: 3px;
+                      "
+                    >
+                      <q-icon name="saved_search" size="20px" />
+                    </div>
+                    {{ t("search.listSavedViews") }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
             </q-list>
           </q-menu>
         </q-btn>
-        <!-- moved to dropdown if ai chat is enabled -->
-        <div
-          class="toolbar-toggle-container element-box-shadow"
-          v-if="!store.state.isAiChatEnabled"
-        >
-          <q-toggle
-            data-test="logs-search-bar-quick-mode-toggle-btn"
-            v-model="searchObj.meta.quickMode"
-            @click="handleQuickMode"
-            class="o2-toggle-button-xs"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-          >
-            <img :src="quickModeIcon"
-alt="Quick Mode" class="toolbar-icon" />
-            <q-tooltip>
-              {{ t("search.quickModeLabel") }}
-            </q-tooltip>
-          </q-toggle>
-        </div>
       </div>
 
       <div class="float-right col-auto">
-        <!-- this is moved to dropdown if ai chat is enabled -->
-        <div
-          v-if="!store.state.isAiChatEnabled"
-          class="toolbar-toggle-container float-left"
-        >
-          <q-toggle
-            data-test="logs-search-bar-wrap-table-content-toggle-btn"
-            v-model="searchObj.meta.toggleSourceWrap"
-            class="o2-toggle-button-xs element-box-shadow"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-            :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
-          >
-            <q-icon name="wrap_text" class="toolbar-icon-in-toggle" />
-            <q-tooltip>
-              {{
-                searchObj.meta.logsVisualizeToggle === "visualize"
-                  ? t("search.notSupportedForVisualization")
-                  : t("search.messageWrapContent")
-              }}
-            </q-tooltip>
-          </q-toggle>
-        </div>
-
         <transform-selector
           v-if="isActionsEnabled"
           :function-options="functionOptions"
@@ -727,9 +314,10 @@ alt="Quick Mode" class="toolbar-icon" />
 
         <q-btn
           data-test="logs-search-bar-more-options-btn"
-          class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
+          class=" download-logs-btn q-px-sm element-box-shadow el-border "
+          style="padding: 0.25rem 0.25rem !important;"
+          icon="menu"
         >
-        <Menu size="1rem" />
           <q-menu>
             <q-list>
               <q-item
@@ -906,11 +494,11 @@ class="q-pr-sm q-pt-xs" />
               </q-item>
             </q-list>
           </q-menu>
-          <q-tooltip style="width: 80px">
+          <q-tooltip style="width: 110px">
             {{ t("search.moreActions") }}
           </q-tooltip>
         </q-btn>
-        <div class="float-left tw:mr-[-4px]">
+        <div class="float-left tw:mr-[4px]">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -935,16 +523,6 @@ class="q-pr-sm q-pt-xs" />
         </div>
         <div class="search-time float-left q-mr-xs">
           <div class="flex">
-            <auto-refresh-interval
-              class="q-mr-xs q-px-none logs-auto-refresh-interval"
-              v-model="searchObj.meta.refreshInterval"
-              :trigger="true"
-              :min-refresh-interval="
-                store.state?.zoConfig?.min_auto_refresh_interval ?? 0
-              "
-              @update:model-value="onRefreshIntervalUpdate"
-              @trigger="$emit('onAutoIntervalTrigger')"
-            />
             <q-btn-group
               class="q-pa-none q-mr-xs element-box-shadow el-border"
               v-if="
@@ -990,43 +568,40 @@ class="q-pr-sm q-pt-xs" />
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
+                :class="
+                  config.isEnterprise == 'true'
+                    ? 'search-button-enterprise-border-radius'
+                    : 'search-button-normal-border-radius'
+                "
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
-              <!-- Main action button: "Ask AI" when NL detected + AI bar not open, otherwise "Run Query" -->
               <q-btn
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
                   dense
                   flat
-                  :title="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t('search.generateQueryTooltip') : t('search.runQuery')"
-                  :disable="isGeneratingSQL || ((isNaturalLanguageDetected && !searchObj.meta.nlpMode) && !searchObj.data.stream.selectedStream.length)"
-                  class="q-pa-none tw:h-[30px]  element-box-shadow"
-                  :class="[
-                    (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
+                  :title="t('search.runQuery')"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
+                  :class="
                     config.isEnterprise == 'true'
                       ? 'search-button-enterprise-border-radius'
                       : 'search-button-normal-border-radius'
-                  ]"
-                  :color="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'primary' : undefined"
+                  "
                   no-caps
-                  @click="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? handleGenerateSQLQuery() : handleRunQueryFn()"
-                  >
-                  {{ (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t("search.generateQuery") : t("search.runQuery") }}
-                </q-btn
+                  @click="handleRunQueryFn"
+                  >{{ t("search.runQuery") }}</q-btn
                 >
-              <q-separator v-if="visualizeSearchRequestTraceIds.length === 0" class="tw:h-[29px] tw:w-[1px]" />
+              <q-separator class="tw:h-[29px] tw:w-[1px]" />
               <q-btn-dropdown
-                v-if="visualizeSearchRequestTraceIds.length === 0"
                 flat
                 class="tw:h-[29px] search-button-dropdown"
                 :class="[
-                  (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-dropdown-button' : '',
-                  !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) && config.isEnterprise == 'true' &&
+                  config.isEnterprise == 'true' &&
                   visualizeSearchRequestTraceIds.length
                     ? 'o2-color-cancel'
-                    : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-color-primary' : '',
+                    : 'o2-color-primary',
                   config.isEnterprise == 'true'
                     ? 'search-button-dropdown-enterprise-border-radius'
                     : 'search-button-normal-border-radius',
@@ -1034,122 +609,43 @@ class="q-pr-sm q-pt-xs" />
                 unelevated
                 dense
               >
-                <!-- Normal mode or AI bar open: Refresh option -->
-                <template v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)">
-                  <q-btn
-                    data-test="logs-search-bar-refresh-btn"
-                    data-cy="search-bar-visuzlie-hard-refresh-button"
-                    dense
-                    flat
-                    no-caps
-                    :title="t('search.refreshCacheAndRunQuery')"
-                    class="q-pa-sm search-button-dropdown tw:text-[12px]"
-                    v-close-popup
-                    @click="handleRunQueryFn(true)"
-                    :disable="
-                      config.isEnterprise == 'true' &&
-                      !!visualizeSearchRequestTraceIds.length
-                    "
-                  >
-                    <q-icon name="refresh" class="q-mr-xs" />
-                    {{ t("search.refreshCacheAndRunQuery") }}
-                  </q-btn>
-                </template>
-
-                <!-- NLP Mode: No additional options -->
-                <template v-else>
-                  <q-list class="tw:min-w-[140px] tw:p-2">
-                    <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
-                      {{ t('nlMode.noAdditionalOptions') }}
-                    </q-item-label>
-                  </q-list>
-                </template>
+                <q-btn
+                  data-test="logs-search-bar-refresh-btn"
+                  data-cy="search-bar-visuzlie-hard-refresh-button"
+                  dense
+                  flat
+                  no-caps
+                  :title="t('search.refreshCacheAndRunQuery')"
+                  class="q-pa-sm search-button-dropdown tw:text-[12px]"
+                  v-close-popup
+                  @click="handleRunQueryFn(true)"
+                  :disable="
+                    config.isEnterprise == 'true' &&
+                    !!visualizeSearchRequestTraceIds.length
+                  "
+                >
+                  <q-icon name="refresh" class="q-mr-xs" />
+                  {{ t("search.refreshCacheAndRunQuery") }}</q-btn
+                >
               </q-btn-dropdown>
               </div>
               <div v-else class="tw:flex">
-                <!-- Cancel button when query is running -->
                 <q-btn
-                v-if="
-                  visualizeSearchRequestTraceIds.length > 0
-                "
-                data-test="logs-search-bar-visualize-cancel-btn"
-                dense
-                flat
-                :title="t('search.cancel')"
-                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
-                @click="cancelVisualizeQueries"
-                >{{ t("search.cancel") }}</q-btn
-              >
-                <!-- Main action button -->
-                <q-btn
-                  v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
                   dense
                   flat
-                  :title="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t('search.generateQueryTooltip') : t('search.runQuery')"
-                  :disable="disable || isGeneratingSQL || ((isNaturalLanguageDetected && !searchObj.meta.nlpMode) && !searchObj.data.stream.selectedStream.length)"
-                  class="q-pa-none tw:h-[30px]  element-box-shadow"
-                  :class="[
-                    (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
+                  :title="t('search.runQuery')"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
+                  :class="
                     config.isEnterprise == 'true'
                       ? 'search-button-enterprise-border-radius'
                       : 'search-button-normal-border-radius'
-                  ]"
-                  :color="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'primary' : undefined"
+                  "
                   no-caps
-                  @click="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? handleGenerateSQLQuery() : handleRunQueryFn()"
-                  >
-                  {{ (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t("search.generateQuery") : t("search.runQuery") }}
-                </q-btn>
-                <q-separator v-if="visualizeSearchRequestTraceIds.length === 0" class="tw:h-[29px] tw:w-[1px]" />
-                <q-btn-dropdown
-                  v-if="visualizeSearchRequestTraceIds.length === 0"
-                  flat
-                  class="tw:h-[29px] search-button-dropdown"
-                  :class="[
-                    (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-dropdown-button' : '',
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) && config.isEnterprise == 'true' &&
-                    visualizeSearchRequestTraceIds.length
-                      ? 'o2-color-cancel'
-                      : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-color-primary' : '',
-                    config.isEnterprise == 'true'
-                      ? 'search-button-dropdown-enterprise-border-radius'
-                      : 'search-button-normal-border-radius',
-                  ]"
-                  unelevated
-                  dense
+                  @click="handleRunQueryFn"
+                  :disable="disable"
+                  >{{ t("search.runQuery") }}</q-btn
                 >
-                  <!-- Normal mode or AI bar open: Refresh option -->
-                  <template v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)">
-                    <q-btn
-                      data-test="logs-search-bar-refresh-btn"
-                      data-cy="search-bar-visuzlie-hard-refresh-button"
-                      dense
-                      flat
-                      no-caps
-                      :title="t('search.refreshCacheAndRunQuery')"
-                      class="q-pa-sm search-button-dropdown tw:text-[12px]"
-                      v-close-popup
-                      @click="handleRunQueryFn(true)"
-                      :disable="
-                        config.isEnterprise == 'true' &&
-                        !!visualizeSearchRequestTraceIds.length
-                      "
-                    >
-                      <q-icon name="refresh" class="q-mr-xs" />
-                      {{ t("search.refreshCacheAndRunQuery") }}
-                    </q-btn>
-                  </template>
-
-                  <!-- NL detected, AI bar not open: No additional options -->
-                  <template v-else>
-                    <q-list class="tw:min-w-[140px] tw:p-2">
-                      <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
-                        {{ t('nlMode.noAdditionalOptions') }}
-                      </q-item-label>
-                    </q-list>
-                  </template>
-                </q-btn-dropdown>
               </div>
             </div>
             <div v-else class="tw:flex">
@@ -1170,51 +666,34 @@ class="q-pr-sm q-pt-xs" />
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
-              <!-- Main action button: "Ask AI" when NL detected but AI bar not open, otherwise "Run Query" -->
               <q-btn
                 v-else
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                :title="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t('search.generateQueryTooltip') : t('search.runQuery')"
-                class="q-pa-none tw:h-[30px] element-box-shadow"
-                :class="[
-                  (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
-                  config.isEnterprise == 'true'
-                    ? 'search-button-enterprise-border-radius'
-                    : 'search-button-normal-border-radius'
-                ]"
-                :color="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'primary' : undefined"
+                :title="t('search.runQuery')"
+                class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 no-caps
-                @click="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? handleGenerateSQLQuery() : handleRunQueryFn()"
+                @click="handleRunQueryFn"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disable="
                   searchObj.loading == true ||
-                  searchObj.loadingHistogram == true ||
-                  isGeneratingSQL ||
-                  ((isNaturalLanguageDetected && !searchObj.meta.nlpMode) && !searchObj.data.stream.selectedStream.length)
+                  searchObj.loadingHistogram == true
                 "
-                >
-                {{ (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t("search.generateQuery") : t("search.runQuery") }}
-              </q-btn>
-              <!-- Dropdown: "Ask AI" state only when NL detected + AI bar not open -->
-              <q-separator v-if="config.isEnterprise == 'true'" class="tw:h-[29px] tw:w-[1px]" />
-              <q-btn-dropdown
-                v-if="config.isEnterprise == 'true'"
-                flat
-                class="tw:h-[29px] search-button-dropdown"
+                >{{ t("search.runQuery") }}</q-btn
+              >
+               <q-separator  class="tw:h-[29px] tw:w-[1px]" />
+              <q-btn-dropdown v-if="config.isEnterprise == 'true'" flat class="tw:h-[29px]"
                 :class="[
-                (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-dropdown-button' : '',
-                !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) && config.isEnterprise == 'true' &&
+                config.isEnterprise == 'true' &&
                     (!!searchObj.data.searchRequestTraceIds.length ||
                       !!searchObj.data.searchWebSocketTraceIds.length) &&
                     (searchObj.loading == true ||
-                      searchObj.loadingHistogram == true) ? 'o2-color-cancel' : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-color-primary' : '',
+                      searchObj.loadingHistogram == true) ? 'o2-color-cancel' : 'o2-color-primary',
                 config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
                 ]"
-              unelevated dense >
-                  <!-- SQL Mode / AI bar open: Refresh option -->
-                  <template v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)">
+               unelevated dense >
                     <q-btn
                       data-test="logs-search-bar-refresh-btn"
                       data-cy="search-bar-refresh-button"
@@ -1231,18 +710,20 @@ class="q-pr-sm q-pt-xs" />
                       "
                       >
                       <q-icon name="refresh" class="q-mr-xs" />
-                      {{ t("search.refreshCacheAndRunQuery") }}
-                    </q-btn>
-                  </template>
-                  <!-- NL detected, AI bar not open: Empty menu -->
-                  <template v-else>
-                    <q-list class="tw:min-w-[140px] tw:p-2">
-                      <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
-                        No additional options
-                      </q-item-label>
-                    </q-list>
-                  </template>
+                      {{ t("search.refreshCacheAndRunQuery") }}</q-btn>
               </q-btn-dropdown>
+              <!-- Compact Auto Refresh Button -->
+              <auto-refresh-interval
+                class="q-ml-xs"
+                v-model="searchObj.meta.refreshInterval"
+                :trigger="true"
+                :is-compact="true"
+                :min-refresh-interval="
+                  store.state?.zoConfig?.min_auto_refresh_interval ?? 0
+                "
+                @update:model-value="onRefreshIntervalUpdate"
+                @trigger="$emit('onAutoIntervalTrigger')"
+              />
             </div>
           </div>
         </div>
@@ -1265,23 +746,20 @@ class="q-pr-sm q-pt-xs" />
               class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
               :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw:ml-[0.375rem]' : 'tw:mx-[0.375rem]'"
             >
-              <!-- Unified Query Editor (with built-in AI bar) -->
-              <unified-query-editor
+              <code-query-editor
                 v-if="router.currentRoute.value.name === 'logs'"
+                data-test="logs-search-bar-query-editor"
+                editor-id="logsQueryEditor"
                 ref="queryEditorRef"
-                :query="searchObj.data.query"
+                class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
+                :style="editorWidthToggleFunction"
+                v-model:query="searchObj.data.query"
                 :keywords="autoCompleteKeywords"
                 :suggestions="autoCompleteSuggestions"
-                :debounce-time="100"
-                :nlp-mode="searchObj.meta.nlpMode"
-                :show-ai-icon="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                :disable-ai="!searchObj.data.stream.selectedStream.length || isSqlModeDisabled"
-                :disable-ai-reason="!searchObj.data.stream.selectedStream.length ? t('search.selectStreamForAI') : t('search.nlpModeDisabledForVisualization')"
-                data-test="logs-search-bar-query-editor"
-                data-test-prefix="logs-search-bar"
-                editor-height="100%"
-                @toggle-nlp-mode="handleToggleNlpMode"
-                :style="editorWidthToggleFunction"
+                :debounceTime="100"
+                @update:query="updateQueryValue"
+                @run-query="handleRunQueryFn"
+                @keydown="handleKeyDown"
                 :class="
                   searchObj.data.editorValue == '' &&
                   searchObj.meta.queryEditorPlaceholderFlag
@@ -1290,15 +768,8 @@ class="q-pr-sm q-pt-xs" />
                 "
                 language="sql"
                 :readOnly="searchObj.meta.logsVisualizeToggle === 'build' && searchObj.meta.buildModeQueryEditorDisabled"
-                @update:query="updateQueryValue"
-                @update:nlp-mode="(val) => searchObj.meta.nlpMode = val"
-                @run-query="handleRunQueryFn"
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
-                @nlp-detected="handleNlpModeDetected"
-                @generation-start="handleGenerationStart"
-                @generation-end="handleGenerationEnd"
-                @generation-success="handleGenerationSuccess"
               />
               <!-- Mode Toggle for Build Mode -->
               <div
@@ -1332,42 +803,30 @@ class="q-pr-sm q-pt-xs" />
               <template v-if="showFunctionEditor">
                 <div class="tw:relative tw:h-full tw:w-full">
                   <div
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mr-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:h-full"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mr-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full"
                   >
-                    <!-- Unified Query Editor (with built-in AI bar) -->
-                    <unified-query-editor
+                    <code-query-editor
                       v-if="router.currentRoute.value.name === 'logs'"
                       data-test="logs-vrl-function-editor"
                       ref="fnEditorRef"
-                      :languages="['vrl']"
-                      :default-language="'vrl'"
-                      :query="searchObj.data.tempFunctionContent"
-                      :hide-nl-toggle="false"
-                      :disable-ai="isVrlEditorDisabled"
-                      :disable-ai-reason="isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''"
-                      :ai-placeholder="t('search.askAIFunctionPlaceholder')"
-                      :ai-tooltip="t('search.enterFunctionPrompt')"
-                      :read-only="isVrlEditorDisabled"
-                      editor-height="100%"
-                      class="monaco-editor"
+                      editor-id="fnEditor"
+                      class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
+                      v-model:query="searchObj.data.tempFunctionContent"
                       :class="
                         searchObj.data.tempFunctionContent == '' &&
                         searchObj.meta.functionEditorPlaceholderFlag
                           ? 'empty-function'
                           : ''
                       "
-                      @update:query="searchObj.data.tempFunctionContent = $event"
+                      :readOnly="isVrlEditorDisabled"
                       @keydown="handleKeyDown"
+                      language="vrl"
                       @focus="
                         searchObj.meta.functionEditorPlaceholderFlag = false
                       "
                       @blur="
                         searchObj.meta.functionEditorPlaceholderFlag = true
                       "
-                      @toggle-nlp-mode="handleFunctionEditorToggleNlpMode"
-                      @generation-start="handleFunctionEditorGenerationStart"
-                      @generation-end="handleFunctionEditorGenerationEnd"
-                      @generation-success="handleFunctionEditorGenerationSuccess"
                     />
                     <!-- VRL disabled warning for non-table charts -->
                     <div
@@ -1421,9 +880,9 @@ class="q-pr-sm q-pt-xs" />
         dense
         size="10px"
         round
+        color="primary"
         @click="isFocused = !isFocused"
-        :class="searchObj.meta.showTransformEditor ? 'tw:right-[2.1rem]!' : 'tw:right-[2.4rem]!'"
-        class="q-pa-xs tw:absolute! tw:top-[6.5rem]! tw:z-50 fullscreen-hover-btn"
+        class="q-pa-xs tw:absolute! tw:top-[3.3rem]! tw:right-[1.2rem]! tw:z-50"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />
@@ -1824,6 +1283,261 @@ class="q-pr-sm q-pt-xs" />
       v-model="showExplainDialog"
       :searchObj="searchObj"
     />
+
+    <!-- Saved Views List Dialog -->
+    <q-dialog v-model="savedViewsListDialog" data-test="saved-views-list-dialog">
+      <q-card :style="localSavedViews.length > 0 ? 'width: 600px; max-width: 80vw' : 'width: 350px; max-width: 80vw'">
+        <q-card-section class="row items-center q-pb-none q-pa-md">
+          <div class="text-h6">{{ t("search.savedViewsLabel") }}</div>
+          <q-space />
+          <q-btn icon="cancel" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-section class="q-pt-md">
+          <q-list data-test="logs-search-saved-view-list">
+            <q-item style="padding: 0px 0px 0px 0px">
+              <q-item-section
+                class="column"
+                no-hover
+                :style="localSavedViews.length > 0 ? 'width: 60%; border-right: 1px solid lightgray' : 'width: 100%'"
+              >
+                <q-table
+                  data-test="log-search-saved-view-list-fields-table"
+                  :visible-columns="['view_name']"
+                  :rows="searchObj.data.savedViews"
+                  :row-key="(row) => 'saved_view_' + row.view_id"
+                  :filter="searchObj.data.savedViewFilterFields"
+                  :filter-method="filterSavedViewFn"
+                  :pagination="{ rowsPerPage }"
+                  hide-header
+                  :wrap-cells="searchObj.meta.resultGrid.wrapCells"
+                  class="saved-view-table full-height"
+                  no-hover
+                  :rows-per-page-options="[]"
+                  style="min-height: 420px; height: 420px;"
+                  :hide-bottom="searchObj.data.savedViews.length == 0"
+                >
+                  <template #top>
+                    <div class="full-width">
+                      <q-input
+                        data-test="log-search-saved-view-field-search-input"
+                        v-model="searchObj.data.savedViewFilterFields"
+                        borderless
+                        dense
+                        clearable
+                        debounce="300"
+                        class="tw:mx-2 tw:my-2"
+                        :placeholder="t('search.searchSavedView')"
+                      >
+                        <template #prepend>
+                          <q-icon name="search"  />
+                        </template>
+                      </q-input>
+                    </div>
+                    <div
+                      v-if="searchObj.loadingSavedView == true"
+                      class="full-width q-pa-sm"
+                    >
+                      <div class="text-subtitle2 text-weight-bold">
+                        <q-spinner-hourglass size="20px" />
+                        {{ t("confirmDialog.loading") }}
+                      </div>
+                    </div>
+                  </template>
+                  <template v-slot:no-data>
+                    <div
+                      v-if="searchObj.loadingSavedView == false"
+                      class="text-center q-pa-sm tw:w-full"
+                    >
+                      <q-item-label>{{
+                        t("search.savedViewsNotFound")
+                      }}</q-item-label>
+                    </div>
+                  </template>
+                  <template v-slot:body-cell-view_name="props">
+                    <q-td :props="props" class="field_list" no-hover>
+                      <q-item
+                        class="q-pa-xs saved-view-item"
+                        clickable
+                      >
+                        <q-item-section
+                          @click.stop="applySavedView(props.row); savedViewsListDialog = false"
+                          :title="props.row.view_name"
+                        >
+                          <q-item-label
+                            class="ellipsis"
+                            style="max-width: 140px"
+                            >{{ props.row.view_name }}</q-item-label
+                          >
+                        </q-item-section>
+                        <q-item-section
+                          :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
+                          side
+                          @click.stop="
+                            handleFavoriteSavedView(
+                              props.row,
+                              favoriteViews.includes(props.row.view_id),
+                            )
+                          "
+                        >
+                          <q-btn
+                            :icon="
+                              favoriteViews.includes(props.row.view_id)
+                                ? 'favorite'
+                                : 'favorite_border'
+                            "
+                            :title="t('common.favourite')"
+                            class="logs-saved-view-icon"
+                            padding="xs"
+                            unelevated
+                            size="xs"
+                            round
+                            flat
+                          ></q-btn>
+                        </q-item-section>
+                        <q-item-section
+                          :data-test="`logs-search-bar-update-${props.row.view_name}-saved-view-btn`"
+                          side
+                          @click.stop="handleUpdateSavedView(props.row)"
+                        >
+                          <q-btn
+                            icon="edit"
+                            :title="t('common.edit')"
+                            class="logs-saved-view-icon"
+                            padding="xs"
+                            unelevated
+                            size="xs"
+                            round
+                            flat
+                          ></q-btn>
+                        </q-item-section>
+                        <q-item-section
+                          :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
+                          side
+                          @click.stop="handleDeleteSavedView(props.row)"
+                        >
+                          <q-btn
+                            icon="delete"
+                            :title="t('common.delete')"
+                            class="logs-saved-view-icon"
+                            padding="xs"
+                            unelevated
+                            size="xs"
+                            round
+                            flat
+                          ></q-btn>
+                        </q-item-section>
+                      </q-item>
+                    </q-td>
+                  </template>
+                </q-table>
+              </q-item-section>
+
+              <q-item-section
+                class="column"
+                style="width: 40%; margin-left: 0px"
+                v-if="localSavedViews.length > 0"
+              >
+                <q-table
+                  data-test="log-search-saved-view-favorite-list-fields-table"
+                  :visible-columns="['view_name']"
+                  :rows="localSavedViews"
+                  :row-key="(row) => 'favorite_saved_view_' + row.view_name"
+                  hide-header
+                  :wrap-cells="searchObj.meta.resultGrid.wrapCells"
+                  class="saved-view-table full-height"
+                  :rows-per-page-options="[]"
+                  :hide-bottom="true"
+                >
+                  <template #top-right>
+                    <q-item style="padding: 0px"
+                      ><q-item-label
+                        header
+                        class="q-pa-sm text-bold favorite-label"
+                        >{{ t("search.favoriteViews") }}</q-item-label
+                      ></q-item
+                    >
+                    <q-separator horizontal inset></q-separator>
+                  </template>
+                  <template v-slot:body-cell-view_name="props">
+                    <q-td :props="props" class="field_list q-pa-xs">
+                      <q-item
+                        class="q-pa-xs saved-view-item"
+                        clickable
+                      >
+                        <q-item-section
+                          @click.stop="applySavedView(props.row); savedViewsListDialog = false"
+                        >
+                          <q-item-label
+                            class="ellipsis"
+                            style="max-width: 90px"
+                            >{{ props.row.view_name }}</q-item-label
+                          >
+                        </q-item-section>
+                        <q-item-section
+                          :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
+                          side
+                          @click.stop="
+                            handleFavoriteSavedView(
+                              props.row,
+                              favoriteViews.includes(props.row.view_id),
+                            )
+                          "
+                        >
+                          <q-icon
+                            :name="
+                              favoriteViews.includes(props.row.view_id)
+                                ? 'favorite'
+                                : 'favorite_border'
+                            "
+                            color="grey"
+                            size="xs"
+                          />
+                        </q-item-section>
+                        <q-item-section
+                          :data-test="`logs-search-bar-update-${props.row.view_name}-favorite-saved-view-btn`"
+                          side
+                          @click.stop="handleUpdateSavedView(props.row)"
+                        >
+                          <q-btn
+                            icon="edit"
+                            :title="t('common.edit')"
+                            class="logs-saved-view-icon"
+                            padding="xs"
+                            unelevated
+                            size="xs"
+                            round
+                            flat
+                          ></q-btn>
+                        </q-item-section>
+                        <q-item-section
+                          :data-test="`logs-search-bar-delete-${props.row.view_name}-favorite-saved-view-btn`"
+                          side
+                          @click.stop="handleDeleteSavedView(props.row)"
+                        >
+                          <q-btn
+                            icon="delete"
+                            :title="t('common.delete')"
+                            class="logs-saved-view-icon"
+                            padding="xs"
+                            unelevated
+                            size="xs"
+                            round
+                            flat
+                          ></q-btn>
+                        </q-item-section>
+                      </q-item>
+                    </q-td>
+                  </template>
+                </q-table>
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
@@ -1859,13 +1573,9 @@ import shortURLService from "@/services/short_url";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-// Lazy load CodeQueryEditor for VRL/action editors (still needed)
+// Lazy load CodeQueryEditor to avoid loading Monaco Editor eagerly
 const CodeQueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
-);
-// Unified QueryEditor for main query editor (with built-in AI bar)
-const UnifiedQueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue")
 );
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
@@ -1890,7 +1600,7 @@ import { cloneDeep } from "lodash-es";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { inject } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
-import { computed, unref } from "vue";
+import { computed } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
@@ -1911,8 +1621,6 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { Bookmark, ChartLine, ChartNoAxesColumn, RefreshCcw, ScanSearch, Share, Menu, Maximize, Minimize } from "lucide-vue-next";
 import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
-import { useNLQuery } from "@/composables/useNLQuery";
-import { isFunction } from "@tanstack/vue-table";
 
 const defaultValue: any = () => {
   return {
@@ -1934,7 +1642,6 @@ export default defineComponent({
     TransformSelector,
     FunctionSelector,
     CodeQueryEditor,
-    UnifiedQueryEditor,
     QueryPlanDialog,
     ScanSearch,
     ChartLine,
@@ -1956,7 +1663,6 @@ export default defineComponent({
     "showSearchHistory",
     "extractPatterns",
     "buildModeToggle",
-    "sendToAiChat",
   ],
   methods: {
     searchData() {
@@ -2120,6 +1826,7 @@ export default defineComponent({
 
     const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams();
     const queryEditorRef = ref(null);
+    const syntaxGuideRef = ref(null);
 
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
@@ -2175,9 +1882,6 @@ export default defineComponent({
       updateFunctionKeywords,
     } = useSqlSuggestions();
 
-    // Natural Language Query composable for SQL detection
-    const { detectNaturalLanguage } = useNLQuery();
-
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = Number(item.value);
     };
@@ -2189,6 +1893,7 @@ export default defineComponent({
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
     const savedViewDropdownModel = ref(false);
+    const savedViewsListDialog = ref(false);
     const moreOptionsDropdownModel = ref(false);
     const searchTerm = ref("");
 
@@ -2230,13 +1935,6 @@ export default defineComponent({
         searchObj.meta.showHistogram = value;
       },
     });
-
-    // Track if AI is currently generating SQL query
-    // Updated via @generation-start / @generation-end events from QueryEditor
-    const isGeneratingSQL = ref(false);
-
-    const hasInteractedWithAI = ref(false); // Track if user has used AI in non-NLP mode
-    const isNaturalLanguageDetected = ref(false); // Track NL detection without switching modes
 
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
@@ -2477,7 +2175,6 @@ export default defineComponent({
       //   getQueryData(false);
       // }
       searchObj.data.editorValue = value;
-      searchObj.data.query = value;
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
@@ -2554,10 +2251,8 @@ export default defineComponent({
           }
         }
       }
-      // Only auto-enable SQL mode if NOT in NLP mode (manual toggle takes precedence)
       if (
         searchObj.meta.sqlMode === false &&
-        searchObj.meta.nlpMode === false &&
         value.toLowerCase().includes("select") &&
         value.toLowerCase().includes("from")
       ) {
@@ -2613,7 +2308,7 @@ export default defineComponent({
 
                   // searchObj.data.stream.selectedStream = itemObj;
                   searchObj.data.stream.selectedStream.push(itemObj.value);
-                  onStreamChange(value);
+                  onStreamChange(searchObj.data.query);
                 }
               });
 
@@ -2813,11 +2508,6 @@ export default defineComponent({
     };
 
     onMounted(async () => {
-      console.log('[NL2Q-SearchBar] Component mounted, handler registered:', typeof handleNlpModeDetected);
-      console.log('[NL2Q-SearchBar] AI enabled:', store.state.zoConfig?.ai_enabled);
-      console.log('[NL2Q-SearchBar] Current route:', router.currentRoute.value.name);
-      console.log('[NL2Q-SearchBar] CodeQueryEditor should render:', router.currentRoute.value.name === 'logs');
-
       searchObj.data.transformType =
         router.currentRoute.value.query.transformType || "function";
 
@@ -3107,6 +2797,12 @@ export default defineComponent({
       savedViewSelectedName.value = "";
       savedViewDropdownModel.value = false;
     };
+
+    const openSavedViewsList = () => {
+      loadSavedView();
+      savedViewsListDialog.value = true;
+    };
+
 
     // Common function to restore visualization data and sync to URL
     const restoreVisualizationData = async (visualizationData) => {
@@ -4135,20 +3831,6 @@ export default defineComponent({
     const handleHistogramMode = () => {};
 
     const handleRunQueryFn = (clear_cache = false) => {
-      // If in NLP mode and the editor has a full SQL query (AI-generated),
-      // switch to SQL mode so the query is sent as-is, not wrapped as a filter.
-      if (searchObj.meta.nlpMode && !searchObj.meta.sqlMode) {
-        const editorValue = (searchObj.data.editorValue || '').trim().toLowerCase();
-        if (editorValue.includes('select') && editorValue.includes('from')) {
-          // Sync editor content to query and switch to SQL mode
-          searchObj.data.query = searchObj.data.editorValue;
-          searchObj.meta.sqlModeManualTrigger = true;
-          searchObj.meta.sqlMode = true;
-          searchObj.meta.nlpMode = false;
-          isNaturalLanguageDetected.value = false;
-        }
-      }
-
       if (searchObj.meta.logsVisualizeToggle == "visualize" || searchObj.meta.logsVisualizeToggle == "patterns" || searchObj.meta.logsVisualizeToggle == "build") {
         emit("handleRunQueryFn", typeof clear_cache === 'boolean' ? clear_cache : false);
       } else {
@@ -4176,135 +3858,6 @@ export default defineComponent({
       confirmBuildModeChange.value = false;
       searchObj.meta.buildModeQueryEditorDisabled = true;
       emit("buildModeToggle", false); // isCustomMode = false
-    };
-
-    /**
-     * Handle natural language detection from CodeQueryEditor
-     *
-     * IMPORTANT: This no longer switches modes automatically!
-     * It only tracks detection state to change button text.
-     * User must manually toggle NLP mode or AI bar only appears after first AI interaction.
-     */
-    const handleNlpModeDetected = (isDetected: boolean) => {
-      console.log('[NL2Q-Handler] ===== HANDLER CALLED =====');
-      console.log('[NL2Q-Handler] handleNlpModeDetected called', {
-        isDetected,
-        aiEnabled: store.state.zoConfig.ai_enabled,
-        currentNlpMode: searchObj.meta.nlpMode,
-        manuallyToggled: searchObj.meta.nlpMode,
-        currentDetectionFlag: isNaturalLanguageDetected.value
-      });
-
-      // Only respond to auto-detection if AI is enabled AND user hasn't manually set NLP mode
-      if (store.state.zoConfig.ai_enabled && !searchObj.meta.nlpMode) {
-        // Update detection flag (for button text) but DON'T switch modes
-        const oldValue = isNaturalLanguageDetected.value;
-        isNaturalLanguageDetected.value = isDetected;
-        console.log('[NL2Q-Handler] Detection flag updated:', oldValue, '→', isDetected);
-        console.log('[NL2Q-Handler] Natural language detection:', isDetected ? 'YES (button → Ask AI)' : 'NO (button → Run Query)');
-      } else if (searchObj.meta.nlpMode) {
-        console.log('[NL2Q-Handler] NLP mode manually enabled, ignoring auto-detection');
-      } else {
-        console.log('[NL2Q-Handler] AI not enabled, not tracking detection');
-      }
-    };
-
-    /**
-     * Handle toggle NLP mode from AI icon in CodeQueryEditor
-     */
-    const handleToggleNlpMode = () => {
-      console.log('[SearchBar] Toggling NLP mode from AI icon');
-      searchObj.meta.nlpMode = !searchObj.meta.nlpMode;
-
-      // If enabling NLP mode, disable SQL mode (mutually exclusive)
-      if (searchObj.meta.nlpMode) {
-        searchObj.meta.sqlMode = false;
-        isNaturalLanguageDetected.value = false;
-      }
-    };
-
-    /**
-     * Handle generation start event from CodeQueryEditor
-     */
-    const handleGenerationStart = () => {
-      console.log('[SearchBar] Generation started - disabling button');
-      isGeneratingSQL.value = true;
-    };
-
-    /**
-     * Handle generation end event from CodeQueryEditor
-     */
-    const handleGenerationEnd = () => {
-      console.log('[SearchBar] Generation ended - enabling button');
-      isGeneratingSQL.value = false;
-    };
-
-    /**
-     * Handle generation success with response type
-     */
-    const handleGenerationSuccess = (payload: {type: string, message: string}) => {
-      console.log('[SearchBar] Generation success:', payload.type);
-
-      // Track that user has interacted with AI
-      hasInteractedWithAI.value = true;
-      // NLP mode is already ON (set in handleGenerateSQLQuery) — AI bar stays visible.
-      // QueryEditor manages its own AI bar success text internally.
-    };
-
-    /**
-     * Handle NLP mode toggle for VRL function editor
-     */
-    const handleFunctionEditorToggleNlpMode = () => {
-      console.log('[SearchBar] VRL Function Editor: Toggling NLP mode from AI icon');
-      // UnifiedQueryEditor manages its own NLP mode state internally
-    };
-
-    /**
-     * Handle generation start for VRL function editor
-     */
-    const handleFunctionEditorGenerationStart = () => {
-      console.log('[SearchBar] VRL Function Editor: AI generation started');
-      // Can add loading indicators here if needed
-    };
-
-    /**
-     * Handle generation end for VRL function editor
-     */
-    const handleFunctionEditorGenerationEnd = () => {
-      console.log('[SearchBar] VRL Function Editor: AI generation ended');
-      // Can remove loading indicators here if needed
-    };
-
-    /**
-     * Handle successful generation for VRL function editor
-     */
-    const handleFunctionEditorGenerationSuccess = (payload: {type: string, message: string}) => {
-      console.log('[SearchBar] VRL Function Editor: AI generation success:', payload.type);
-      // Function content is already updated via @update:query handler
-    };
-
-    /**
-     * Handle Generate SQL Query when in NLP mode OR when NL detected
-     * Combines AI bar text + editor text, then calls CodeQueryEditor generation
-     */
-    const handleGenerateSQLQuery = async () => {
-      const queryEditor = queryEditorRef.value;
-      if (!queryEditor?.handleGenerateSQL) return;
-
-      // Turn on NLP mode immediately so the AI bar appears and shows progress/streaming
-      isNaturalLanguageDetected.value = false;
-      searchObj.meta.nlpMode = true;
-      searchObj.meta.sqlMode = false;
-
-      // Delegate to QueryEditor — it handles its own AI bar text internally
-      const editorText = (searchObj.data.editorValue || '').trim();
-      if (editorText) {
-        try {
-          await queryEditor.handleGenerateSQL(editorText);
-        } catch (error) {
-          // QueryEditor handles errors internally
-        }
-      }
     };
 
     const onLogsVisualizeToggleUpdate = async (value: any) => {
@@ -4351,6 +3904,9 @@ export default defineComponent({
           searchObj.data.queryResults.hits.length > 0;
 
         // console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
+
+        // Reset pagination visibility when switching back to logs
+        searchObj.meta.resultGrid.showPagination = true;
 
         if (!hasLogs) {
           // No logs data - fetch them
@@ -4703,11 +4259,6 @@ export default defineComponent({
         ? getImageURL("images/common/hugeicons_sql_light.svg")
         : getImageURL("images/common/hugeicons_sql.svg");
     });
-    const nlpIcon = computed(() => {
-      return store.state.theme === "dark"
-        ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon.svg");
-    });
     const quickModeIcon = computed(() => {
       return store.state.theme === "dark"
         ? getImageURL("images/common/quick_mode_light.svg")
@@ -4757,6 +4308,7 @@ export default defineComponent({
       fnEditorRef,
       searchObj,
       queryEditorRef,
+      syntaxGuideRef,
       confirmDialogVisible,
       confirmCallback,
       refreshTimes: searchObj.config.refreshTimes,
@@ -4785,6 +4337,7 @@ export default defineComponent({
       updateTimezone,
       dateTimeRef,
       fnSavedView,
+      openSavedViewsList,
       applySavedView,
       isSavedViewAction,
       savedViewName,
@@ -4795,6 +4348,7 @@ export default defineComponent({
       confirmDelete,
       saveViewLoader,
       savedViewDropdownModel,
+      savedViewsListDialog,
       moreOptionsDropdownModel,
       fnSavedFunctionDialog,
       isSavedFunctionAction,
@@ -4868,22 +4422,12 @@ export default defineComponent({
       visualizeIcon,
       histogramIcon,
       sqlIcon,
-      nlpIcon,
       quickModeIcon,
       searchHistoryIcon,
       downloadTableIcon,
       customRangeIcon,
       createScheduledSearchIcon,
       listScheduledSearchIcon,
-      handleNlpModeDetected,
-      handleToggleNlpMode,
-      handleGenerationStart,
-      handleGenerationEnd,
-      handleGenerationSuccess,
-      handleGenerateSQLQuery,
-      isGeneratingSQL,
-      isNaturalLanguageDetected,
-      hasInteractedWithAI,
       getColumnNames,
       getSearchObj,
       toggleHistogram,
@@ -5168,57 +4712,6 @@ export default defineComponent({
   object-fit: contain;
 }
 
-// AI Generate Button Styling (matches O2 AI Assistant - purple gradient)
-.o2-ai-generate-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  color: white !important;
-  border: none !important;
-  font-size: 0.6875rem !important; // 11px - match Run Query button
-  font-weight: 600 !important;
-  line-height: 1rem !important; // 16px - match Run Query button
-  transition: all 0.3s ease !important;
-  box-shadow: 0 0.25rem 0.9375rem 0 rgba(102, 126, 234, 0.3) !important; // 0 4px 15px
-  padding: 0 0.75rem !important; // 0 12px - same as Run Query button
-  width: 92px !important; // Fixed width - matches Run Query button
-
-  // Flexbox alignment to control spacing
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0.25rem !important; // 4px gap between icon and text (tighter spacing)
-
-  &:hover:not(.disabled):not([disabled]):not(:disabled) {
-    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
-    box-shadow: 0 0.375rem 1.25rem 0 rgba(102, 126, 234, 0.4) !important; // 0 6px 20px
-    transform: translateY(-0.0625rem) !important; // -1px
-  }
-
-  &:active:not(.disabled):not([disabled]):not(:disabled) {
-    transform: translateY(0) !important;
-    box-shadow: 0 0.125rem 0.625rem 0 rgba(102, 126, 234, 0.3) !important; // 0 2px 10px
-  }
-
-  // Icon styling within button - white color to match text
-  img {
-    filter: brightness(0) invert(1);
-    opacity: 1;
-    margin: 0 !important; // Remove any default margin, using gap instead
-    width: 0.875rem !important; // 14px - slightly smaller for better fit
-    height: 0.875rem !important; // 14px
-  }
-}
-
-// Dropdown button in AI mode - same gradient as main button but auto width
-.o2-ai-dropdown-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  color: white !important;
-  border: none !important;
-
-  &:hover:not(.disabled):not([disabled]):not(:disabled) {
-    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
-  }
-}
-
 .q-dark .toolbar-icon {
   filter: invert(1);
 }
@@ -5226,7 +4719,6 @@ export default defineComponent({
 .toolbar-icon-in-toggle {
   font-size: 0.9rem; // ~14.4px
 }
-
 
 .syntax-guide-in-menu {
   :deep(.q-btn) {
@@ -5296,8 +4788,8 @@ export default defineComponent({
   font-size: 11px;
   font-weight: 500 !important;
   line-height: 16px !important;
-  padding: 0px 12px !important;
-  width: 92px !important;
+  padding: 0px 0px !important;
+  width: 74px !important;
   transition: box-shadow 0.3s ease, opacity 0.2s ease;
   /* subtle default glow */
   // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
@@ -5409,15 +4901,6 @@ export default defineComponent({
         color: white;
       }
     }
-  }
-}
-
-.fullscreen-hover-btn:hover {
-  background-color: var(--q-primary) !important;
-  color: white !important;
-
-  svg {
-    color: white !important;
   }
 }
 </style>
