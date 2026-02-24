@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Content with vertical timeline -->
-                  <div class="tw:flex tw:flex-col tw:gap-6 tw:p-4 tw:overflow-y-auto tw:relative">
+                  <div class="tw:flex tw:flex-col tw:gap-6 tw:px-4 tw:py-2 tw:overflow-y-auto tw:relative">
                     <!-- Vertical line -->
                     <div
                       class="tw:absolute tw:w-0.5"
@@ -480,6 +480,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  <!-- Show Full Activity Button -->
+                  <div class="tw:border-t tw:border-gray-200 dark:tw:border-gray-700 tw:p-2 tw:flex tw:justify-end">
+                    <q-btn
+                      flat
+                      dense
+                      no-caps
+                      size="sm"
+                      color="primary"
+                      @click="activeTab = 'activity'"
+                      data-test="incident-timeline-show-full-activity"
+                    >
+                      <span class="tw:text-xs">Show Full Activity</span>
+                    </q-btn>
                   </div>
                 </div>
                 <!-- Incident Details (66.67% width) -->
@@ -839,6 +854,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :org-id="store.state.selectedOrganization.identifier"
           :incident-id="incidentDetails?.id || ''"
           :visible="activeTab === 'activity'"
+          :refresh-trigger="timelineRefreshTrigger"
         />
 
         <!-- Incident Analysis Tab Content -->
@@ -1311,6 +1327,9 @@ export default defineComponent({
 
     // Tab management
     const activeTab = ref("overview");
+
+    // Counter to trigger timeline refresh (prop-based approach)
+    const timelineRefreshTrigger = ref(0);
 
     // Alert Triggers tab - selected alert for detail view
     const selectedAlertIndex = ref(-1);
@@ -2093,6 +2112,11 @@ export default defineComponent({
         // Mark data as stale so incident list will refresh when navigating back
         store.dispatch('incidents/setShouldRefresh', true);
         emit("status-updated");
+
+        // Refresh events in timeline if Activity tab is active
+        if (activeTab.value === 'activity') {
+          timelineRefreshTrigger.value++;
+        }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
         $q.notify({
@@ -2156,6 +2180,11 @@ export default defineComponent({
         });
         // Mark data as stale so incident list will refresh
         store.dispatch('incidents/setShouldRefresh', true);
+
+        // Refresh events in timeline if Activity tab is active
+        if (activeTab.value === 'activity') {
+          timelineRefreshTrigger.value++;
+        }
       } catch (error: any) {
         console.error("Failed to update title:", error);
         $q.notify({
@@ -2316,6 +2345,11 @@ export default defineComponent({
         });
         // Mark data as stale so incident list will refresh
         store.dispatch('incidents/setShouldRefresh', true);
+
+        // Refresh events in timeline if Activity tab is active
+        if (activeTab.value === 'activity') {
+          timelineRefreshTrigger.value++;
+        }
       } catch (error: any) {
         console.error("Failed to update status:", error);
         $q.notify({
@@ -2778,6 +2812,7 @@ export default defineComponent({
       hasExistingRca,
       isDarkMode,
       activeTab,
+      timelineRefreshTrigger,
       tableOfContents,
       expandedSections,
       formattedRcaContent,
