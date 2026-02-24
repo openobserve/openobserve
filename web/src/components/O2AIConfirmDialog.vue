@@ -284,7 +284,6 @@ const handleDialogClick = (event: MouseEvent) => {
 };
 
 const handleDialogKeydown = (event: KeyboardEvent) => {
-  console.log('Key pressed:', event.key);
 
   if (event.key === 'Enter') {
     event.preventDefault();
@@ -328,16 +327,23 @@ const handleDialogKeydown = (event: KeyboardEvent) => {
   }
 };
 
+// Named handler references so they can be removed in onUnmounted
+let yesBtnHandler: ((e: KeyboardEvent) => void) | null = null;
+let alwaysBtnHandler: ((e: KeyboardEvent) => void) | null = null;
+let noBtnHandler: ((e: KeyboardEvent) => void) | null = null;
+let yesBtnEl: HTMLElement | null = null;
+let alwaysBtnEl: HTMLElement | null = null;
+let noBtnEl: HTMLElement | null = null;
+
 // Add native keyboard listeners to buttons
 onMounted(() => {
   nextTick(() => {
-    const yesBtn = yesButtonRef.value?.$el;
-    const noBtn = noButtonRef.value?.$el;
-    const alwaysBtn = alwaysButtonRef.value?.$el;
+    yesBtnEl = yesButtonRef.value?.$el;
+    noBtnEl = noButtonRef.value?.$el;
+    alwaysBtnEl = alwaysButtonRef.value?.$el;
 
-    if (yesBtn) {
-      yesBtn.addEventListener('keydown', (e: KeyboardEvent) => {
-        console.log('Yes button key:', e.key);
+    if (yesBtnEl) {
+      yesBtnHandler = (e: KeyboardEvent) => {
         if (e.key === 'Enter') {
           e.preventDefault();
           handleConfirm();
@@ -349,12 +355,12 @@ onMounted(() => {
             focusNo();
           }
         }
-      });
+      };
+      yesBtnEl.addEventListener('keydown', yesBtnHandler);
     }
 
-    if (alwaysBtn) {
-      alwaysBtn.addEventListener('keydown', (e: KeyboardEvent) => {
-        console.log('Always button key:', e.key);
+    if (alwaysBtnEl) {
+      alwaysBtnHandler = (e: KeyboardEvent) => {
         if (e.key === 'Enter') {
           e.preventDefault();
           handleAlwaysConfirm();
@@ -365,12 +371,12 @@ onMounted(() => {
           e.preventDefault();
           focusYes();
         }
-      });
+      };
+      alwaysBtnEl.addEventListener('keydown', alwaysBtnHandler);
     }
 
-    if (noBtn) {
-      noBtn.addEventListener('keydown', (e: KeyboardEvent) => {
-        console.log('No button key:', e.key);
+    if (noBtnEl) {
+      noBtnHandler = (e: KeyboardEvent) => {
         if (e.key === 'Enter') {
           e.preventDefault();
           handleCancel();
@@ -382,9 +388,22 @@ onMounted(() => {
             focusYes();
           }
         }
-      });
+      };
+      noBtnEl.addEventListener('keydown', noBtnHandler);
     }
   });
+});
+
+onUnmounted(() => {
+  if (yesBtnEl && yesBtnHandler) {
+    yesBtnEl.removeEventListener('keydown', yesBtnHandler);
+  }
+  if (alwaysBtnEl && alwaysBtnHandler) {
+    alwaysBtnEl.removeEventListener('keydown', alwaysBtnHandler);
+  }
+  if (noBtnEl && noBtnHandler) {
+    noBtnEl.removeEventListener('keydown', noBtnHandler);
+  }
 });
 </script>
 

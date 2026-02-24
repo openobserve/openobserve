@@ -343,16 +343,16 @@
                       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
                       { 'has-details': hasToolCallDetails(block) },
                       { 'error': block.success === false && !block.pendingConfirmation },
-                      { 'pending-confirmation': block.pendingConfirmation && block.tool !== 'create_navigation' },
-                      { 'pending-navigation': block.pendingConfirmation && block.tool === 'create_navigation' },
+                      { 'pending-confirmation': block.pendingConfirmation && block.tool !== 'navigation_action' },
+                      { 'pending-navigation': block.pendingConfirmation && block.tool === 'navigation_action' },
                     ]"
                     @click="hasToolCallDetails(block) && !block.pendingConfirmation && toggleToolCallExpanded(index, blockIndex)"
                   >
                     <div class="tool-call-header">
                       <q-icon
-                        :name="block.pendingConfirmation ? (block.tool === 'create_navigation' ? 'open_in_new' : 'help_outline') : (block.success === false ? 'error' : 'check_circle')"
+                        :name="block.pendingConfirmation ? (block.tool === 'navigation_action' ? 'open_in_new' : 'help_outline') : (block.success === false ? 'error' : 'check_circle')"
                         size="14px"
-                        :color="block.pendingConfirmation ? (block.tool === 'create_navigation' ? 'primary' : 'warning') : (block.success === false ? 'negative' : 'positive')"
+                        :color="block.pendingConfirmation ? (block.tool === 'navigation_action' ? 'primary' : 'warning') : (block.success === false ? 'negative' : 'positive')"
                       />
                       <span class="tool-call-name">
                         {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
@@ -1063,7 +1063,7 @@ export default defineComponent({
     const chatToDelete = ref<number | null>(null);
 
     // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
-    const pendingConfirmation = ref<{ tool: string; args: Record<string, any>; message: string } | null>(null);
+    const pendingConfirmation = ref<{ tool: string; args: Record<string, any>; message: string; navAction?: NavigationAction } | null>(null);
 
     // Auto navigation state - per chat ID
     // Stores chat ID -> boolean mapping for auto navigation preference
@@ -1923,7 +1923,7 @@ export default defineComponent({
                       };
 
                       // Store the navigation action for later execution
-                      (pendingConfirmation.value as any).navAction = navAction;
+                      pendingConfirmation.value.navAction = navAction;
 
                       await scrollToBottom();
                     }
@@ -2669,7 +2669,7 @@ export default defineComponent({
 
       // Check if this is a navigation action
       if (pendingConfirmation.value?.tool === 'navigation_action') {
-        const navAction = (pendingConfirmation.value as any).navAction;
+        const navAction = pendingConfirmation.value?.navAction;
         if (navAction) {
           await handleNavigationAction(navAction);
         }
@@ -2734,7 +2734,7 @@ export default defineComponent({
 
       // Check if this is a navigation action
       if (pendingConfirmation.value?.tool === 'navigation_action') {
-        const navAction = (pendingConfirmation.value as any).navAction;
+        const navAction = pendingConfirmation.value?.navAction;
         if (navAction) {
           await handleNavigationAction(navAction);
         }

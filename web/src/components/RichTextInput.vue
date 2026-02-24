@@ -657,7 +657,7 @@ export default defineComponent({
         pointer-events: none;
         position: absolute;
         left: 0;
-        top: 10;
+        top: 10px;
       }
     }
 
