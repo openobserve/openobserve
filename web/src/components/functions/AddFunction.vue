@@ -62,16 +62,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-show="expandState.functions"
-                    class="tw:border-[1px] tw:border-gray-200"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:h-full"
                   >
-                    <query-editor
+                    <!-- Unified Query Editor (with built-in AI bar) -->
+                    <unified-query-editor
                       data-test="logs-vrl-function-editor"
+                      data-test-prefix="function-vrl"
                       ref="editorRef"
-                      editor-id="add-function-editor"
-                      class="monaco-editor"
-                      :style="{ height: `calc(100vh - (180px + ${heightOffset}px))` }"
-                      v-model:query="formData.function"
-                      :language="formData.transType === '1' ? 'javascript' : 'vrl'"
+                      :languages="['vrl', 'javascript']"
+                      :default-language="formData.transType === '1' ? 'javascript' : 'vrl'"
+                      :query="formData.function"
+                      :hide-nl-toggle="false"
+                      :disable-ai="false"
+                      :disable-ai-reason="''"
+                      :ai-placeholder="t('function.askAIFunctionPlaceholder')"
+                      :ai-tooltip="t('function.enterFunctionPrompt')"
+                      editor-height="300px"
+                      @update:query="handleFunctionUpdate"
+                      @language-change="handleLanguageChange"
+                      @toggle-nlp-mode="handleToggleNlpMode"
+                      @generation-start="handleGenerationStart"
+                      @generation-end="handleGenerationEnd"
+                      @generation-success="handleGenerationSuccess"
                     />
                   </div>
                   <div class="text-subtitle2">
@@ -79,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <FullViewContainer
                         name="function"
                         v-model:is-expanded="expandState.functionError"
-                        :label="formData.transType === '1' ? 'JavaScript Error Details' : t('function.errorDetails')"
+                        :label="formData.transType === '1' ? t('function.jsErrorDetails') : t('function.errorDetails')"
                         labelClass="tw:text-red-600 tw:font-semibold"
                       />
                       <div
@@ -185,6 +197,9 @@ export default defineComponent({
   components: {
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
+    ),
+    UnifiedQueryEditor: defineAsyncComponent(
+      () => import("@/components/QueryEditor.vue"),
     ),
     FunctionsToolbar,
     FullViewContainer,
@@ -495,6 +510,63 @@ export default defineComponent({
       emit("sendToAiChat", value);
     };
 
+    // Unified Query Editor: Handle function update
+    const handleFunctionUpdate = (newFunction: string) => {
+      formData.value.function = newFunction;
+    };
+
+    // Unified Query Editor: Handle language change
+    const handleLanguageChange = (newLanguage: 'vrl' | 'javascript') => {
+      console.log('[AddFunction] Language changed to:', newLanguage);
+      // Update transType: '1' for JavaScript, '0' for VRL
+      formData.value.transType = newLanguage === 'javascript' ? '1' : '0';
+    };
+
+    /**
+     * Handle NLP mode toggle from AI icon in editor
+     */
+    const handleToggleNlpMode = () => {
+      console.log('[AddFunction] Toggling NLP mode from AI icon');
+      // UnifiedQueryEditor manages its own NLP mode state internally
+    };
+
+    /**
+     * Handle generation start event from UnifiedQueryEditor
+     */
+    const handleGenerationStart = () => {
+      console.log('[AddFunction] AI generation started');
+      // Can add loading indicators here if needed
+    };
+
+    /**
+     * Handle generation end event from UnifiedQueryEditor
+     */
+    const handleGenerationEnd = () => {
+      console.log('[AddFunction] AI generation ended');
+      // Can remove loading indicators here if needed
+    };
+
+    /**
+     * Handle successful generation from UnifiedQueryEditor
+     */
+    const handleGenerationSuccess = (payload: {type: string, message: string}) => {
+      console.log('[AddFunction] AI generation success:', payload.type);
+      // Function code is already updated via @update:query handler
+    };
+
+    // Unified Query Editor: Handle Ask AI
+    const handleAskAI = async (naturalLanguage: string, language: 'vrl' | 'javascript') => {
+      console.log('[AddFunction] Ask AI for language:', language, 'input:', naturalLanguage);
+
+      // Enable AI chat if not already enabled
+      if (!store.state.isAiChatEnabled) {
+        openChat(true);
+      }
+
+      // The unified component handles AI generation internally
+      // This event is just for parent components that may need to react
+    };
+
     return {
       t,
       $q,
@@ -532,7 +604,13 @@ export default defineComponent({
       openChat,
       isAddFunctionComponent,
       sendToAiChat,
-      aiChatInputContext
+      aiChatInputContext,
+      handleFunctionUpdate,
+      handleLanguageChange,
+      handleToggleNlpMode,
+      handleGenerationStart,
+      handleGenerationEnd,
+      handleGenerationSuccess,
     };
   },
   created() {

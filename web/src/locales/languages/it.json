@@ -115,7 +115,9 @@
     "retry": "Riprova",
     "copy": "Copia",
     "copySuccess": "Copiato negli appunti",
-    "copyError": "Copia negli appunti non riuscita"
+    "copyError": "Copia negli appunti non riuscita",
+    "goBack": "Torna indietro",
+    "stopGenerating": "Smetti di generare"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -128,7 +130,7 @@
     "source": "_fonte",
     "noResult": "Nessun risultato",
     "syntaxGuide": "Guida alla sintassi",
-    "recordsPerPage": "Record per pagina",
+    "rowsPerPage": "Record per pagina",
     "showing": "Mostrando",
     "of": "di",
     "rowDetail": "Dettagli della fonte",
@@ -319,7 +321,35 @@
     "buildQuery": "Costruisci",
     "enableSqlModeForBuild": "Abilita la modalità SQL e seleziona un singolo stream per utilizzare Query Builder",
     "applyToSearch": "Applica alla ricerca",
-    "complexQueryDetected": "È stata rilevata una query complessa. Utilizzo della modalità personalizzata."
+    "complexQueryDetected": "È stata rilevata una query complessa. Utilizzo della modalità personalizzata.",
+    "nlpModeLabel": "Modalità linguaggio naturale",
+    "generateSQL": "Genera SQL",
+    "generateQuery": "Genera interrogazione",
+    "generateSQLTooltip": "Genera query SQL dal linguaggio naturale (Ctrl/Cmd + Invio)",
+    "generateQueryTooltip": "Genera query SQL dal linguaggio naturale",
+    "generating": "Generazione...",
+    "nlQueryGenerationFailed": "Generazione della query non riuscita. Per favore riprova.",
+    "nlQueryGenerationSuccess": "Query generata con successo!",
+    "nlpModeDisabledForVisualization": "La modalità Natural Language non può essere disabilitata durante la visualizzazione con più stream",
+    "askAIPlaceholder": "Chiedi all'IA di aiutarti con la tua domanda...",
+    "aiBarSuccessPlaceholder": "Cosa vorresti fare dopo?",
+    "askAI": "Chiedi all'AI",
+    "askAITooltip": "Chiedi all'IA di aiutarti con la tua richiesta",
+    "enterPrompt": "Inserisci un prompt per generare la query",
+    "analyzingQuery": "Analizzando la query...",
+    "generatingQuery": "Generazione di una query...",
+    "queryGeneratedSuccess": "Query generata con successo!",
+    "queryGenerationStopped": "La generazione delle query è stata interrotta.",
+    "queryGenerationFailed": "Generazione della query non riuscita.",
+    "fetchingResults": "Recupero dei risultati della ricerca...",
+    "noResultsFound": "Nessun risultato trovato",
+    "errorFetchingResults": "Errore durante il recupero dei risultati",
+    "somethingWentWrong": "Qualcosa è andato storto",
+    "selectStreamForAI": "Seleziona prima uno stream per utilizzare l'IA",
+    "collapseFields": "Comprimi campi",
+    "openFields": "Campi aperti",
+    "askAIFunctionPlaceholder": "Chiedi all'IA di aiutarti con la tua funzione...",
+    "enterFunctionPrompt": "Inserisci un prompt per generare la funzione"
   },
   "menu": {
     "home": "Home",
@@ -964,7 +994,10 @@
     "jsType": "JavaScript (ES2023)",
     "vrlfunction": "Funzione VRL",
     "jsFunctionHint": "Usa l'oggetto `row` per accedere e modificare i campi di registro. Esempio: row.new_field = row.existing_field + 'processato';",
-    "vrlFunctionHint": "Usa il `.` per rappresentare l'evento corrente. Esempio: .new_field = .existing_field + 'processed'"
+    "vrlFunctionHint": "Usa il `.` per rappresentare l'evento corrente. Esempio: .new_field = .existing_field + 'processed'",
+    "jsErrorDetails": "Dettagli sull'errore JavaScript",
+    "askAIFunctionPlaceholder": "Chiedi all'IA di aiutarti con la tua funzione...",
+    "enterFunctionPrompt": "Inserisci un prompt per generare la funzione"
   },
   "confirmDialog": {
     "cancel": "Annulla",
@@ -1415,7 +1448,14 @@
     "noColumnsOrdered": "Nessuna colonna ordinata",
     "columnsDefaultOrder": "Le colonne verranno visualizzate nell'ordine predefinito",
     "moveUp": "Sposta verso l'alto",
-    "moveDown": "Sposta verso il basso"
+    "moveDown": "Sposta verso il basso",
+    "toggleFunctionEditor": "Attiva/disattiva l'editor delle funzioni",
+    "useSavedFunction": "Usa la funzione Salvata",
+    "showQueryResults": "Mostra i risultati delle query",
+    "hideQueryResults": "Nascondi i risultati delle query",
+    "vrlExtractionTooltip": "Per utilizzare i campi VRL estratti nel grafico, scrivi una funzione VRL e fai clic sul pulsante Applica. I campi verranno estratti, consentendoti di utilizzarli per creare il grafico.",
+    "errorFetchingFunctions": "Errore durante il recupero delle funzioni",
+    "functionAppliedSuccess": "Funzione {name} applicata correttamente."
   },
   "panel": {
     "header": "Pannello",
@@ -2000,7 +2040,20 @@
       "variablesTooltip": "Le variabili vengono utilizzate per passare i dati dall'avviso alla destinazione.",
       "rowTemplateTooltip": "Il modello di riga viene utilizzato per formattare il messaggio di avviso.",
       "templateType": "Tipo di modello:"
-    }
+    },
+    "addConditions": "Aggiungi condizioni",
+    "sqlEditor": "Editor SQL",
+    "promqlEditor": "Editor ProMQL",
+    "vrlEditor": "Editor VRL",
+    "generateVRL": "Genera VRL",
+    "applyVRL": "Applica VRL",
+    "runQuery": "Esegui interrogazione",
+    "onStream": "sul",
+    "streamLabel": "flusso",
+    "noStreamSelected": "Nessuno stream selezionato",
+    "resultsIncludeAllWindows": "I risultati includono tutte le aggiunte multi-finestra",
+    "runQueryForOutput": "Fai clic su Esegui query per vedere l'output",
+    "applyVRLForOutput": "Fai clic su Applica VRL per vedere l'output combinato"
   },
   "alert_templates": {
     "header": "Modelli",
@@ -2256,6 +2309,7 @@
       "groupsLabel": "gruppi",
       "noMatchingGroups": "Nessun gruppo corrispondente",
       "fqnFormulaTitle": "Formula identità",
+      "fqnFormulaTooltip": "Mostra come verrà calcolata l'identità del servizio. Le dimensioni di ambito (blu) sono concatenate con '/'. La prima dimensione di workload non nulla (verde) diventa il nome del servizio.",
       "scopeDimension": "Dimensione di ambito",
       "workloadDimension": "Dimensione di workload",
       "noFormulaConfigured": "Nessuna formula di identità configurata. Aggiungi dimensioni sopra.",
@@ -2412,7 +2466,11 @@
     "errorSavingPipeline": "Errore durante il salvataggio della pipeline",
     "cancelChangesConfirm": "Sei sicuro di voler annullare le modifiche?",
     "cancel": "Annulla",
-    "dragDropNodesHere": "Trascina e rilascia i nodi qui"
+    "dragDropNodesHere": "Trascina e rilascia i nodi qui",
+    "promqlOnlyForMetrics": "ProMQL è disponibile solo per il tipo di flusso di metriche",
+    "invalidCronExpression": "Espressione cron non valida",
+    "thresholdShouldNotBeEmpty": "La soglia non deve essere vuota",
+    "errorGettingResults": "Errore durante l'ottenimento dei risultati"
   },
   "reports": {
     "header": "Rapporti",
@@ -2918,5 +2976,10 @@
     "invalidFormat": "Formato non valido",
     "mustBeGreaterThan": "Deve essere maggiore di {value}",
     "mustBeLessThan": "Deve essere inferiore a {value}"
+  },
+  "nlMode": {
+    "toggle": "Modalità linguaggio naturale",
+    "noAdditionalOptions": "Nessuna opzione aggiuntiva",
+    "generateVRL": "Genera VRL"
   }
 }

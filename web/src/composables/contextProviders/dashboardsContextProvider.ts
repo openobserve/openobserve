@@ -52,6 +52,21 @@ export const createDashboardsContextProvider = (
         request_timestamp: Date.now() * 1000,
       };
 
+      // Extract stream information from current query (for AI query generation)
+      if (dashboardPanelData?.data?.queries && dashboardPanelData?.layout?.currentQueryIndex !== undefined) {
+        const currentQuery = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+        if (currentQuery?.fields?.stream) {
+          context.selectedStreams = [currentQuery.fields.stream];
+        } else {
+          context.selectedStreams = ['default'];
+        }
+        // Determine stream type based on query type (SQL = logs, PromQL = metrics)
+        context.streamType = dashboardPanelData.data.queryType === 'promql' ? 'metrics' : 'logs';
+      } else {
+        context.selectedStreams = ['default'];
+        context.streamType = 'logs';
+      }
+
       // Determine user intent based on route and context
       if (route?.query?.panelId) {
         // Editing specific panel

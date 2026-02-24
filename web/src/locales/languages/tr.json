@@ -115,7 +115,9 @@
     "retry": "Tekrar dene",
     "copy": "Kopyalama",
     "copySuccess": "Panoya kopyalandı",
-    "copyError": "Panoya kopyalanamadı"
+    "copyError": "Panoya kopyalanamadı",
+    "goBack": "Geri Dön",
+    "stopGenerating": "Oluşturmayı bırak"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -128,7 +130,7 @@
     "source": "_kaynak",
     "noResult": "Sonuç Yok",
     "syntaxGuide": "Sözdizimi kılavuzu",
-    "recordsPerPage": "Sayfa başına kayıtlar",
+    "rowsPerPage": "Sayfa başına kayıtlar",
     "showing": "Gösterme",
     "of": "dan",
     "rowDetail": "Kaynak Ayrıntıları",
@@ -319,7 +321,35 @@
     "buildQuery": "İnşa",
     "enableSqlModeForBuild": "Lütfen SQL modunu etkinleştirin ve sorgu oluşturucuyu kullanmak için tek bir akış seçin",
     "applyToSearch": "Aramaya Uygula",
-    "complexQueryDetected": "Karmaşık sorgu algılandı. Özel modu kullanma."
+    "complexQueryDetected": "Karmaşık sorgu algılandı. Özel modu kullanma.",
+    "nlpModeLabel": "Doğal Dil Modu",
+    "generateSQL": "SQL oluştur",
+    "generateQuery": "Sorgu Oluştur",
+    "generateSQLTooltip": "Doğal dilden SQL sorgusu oluşturun (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Doğal dilden SQL sorgusu oluştur",
+    "generating": "Oluşturuluyor...",
+    "nlQueryGenerationFailed": "Sorgu oluşturulamadı. Lütfen tekrar deneyin.",
+    "nlQueryGenerationSuccess": "Sorgu başarıyla oluşturuldu!",
+    "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz",
+    "askAIPlaceholder": "Yapay zekadan sorgunuzla ilgili yardım isteyin...",
+    "aiBarSuccessPlaceholder": "Bundan sonra ne yapmak istersin?",
+    "askAI": "Yapay zekaya sor",
+    "askAITooltip": "Yapay zekadan sorgunuzla ilgili yardım isteyin",
+    "enterPrompt": "Sorgu oluşturmak için bir istem girin",
+    "analyzingQuery": "Sorgu analiz ediyor...",
+    "generatingQuery": "Sorgu oluşturuluyor...",
+    "queryGeneratedSuccess": "Sorgu başarıyla oluşturuldu!",
+    "queryGenerationStopped": "Sorgu oluşturma durduruldu.",
+    "queryGenerationFailed": "Sorgu oluşturma başarısız oldu.",
+    "fetchingResults": "Arama Sonuçları Getiriliyor...",
+    "noResultsFound": "Hiçbir sonuç bulunamadı",
+    "errorFetchingResults": "Sonuçları getirirken hata oluştu",
+    "somethingWentWrong": "Bir şeyler ters gitti",
+    "selectStreamForAI": "Yapay zekayı kullanmak için önce bir akış seçin",
+    "collapseFields": "Alanları Daralt",
+    "openFields": "Açık Alanlar",
+    "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
+    "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -964,7 +994,10 @@
     "jsType": "JavaScript (ES2023)",
     "vrlfunction": "VRL Fonksiyonu",
     "jsFunctionHint": "Günlük alanlarına erişmek ve değiştirmek için `row` nesnesini kullanın. Örnek: Row.new_field = Row.existing_field + 'processed';",
-    "vrlFunctionHint": "Geçerli olayı temsil etmek için `.` tuşunu kullanın. Örnek: .new_field = .existing_field + 'işlenmiş'"
+    "vrlFunctionHint": "Geçerli olayı temsil etmek için `.` tuşunu kullanın. Örnek: .new_field = .existing_field + 'işlenmiş'",
+    "jsErrorDetails": "JavaScript Hata Ayrıntıları",
+    "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
+    "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin"
   },
   "confirmDialog": {
     "cancel": "İptal",
@@ -1415,7 +1448,14 @@
     "noColumnsOrdered": "Sıralı sütun yok",
     "columnsDefaultOrder": "Sütunlar varsayılan sıralarında görüntülenecektir",
     "moveUp": "Yukarı hareket et",
-    "moveDown": "Aşağı hareket et"
+    "moveDown": "Aşağı hareket et",
+    "toggleFunctionEditor": "İşlev Düzenleyicisini Aç/Kapat",
+    "useSavedFunction": "Kaydedilmiş işlevini kullan",
+    "showQueryResults": "Sorgu sonuçlarını göster",
+    "hideQueryResults": "Sorgu sonuçlarını gizle",
+    "vrlExtractionTooltip": "Grafikte çıkarılan VRL alanlarını kullanmak için bir VRL işlevi yazın ve Uygula düğmesine tıklayın. Alanlar çıkarılacak ve bunları grafiği oluşturmak için kullanmanıza izin verecektir.",
+    "errorFetchingFunctions": "İşlevleri getirirken hata oluştu",
+    "functionAppliedSuccess": "{name} işlevi başarıyla uygulandı."
   },
   "panel": {
     "header": "Panel",
@@ -2000,7 +2040,20 @@
       "variablesTooltip": "Değişkenler, verileri uyarıdan hedefe iletmek için kullanılır.",
       "rowTemplateTooltip": "Satır Şablonu uyarı mesajını biçimlendirmek için kullanılır.",
       "templateType": "Şablon Türü:"
-    }
+    },
+    "addConditions": "Koşulları Ekle",
+    "sqlEditor": "SQL Düzenleyici",
+    "promqlEditor": "PromQL Editörü",
+    "vrlEditor": "VRL Editörü",
+    "generateVRL": "VRL oluştur",
+    "applyVRL": "VRL uygulayın",
+    "runQuery": "Sorguyu Çalıştırma",
+    "onStream": "üzerinde",
+    "streamLabel": "akış",
+    "noStreamSelected": "Akış Seçilmedi",
+    "resultsIncludeAllWindows": "Sonuçlar tüm çoklu pencere eklemelerini içerir",
+    "runQueryForOutput": "Çıktıyı görmek için lütfen Sorguyu Çalıştır'a tıklayın",
+    "applyVRLForOutput": "Kombine çıktıyı görmek için lütfen VRL Uygula'ya tıklayın"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2258,6 +2311,7 @@
       "groupsLabel": "gruplar",
       "noMatchingGroups": "Eşleşen grup yok",
       "fqnFormulaTitle": "Kimlik Formülü",
+      "fqnFormulaTooltip": "Servis kimliğinin nasıl hesaplanacağını gösterir. Kapsam boyutları (mavi) '/' ile birleştirilir. İlk null olmayan iş yükü boyutu (yeşil) servis adı olur.",
       "scopeDimension": "Kapsam Boyutu",
       "workloadDimension": "İş Yükü Boyutu",
       "noFormulaConfigured": "Hiçbir kimlik formülü yapılandırılmamış. Yukarıda boyutlar ekleyin.",
@@ -2414,7 +2468,11 @@
     "errorSavingPipeline": "Boru hattını kaydederken hata",
     "cancelChangesConfirm": "Değişiklikleri iptal etmek istediğinizden emin misiniz?",
     "cancel": "İptal",
-    "dragDropNodesHere": "Düğümleri buraya sürükleyip bırakın"
+    "dragDropNodesHere": "Düğümleri buraya sürükleyip bırakın",
+    "promqlOnlyForMetrics": "PromQL yalnızca metrik akış türü için kullanılabilir",
+    "invalidCronExpression": "Geçersiz cron ifadesi",
+    "thresholdShouldNotBeEmpty": "Eşik boş olmamalıdır",
+    "errorGettingResults": "Sonuç alınırken hata oluştu"
   },
   "reports": {
     "header": "Raporlar",
@@ -2920,5 +2978,10 @@
     "invalidFormat": "Geçersiz biçim",
     "mustBeGreaterThan": "{value} 'den büyük olmalıdır",
     "mustBeLessThan": "{value} 'den küçük olmalıdır"
+  },
+  "nlMode": {
+    "toggle": "Doğal Dil Modu",
+    "noAdditionalOptions": "Ek seçenek yok",
+    "generateVRL": "VRL oluştur"
   }
 }
