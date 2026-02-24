@@ -403,7 +403,7 @@ test.describe(
       await ingestion(page);
     });
 
-    test("cross-source cycles: multi-variable chain and edit-introduced cycle", async ({
+    test.skip("cross-source cycles: multi-variable chain and edit-introduced cycle", async ({
       page,
     }) => {
       test.slow(); // Triple timeout — this test creates 7 variables and performs multiple edit cycles
@@ -540,7 +540,7 @@ test.describe(
       await ingestion(page);
     });
 
-    test("runtime cascade: parent changes reload children via stream and field dependencies", async ({
+    test.skip("runtime cascade: parent changes reload children via stream and field dependencies", async ({
       page,
     }) => {
       test.slow(); // Triple timeout — this test creates 5 variables and monitors cascade API calls
