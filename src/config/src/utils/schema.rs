@@ -54,8 +54,9 @@ pub fn infer_json_schema_from_seekable<R: BufRead + Seek>(
 }
 
 pub fn infer_json_schema_from_map<I, V>(
-    value_iter: I,
+    stream_name: &str,
     stream_type: impl Into<StreamType>,
+    value_iter: I,
 ) -> Result<Schema, ArrowError>
 where
     I: Iterator<Item = V>,
@@ -69,7 +70,7 @@ where
                 Default::default(),
             ));
         }
-        infer_json_schema_from_object(fields.as_mut().unwrap(), value.borrow())?;
+        infer_json_schema_from_object(stream_name, fields.as_mut().unwrap(), value.borrow())?;
     }
     let fields = fields.unwrap_or_default();
     let fields = fields
@@ -80,8 +81,9 @@ where
 }
 
 pub fn infer_json_schema_from_values<I, V>(
-    value_iter: I,
+    stream_name: &str,
     stream_type: impl Into<StreamType>,
+    value_iter: I,
 ) -> Result<Schema, ArrowError>
 where
     I: Iterator<Item = V>,
@@ -97,7 +99,7 @@ where
                         Default::default(),
                     ));
                 }
-                infer_json_schema_from_object(fields.as_mut().unwrap(), v)?;
+                infer_json_schema_from_object(stream_name, fields.as_mut().unwrap(), v)?;
             }
             _ => {
                 return Err(ArrowError::SchemaError(
@@ -115,6 +117,7 @@ where
 }
 
 fn infer_json_schema_from_object(
+    stream_name: &str,
     fields: &mut FxIndexMap<String, Field>,
     value: &Map<String, Value>,
 ) -> Result<(), ArrowError> {
@@ -131,9 +134,12 @@ fn infer_json_schema_from_object(
                 } else if v.is_f64() {
                     convert_data_type(fields, key, DataType::Float64)?;
                 } else {
-                    return Err(ArrowError::SchemaError(format!(
-                        "Cannot infer schema from non-basic-number type value: {v:?}",
-                    )));
+                    // For numbers that are too large to fit in i64/u64/f64,
+                    // treat them as strings to preserve the data
+                    log::warn!(
+                        "stream: {stream_name}, Number value too large for standard numeric types, treating as string: {key:?} {v:?}"
+                    );
+                    convert_data_type(fields, key, DataType::Utf8)?;
                 }
             }
             Value::Bool(_) => {
