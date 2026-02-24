@@ -2479,6 +2479,7 @@ export default defineComponent({
       //   getQueryData(false);
       // }
       searchObj.data.editorValue = value;
+      searchObj.data.query = value;
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
