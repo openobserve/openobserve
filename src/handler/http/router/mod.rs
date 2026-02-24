@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 
 use axum::{
     Router,
@@ -965,15 +965,6 @@ pub fn create_app_router() -> Router {
             );
         }
 
-        let router_routes = router_routes;
-
-        // Apply base_uri if configured
-        let router_routes = if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
-            router_routes
-        } else {
-            Router::new().nest(&cfg.common.base_uri, router_routes)
-        };
-
         // basic_routes are at root level (not under base_uri)
         Router::new().merge(basic_routes()).merge(router_routes)
     } else {
@@ -988,10 +979,17 @@ pub fn create_app_router() -> Router {
 
     // Add UI routes at app level (outside basic_routes to avoid any middleware conflicts)
     if cfg.common.ui_enabled {
+        // Ensure redirect takes into account base_uri
+        let base_uri = cfg.common.base_uri.trim_matches('/');
+        let web_path = if base_uri.is_empty() {
+            Cow::Borrowed("/web/")
+        } else {
+            format!("/{}/web/", base_uri).into()
+        };
         app = app
             .route(
                 "/",
-                get(|| async { axum::response::Redirect::permanent("/web/") }),
+                get(move || core::future::ready(axum::response::Redirect::permanent(&web_path))),
             )
             .nest_service("/web", ui::ui_routes());
     }
@@ -1001,7 +999,12 @@ pub fn create_app_router() -> Router {
         .layer(cors_layer())
         .layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
 
-    app
+    // Apply base_uri if configured
+    if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
+        app
+    } else {
+        Router::new().nest(&cfg.common.base_uri, app)
+    }
 }
 
 #[cfg(test)]
