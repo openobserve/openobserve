@@ -747,7 +747,7 @@ export default defineComponent({
     };
     // Helper function to resolve variable references in a string
     const resolveVariableValue = (value: string): string => {
-      if (!value || typeof value !== 'string') return value;
+      if (!value || typeof value !== 'string') return value ?? "";
 
       // Replace all variable references ($variableName) with their resolved values
       // Using replace callback avoids regex exec loop risks and handles
@@ -764,8 +764,9 @@ export default defineComponent({
             let varValue = referencedVar.value;
 
             // Handle array values (multi-select)
+            // Stream and field must be single tokens, use first element only
             if (Array.isArray(varValue)) {
-              varValue = varValue.map(String).join(',');
+              varValue = String(varValue[0] ?? '');
             }
 
             return varValue ?? '';
