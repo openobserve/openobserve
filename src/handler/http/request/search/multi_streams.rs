@@ -595,22 +595,23 @@ pub async fn search_multi(
                                 // In per-query mode each element must itself be an array of
                                 // hits. If the VRL function errored out the value may be a
                                 // plain object instead; skip gracefully rather than panic.
-                                let inner = v.as_array()?;
-                                let flattened_array = inner
-                                    .iter()
-                                    .map(|item| {
-                                        if !item.is_null() && item.is_object() {
-                                            // flatten() only errors when the value is not an
-                                            // object, which is already guarded above, but we
-                                            // keep .unwrap_or to be safe.
-                                            config::utils::flatten::flatten(item.clone())
-                                                .unwrap_or_else(|_| item.clone())
-                                        } else {
-                                            item.clone()
-                                        }
-                                    })
-                                    .collect::<Vec<_>>();
-                                Some(serde_json::Value::Array(flattened_array))
+                                v.as_array().map(|inner| {
+                                    let flattened_array = inner
+                                        .iter()
+                                        .map(|item| {
+                                            if !item.is_null() && item.is_object() {
+                                                // flatten() only errors when the value is not
+                                                // an object, which is already guarded above,
+                                                // but we keep .unwrap_or to be safe.
+                                                config::utils::flatten::flatten(item.clone())
+                                                    .unwrap_or_else(|_| item.clone())
+                                            } else {
+                                                item.clone()
+                                            }
+                                        })
+                                        .collect::<Vec<_>>();
+                                    serde_json::Value::Array(flattened_array)
+                                })
                             } else if !v.is_null() && v.is_object() {
                                 config::utils::flatten::flatten(v.clone()).ok()
                             } else {
