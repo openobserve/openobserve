@@ -21,6 +21,14 @@ export interface ServiceGraphParams {
   endTime?: number;
 }
 
+export interface EdgeTrendParams {
+  client_service?: string;
+  server_service?: string;
+  start_time?: number;
+  end_time?: number;
+  stream_name?: string;
+}
+
 const serviceGraphService = {
   /**
    * Get current service graph topology in JSON format
@@ -42,6 +50,24 @@ const serviceGraphService = {
     }
 
     return http().get(`/api/${orgId}/traces/service_graph/topology/current`, {
+      params,
+    });
+  },
+
+  /**
+   * Get latency trend for a specific edge (client → server).
+   * Returns raw time-series data points plus weighted-average baselines.
+   */
+  getEdgeHistory: (orgId: string, options: EdgeTrendParams) => {
+    const params: Record<string, string | number> = {};
+    if (options.client_service) params.client_service = options.client_service;
+    if (options.server_service) params.server_service = options.server_service;
+    if (options.start_time) params.start_time = options.start_time;
+    if (options.end_time) params.end_time = options.end_time;
+    if (options.stream_name && options.stream_name !== "all") {
+      params.stream_name = options.stream_name;
+    }
+    return http().get(`/api/${orgId}/traces/service_graph/edge/history`, {
       params,
     });
   },

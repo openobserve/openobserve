@@ -200,7 +200,8 @@ export const convertTraceServiceMapData = (
 export const convertServiceGraphToTree = (
   graphData: { nodes: any[]; edges: any[] },
   layoutType: string = 'horizontal',
-  isDarkMode: boolean = true
+  isDarkMode: boolean = true,
+  edgeBaselines?: Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>
 ) => {
   // Build adjacency map for edges
   const edgesMap = new Map<string, any[]>();
@@ -311,9 +312,21 @@ export const convertServiceGraphToTree = (
     const nodeErrorRate = node.error_rate ?? (node.requests > 0 ? (node.errors / node.requests) * 100 : 0);
     const borderColor = getNodeColor(nodeErrorRate);
 
-    // Edge line: colored by this edge's P95 latency relative to baseline
+    // Edge line: colored by this edge's P95 latency vs 24h baseline (if available), else percentile-relative
     const edgeP95Ms = incomingEdge ? (incomingEdge.p95_latency_ns || 0) / 1000000 : 0;
-    const edgeColor = incomingEdge ? getEdgeColor(edgeP95Ms) : (isDarkMode ? "#4a5568" : "#d9d9d9");
+    let edgeColor: string;
+    if (!incomingEdge) {
+      edgeColor = isDarkMode ? "#4a5568" : "#d9d9d9";
+    } else {
+      const bKey = `${incomingEdge.from}->${incomingEdge.to}`;
+      const baseline = edgeBaselines?.get(bKey);
+      if (baseline && baseline.p95_avg > 0) {
+        const ratio = (incomingEdge.p95_latency_ns || 0) / baseline.p95_avg;
+        edgeColor = ratio > 2.0 ? "#ff7875" : ratio > 1.5 ? "#ffc069" : "#52c41a";
+      } else {
+        edgeColor = getEdgeColor(edgeP95Ms);
+      }
+    }
 
     // Dynamic size based on request volume — matches graph view formula
     const nodeRequests = node.requests ?? totalRequests;
@@ -587,7 +600,8 @@ export const convertServiceGraphToNetwork = (
   layoutType: string = "force",
   cachedPositions?: Map<string, { x: number; y: number }>,
   isDarkMode: boolean = true,
-  selectedNodeId?: string
+  selectedNodeId?: string,
+  edgeBaselines?: Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>
 ) => {
   // Graph view only supports force-directed layout
   // Tree layouts ('horizontal', 'vertical') should use convertServiceGraphToTree instead
@@ -809,13 +823,25 @@ export const convertServiceGraphToNetwork = (
     const p99 = formatLatency(edge.p99_latency_ns || 0);
 
     // Determine color based on error rate AND latency (P95)
-    // Priority: errors first, then latency
+    // Priority: errors first, then latency vs baseline (if available) or absolute thresholds
     const p95Ms = (edge.p95_latency_ns || 0) / 1000000;
+    const baselineKey = `${edge.from}->${edge.to}`;
+    const baseline = edgeBaselines?.get(baselineKey);
     let edgeColor;
     if (errorRate > 5) {
       edgeColor = "#f5222d"; // Red for high errors
     } else if (errorRate > 1) {
       edgeColor = "#faad14"; // Orange for medium errors
+    } else if (baseline && baseline.p95_avg > 0) {
+      // Baseline-relative coloring: compare current p95 to 24h weighted average
+      const ratio = (edge.p95_latency_ns || 0) / baseline.p95_avg;
+      if (ratio > 2.0) {
+        edgeColor = "#ff7875"; // Light red: >2x baseline
+      } else if (ratio > 1.5) {
+        edgeColor = "#ffc069"; // Light orange: >1.5x baseline
+      } else {
+        edgeColor = "#52c41a"; // Green: within baseline
+      }
     } else if (p95Ms > 1000) {
       edgeColor = "#ff7875"; // Light red for high latency (>1s)
     } else if (p95Ms > 500) {
@@ -828,14 +854,8 @@ export const convertServiceGraphToNetwork = (
       source: edge.from,
       target: edge.to,
       value: edge.total_requests || 0,
-      tooltip: {
-        formatter: edge.from + ' → ' + edge.to + '<br/>' +
-          'Requests: ' + (edge.total_requests || 0) + '<br/>' +
-          'Errors: ' + (edge.failed_requests || 0) + ' (' + errorRate.toFixed(2) + '%)<br/>' +
-          'P50: ' + p50 + '<br/>' +
-          'P95: ' + p95 + '<br/>' +
-          'P99: ' + p99
-      },
+      // Edge tooltips are handled by the mini chart overlay — disable ECharts native tooltip
+      tooltip: { show: false },
       symbol: ['none', 'arrow'], // Arrow at target end
       symbolSize: [0, 12], // Smaller arrows for cleaner look
       lineStyle: {

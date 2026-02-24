@@ -639,6 +639,7 @@ export default defineComponent({
         cleanupChart();
         chart = echarts.init(chartRef.value, theme, {
           renderer: props.renderType,
+          devicePixelRatio: window.devicePixelRatio || 1,
         });
         const options = props.data.options || {};
 

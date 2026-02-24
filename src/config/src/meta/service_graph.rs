@@ -101,3 +101,27 @@ pub struct ServiceEdge {
     pub p95_latency_ns: u64,
     pub p99_latency_ns: u64,
 }
+
+/// One time-series data point in an edge latency trend
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct EdgeTrendDataPoint {
+    pub timestamp: i64,
+    pub p50_latency_ns: u64,
+    pub p95_latency_ns: u64,
+    pub p99_latency_ns: u64,
+    pub total_requests: u64,
+    pub failed_requests: u64,
+}
+
+/// Response for the edge latency trend endpoint.
+/// Includes 24h weighted-average baselines alongside the raw data points.
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct EdgeTrendResponse {
+    /// Weighted-average p50 across all data points (weighted by total_requests)
+    pub p50_avg: u64,
+    /// Weighted-average p95 across all data points (weighted by total_requests)
+    pub p95_avg: u64,
+    /// Weighted-average p99 across all data points (weighted by total_requests)
+    pub p99_avg: u64,
+    pub data_points: Vec<EdgeTrendDataPoint>,
+}
