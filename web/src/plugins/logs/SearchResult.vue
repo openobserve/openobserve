@@ -162,8 +162,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             dense
             class="wrap-content-btn float-right"
-            :class="{ 'wrap-content-btn--active': searchObj.meta.toggleSourceWrap }"
-            @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+            :class="{
+              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
+            }"
+            @click="
+              searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
+            "
           >
             <q-tooltip>
               {{ t("search.messageWrapContent") }}
