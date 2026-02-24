@@ -229,14 +229,6 @@ const store = useStore();
 // For SQL/custom with aggregations (GROUP BY), we should use histogram
 // because histogram is needed for aggregated queries
 const shouldUseHistogram = computed(() => {
-  // SQL mode with aggregations: dont use histogram
-  // if (props.selectedTab === "sql") {
-  //   const parsedSQL = fnParsedSQL(props.query);
-  //   if (parsedSQL && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null)) {
-  //     return false;
-  //   }
-  //   return true;
-  // }
 
   // Custom mode with aggregations: never use histogram
   if (props.selectedTab === "custom" && props.isAggregationEnabled) {
