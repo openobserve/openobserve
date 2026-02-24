@@ -248,16 +248,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :isAggregationEnabled="isAggregationEnabled"
                   :destinations="formData.destinations"
                   :formattedDestinations="getFormattedDestinations"
-                  :template="formData.template"
-                  :templates="templates"
                   @update:trigger="(val) => formData.trigger_condition = val"
                   @update:aggregation="(val) => formData.query_condition.aggregation = val"
                   @update:isAggregationEnabled="(val) => isAggregationEnabled = val"
                   @update:promqlCondition="(val) => formData.query_condition.promql_condition = val"
                   @update:destinations="updateDestinations"
-                  @update:template="(val) => formData.template = val"
                   @refresh:destinations="refreshDestinations"
-                  @refresh:templates="refreshTemplates"
                 />
               </div>
             </div>
@@ -546,7 +542,6 @@ const defaultValue: any = () => {
       timezone: "UTC",
     },
     destinations: [],
-    template: "",
     context_attributes: [],
     enabled: true,
     description: "",
@@ -576,12 +571,8 @@ export default defineComponent({
       type: Array,
       default: () => [],
     },
-    templates: {
-      type: Array,
-      default: () => [],
-    },
   },
-  emits: ["update:list", "cancel:hideform", "refresh:destinations", "refresh:templates"],
+  emits: ["update:list", "cancel:hideform", "refresh:destinations"],
   components: {
     JsonEditor,
     HorizontalStepper,
@@ -1574,9 +1565,6 @@ export default defineComponent({
     const refreshDestinations = () => {
       emit("refresh:destinations");
     }
-    const refreshTemplates = () => {
-      emit("refresh:templates");
-    }
     const updateDestinations = (destinations: any[]) => {
       formData.value.destinations = destinations;
     }
@@ -2209,7 +2197,6 @@ export default defineComponent({
       updateExpandState,
       updateSilence,
       refreshDestinations,
-      refreshTemplates,
       updateDestinations,
       updateTab,
       updateGroup,
