@@ -661,8 +661,6 @@ pub struct FileRecord {
     #[sqlx(default)]
     pub flattened: bool,
     #[sqlx(default)]
-    pub created_at: i64,
-    #[sqlx(default)]
     pub updated_at: i64,
 }
 
