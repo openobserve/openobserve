@@ -4308,7 +4308,7 @@ export default defineComponent({
       }
     };
 
-    const onLogsVisualizeToggleUpdate = (value: any) => {
+    const onLogsVisualizeToggleUpdate = async (value: any) => {
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
       if (
         value === "visualize" &&

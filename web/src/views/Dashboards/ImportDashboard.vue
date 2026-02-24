@@ -334,7 +334,7 @@ export default defineComponent({
     const selectedFolder = ref({
       label:
         store.state.organizationData.folders.find(
-          (item: any) => item.folderId === route.query.folder ?? "default",
+          (item: any) => item.folderId === (route.query.folder ?? "default"),
         )?.name ?? "default",
       value: route.query.folder,
     });
