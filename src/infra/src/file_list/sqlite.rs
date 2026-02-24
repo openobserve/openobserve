@@ -115,8 +115,8 @@ impl super::FileList for SqliteFileList {
         let meta = &file.meta;
         let now_ts = now_micros();
 
-        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);"#)
+        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);"#)
         .bind(&file.account)
         .bind(org_id)
         .bind(stream_key)
@@ -1444,8 +1444,8 @@ impl SqliteFileList {
         }
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
+INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);
         "#).as_str(),
     )
         .bind(id)
@@ -1462,7 +1462,6 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
         .bind(meta.compressed_size)
         .bind(meta.index_size)
         .bind(meta.flattened)
-        .bind(now_ts)
         .bind(now_ts)
         .execute(&*client)
         .await {
@@ -1491,7 +1490,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)").as_str(),
+                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let id = if item.id > 0 { Some(item.id) } else { None };
@@ -1519,7 +1518,6 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
                         .push_bind(item.meta.flattened)
-                        .push_bind(now_ts)
                         .push_bind(now_ts);
                 });
                 query_builder.push(" ON CONFLICT(id) DO NOTHING");
@@ -1621,7 +1619,6 @@ CREATE TABLE IF NOT EXISTS file_list
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
-    created_at      BIGINT not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -1647,7 +1644,6 @@ CREATE TABLE IF NOT EXISTS file_list_history
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
-    created_at      BIGINT not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -1790,11 +1786,6 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
     )
     .await?;
 
-    // create column created_at and updated_at for version >= 0.14.7
-    let column = "created_at";
-    let data_type = "BIGINT default 0 not null";
-    add_column(&client, "file_list", column, data_type).await?;
-    add_column(&client, "file_list_history", column, data_type).await?;
     let column = "updated_at";
     let data_type = "BIGINT default 0 not null";
     add_column(&client, "file_list", column, data_type).await?;
