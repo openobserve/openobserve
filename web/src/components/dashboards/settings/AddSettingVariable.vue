@@ -1313,11 +1313,9 @@ export default defineComponent({
               if (variableData?.query_data?.stream) {
                 // Check if stream is a variable reference (contains $)
                 const isVariableReference = variableData.query_data.stream?.includes('$');
-                console.log("[Variable Config Init] Stream:", variableData.query_data.stream, "Is variable reference:", isVariableReference);
 
                 if (isVariableReference) {
                   // Don't fetch schema for variable references - field list will be empty
-                  console.log("[Variable Config Init] ⚠️ Variable reference detected - skipping schema fetch");
                   data.currentFieldsList = [];
                 } else {
                   // get schema of that field using getstream (only for real streams)
@@ -1342,17 +1340,12 @@ export default defineComponent({
           } catch (error: any) {
             // Check if the error is for a variable reference (should be suppressed)
             const isVariableReference = variableData?.query_data?.stream?.includes('$');
-            console.error("[Variable Config Init] Error loading stream/fields:", error);
-            console.log("[Variable Config Init] Is variable reference:", isVariableReference);
 
             if (!isVariableReference) {
               // Only show error if it's NOT a variable reference
-              console.error("[Variable Config Init] Showing error notification");
               showErrorNotification(error ?? "Failed to get stream fields", {
                 timeout: 2000,
               });
-            } else {
-              console.log("[Variable Config Init] ✅ Suppressing error for variable reference (expected)");
             }
           }
         }
@@ -1616,11 +1609,8 @@ export default defineComponent({
       try {
         // Check if stream is a variable reference FIRST (contains $)
         const isVariableReference = variableData.query_data.stream?.includes('$');
-        console.log("[Variable Config] Is variable reference:", isVariableReference);
 
         if (isVariableReference) {
-          console.log("[Variable Config] ⚠️ Variable reference detected - skipping schema fetch");
-          console.log("[Variable Config] Field list will be available at runtime");
           // Don't reset field if it already has a value (editing mode)
           if (!variableData.query_data.field) {
             variableData.query_data.field = "";
@@ -1652,18 +1642,13 @@ export default defineComponent({
           data.currentFieldsList = [];
         }
       } catch (error: any) {
-        console.error("[Variable Config] ❌ Error in streamUpdated:", error);
         // Only show error if it's not a variable reference
         const isVariableReference = variableData.query_data.stream?.includes('$');
-        console.log("[Variable Config] Error - is variable reference:", isVariableReference);
 
         if (!isVariableReference) {
-          console.error("[Variable Config] Showing error notification");
           showErrorNotification(error ?? "Failed to get stream fields", {
             timeout: 2000,
           });
-        } else {
-          console.log("[Variable Config] ✅ Suppressing error for variable reference (expected)");
         }
       }
     };

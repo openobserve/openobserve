@@ -527,7 +527,6 @@ export default defineComponent({
 
           // Resolve field name for searching in response
           const resolvedFieldName = resolveVariableValue(variableObject.query_data.field);
-          console.log(`[Variable Resolution] Searching response for field: "${variableObject.query_data.field}" → "${resolvedFieldName}"`);
 
           const fieldHit = hits.find(
             (field: any) => field.field === resolvedFieldName,
@@ -812,9 +811,6 @@ export default defineComponent({
       const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
       const resolvedField = resolveVariableValue(variableObject.query_data.field);
 
-      console.log(`[Variable Resolution] Stream: "${variableObject.query_data.stream}" → "${resolvedStream}"`);
-      console.log(`[Variable Resolution] Field: "${variableObject.query_data.field}" → "${resolvedField}"`);
-
       const payload = {
         fields: [resolvedField],
         size: variableObject.query_data.max_record_size || 10,
@@ -837,17 +833,10 @@ export default defineComponent({
       };
       try {
         // Log the payload and trace id for debugging
-        console.log("[Variable Resolution] 📤 API Request Payload:");
-        console.log("  Stream:", payload.stream_name);
-        console.log("  Fields:", payload.fields);
-        console.log("  Original stream:", variableObject.query_data.stream);
-        console.log("  Original field:", variableObject.query_data.field);
-
         // Start new streaming connection
         initializeStreamingConnection(wsPayload, variableObject);
         addTraceId(variableObject.name, wsPayload.traceId);
       } catch (error) {
-        console.error("[Variable Resolution] ❌ Error fetching variable values:", error);
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
       }
@@ -2066,9 +2055,6 @@ export default defineComponent({
       const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
       const resolvedField = resolveVariableValue(variableObject.query_data.field);
 
-      console.log(`[Variable Resolution SQL] Stream: "${variableObject.query_data.stream}" → "${resolvedStream}"`);
-      console.log(`[Variable Resolution SQL] Field: "${variableObject.query_data.field}" → "${resolvedField}"`);
-
       let dummyQuery: string;
 
       if (searchText) {
@@ -2163,9 +2149,6 @@ export default defineComponent({
       // Resolve variable references in stream and field names
       const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
       const resolvedField = resolveVariableValue(variableObject.query_data.field);
-
-      console.log(`[Variable Resolution REST] Stream: "${variableObject.query_data.stream}" → "${resolvedStream}"`);
-      console.log(`[Variable Resolution REST] Field: "${variableObject.query_data.field}" → "${resolvedField}"`);
 
       const payload = {
         org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
