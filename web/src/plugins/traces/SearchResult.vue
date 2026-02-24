@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="traces-search-result" class="col column overflow-hidden">
-    <div data-test="traces-search-result-list" class="search-list tw:w-full">
-      <!-- RED Metrics Dashboard -->
+  <div data-test="traces-search-result" class="overflow-hidden tw:h-full">
+    <!-- ════════════════════ RED Metrics Section ════════════════════ -->
+    <div class="card-container tw:bg-white! tw:h-fit tw:overflow-hidden">
       <transition
         enter-active-class="transition-all duration-300 ease-in-out"
         leave-active-class="transition-all duration-300 ease-in-out"
@@ -48,20 +48,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @filters-updated="onMetricsFiltersUpdated"
         />
       </transition>
-
-      <div
-        data-test="traces-search-result-count"
-        class="text-bold q-pt-sm tw:pb-[0.125rem]! tw:pl-[0.8rem]! tw:text-[0.85rem]"
-        v-show="
-          searchObj.data.stream.selectedStream.value &&
-          !searchObj.data.errorMsg?.trim()?.length &&
-          !searchObj.loading &&
-          searchObj.searchApplied
-        "
-      >
-        {{ searchObj.data.queryResults?.hits?.length || 0 }} Traces
-      </div>
-
+    </div>
+    <div
+      class="card-container tw:bg-white! tw:overflow-hidden tw:mt-[0.625rem] tw:duration-300 tw:ease-in"
+      :class="
+        searchObj.meta.showHistogram
+          ? 'tw:h-[calc(100%-16.8rem)]!'
+          : 'tw:h-[calc(100%-3.25rem)]!'
+      "
+    >
+      <!-- ════════════════════ Loading State ════════════════════ -->
       <div
         class="full-height flex justify-center items-center tw:pt-[4rem]"
         v-if="searchObj.loading == true"
@@ -77,54 +73,117 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
       </div>
+
+      <!-- ════════════════════ Empty State ════════════════════ -->
       <div
-        v-else-if="
-          searchObj.data.queryResults.hasOwnProperty('total') &&
-          searchObj.data.queryResults?.hits?.length == 0 &&
-          searchObj.loading == false
-        "
+        v-else-if="noResults"
         class="text-center tw:mx-[10%] tw:my-[40px] tw:text-[20px]"
       >
         <q-icon name="info" color="primary" size="md" /> No traces found. Please
         adjust the filters and try again.
       </div>
-      <q-virtual-scroll
+
+      <!-- ════════════════════ Traces List Section ════════════════════ -->
+      <div
         v-else
-        v-show="
-          searchObj.data.queryResults.hasOwnProperty('total') &&
-          !!searchObj.data.queryResults?.hits?.length
-        "
-        id="tracesSearchGridComponent"
-        data-test="traces-search-result-virtual-scroll"
-        :items="searchObj.data.queryResults.hits"
-        class="traces-table-container"
-        :class="
-          searchObj.meta.showHistogram
-            ? 'tw:h-[calc(100vh-30rem)]'
-            : 'tw:h-[calc(100vh-14.50rem)]'
-        "
-        v-slot="{ item, index }"
-        :virtual-scroll-item-size="25"
-        :virtual-scroll-sticky-size-start="0"
-        :virtual-scroll-sticky-size-end="0"
-        :virtual-scroll-slice-size="50"
-        :virtual-scroll-slice-ratio-before="10"
-        @virtual-scroll="onScroll"
+        v-show="hasResults"
+        data-test="traces-table-wrapper"
+        class="traces-section column tw:h-full"
       >
-        <q-item data-test="traces-search-result-item" :key="index" dense>
-          <TraceBlock
+        <!-- Section header: title + count badge (left) | pagination controls (right) -->
+        <div
+          data-test="traces-section-header"
+          class="traces-section-header row items-center q-px-sm q-py-xs tw:bg-[var(--o2-section-header-bg)]!"
+          v-show="
+            searchObj.data.stream.selectedStream.value &&
+            !searchObj.data.errorMsg?.trim()?.length &&
+            searchObj.searchApplied
+          "
+        >
+          <!-- Left: label + count -->
+          <span
+            data-test="traces-section-title"
+            class="tw:text-[0.75rem] tw:font-bold tw:tracking-[0.0625rem]! tw:text-[var(--o2-text-1)]! tw:mr-[0.85rem]"
+          >
+            TRACES
+          </span>
+          <q-badge
+            data-test="traces-count-badge"
+            rounded
+            :label="`${hits.length} Traces Found`"
+            class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
+          />
+
+          <q-space />
+
+          <!-- Right: rows-per-page + range info + page buttons -->
+          <div class="pagination-block tw:flex tw:items-center">
+            <q-select
+              v-model="rowsPerPage"
+              :options="rowsPerPageOptions"
+              dense
+              borderless
+              data-test="traces-rows-per-page"
+              class="tw:m-0! select-pagination"
+              @update:model-value="onRowsPerPageChange"
+            />
+            <q-pagination
+              v-model="pageInput"
+              :max="totalPages"
+              :max-pages="5"
+              :input="false"
+              :boundary-numbers="false"
+              direction-links
+              size="sm"
+              color="primary"
+              active-design="unelevated"
+              data-test="traces-pagination"
+              icon-first="skip_previous"
+              icon-last="skip_next"
+              icon-prev="fast_rewind"
+              icon-next="fast_forward"
+              rowsPerPageLabel="Rows per page"
+              @update:model-value="onPageChange"
+              class="paginator-section tw:mt-0!"
+            />
+          </div>
+        </div>
+
+        <!-- Table scroll area -->
+        <div
+          data-test="traces-search-result-list"
+          class="traces-table-scroll-area"
+        >
+          <!-- Sticky column header -->
+          <TracesTableHeader
+            :show-llm-columns="hasLlmTraces"
+            class="tw:bg-white!"
+          />
+
+          <!-- Paginated trace rows -->
+          <TraceRow
+            v-for="(item, idx) in pagedHits"
+            :key="item.trace_id || idx"
+            data-test="traces-search-result-item"
             :item="item"
-            :index="index"
+            :index="idx"
+            :show-llm-columns="hasLlmTraces"
             @click="expandRowDetail(item)"
           />
-        </q-item>
-      </q-virtual-scroll>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, ref } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  defineComponent,
+  ref,
+  watch,
+} from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -133,12 +192,17 @@ import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import TraceBlock from "./TraceBlock.vue";
+import TraceRow from "./TraceRow.vue";
+import TracesTableHeader from "./TracesTableHeader.vue";
 import { useRouter } from "vue-router";
+import { isLLMTrace } from "../../utils/llmUtils";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     TraceBlock,
+    TraceRow,
+    TracesTableHeader,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
     ),
@@ -165,31 +229,16 @@ export default defineComponent({
         this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
     },
-    onScroll(info: any) {
-      if (
-        info.ref.items.length / info.index <= 1.2 &&
-        this.searchObj.loading == false &&
-        this.searchObj.data.resultGrid.currentPage <=
-          this.searchObj.data.queryResults.from /
-            this.searchObj.meta.resultGrid.rowsPerPage &&
-        this.searchObj.data.queryResults.hits.length >
-          this.searchObj.meta.resultGrid.rowsPerPage *
-            this.searchObj.data.resultGrid.currentPage
-      ) {
-        this.searchObj.data.resultGrid.currentPage += 1;
-        this.$emit("update:scroll");
-      }
-    },
     onTimeBoxed(obj: any) {
       this.searchObj.meta.showDetailTab = false;
       this.searchObj.data.searchAround.indexTimestamp = obj.key;
       this.$emit("search:timeboxed", obj);
     },
   },
-  setup(props, { emit }) {
+  setup(_props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
+    useQuasar();
     const router = useRouter();
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();
@@ -213,7 +262,7 @@ export default defineComponent({
       emit("get:traceDetails", props);
     };
 
-    const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
+    const getRowIndex = (next: boolean, _prev: boolean, oldIndex: number) => {
       if (next) {
         return oldIndex + 1;
       } else {
@@ -222,7 +271,6 @@ export default defineComponent({
     };
 
     const addSearchTerm = (term: string) => {
-      // searchObj.meta.showDetailTab = false;
       searchObj.data.stream.addToFilter = term;
     };
 
@@ -234,7 +282,6 @@ export default defineComponent({
       start: number;
       end: number;
     }) => {
-      // Update the datetime and trigger a new search
       emit("update:datetime", {
         start: range.start,
         end: range.end,
@@ -242,13 +289,74 @@ export default defineComponent({
     };
 
     const onMetricsFiltersUpdated = (filters: string[]) => {
-      // Pass filters up to Index.vue to update Query Editor
       emit("metrics:filters-updated", filters);
     };
 
     const getDashboardData = () => {
       metricsDashboardRef?.value?.loadDashboard();
     };
+
+    const hasLlmTraces = computed(() =>
+      (searchObj.data.queryResults?.hits ?? []).some((hit: any) =>
+        isLLMTrace(hit),
+      ),
+    );
+
+    // -----------------------------------------------------------------------
+    // Pagination
+    // -----------------------------------------------------------------------
+    const rowsPerPageOptions = [10, 25, 50, 100];
+    const rowsPerPage = ref<number>(
+      searchObj.meta.resultGrid.rowsPerPage || 25,
+    );
+    const pageInput = ref(1);
+
+    const hits = computed<any[]>(() => searchObj.data.queryResults?.hits ?? []);
+
+    const noResults = computed(
+      () =>
+        Object.prototype.hasOwnProperty.call(
+          searchObj.data.queryResults,
+          "total",
+        ) &&
+        hits.value.length === 0 &&
+        !searchObj.loading,
+    );
+
+    const hasResults = computed(
+      () =>
+        Object.prototype.hasOwnProperty.call(
+          searchObj.data.queryResults,
+          "total",
+        ) && hits.value.length > 0,
+    );
+
+    const totalPages = computed(() =>
+      Math.max(1, Math.ceil(hits.value.length / rowsPerPage.value)),
+    );
+
+    const pagedHits = computed(() => {
+      const rpp = rowsPerPage.value;
+      const page = pageInput.value;
+      return hits.value.slice((page - 1) * rpp, page * rpp);
+    });
+
+    const onPageChange = (page: number) => {
+      pageInput.value = page;
+    };
+
+    const onRowsPerPageChange = (rpp: number) => {
+      searchObj.meta.resultGrid.rowsPerPage = rpp;
+      pageInput.value = 1;
+    };
+
+    // Reset to first page whenever a new search kicks off
+    watch(
+      () => searchObj.loading,
+      (isLoading) => {
+        if (isLoading) pageInput.value = 1;
+      },
+    );
 
     return {
       t,
@@ -267,190 +375,51 @@ export default defineComponent({
       onMetricsTimeRangeSelected,
       onMetricsFiltersUpdated,
       getDashboardData,
+      hasLlmTraces,
+      // Pagination
+      rowsPerPageOptions,
+      rowsPerPage,
+      pageInput,
+      hits,
+      noResults,
+      hasResults,
+      totalPages,
+      pagedHits,
+      onPageChange,
+      onRowsPerPageChange,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
+@import "@/styles/pagination.scss";
+
+/* ── Traces list section ─────────────────────────────────────────────────── */
+.traces-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.traces-section-header {
+  flex-shrink: 0;
+  min-height: 40px;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+  padding: 4px 8px;
+}
+
+/* Scrollable area that holds the column header + rows */
+.traces-table-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  position: relative;
+}
+
+/* ── Leftover table styles (kept for backward compat) ────────────────────── */
 .max-result {
   width: 170px;
-}
-
-.search-list {
-  width: 100%;
-
-  .my-sticky-header-table {
-    .q-table__top,
-    .q-table__bottom,
-    thead tr:first-child th {
-      /* bg color is important for th; just specify one */
-      background-color: white;
-    }
-
-    thead tr th {
-      position: sticky;
-      z-index: 1;
-    }
-
-    thead tr:first-child th {
-      top: 0;
-    }
-
-    /* this is when the loading indicator appears */
-    &.q-table--loading thead tr:last-child th {
-      /* height of all previous header rows */
-      top: 48px;
-    }
-  }
-
-  .q-table__top {
-    padding-left: 0;
-    padding-top: 0;
-  }
-
-  .q-table thead tr,
-  .q-table tbody td,
-  .q-table th,
-  .q-table td {
-    height: 25px;
-    padding: 0px 5px;
-    font-size: 0.75rem;
-  }
-
-  .q-table__bottom {
-    width: 100%;
-  }
-
-  .q-table__bottom {
-    min-height: 40px;
-    padding-top: 0;
-    padding-bottom: 0;
-  }
-
-  .q-td {
-    overflow: hidden;
-    min-width: 100px;
-
-    .expanded {
-      margin: 0;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      word-break: break-all;
-    }
-  }
-
-  .highlight {
-    background-color: rgb(255, 213, 0);
-  }
-
-  .table-header {
-    // text-transform: capitalize;
-
-    .table-head-chip {
-      background-color: $accent;
-      padding: 0px;
-
-      .q-chip__content {
-        margin-right: 0.5rem;
-        font-size: 0.75rem;
-        color: $dark;
-      }
-
-      .q-chip__icon--remove {
-        height: 1rem;
-        width: 1rem;
-        opacity: 1;
-        margin: 0;
-
-        &:hover {
-          opacity: 0.7;
-        }
-      }
-
-      .q-table th.sortable {
-        cursor: pointer;
-        text-transform: capitalize;
-        font-weight: bold;
-      }
-    }
-
-    &.isClosable {
-      padding-right: 26px;
-      position: relative;
-
-      .q-table-col-close {
-        transform: translateX(26px);
-        position: absolute;
-        margin-top: 2px;
-        color: grey;
-        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
-      }
-    }
-
-    .q-table th.sortable {
-      cursor: pointer;
-      text-transform: capitalize;
-      font-weight: bold;
-    }
-  }
-}
-.thead-sticky tr > *,
-.tfoot-sticky tr > * {
-  position: sticky;
-  opacity: 1;
-  z-index: 1;
-  background: #f5f5f5;
-}
-
-.q-table--dark .thead-sticky tr > *,
-.q-table--dark .tfoot-sticky tr > * {
-  background: #565656;
-}
-.thead-sticky tr:last-child > * {
-  top: 0;
-}
-
-.tfoot-sticky tr:first-child > * {
-  bottom: 0;
-}
-
-.field_list {
-  padding: 0px;
-  margin-bottom: 0.125rem;
-  position: relative;
-  overflow: visible;
-  cursor: default;
-
-  .field_overlay {
-    position: absolute;
-    height: 100%;
-    right: 0;
-    top: 0;
-    background-color: #ffffff;
-    border-radius: 6px;
-    padding: 0 6px;
-    visibility: hidden;
-    display: flex;
-    align-items: center;
-    transition: all 0.3s linear;
-
-    .q-icon {
-      cursor: pointer;
-      opacity: 0;
-      transition: all 0.3s linear;
-      margin: 0 1px;
-    }
-  }
-
-  &:hover {
-    .field_overlay {
-      visibility: visible;
-
-      .q-icon {
-        opacity: 1;
-      }
-    }
-  }
 }
 </style>

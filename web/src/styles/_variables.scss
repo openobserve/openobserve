@@ -491,6 +491,17 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --tw-border-style: #e5e7eb;
 
+  --o2-section-header-bg: #F8FAFC;
+
+  --o2-text-3: #94A3B8;
+  --o2-text-1: #64748B;
+  --o2-text-2: #475569;
+  --o2-text-4: #334155;
+
+  --o2-tag-grey-1: #E2E8F0;
+  --o2-tag-grey-2: #F1F5F9;
+
+
   // Span Colors for Traces (Light Mode)
   --o2-span-1: #{$o2-span-1};
   --o2-span-2: #{$o2-span-2};
@@ -620,7 +631,7 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
 
-    --o2-table-actions-bg: #1f2223;
+  --o2-table-actions-bg: #1f2223;
 
 
   --o2-tab-bg: color-mix(in srgb, white 20%, var(--o2-theme-color));
@@ -629,7 +640,7 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #112027);
   --o2-actions-column-shawdow: rgba(125, 125, 125, 0.694);
 
-    --q-primary: var(--o2-dark-theme-color);
+  --q-primary: var(--o2-dark-theme-color);
 
   // JSON Syntax Highlighting
   --o2-json-key: #{$json-key-dark};
@@ -702,6 +713,8 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-trace-text-secondary: #{$o2-dark-gray-1000};
   --o2-trace-hover: #{$o2-dark-gray-300};
   --o2-trace-selected: #{$o2-dark-blue-300};
+
+  
 }
 
 // ============================================
