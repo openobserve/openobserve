@@ -112,7 +112,10 @@
     "id": "IDENTIFIANT",
     "getStarted": "Commencez",
     "reset": "Réinitialiser",
-    "retry": "Réessayez"
+    "retry": "Réessayez",
+    "copy": "Copier",
+    "copySuccess": "Copié dans le presse-papiers",
+    "copyError": "Impossible de copier dans le presse-papiers"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -232,8 +235,10 @@
     "patternColumnHeader": "Motif",
     "occurrenceColumnHeader": "Événement",
     "percentageColumnHeader": "Pourcentage",
+    "anomalyColumnHeader": "Anomalie",
     "actionsColumnHeader": "Actions",
     "anomalyLabel": "ANOMALIE",
+    "anomalyDetected": "Anomalie détectée",
     "includePatternInSearch": "Inclure un motif dans la recherche",
     "excludePatternFromSearch": "Exclure le modèle de la recherche",
     "showPatternDetails": "Afficher les détails ({variables} variables, {exemples} exemples)",
@@ -307,7 +312,14 @@
     "show": "Afficher",
     "editor": "Rédacteur",
     "webUrlNotConfigured": "L'URL de partage est désactivée jusqu'à ce que ZO_WEB_URL soit configuré par votre administrateur.",
-    "showHideColumns": "Afficher/masquer les colonnes"
+    "showHideColumns": "Afficher/masquer les colonnes",
+    "autoRefresh": "Actualisation automatique",
+    "createSavedView": "Créer une vue enregistrée",
+    "listSavedViews": "Répertorier les vues enregistrées",
+    "buildQuery": "Construisez",
+    "enableSqlModeForBuild": "Activez le mode SQL et sélectionnez un seul flux pour utiliser le générateur de requêtes",
+    "applyToSearch": "Appliquer à la recherche",
+    "complexQueryDetected": "Requête complexe détectée. Utilisation du mode personnalisé."
   },
   "menu": {
     "home": "Accueil",
@@ -1482,7 +1494,10 @@
     "SQL": "SQL",
     "builder": "Constructeur",
     "custom": "Personnalisé",
-    "sqlBuilder": "Générateur SQL"
+    "sqlBuilder": "Générateur SQL",
+    "generatedSql": "SQL généré",
+    "enterCustomSql": "Entrez votre requête SQL personnalisée...",
+    "customSql": "SQL personnalisé"
   },
   "home": {
     "streams": "Ruisseaux",
@@ -2036,7 +2051,10 @@
     "customWebhook": "Personnalisé (Webhook)",
     "customEmail": "Personnalisé (e-mail)",
     "customAction": "Personnalisé (Action)",
-    "custom": "Personnalisé"
+    "custom": "Personnalisé",
+    "separator": "Séparateur",
+    "separator_placeholder": "Entrez un séparateur (par exemple, |,\\n, \\ t, espace)",
+    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)"
   },
   "metrics": {
     "searchMetric": "Rechercher une métrique",
@@ -2848,7 +2866,12 @@
     },
     "viewInTraces": "Afficher dans Traces",
     "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées",
-    "exportToJson": "Exporter au format JSON"
+    "exportToJson": "Exporter au format JSON",
+    "noLogsDescription": "Aucun journal n'a été trouvé pour cette corrélation dans la plage de temps sélectionnée.",
+    "tracesErrorDetails": "Une erreur s'est produite lors de la récupération des données de trace. Veuillez réessayer.",
+    "metricsError": "Impossible de charger les métriques",
+    "metricsErrorDetails": "Une erreur s'est produite lors de la récupération des données des métriques. Veuillez réessayer.",
+    "noMetricsDescription": "Aucune métrique n'a été trouvée pour cette corrélation dans la plage de temps sélectionnée."
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",

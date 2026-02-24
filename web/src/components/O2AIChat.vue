@@ -356,6 +356,17 @@
                       <span class="tool-call-name">
                         {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
                       </span>
+                      <!-- Navigation icon -->
+                      <q-icon
+                        v-if="block.navigationAction && !block.pendingConfirmation"
+                        name="open_in_new"
+                        size="14px"
+                        color="primary"
+                        class="navigation-icon"
+                        @click.stop="handleNavigationAction(block.navigationAction)"
+                      >
+                        <q-tooltip>{{ block.navigationAction.label }}</q-tooltip>
+                      </q-icon>
                       <q-icon
                         v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
                         :name="isToolCallExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
@@ -619,6 +630,23 @@
                     <div v-if="block.recoverable" class="stream-error-recoverable">
                       This error may be temporary. You can try again.
                     </div>
+                  </div>
+                  <!-- Navigation block - standalone navigation button -->
+                  <div
+                    v-else-if="block.type === 'navigation' && block.navigationAction"
+                    class="navigation-block"
+                    :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+                  >
+                    <q-btn
+                      dense
+                      no-caps
+                      unelevated
+                      color="primary"
+                      :icon="'open_in_new'"
+                      :label="block.navigationAction.label"
+                      class="navigation-block-btn"
+                      @click="handleNavigationAction(block.navigationAction)"
+                    />
                   </div>
                   <!-- Text block - render with markdown processing -->
                   <template v-else-if="block.type === 'text' && block.text">
@@ -902,10 +930,11 @@ import { MarkedOptions } from 'marked';
 import DOMPurify from 'dompurify';
 import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
+import { useRouter } from 'vue-router';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
-import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
+import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, NavigationAction, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 
@@ -1008,6 +1037,7 @@ export default defineComponent({
     const currentChatId = ref<number | null>(null);
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const store = useStore ();
+    const router = useRouter();
     const chatUpdated = computed(() => store.state.chatUpdated);
 
     const currentChatTimestamp = ref<string | null>(null);
@@ -1702,7 +1732,7 @@ export default defineComponent({
                     return;
                   }
 
-                  // Handle complete events - complete any active tool call
+                  // Handle complete events - complete any active tool call and flush navigation
                   if (data && data.type === 'complete') {
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
@@ -1720,6 +1750,8 @@ export default defineComponent({
                       }
                       activeToolCall.value = null;
                     }
+
+                    await scrollToBottom();
                     continue;
                   }
 
@@ -1735,6 +1767,16 @@ export default defineComponent({
                       response: data.response || undefined,
                     };
 
+                    // Generate navigation from tool result if applicable
+                    let navigationAction: NavigationAction | null = null;
+                    if (data.success !== false && data.call_args) {
+                      navigationAction = generateNavigationFromToolResult(
+                        data.tool,
+                        data.call_args,
+                        data
+                      );
+                    }
+
                     // If active tool call matches, complete it with result data
                     if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
                       const completedToolBlock: ContentBlock = {
@@ -1742,7 +1784,8 @@ export default defineComponent({
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context,
-                        ...resultData
+                        ...resultData,
+                        ...(navigationAction && { navigationAction })
                       };
                       let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
@@ -1760,6 +1803,9 @@ export default defineComponent({
                           const block = lastMessage.contentBlocks[i];
                           if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
                             Object.assign(block, resultData);
+                            if (navigationAction) {
+                              block.navigationAction = navigationAction;
+                            }
                             break;
                           }
                         }
@@ -1774,6 +1820,19 @@ export default defineComponent({
                       }
                     }
                     await scrollToBottom();
+                    continue;
+                  }
+
+                  // Handle navigation_action events - always navigate immediately
+                  // (clickable buttons on tool results are generated by frontend from tool_result data)
+                  if (data && data.type === 'navigation_action') {
+                    const navAction: NavigationAction = {
+                      resource_type: data.resource_type,
+                      action: data.action,
+                      label: data.label,
+                      target: data.target,
+                    };
+                    await handleNavigationAction(navAction);
                     continue;
                   }
 
@@ -2066,55 +2125,6 @@ export default defineComponent({
                       pendingToolCalls.value.push(completedToolBlock);
                     }
                     activeToolCall.value = null;
-                  }
-                  continue;
-                }
-
-                // Handle tool_result events - enrich tool call with result data
-                if (data && data.type === 'tool_result') {
-                  const resultData = {
-                    success: data.success !== false,
-                    resultMessage: data.message || '',
-                    summary: data.summary || undefined,
-                    errorType: data.error_type || undefined,
-                    suggestion: data.suggestion || undefined,
-                    details: data.details || undefined,
-                  };
-
-                  if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
-                    const completedToolBlock: ContentBlock = {
-                      type: 'tool_call',
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
-                      ...resultData
-                    };
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                    if (lastMessage && lastMessage.role === 'assistant') {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(completedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(completedToolBlock);
-                    }
-                    activeToolCall.value = null;
-                  } else {
-                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                    if (lastMessage && lastMessage.contentBlocks) {
-                      for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
-                        const block = lastMessage.contentBlocks[i];
-                        if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
-                          Object.assign(block, resultData);
-                          break;
-                        }
-                      }
-                    }
-                    for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
-                      const block = pendingToolCalls.value[i];
-                      if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
-                        Object.assign(block, resultData);
-                        break;
-                      }
-                    }
                   }
                   continue;
                 }
@@ -2586,6 +2596,248 @@ export default defineComponent({
         console.error('Error cancelling action:', error);
       }
       pendingConfirmation.value = null;
+    };
+
+    // Generate navigation action from tool result data (generic, pattern-based)
+    //
+    // Expected backend response format:
+    // - Search tools: Must have SQL query in callArgs.request_body.query.sql
+    // - Create/Get/Update/Delete tools: Must return {resource}_id in response
+    //   Examples: alert_id, dashboard_id, pipeline_id, stream_id, etc.
+    //   Optional fields: name, folder (will use 'default' if not provided)
+    const generateNavigationFromToolResult = (toolName: string, callArgs: any, responseBody: any): NavigationAction | null => {
+      if (!callArgs) {
+        return null;
+      }
+
+      // Pattern 1: Search tools (has SQL query) → load_query navigation
+      const requestBody = callArgs.request_body || {};
+      const query = requestBody.query || {};
+      const sql = query.sql || '';
+
+      if (sql) {
+        const streamType = callArgs.stream_type || 'logs';
+        let streamName = callArgs.stream_name || '';
+
+        // If stream_name is not in callArgs, try to extract it from the SQL query
+        if (!streamName) {
+          // Extract stream name from FROM clause (handles quoted and unquoted table names)
+          const fromMatch = sql.match(/FROM\s+["']?([^"'\s,()]+)["']?/i);
+          if (fromMatch) {
+            streamName = fromMatch[1];
+          }
+        }
+
+        const vrlFunction = query.functionContent || requestBody.function || requestBody.functionContent;
+
+        // Don't generate navigation if time range is missing
+        if (query.start_time === undefined || query.end_time === undefined) {
+          return null;
+        }
+
+        // Don't generate navigation if stream name is still missing
+        if (!streamName) {
+          return null;
+        }
+
+        const target: any = {
+          query: sql,
+          sql_mode: true,
+          from: query.start_time,
+          to: query.end_time,
+          stream: streamName.split(','),
+        };
+
+        if (vrlFunction) {
+          target.functionContent = vrlFunction;
+        }
+
+        return {
+          resource_type: streamType,
+          action: 'load_query',
+          label: `View in ${streamType.charAt(0).toUpperCase() + streamType.slice(1)}`,
+          target
+        };
+      }
+
+      // Pattern 2: Create/Get tools (has ID) → navigate_direct
+      // Extract resource type from tool name (CreateAlert → alert, GetDashboard → dashboard, createPipeline → pipeline)
+      const resourceTypeMatch = toolName.match(/^(create|get|update|delete)(.+)$/i);
+      if (!resourceTypeMatch) return null;
+
+      const resourceType = resourceTypeMatch[2].toLowerCase(); // Alert → alert, Dashboard → dashboard, Pipeline → pipeline
+
+      // Parse response data - it might be in different formats
+      let parsedResponse: any = {};
+      if (responseBody) {
+        // If responseBody has a 'response' field (from SRE agent tool_result event)
+        if (responseBody.response) {
+          let responseData = responseBody.response;
+          // If response is a JSON string, parse it
+          if (typeof responseData === 'string') {
+            try {
+              responseData = JSON.parse(responseData);
+            } catch (e) {
+              console.warn('[Navigation] Failed to parse response string:', e);
+            }
+          }
+          // Extract from versioned response (v8, v7, etc.) for dashboards
+          if (typeof responseData === 'object' && responseData !== null) {
+            parsedResponse = responseData.v8 || responseData.v7 || responseData.v6 || responseData.v5 || responseData;
+          } else {
+            parsedResponse = responseData;
+          }
+        }
+        // If responseBody has 'content' array (MCP format)
+        else if (responseBody.content && Array.isArray(responseBody.content) && responseBody.content[0]?.text) {
+          try {
+            const textContent = responseBody.content[0].text;
+            const parsed = JSON.parse(textContent);
+            // Extract from versioned response (v8, v7, etc.)
+            parsedResponse = parsed.v8 || parsed.v7 || parsed.v6 || parsed.v5 || parsed;
+          } catch (e) {
+            console.warn('[Navigation] Failed to parse content text:', e);
+          }
+        }
+        // Otherwise use responseBody as-is
+        else {
+          parsedResponse = responseBody;
+        }
+      }
+
+      // Merge data from parsed response, call args, and call args request_body for ID/field lookup
+      const requestBodyFromArgs = (callArgs || {}).request_body || {};
+      const data = { ...parsedResponse, ...(callArgs || {}), ...requestBodyFromArgs };
+
+      // Standard pattern: {resource}_id (e.g., alert_id, dashboard_id, pipeline_id)
+      const resourceIdField = `${resourceType}_id`;
+      let resourceId = data[resourceIdField] || data.id;
+
+      // Also check camelCase variants (dashboardId, alertId)
+      if (!resourceId) {
+        const camelCaseField = resourceType + 'Id';
+        resourceId = data[camelCaseField];
+      }
+
+      if (!resourceId) {
+        return null;
+      }
+
+      // Build target with consistent {resource}_id pattern
+      const target: any = {
+        [resourceIdField]: resourceId  // e.g., alert_id, dashboard_id, pipeline_id
+      };
+
+      // Add name if available (required for some resources like alerts)
+      const name = data.name;
+      if (name) {
+        target.name = name;
+      }
+
+      // Add folder if available (default to 'default' for resources that use folders)
+      const folder = data.folder;
+      if (folder || resourceType === 'alert' || resourceType === 'dashboard') {
+        target.folder = folder || 'default';
+      }
+
+      return {
+        resource_type: resourceType,
+        action: 'navigate_direct',
+        label: `View ${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)}`,
+        target
+      };
+    };
+
+    const handleNavigationAction = async (action: NavigationAction) => {
+      // Helper to encode strings for URL (same as search history)
+      const encodeForUrl = (str: string) => btoa(unescape(encodeURIComponent(str)));
+
+      if (action.action === 'load_query') {
+        const targetPath = `/${action.resource_type}`;
+        const target = action.target;
+
+        // Build query object similar to SearchHistory goToLogs function
+        const queryParams: Record<string, string> = {
+          org_identifier: store.state.selectedOrganization.identifier,
+          stream_type: action.resource_type, // logs, metrics, traces
+          refresh: '0',
+          sql_mode: target.sql_mode?.toString() || 'false',
+          quick_mode: 'false',
+          show_histogram: 'true',
+          type: 'ai_chat_query',
+        };
+
+        // Add stream (comma-separated if array)
+        if (target.stream) {
+          queryParams.stream = Array.isArray(target.stream)
+            ? target.stream.join(',')
+            : target.stream;
+        }
+
+        // Add time range (prefer absolute from/to over period)
+        if (target.from !== undefined && target.to !== undefined) {
+          queryParams.from = target.from.toString();
+          queryParams.to = target.to.toString();
+        } else if (target.period) {
+          queryParams.period = target.period;
+        }
+
+        // Add base64 encoded query
+        if (target.query) {
+          queryParams.query = encodeForUrl(target.query);
+        }
+
+        // Add VRL function if present
+        if (target.functionContent) {
+          queryParams.functionContent = encodeForUrl(target.functionContent);
+          queryParams.fn_editor = 'true';
+        } else {
+          queryParams.fn_editor = 'false';
+        }
+
+        // Navigate using same pattern as search history
+        await router.push({
+          path: targetPath,
+          query: queryParams
+        });
+
+      } else if (action.action === 'navigate_direct') {
+        // Direct navigation - build proper URLs based on resource type
+        let path = action.target.path || `/${action.resource_type}`;
+        const queryParams: Record<string, string> = {
+          org_identifier: store.state.selectedOrganization.identifier,
+          ...action.target.query
+        };
+
+        // Resource-type-specific URL handling
+        if (action.resource_type === 'alert') {
+          path = '/alerts';
+          const alertId = action.target.alert_id || action.target.query?.alert_id;
+          if (alertId) {
+            // Navigate to specific alert with update action
+            queryParams.action = 'update';
+            queryParams.alert_id = alertId;
+            queryParams.name = action.target.name || action.target.query?.name;
+          }
+          queryParams.folder = action.target.folder || action.target.query?.folder || 'default';
+        } else if (action.resource_type === 'dashboard') {
+          // Dashboards use /dashboards/view path
+          path = '/dashboards/view';
+          queryParams.dashboard = action.target.dashboard_id || action.target.dashboardId || action.target.query?.dashboardId;
+          queryParams.folder = action.target.folder || action.target.query?.folder || 'default';
+          queryParams.tab = action.target.tab || 'tab-1';
+          queryParams.refresh = 'Off';
+          queryParams.period = '15m';
+          queryParams.print = 'false';
+        } else if (action.resource_type === 'pipeline') {
+          // Pipelines use /pipeline/pipelines/edit path
+          path = '/pipeline/pipelines/edit';
+          queryParams.id = action.target.pipeline_id || action.target.id || action.target.query?.id;
+          queryParams.name = action.target.name || action.target.query?.name;
+        }
+
+        await router.push({ path, query: queryParams });
+      }
     };
 
     const confirmClearAllConversations = async () => {
@@ -3436,15 +3688,25 @@ export default defineComponent({
     };
 
     // Filter markdown headers - convert # and ## to smaller formatting
+    // This should only process actual markdown headers, not code block comments
     const filterMarkdownHeaders = (content: string): string => {
-      // Convert # and ## at start of lines to bold format for cleaner display
-      let filtered = content;
+      // First, protect code blocks by temporarily replacing them
+      const codeBlocks: string[] = [];
+      let filtered = content.replace(/```[\s\S]*?```/g, (match) => {
+        codeBlocks.push(match);
+        return `___CODE_BLOCK_${codeBlocks.length - 1}___`;
+      });
 
-      // Convert ## headers to bold with colon
+      // Convert ## headers to bold with colon (only outside code blocks)
       filtered = filtered.replace(/^## (.+)$/gm, '**$1:**');
 
-      // Convert # headers to bold with colon
+      // Convert # headers to bold with colon (only outside code blocks)
       filtered = filtered.replace(/^# (.+)$/gm, '**$1:**');
+
+      // Restore code blocks
+      filtered = filtered.replace(/___CODE_BLOCK_(\d+)___/g, (_match, index) => {
+        return codeBlocks[parseInt(index)];
+      });
 
       return filtered;
     };
@@ -3897,6 +4159,7 @@ export default defineComponent({
       pendingConfirmation,
       handleToolConfirm,
       handleToolCancel,
+      handleNavigationAction,
       processedMessages,
       pendingToolCalls,
       processTextBlock,
@@ -3976,6 +4239,9 @@ export default defineComponent({
       previewImage,
       openImagePreview,
       closeImagePreview,
+      // Context references
+      contextReferences,
+      handleReferencesUpdate,
     }
   }
 });
@@ -5125,6 +5391,35 @@ export default defineComponent({
         font-size: 12px;
         padding: 2px 12px;
       }
+    }
+  }
+
+  .navigation-icon {
+    cursor: pointer;
+    margin-left: 4px;
+    transition: transform 0.2s;
+
+    &:hover {
+      transform: scale(1.15);
+    }
+  }
+
+  .navigation-block {
+    margin: 8px 0;
+    padding: 10px 12px;
+    border-radius: 4px;
+    display: inline-block;
+
+    &.light-mode {
+      background: rgba(25, 118, 210, 0.08);
+    }
+
+    &.dark-mode {
+      background: rgba(66, 165, 245, 0.12);
+    }
+
+    .navigation-block-btn {
+      font-size: 13px;
     }
   }
 

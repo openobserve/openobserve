@@ -1287,13 +1287,13 @@ const filterActions = (val: string, update: any) => {
 }
 
 .destination-type-card {
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--o2-border-color);
   border-radius: 8px;
   padding: 1rem;
   text-align: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: white;
+  background: var(--o2-card-bg);
   min-height: 120px;
   display: flex;
   flex-direction: column;
@@ -1302,14 +1302,14 @@ const filterActions = (val: string, update: any) => {
   position: relative;
 
   &:hover {
-    border-color: #5960b2;
+    border-color: var(--q-primary);
     box-shadow: 0 4px 12px rgba(89, 96, 178, 0.15);
     transform: translateY(-2px);
   }
 
   &.selected {
-    border-color: #5960b2;
-    background: linear-gradient(135deg, #5960b2 0%, #4a52a0 100%);
+    border-color: var(--q-primary);
+    background: linear-gradient(135deg, var(--q-primary) 0%, color-mix(in srgb, var(--q-primary) 85%, black) 100%);
     color: white;
     box-shadow: 0 4px 16px rgba(89, 96, 178, 0.3);
 
@@ -1346,7 +1346,7 @@ const filterActions = (val: string, update: any) => {
 }
 
 .destination-type-icon {
-  color: #666;
+  color: var(--o2-icon-color);
 
   .selected & {
     color: white;
@@ -1356,7 +1356,7 @@ const filterActions = (val: string, update: any) => {
 .destination-type-label {
   font-weight: 600;
   font-size: 0.875rem;
-  color: #333;
+  color: var(--q-text-primary);
   margin: 0;
 
   &.active {

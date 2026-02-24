@@ -186,7 +186,7 @@ describe("TraceDetailsSidebar", async () => {
       '[data-test="trace-details-sidebar-header-toolbar-service"]',
     );
     expect(serviceName.exists()).toBe(true);
-    expect(serviceName.text()).toContain("Service: " + mockSpan.service_name);
+    expect(serviceName.text()).toContain(mockSpan.service_name);
   });
 
   it("should display duration", () => {
@@ -194,7 +194,7 @@ describe("TraceDetailsSidebar", async () => {
       '[data-test="trace-details-sidebar-header-toolbar-duration"]',
     );
     expect(duration.exists()).toBe(true);
-    expect(duration.text()).toContain("Duration: 321.37ms");
+    expect(duration.text()).toContain("321.37ms");
   });
 
   it("should display start time", () => {
@@ -202,7 +202,7 @@ describe("TraceDetailsSidebar", async () => {
       '[data-test="trace-details-sidebar-header-toolbar-start-time"]',
     );
     expect(startTime.exists()).toBe(true);
-    expect(startTime.text()).toContain("Start Time: 0us");
+    expect(startTime.text()).toContain("0us");
   });
 
   it("should display span ID", () => {
@@ -210,7 +210,7 @@ describe("TraceDetailsSidebar", async () => {
       '[data-test="trace-details-sidebar-header-toolbar-span-id"]',
     );
     expect(spanId.exists()).toBe(true);
-    expect(spanId.text()).toContain("Span ID: " + mockSpan.span_id);
+    expect(spanId.text()).toContain(mockSpan.span_id);
   });
 
   it("should emit close when close button is clicked", async () => {

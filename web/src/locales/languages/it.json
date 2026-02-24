@@ -112,7 +112,10 @@
     "id": "ID",
     "getStarted": "Inizia",
     "reset": "Reimposta",
-    "retry": "Riprova"
+    "retry": "Riprova",
+    "copy": "Copia",
+    "copySuccess": "Copiato negli appunti",
+    "copyError": "Copia negli appunti non riuscita"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -232,8 +235,10 @@
     "patternColumnHeader": "Motivo",
     "occurrenceColumnHeader": "Evento",
     "percentageColumnHeader": "Percentuale",
+    "anomalyColumnHeader": "Anomalia",
     "actionsColumnHeader": "Azioni",
     "anomalyLabel": "ANOMALIA",
+    "anomalyDetected": "Anomalia rilevata",
     "includePatternInSearch": "Includi modello nella ricerca",
     "excludePatternFromSearch": "Escludi il pattern dalla ricerca",
     "showPatternDetails": "Mostra dettagli ({variabili}, {esempi} esempi)",
@@ -307,7 +312,14 @@
     "show": "Mostra",
     "editor": "Redattore",
     "webUrlNotConfigured": "L'URL di condivisione è disabilitato finché ZO_WEB_URL non viene configurato dall'amministratore.",
-    "showHideColumns": "Mostra/nascondi colonne"
+    "showHideColumns": "Mostra/nascondi colonne",
+    "autoRefresh": "Aggiornamento automatico",
+    "createSavedView": "Crea visualizzazione salvata",
+    "listSavedViews": "Elenca visualizzazioni salvate",
+    "buildQuery": "Costruisci",
+    "enableSqlModeForBuild": "Abilita la modalità SQL e seleziona un singolo stream per utilizzare Query Builder",
+    "applyToSearch": "Applica alla ricerca",
+    "complexQueryDetected": "È stata rilevata una query complessa. Utilizzo della modalità personalizzata."
   },
   "menu": {
     "home": "Home",
@@ -1482,7 +1494,10 @@
     "SQL": "SQL",
     "builder": "Costruttore",
     "custom": "Personalizzato",
-    "sqlBuilder": "SQL Builder"
+    "sqlBuilder": "SQL Builder",
+    "generatedSql": "SQL generato",
+    "enterCustomSql": "Inserisci la tua query SQL personalizzata...",
+    "customSql": "SQL personalizzato"
   },
   "home": {
     "streams": "Stream",
@@ -2036,7 +2051,10 @@
     "customWebhook": "Personalizzato (Webhook)",
     "customEmail": "Personalizzato (email)",
     "customAction": "Personalizzato (azione)",
-    "custom": "Personalizzato"
+    "custom": "Personalizzato",
+    "separator": "Separatore",
+    "separator_placeholder": "Inserisci un separatore (ad esempio, |,\\n,\\ t, spazio)",
+    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)"
   },
   "metrics": {
     "searchMetric": "Cerca una metrica",
@@ -2846,7 +2864,12 @@
     },
     "viewInTraces": "Visualizza in Tracce",
     "viewInTracesTooltip": "Apri la pagina delle tracce con il dashboard delle metriche RED e tutte le tracce correlate",
-    "exportToJson": "Esporta in JSON"
+    "exportToJson": "Esporta in JSON",
+    "noLogsDescription": "Nessun registro trovato per questa correlazione nell'intervallo di tempo selezionato.",
+    "tracesErrorDetails": "Si è verificato un errore durante il recupero dei dati di traccia. Per favore riprova.",
+    "metricsError": "Impossibile caricare le metriche",
+    "metricsErrorDetails": "Si è verificato un errore durante il recupero dei dati delle metriche. Riprova.",
+    "noMetricsDescription": "Nessuna metrica trovata per questa correlazione nell'intervallo di tempo selezionato."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

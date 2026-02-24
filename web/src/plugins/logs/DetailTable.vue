@@ -294,7 +294,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'tw:whitespace-nowrap'
                         : 'tw:whitespace-pre-wrap'
                     "
-                  ><LogsHighLighting :data="props.row.value" :show-braces="false" :query-string="highlightQuery" :disable-truncation="true" /></pre>
+                  ><ChunkedContent
+                      v-if="getContentSize(props.row.value) > 50000"
+                      :data="props.row.value"
+                      :field-key="`detail_${props.row.field}`"
+                      :query-string="highlightQuery"
+                      :simple-mode="false"
+                    /><LogsHighLighting
+                      v-else
+                      :data="props.row.value"
+                      :show-braces="false"
+                      :query-string="highlightQuery"
+                    /></pre>
                 </div>
               </q-td>
             </template>
@@ -482,6 +493,7 @@ import { copyToClipboard, useQuasar } from "quasar";
 import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -497,7 +509,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, TelemetryCorrelationDashboard, CorrelatedLogsTable },
+  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable },
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -764,6 +776,19 @@ export default defineComponent({
       emit("show-correlation", props.modelValue);
     };
 
+    const getContentSize = (data: any): number => {
+      if (data === null || data === undefined) return 0;
+      if (typeof data === "string") return data.length;
+      if (typeof data === "object") {
+        try {
+          return JSON.stringify(data).length;
+        } catch {
+          return 0;
+        }
+      }
+      return String(data).length;
+    };
+
     return {
       t,
       store,
@@ -792,6 +817,7 @@ export default defineComponent({
       tablePagination,
       serviceStreamsEnabled,
       config,
+      getContentSize,
     };
   },
   async created() {

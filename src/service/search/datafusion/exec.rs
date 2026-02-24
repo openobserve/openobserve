@@ -17,7 +17,7 @@ use std::{cmp::max, num::NonZero, str::FromStr, sync::Arc};
 
 use arrow_schema::Field;
 use config::{
-    FileFormat, PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, get_config,
+    FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
         search::{Session as SearchSession, StorageType},
         stream::FileKey,
@@ -48,8 +48,9 @@ use datafusion::{
     prelude::{SessionContext, col},
 };
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::WorkGroup};
+#[cfg(all(feature = "enterprise", feature = "vortex"))]
 use {
-    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::WorkGroup},
     vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession},
     vortex_datafusion::VortexFormat,
 };
@@ -81,7 +82,7 @@ pub fn create_session_config(
         max(cfg.limit.datafusion_min_partition_num, target_partitions),
     );
     let mut config = SessionConfig::from_env()?
-        .with_batch_size(PARQUET_BATCH_SIZE)
+        .with_batch_size(get_batch_size())
         .with_target_partitions(target_partitions)
         .with_information_schema(true);
     config
@@ -412,25 +413,25 @@ impl TableBuilder {
 
         // Group files by format
         let mut parquet_files = Vec::new();
-        #[cfg(feature = "enterprise")]
+        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         let mut vortex_files = Vec::new();
 
         for file in files {
             match FileFormat::from_extension(&file.key) {
-                #[cfg(feature = "enterprise")]
+                #[cfg(all(feature = "enterprise", feature = "vortex"))]
                 Some(FileFormat::Vortex) => vortex_files.push(file),
                 _ => parquet_files.push(file), // Default to parquet
             }
         }
 
-        #[cfg(feature = "enterprise")]
+        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         log::info!(
             "[trace_id: {}] parquet_files numbers: {}, vortex_files numbers: {}",
             session.id,
             parquet_files.len(),
             vortex_files.len()
         );
-        #[cfg(not(feature = "enterprise"))]
+        #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
         log::info!(
             "[trace_id: {}] parquet_files numbers: {}",
             session.id,
@@ -453,7 +454,7 @@ impl TableBuilder {
             tables.push(table);
         }
 
-        #[cfg(feature = "enterprise")]
+        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         if !vortex_files.is_empty() {
             let table = self
                 .build_table_for_format(
@@ -481,15 +482,15 @@ impl TableBuilder {
         // Configure listing options with the appropriate file format
         let file_format: Arc<dyn DataFusionFileFormat> = match format {
             FileFormat::Parquet => Arc::new(ParquetFormat::default()),
-            #[cfg(feature = "enterprise")]
+            #[cfg(all(feature = "enterprise", feature = "vortex"))]
             FileFormat::Vortex => {
                 let vortex_session = VortexSession::default().with_tokio();
                 Arc::new(VortexFormat::new(vortex_session))
             }
-            #[cfg(not(feature = "enterprise"))]
+            #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
             FileFormat::Vortex => {
                 return Err(DataFusionError::Execution(
-                    "Vortex file format requires enterprise feature".to_string(),
+                    "Vortex file format requires enterprise and vortex features".to_string(),
                 ));
             }
         };
@@ -629,7 +630,7 @@ mod tests {
                 .max(DATAFUSION_MIN_PARTITION)
                 .max(get_config().limit.datafusion_min_partition_num)
         );
-        assert_eq!(config.options().execution.batch_size, PARQUET_BATCH_SIZE);
+        assert_eq!(config.options().execution.batch_size, get_batch_size());
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());

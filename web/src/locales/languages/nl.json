@@ -112,7 +112,10 @@
     "id": "ID",
     "getStarted": "Ga aan de slag",
     "reset": "Resetten",
-    "retry": "Probeer het opnieuw"
+    "retry": "Probeer het opnieuw",
+    "copy": "Kopiëren",
+    "copySuccess": "Gekopieerd naar klembord",
+    "copyError": "Kopiëren naar klembord is mislukt"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -232,8 +235,10 @@
     "patternColumnHeader": "Patroon",
     "occurrenceColumnHeader": "Voorkomen",
     "percentageColumnHeader": "Percentage",
+    "anomalyColumnHeader": "Anomalie",
     "actionsColumnHeader": "Acties",
     "anomalyLabel": "ANOMALIE",
+    "anomalyDetected": "Anomalie gedetecteerd",
     "includePatternInSearch": "Patroon opnemen in de zoekopdracht",
     "excludePatternFromSearch": "Patroon uitsluiten van de zoekopdracht",
     "showPatternDetails": "Details weergeven ({variabelen} variabelen, {voorbeelden} voorbeelden)",
@@ -307,7 +312,14 @@
     "show": "Laat zien",
     "editor": "Redacteur",
     "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder.",
-    "showHideColumns": "Kolommen tonen/verbergen"
+    "showHideColumns": "Kolommen tonen/verbergen",
+    "autoRefresh": "Automatisch verversen",
+    "createSavedView": "Opgeslagen weergave maken",
+    "listSavedViews": "Opgeslagen weergaven weergeven",
+    "buildQuery": "Bouwen",
+    "enableSqlModeForBuild": "Schakel de SQL-modus in en selecteer een enkele stream om de querybuilder te gebruiken",
+    "applyToSearch": "Toepassen om te zoeken",
+    "complexQueryDetected": "Complexe zoekopdracht gedetecteerd. Met behulp van de aangepaste modus."
   },
   "menu": {
     "home": "Home",
@@ -1482,7 +1494,10 @@
     "SQL": "SQL",
     "builder": "Bouwer",
     "custom": "Op maat",
-    "sqlBuilder": "SQL Builder"
+    "sqlBuilder": "SQL Builder",
+    "generatedSql": "Gegenereerde SQL",
+    "enterCustomSql": "Voer uw aangepaste SQL-query in...",
+    "customSql": "SQL op maat"
   },
   "home": {
     "streams": "Streams",
@@ -2036,7 +2051,10 @@
     "customWebhook": "Op maat (Webhook)",
     "customEmail": "Aangepast (e-mail)",
     "customAction": "Aangepast (actie)",
-    "custom": "Op maat"
+    "custom": "Op maat",
+    "separator": "Separator",
+    "separator_placeholder": "Voer een scheidingsteken in (bijvoorbeeld |,\\n,\\ t, spatie)",
+    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)"
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",
@@ -2848,7 +2866,12 @@
     },
     "viewInTraces": "Bekijk in Traces",
     "viewInTracesTooltip": "Open de pagina met sporen met het RED-metriekendashboard en alle gerelateerde sporen",
-    "exportToJson": "Exporteren naar JSON"
+    "exportToJson": "Exporteren naar JSON",
+    "noLogsDescription": "Er zijn geen logboeken gevonden voor deze correlatie in het geselecteerde tijdbereik.",
+    "tracesErrorDetails": "Er is een fout opgetreden tijdens het ophalen van traceergegevens. Probeer het nog eens.",
+    "metricsError": "Kan statistieken niet laden",
+    "metricsErrorDetails": "Er is een fout opgetreden tijdens het ophalen van metrische gegevens. Probeer het nog eens.",
+    "noMetricsDescription": "Er zijn geen statistieken gevonden voor deze correlatie in het geselecteerde tijdbereik."
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",

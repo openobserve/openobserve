@@ -21,9 +21,13 @@ use std::{
     sync::Arc,
 };
 
-use arrow::{array::StructArray, error::ArrowError, record_batch::RecordBatch};
-use arrow_schema::{DataType, Schema};
-use futures::{Stream, StreamExt, TryStreamExt};
+#[cfg(feature = "vortex")]
+use arrow::{array::StructArray, datatypes::DataType};
+use arrow::{error::ArrowError, record_batch::RecordBatch};
+use arrow_schema::Schema;
+#[cfg(feature = "vortex")]
+use futures::StreamExt;
+use futures::{Stream, TryStreamExt};
 use parquet::{
     arrow::{
         AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
@@ -33,6 +37,7 @@ use parquet::{
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
+#[cfg(feature = "vortex")]
 use vortex::{
     VortexSessionDefault, array::arrow::IntoArrowArray, buffer::Buffer,
     file::OpenOptionsSessionExt, io::session::RuntimeSessionExt, session::VortexSession,
@@ -51,7 +56,7 @@ pub fn new_parquet_writer<'a>(
     let cfg = get_config();
     let compression = compression.unwrap_or(&cfg.common.parquet_compression);
     let mut writer_props = WriterProperties::builder()
-        .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
+        .set_write_batch_size(cfg.limit.batch_size) // in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
         .set_compression(get_parquet_compression(compression))
         .set_column_dictionary_enabled(
@@ -146,7 +151,7 @@ where
 {
     let arrow_reader = ParquetRecordBatchStreamBuilder::new(reader).await?;
     let schema = arrow_reader.schema().clone();
-    let reader = arrow_reader.with_batch_size(PARQUET_BATCH_SIZE).build()?;
+    let reader = arrow_reader.with_batch_size(get_batch_size()).build()?;
     Ok((schema, reader))
 }
 
@@ -161,6 +166,7 @@ pub async fn get_recordbatch_reader_from_bytes(
             let stream: RecordBatchStream = Box::pin(reader.map_err(ArrowError::from));
             Ok((schema, stream))
         }
+        #[cfg(feature = "vortex")]
         FileFormat::Vortex => {
             // Read vortex file from bytes and convert to record batches
             let session = VortexSession::default().with_tokio();
@@ -202,6 +208,10 @@ pub async fn get_recordbatch_reader_from_bytes(
             let stream: RecordBatchStream = Box::pin(stream);
             Ok((schema, stream))
         }
+        #[cfg(not(feature = "vortex"))]
+        FileFormat::Vortex => Err(anyhow::anyhow!(
+            "Vortex file format requires the vortex feature"
+        )),
     }
 }
 
@@ -221,6 +231,7 @@ pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow
     let format = FileFormat::from_extension(path_str);
 
     match format {
+        #[cfg(feature = "vortex")]
         Some(FileFormat::Vortex) => {
             // Read vortex file
             let session = VortexSession::default().with_tokio();
@@ -248,12 +259,17 @@ pub async fn read_schema_from_bytes(
             let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
             Ok(arrow_reader.schema().clone())
         }
+        #[cfg(feature = "vortex")]
         FileFormat::Vortex => {
             let session = VortexSession::default().with_tokio();
             let buf = Buffer::from(data.to_vec());
             let vxf = session.open_options().open_buffer(buf)?;
             let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
             Ok(schema)
+        }
+        #[cfg(not(feature = "vortex"))]
+        FileFormat::Vortex => {
+            anyhow::bail!("Vortex file format requires the vortex feature to be enabled")
         }
     }
 }

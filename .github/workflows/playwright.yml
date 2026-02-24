@@ -138,11 +138,13 @@ jobs:
                 "logshistogram.spec.js",
                 "logspage.spec.js",
                 "logsquickmode.spec.js",
+                "logsQueryBuilder.spec.js",
                 "pagination.spec.js",
                 "unflattened.spec.js",
                 "logstable.spec.js",
                 "shareLink.spec.js",
                 "monaco-query-prefill.spec.js",
+                "logsAnalyzeDimensions.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
@@ -188,6 +190,8 @@ jobs:
                 "dashboard-transpose.spec.js",
                 "dashboard-join.spec.js",
                 "dashboard-nested-functions.spec.js",
+                "dashboard-legends-copy.spec.js",
+                "dashboard-raw-query.spec.js",
               ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
@@ -211,6 +215,10 @@ jobs:
                 "pipelines.spec.js",
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
+                "pipeline-traces.spec.js",
+                "pipeline-metrics.spec.js",
+                "pipeline-backfill.spec.js",
+                "pipeline-history.spec.js",
                 "scheduled-pipeline-query-builder.spec.js",
                 # "remotepipeline.spec.js"
               ]
@@ -245,6 +253,7 @@ jobs:
                 "traceErrorFilter.spec.js",
                 "traceDetails.spec.js",
                 "traceAdvancedFiltering.spec.js",
+                "tracesAnalyzeDimensions.spec.js",
               ]
 
           - testfolder: "RegressionSet"

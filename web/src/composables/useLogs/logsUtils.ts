@@ -23,6 +23,8 @@ import { b64EncodeUnicode, useLocalLogFilterField, } from "@/utils/zincutils";
 import {
   encodeVisualizationConfig,
   getVisualizationConfig,
+  encodeBuildConfig,
+  getBuildConfig,
 } from "@/composables/useLogs/logsVisualization";
 
 import { searchState } from "@/composables/useLogs/searchState";
@@ -528,6 +530,7 @@ export const logsUtils = () => {
   const generateURLQuery = (
     isShareLink: boolean = false,
     dashboardPanelData: any = null,
+    buildPanelData: any = null,
   ) => {
     const date = searchObj.data.datetime;
 
@@ -632,11 +635,33 @@ export const logsUtils = () => {
       }
     }
 
+    // Preserve build data in URL
+    // - If in build mode and build panel data is provided, encode the buildPanelData
+    if (
+      searchObj.meta.logsVisualizeToggle === "build" &&
+      buildPanelData
+    ) {
+      const buildData = getBuildConfig(buildPanelData);
+      if (buildData) {
+        const encoded = encodeBuildConfig(buildData);
+        if (encoded) {
+          query["build_data"] = encoded;
+        }
+      }
+    } else {
+      // else preserve existing build data from the current URL
+      const existingEncodedBuildConfig = router.currentRoute.value?.query
+        ?.build_data as string | undefined;
+      if (existingEncodedBuildConfig) {
+        query["build_data"] = existingEncodedBuildConfig;
+      }
+    }
+
     return query;
   };
 
-  const updateUrlQueryParams = (dashboardPanelData: any = null) => {
-    const query = generateURLQuery(false, dashboardPanelData);
+  const updateUrlQueryParams = (dashboardPanelData: any = null, buildPanelData: any = null) => {
+    const query = generateURLQuery(false, dashboardPanelData, buildPanelData);
     if (
       (Object.hasOwn(query, "type") && query.type == "search_history_re_apply") ||
       query.type == "search_scheduler"
