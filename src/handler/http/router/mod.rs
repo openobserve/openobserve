@@ -792,6 +792,7 @@ pub fn service_routes() -> Router {
 
             // Topology
             .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
+            .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
 
             // Patterns
             .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))

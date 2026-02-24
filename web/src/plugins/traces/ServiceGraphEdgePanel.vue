@@ -89,15 +89,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
+
+        <!-- Latency Trend Section -->
+        <div
+          class="panel-section trend-section"
+          data-test="service-graph-edge-panel-latency-trend"
+        >
+          <div class="section-title">Latency Trend</div>
+          <div class="latency-chart-container">
+            <div v-if="trendLoading" class="trend-loading">
+              <q-spinner size="sm" />
+            </div>
+            <CustomChartRenderer
+              v-else-if="latencyTrend"
+              :data="latencyTrend"
+              class="latency-chart"
+              data-test="service-graph-edge-panel-trend-chart"
+            />
+            <div
+              v-else
+              class="trend-empty"
+              data-test="service-graph-edge-panel-trend-empty"
+            >
+              No trend data available
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </transition>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, type PropType } from 'vue';
+import { defineComponent, computed, ref, watch, type PropType } from 'vue';
 import { useStore } from 'vuex';
+import { useRouter } from 'vue-router';
 import CustomChartRenderer from '@/components/dashboards/panels/CustomChartRenderer.vue';
+import serviceGraphService from '@/services/service_graph';
 
 export default defineComponent({
   name: 'ServiceGraphEdgePanel',
@@ -122,9 +150,13 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['close'],
+  emits: ['close', 'trend-loaded'],
   setup(props, { emit }) {
     const store = useStore();
+    const router = useRouter();
+
+    const trendLoading = ref(false);
+    const trendData = ref<any>(null);
 
     // Computed: Source Service Name
     const sourceServiceName = computed(() => {
@@ -335,6 +367,138 @@ export default defineComponent({
       return requests + ' req/min';
     };
 
+    // Fetch trend data for the selected edge
+    const fetchTrend = async () => {
+      if (!props.selectedEdge || !props.visible) return;
+
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId) return;
+
+      const clientService = sourceServiceName.value || undefined;
+      const serverService = targetServiceName.value || undefined;
+
+      trendLoading.value = true;
+      trendData.value = null;
+      try {
+        const res = await serviceGraphService.getEdgeTrend(orgId, {
+          client_service: clientService,
+          server_service: serverService,
+          start_time: props.timeRange?.startTime,
+          end_time: props.timeRange?.endTime,
+        });
+        trendData.value = res.data;
+        // Emit baselines so ServiceGraph can use them for edge coloring
+        emit('trend-loaded', {
+          from: clientService,
+          to: serverService,
+          p50_avg: res.data.p50_avg ?? 0,
+          p95_avg: res.data.p95_avg ?? 0,
+          p99_avg: res.data.p99_avg ?? 0,
+        });
+      } catch (e) {
+        trendData.value = null;
+      } finally {
+        trendLoading.value = false;
+      }
+    };
+
+    watch(
+      () => [props.selectedEdge, props.visible],
+      ([, visible]) => {
+        if (visible) fetchTrend();
+      },
+      { immediate: true },
+    );
+
+    // Build ECharts line chart options from trend data
+    const latencyTrend = computed(() => {
+      if (!trendData.value || !trendData.value.data_points?.length) return null;
+
+      const points = trendData.value.data_points;
+      const isDark = store.state.theme === 'dark';
+      const axisColor = isDark ? '#B7B7B7' : '#72777B';
+      const splitLineColor = isDark ? '#3A3A3A' : '#F0F0F0';
+      const bgColor = isDark ? '#2B2C2D' : '#ffffff';
+      const borderColor = isDark ? '#444444' : '#E7EAEE';
+      const textColor = isDark ? '#DCDCDC' : '#232323';
+
+      // ns → ms conversion
+      const toMs = (ns: number) => ns / 1_000_000;
+
+      return {
+        backgroundColor: 'transparent',
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: bgColor,
+          borderColor,
+          textStyle: { color: textColor, fontSize: 12 },
+          formatter: (params: any[]) => {
+            const ts = new Date(params[0].axisValue / 1000).toLocaleString();
+            const lines = params.map((p: any) => {
+              const ms = p.value[1];
+              const formatted = ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${ms.toFixed(2)}ms`;
+              return `${p.marker}${p.seriesName}: ${formatted}`;
+            });
+            return `${ts}<br/>${lines.join('<br/>')}`;
+          },
+        },
+        legend: {
+          data: ['P50', 'P95', 'P99'],
+          textStyle: { color: axisColor, fontSize: 11 },
+          top: 4,
+        },
+        grid: { left: '3%', right: '4%', bottom: '3%', top: '30px', containLabel: true },
+        xAxis: {
+          type: 'time',
+          axisLabel: { color: axisColor, fontSize: 11 },
+          axisLine: { lineStyle: { color: borderColor } },
+          splitLine: { show: false },
+        },
+        yAxis: {
+          type: 'value',
+          name: 'Latency (ms)',
+          nameTextStyle: { color: axisColor, fontSize: 11 },
+          axisLabel: {
+            color: axisColor,
+            formatter: (v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${v.toFixed(0)}ms`,
+          },
+          splitLine: { lineStyle: { color: splitLineColor } },
+        },
+        series: [
+          {
+            name: 'P50',
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 5,
+            data: points.map((p: any) => [p.timestamp / 1000, toMs(p.p50_latency_ns)]),
+            itemStyle: { color: '#4caf50' },
+            lineStyle: { color: '#4caf50', width: 2 },
+          },
+          {
+            name: 'P95',
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 5,
+            data: points.map((p: any) => [p.timestamp / 1000, toMs(p.p95_latency_ns)]),
+            itemStyle: { color: '#2196f3' },
+            lineStyle: { color: '#2196f3', width: 2 },
+          },
+          {
+            name: 'P99',
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 5,
+            data: points.map((p: any) => [p.timestamp / 1000, toMs(p.p99_latency_ns)]),
+            itemStyle: { color: '#ff9800' },
+            lineStyle: { color: '#ff9800', width: 2 },
+          },
+        ],
+      };
+    });
+
     // Handlers
     const handleClose = () => {
       emit('close');
@@ -345,6 +509,8 @@ export default defineComponent({
       targetServiceName,
       edgeStats,
       latencyDistribution,
+      latencyTrend,
+      trendLoading,
       handleClose,
     };
   },
@@ -666,6 +832,45 @@ export default defineComponent({
   .latency-chart-container {
     background: #ffffff;
     border-color: #e0e0e0;
+  }
+}
+
+// Latency Trend Section
+.trend-section {
+  .latency-chart-container {
+    padding: 0.5rem;
+    border-radius: 8px;
+    background: #252b3d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .latency-chart {
+    width: 100%;
+    height: 180px;
+  }
+
+  .trend-loading,
+  .trend-empty {
+    color: #B7B7B7;
+    font-size: 13px;
+    text-align: center;
+    padding: 1rem;
+  }
+}
+
+.body--light .trend-section {
+  .latency-chart-container {
+    background: #ffffff;
+    border-color: #e0e0e0;
+  }
+
+  .trend-loading,
+  .trend-empty {
+    color: #72777B;
   }
 }
 

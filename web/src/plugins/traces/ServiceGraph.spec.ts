@@ -986,7 +986,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.layoutType).toBe("force");
     });
 
-    it("should increment chartKey when visualization type changes", async () => {
+    it("should NOT increment chartKey when visualization type changes (prevents tree animation replay)", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
@@ -994,7 +994,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       wrapper.vm.setVisualizationType("tree");
 
-      expect(wrapper.vm.chartKey).toBe(initialChartKey + 1);
+      // chartKey must stay the same — incrementing it destroys the component and
+      // replays the full expand animation every time the user toggles between views
+      expect(wrapper.vm.chartKey).toBe(initialChartKey);
     });
   });
 
@@ -1037,7 +1039,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.showSidePanel).toBe(false);
     });
 
-    it("should open edge panel when edge is clicked", async () => {
+    it("should not open any panel when edge is clicked (tooltip handles interaction)", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
@@ -1051,8 +1053,8 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         },
       });
 
-      expect(wrapper.vm.showEdgePanel).toBe(true);
-      expect(wrapper.vm.selectedEdge).toBeTruthy();
+      // Edge panel was removed; edges are handled via hover tooltip only
+      expect(wrapper.vm.showSidePanel).toBe(false);
     });
 
     it("should close node panel when edge is clicked", async () => {
@@ -1114,12 +1116,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       consoleLog.mockRestore();
     });
 
-    it("should warn when edge data is not found", async () => {
+    it("should silently ignore edge clicks for nonexistent edges", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
-
+      // Edge clicks no longer open a panel or warn — tooltip handles interaction
       wrapper.vm.handleNodeClick({
         dataType: "edge",
         data: {
@@ -1128,10 +1129,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         },
       });
 
-      expect(consoleWarn).toHaveBeenCalled();
-      expect(wrapper.vm.showEdgePanel).toBe(false);
-
-      consoleWarn.mockRestore();
+      expect(wrapper.vm.showSidePanel).toBe(false);
     });
   });
 
@@ -1165,34 +1163,8 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       vi.useRealTimers();
     });
 
-    it("should close edge panel", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.showEdgePanel = true;
-      wrapper.vm.selectedEdge = wrapper.vm.graphData.edges[0];
-
-      wrapper.vm.handleCloseEdgePanel();
-
-      expect(wrapper.vm.showEdgePanel).toBe(false);
-    });
-
-    it("should clear selectedEdge after animation delay", async () => {
-      vi.useFakeTimers();
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.selectedEdge = wrapper.vm.graphData.edges[0];
-      wrapper.vm.handleCloseEdgePanel();
-
-      expect(wrapper.vm.selectedEdge).toBeTruthy();
-
-      vi.advanceTimersByTime(300);
-
-      expect(wrapper.vm.selectedEdge).toBeNull();
-
-      vi.useRealTimers();
-    });
+    // Edge panel was removed — edges are handled via hover tooltip.
+    // handleCloseEdgePanel, showEdgePanel, and selectedEdge no longer exist.
   });
 
   // View Logs and Traces Navigation — removed in favor of consolidated
