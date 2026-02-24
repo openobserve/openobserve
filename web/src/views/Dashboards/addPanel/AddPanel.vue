@@ -1052,6 +1052,7 @@ export default defineComponent({
 
         // CRITICAL: Update chartData to trigger PanelSchemaRenderer to re-render
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        panelEditorRef.value?.initChartData(dashboardPanelData.data);
 
         // Variables also use the global time in add/edit mode
         dateTimeForVariables.value = {
