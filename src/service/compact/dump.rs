@@ -834,7 +834,6 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
     let mut field_compressed_size = Int64Builder::with_capacity(batch_size);
     let mut field_index_size = Int64Builder::with_capacity(batch_size);
     let mut field_flattened = BooleanBuilder::with_capacity(batch_size);
-    let mut field_created_at = Int64Builder::with_capacity(batch_size);
     let mut field_updated_at = Int64Builder::with_capacity(batch_size);
 
     for file in files {
@@ -852,7 +851,6 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
         field_compressed_size.append_value(file.compressed_size);
         field_index_size.append_value(file.index_size);
         field_flattened.append_value(file.flattened);
-        field_created_at.append_value(file.created_at);
         field_updated_at.append_value(file.updated_at);
     }
 
@@ -873,7 +871,6 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
             Arc::new(field_original_size.finish()),
             Arc::new(field_compressed_size.finish()),
             Arc::new(field_index_size.finish()),
-            Arc::new(field_created_at.finish()),
             Arc::new(field_updated_at.finish()),
         ],
     )?;
@@ -929,7 +926,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 0);
-        assert_eq!(batch.num_columns(), 16);
+        assert_eq!(batch.num_columns(), 15);
     }
 
     #[test]
@@ -949,7 +946,6 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
-            created_at: 1000,
             updated_at: 1100,
         };
 
@@ -959,7 +955,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 16);
+        assert_eq!(batch.num_columns(), 15);
 
         // Verify column values
         let id_col = batch
@@ -1009,7 +1005,6 @@ mod tests {
                 original_size: 10000,
                 compressed_size: 5000,
                 index_size: 500,
-                created_at: 1000,
                 updated_at: 1100,
             },
             FileRecord {
@@ -1027,7 +1022,6 @@ mod tests {
                 original_size: 20000,
                 compressed_size: 10000,
                 index_size: 1000,
-                created_at: 2000,
                 updated_at: 2100,
             },
             FileRecord {
@@ -1045,7 +1039,6 @@ mod tests {
                 original_size: 30000,
                 compressed_size: 15000,
                 index_size: 1500,
-                created_at: 3000,
                 updated_at: 3100,
             },
         ];
@@ -1102,7 +1095,6 @@ mod tests {
             original_size: 500000,
             compressed_size: 250000,
             index_size: 25000,
-            created_at: 1234567000,
             updated_at: 1234568000,
         };
 
@@ -1144,7 +1136,6 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
-            created_at: 1000,
             updated_at: 1100,
         };
 
@@ -1170,7 +1161,6 @@ mod tests {
             "original_size",
             "compressed_size",
             "index_size",
-            "created_at",
             "updated_at",
         ];
 
