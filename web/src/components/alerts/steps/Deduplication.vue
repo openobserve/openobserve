@@ -35,31 +35,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
           {{ t("alerts.deduplication.fingerprintFieldsHint") }}
         </div>
-        <q-select
-          v-model="localDeduplication.fingerprint_fields"
-          :options="columns"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop no-case"
-          dense
-          borderless
-          multiple
-          use-chips
-          use-input
-          input-debounce="0"
-          new-value-mode="add-unique"
-          emit-value
-          map-options
-          @update:model-value="emitUpdate"
-          style="width: 300px;"
-        >
-          <template v-slot:hint>
-            <div class="tw-text-xs">
-              💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition
-              fields)
-            </div>
-          </template>
-        </q-select>
+        <div class="tw-relative">
+          <q-select
+            v-model="localDeduplication.fingerprint_fields"
+            :options="filteredColumns"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop no-case fingerprint-select tw-max-w-[600px] tw-min-w-[300px]"
+            dense
+            borderless
+            multiple
+            use-chips
+            use-input
+            input-debounce="300"
+            new-value-mode="add-unique"
+            emit-value
+            map-options
+            @filter="filterColumns"
+            @update:model-value="emitUpdate"
+          >
+            <template v-slot:hint>
+              <div class="tw-text-xs">
+                💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition
+                fields)
+              </div>
+            </template>
+          </q-select>
+          <q-tooltip v-if="localDeduplication.fingerprint_fields?.length > 0" max-width="400px">
+            {{ localDeduplication.fingerprint_fields.join(', ') }}
+          </q-tooltip>
+        </div>
       </div>
 
       <!-- Time Window -->
@@ -81,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.deduplication.timeWindowHint") }}
         </div>
         <div class="tw-flex tw-items-center">
-          <div style="width: 210px; margin-left: 0 !important">
+          <div class="tw-w-[210px] tw-ml-0">
             <q-input
               v-model.number="localDeduplication.time_window_minutes"
               type="number"
@@ -138,6 +143,8 @@ export default defineComponent({
       time_window_minutes: props.deduplication?.time_window_minutes || undefined,
     });
 
+    const filteredColumns = ref(props.columns || []);
+
     // Watch for prop changes
     watch(
       () => props.deduplication,
@@ -153,11 +160,39 @@ export default defineComponent({
       { deep: true }
     );
 
+    // Watch for columns prop changes
+    watch(
+      () => props.columns,
+      (newVal) => {
+        filteredColumns.value = newVal || [];
+      }
+    );
+
+    const sanitizeTimeWindow = (val: any): number | undefined => {
+      if (val == null || val === "") return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    };
+
     const emitUpdate = () => {
       emit("update:deduplication", {
         enabled: true,
         fingerprint_fields: localDeduplication.value.fingerprint_fields,
-        time_window_minutes: localDeduplication.value.time_window_minutes,
+        time_window_minutes: sanitizeTimeWindow(localDeduplication.value.time_window_minutes),
+      });
+    };
+
+    const filterColumns = (val: string, update: any) => {
+      update(() => {
+        if (val === '') {
+          filteredColumns.value = props.columns || [];
+        } else {
+          const needle = val.toLowerCase();
+          filteredColumns.value = (props.columns || []).filter((v: any) => {
+            const str = typeof v === 'string' ? v : (v?.label || v?.value || '');
+            return str.toLowerCase().indexOf(needle) > -1;
+          });
+        }
       });
     };
 
@@ -165,7 +200,9 @@ export default defineComponent({
       t,
       store,
       localDeduplication,
+      filteredColumns,
       emitUpdate,
+      filterColumns,
     };
   },
 });
@@ -194,6 +231,97 @@ export default defineComponent({
     .step-content {
       background-color: #ffffff;
       border: 1px solid #e6e6e6;
+    }
+  }
+}
+
+:deep(.fingerprint-select) {
+  .q-field__control {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+  }
+
+  .q-field__control-container {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-right: 36px; // Reserve space for dropdown arrow
+    display: flex;
+    align-items: center;
+  }
+
+  .q-field__native {
+    min-height: 32px;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important; // Center align chips vertically
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+
+    // Hide scrollbar but keep scrolling functionality
+    scrollbar-width: none; // Firefox
+    -ms-overflow-style: none; // IE/Edge
+
+    &::-webkit-scrollbar {
+      display: none; // Chrome/Safari/Opera
+    }
+  }
+
+  .q-chip {
+    margin: 0 !important;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  // Ensure the input field stays visible and accessible
+  input {
+    min-width: 100px !important;
+    flex-shrink: 0 !important;
+  }
+
+  // Ensure dropdown icon is always visible
+  .q-field__append {
+    padding-left: 8px;
+  }
+}
+
+// Dark mode chip styling
+.dark-mode {
+  :deep(.fingerprint-select) {
+    .q-chip {
+      background-color: rgba(255, 255, 255, 0.1) !important;
+      color: #e0e0e0 !important;
+
+      .q-icon {
+        color: #e0e0e0 !important;
+        opacity: 0.8;
+
+        &:hover {
+          opacity: 1;
+        }
+      }
+    }
+  }
+}
+
+// Light mode chip styling
+.light-mode {
+  :deep(.fingerprint-select) {
+    .q-chip {
+      background-color: rgba(0, 0, 0, 0.08) !important;
+      color: #424242 !important;
+
+      .q-icon {
+        color: #424242 !important;
+        opacity: 0.7;
+
+        &:hover {
+          opacity: 1;
+        }
+      }
     }
   }
 }
