@@ -160,6 +160,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+
+        <!-- Template Override for Real-Time Alerts -->
+        <div class="flex items-start tw:pb-4 tw:mb-4">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+            {{ t("alerts.template") }}
+            <q-icon
+              name="info"
+              size="17px"
+              class="q-ml-xs cursor-pointer"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            >
+              <q-tooltip anchor="center right" self="center left" max-width="300px">
+                <span style="font-size: 14px">
+                  {{ t('alerts.alertSettings.templateTooltip') }}
+                </span>
+              </q-tooltip>
+            </q-icon>
+          </div>
+          <div>
+            <div class="flex items-center">
+              <q-select
+                v-model="localTemplate"
+                :options="filteredTemplates"
+                color="input-border"
+                bg-color="input-bg"
+                class="showLabelOnTop no-case template-select-field"
+                filled
+                dense
+                use-input
+                clearable
+                emit-value
+                input-debounce="0"
+                @filter="filterTemplates"
+                @update:model-value="emitTemplateUpdate"
+                style="width: 300px; max-width: 300px"
+              >
+                <template v-slot:selected>
+                  <div v-if="localTemplate" class="ellipsis">
+                    {{ localTemplate }}
+                    <q-tooltip>{{ localTemplate }}</q-tooltip>
+                  </div>
+                </template>
+                <template v-slot:no-option>
+                  <q-item>
+                    <q-item-section class="text-grey">No templates available</q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+              <q-btn
+                icon="refresh"
+                class="iconHoverBtn q-ml-xs"
+                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                padding="xs"
+                unelevated
+                size="sm"
+                round
+                flat
+                title="Refresh latest Templates"
+                @click="$emit('refresh:templates')"
+                style="min-width: auto"
+              />
+            </div>
+          </div>
+        </div>
       </template>
 
       <!-- For Scheduled Alerts -->
