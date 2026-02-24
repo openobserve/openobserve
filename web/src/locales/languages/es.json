@@ -112,7 +112,10 @@
     "id": "CARNÉ DE IDENTIDAD",
     "getStarted": "Comenzar",
     "reset": "Reiniciar",
-    "retry": "Reintentar"
+    "retry": "Reintentar",
+    "copy": "Copiar",
+    "copySuccess": "Copiado al portapapeles",
+    "copyError": "No se pudo copiar al portapapeles"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -312,7 +315,11 @@
     "showHideColumns": "Mostrar/ocultar columnas",
     "autoRefresh": "Actualización automática",
     "createSavedView": "Crear vista guardada",
-    "listSavedViews": "Listar vistas guardadas"
+    "listSavedViews": "Listar vistas guardadas",
+    "buildQuery": "Construir",
+    "enableSqlModeForBuild": "Habilite el modo SQL y seleccione una sola secuencia para usar el generador de consultas",
+    "applyToSearch": "Aplicar a la búsqueda",
+    "complexQueryDetected": "Se detectó una consulta compleja. Uso del modo personalizado."
   },
   "menu": {
     "home": "Inicio",
@@ -1487,7 +1494,10 @@
     "SQL": "SQL",
     "builder": "Constructor",
     "custom": "Personalizado",
-    "sqlBuilder": "Constructor SQL"
+    "sqlBuilder": "Constructor SQL",
+    "generatedSql": "SQL generado",
+    "enterCustomSql": "Introduzca su consulta SQL personalizada...",
+    "customSql": "SQL personalizado"
   },
   "home": {
     "streams": "Transmisiones",

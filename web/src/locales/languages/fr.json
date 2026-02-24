@@ -112,7 +112,10 @@
     "id": "IDENTIFIANT",
     "getStarted": "Commencez",
     "reset": "Réinitialiser",
-    "retry": "Réessayez"
+    "retry": "Réessayez",
+    "copy": "Copier",
+    "copySuccess": "Copié dans le presse-papiers",
+    "copyError": "Impossible de copier dans le presse-papiers"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -312,7 +315,11 @@
     "showHideColumns": "Afficher/masquer les colonnes",
     "autoRefresh": "Actualisation automatique",
     "createSavedView": "Créer une vue enregistrée",
-    "listSavedViews": "Répertorier les vues enregistrées"
+    "listSavedViews": "Répertorier les vues enregistrées",
+    "buildQuery": "Construisez",
+    "enableSqlModeForBuild": "Activez le mode SQL et sélectionnez un seul flux pour utiliser le générateur de requêtes",
+    "applyToSearch": "Appliquer à la recherche",
+    "complexQueryDetected": "Requête complexe détectée. Utilisation du mode personnalisé."
   },
   "menu": {
     "home": "Accueil",
@@ -1487,7 +1494,10 @@
     "SQL": "SQL",
     "builder": "Constructeur",
     "custom": "Personnalisé",
-    "sqlBuilder": "Générateur SQL"
+    "sqlBuilder": "Générateur SQL",
+    "generatedSql": "SQL généré",
+    "enterCustomSql": "Entrez votre requête SQL personnalisée...",
+    "customSql": "SQL personnalisé"
   },
   "home": {
     "streams": "Ruisseaux",

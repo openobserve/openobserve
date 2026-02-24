@@ -112,7 +112,10 @@
     "id": "ID",
     "getStarted": "Fangen Sie an",
     "reset": "Zurücksetzen",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "copy": "Kopieren",
+    "copySuccess": "In die Zwischenablage kopiert",
+    "copyError": "Fehler beim Kopieren in die Zwischenablage"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -312,7 +315,11 @@
     "showHideColumns": "Spalten ein-/ausblenden",
     "autoRefresh": "Automatische Aktualisierung",
     "createSavedView": "Gespeicherte Ansicht erstellen",
-    "listSavedViews": "Gespeicherte Ansichten auflisten"
+    "listSavedViews": "Gespeicherte Ansichten auflisten",
+    "buildQuery": "Bauen",
+    "enableSqlModeForBuild": "Bitte aktivieren Sie den SQL-Modus und wählen Sie einen einzelnen Stream aus, um den Query Builder zu verwenden",
+    "applyToSearch": "Für die Suche bewerben",
+    "complexQueryDetected": "Eine komplexe Abfrage wurde erkannt. Im benutzerdefinierten Modus."
   },
   "menu": {
     "home": "Startseite",
@@ -1487,7 +1494,10 @@
     "SQL": "SQL",
     "builder": "Baumeister",
     "custom": "Benutzerdefiniert",
-    "sqlBuilder": "SQL-Generator"
+    "sqlBuilder": "SQL-Generator",
+    "generatedSql": "Generiertes SQL",
+    "enterCustomSql": "Geben Sie Ihre benutzerdefinierte SQL-Abfrage ein...",
+    "customSql": "Benutzerdefiniertes SQL"
   },
   "home": {
     "streams": "Streams",

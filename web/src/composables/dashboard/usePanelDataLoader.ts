@@ -156,11 +156,13 @@ export const usePanelDataLoader = (
     },
     metadata: {
       queries: [] as any,
-      seriesLimiting: undefined as {
-        totalMetricsReceived: number;
-        metricsStored: number;
-        maxSeries: number;
-      } | undefined,
+      seriesLimiting: undefined as
+        | {
+            totalMetricsReceived: number;
+            metricsStored: number;
+            maxSeries: number;
+          }
+        | undefined,
     } as {
       queries: any;
       seriesLimiting?: {
@@ -997,7 +999,8 @@ export const usePanelDataLoader = (
               }
 
               // Get series limit from config
-              const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+              const maxSeries =
+                store.state?.zoConfig?.max_dashboard_series ?? 100;
 
               // Create chunk processor for efficient metric merging
               const chunkProcessor = createPromQLChunkProcessor({
@@ -1017,7 +1020,7 @@ export const usePanelDataLoader = (
                   // Process chunk using extracted processor module
                   queryResults[queryIndex] = chunkProcessor.processChunk(
                     queryResults[queryIndex],
-                    newData
+                    newData,
                   );
 
                   // Update state with accumulated results
@@ -1945,7 +1948,6 @@ export const usePanelDataLoader = (
 
   const hasAtLeastOneQuery = () =>
     panelSchema.value.queries?.some((q: any) => q?.query);
-
   // [START] variables management
 
   // check when the variables data changes
