@@ -3064,8 +3064,22 @@ fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if !cfg.s3.bucket_prefix.is_empty() && !cfg.s3.bucket_prefix.ends_with('/') {
-        cfg.s3.bucket_prefix = format!("{}/", cfg.s3.bucket_prefix);
+    // Ensure each bucket prefix ends with '/' for multi-bucket configurations
+    if !cfg.s3.bucket_prefix.is_empty() {
+        let prefixes: Vec<String> = cfg
+            .s3
+            .bucket_prefix
+            .split(',')
+            .map(|prefix| {
+                let trimmed = prefix.trim();
+                if trimmed.is_empty() || trimmed.ends_with('/') {
+                    trimmed.to_string()
+                } else {
+                    format!("{}/", trimmed)
+                }
+            })
+            .collect();
+        cfg.s3.bucket_prefix = prefixes.join(",");
     }
     if cfg.s3.provider.is_empty() {
         if cfg.s3.server_url.contains(".googleapis.com") {
