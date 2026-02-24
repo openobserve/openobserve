@@ -403,25 +403,19 @@ pub async fn search_multi(
         match search_res {
             Ok(mut res) => {
                 let time = start.elapsed().as_secs_f64();
+                let label_values = &[
+                    "/api/org/_search_multi",
+                    "200",
+                    &org_id,
+                    stream_type.as_str(),
+                    "",
+                    "",
+                ];
                 metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_search_multi",
-                        "200",
-                        &org_id,
-                        stream_type.as_str(),
-                        "",
-                        "",
-                    ])
+                    .with_label_values(label_values)
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_search_multi",
-                        "200",
-                        &org_id,
-                        stream_type.as_str(),
-                        "",
-                        "",
-                    ])
+                    .with_label_values(label_values)
                     .inc();
                 res.set_trace_id(trace_id);
                 res.set_took(start.elapsed().as_millis() as usize);
@@ -494,25 +488,19 @@ pub async fn search_multi(
             }
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
+                let label_values = &[
+                    "/api/org/_search_multi",
+                    "500",
+                    &org_id,
+                    stream_type.as_str(),
+                    "",
+                    "",
+                ];
                 metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_search_multi",
-                        "500",
-                        &org_id,
-                        stream_type.as_str(),
-                        "",
-                        "",
-                    ])
+                    .with_label_values(label_values)
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_search_multi",
-                        "500",
-                        &org_id,
-                        stream_type.as_str(),
-                        "",
-                        "",
-                    ])
+                    .with_label_values(label_values)
                     .inc();
 
                 log::error!("search error: {err:?}");
@@ -535,15 +523,17 @@ pub async fn search_multi(
     }
 
     let mut report_function_usage = false;
-    multi_res.hits = if let Some(input_fn) = query_fn.as_ref()
+    multi_res.hits = if let Some(input_fn) = query_fn
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
         && per_query_resp
     {
         // compile vrl function & apply the same before returning the response
-        let input_fn = input_fn.trim().to_string();
 
-        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+        let apply_over_hits = RESULT_ARRAY.is_match(input_fn);
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {
+        let program = match crate::service::ingestion::compile_vrl_function(input_fn, &org_id) {
             Ok(program) => {
                 let registry = program
                     .config
@@ -589,39 +579,37 @@ pub async fn search_multi(
                             vec![]
                         }
                         Some(ret_arr) => ret_arr
-                        .iter()
-                        .filter_map(|v| {
-                            if per_query_resp {
-                                // In per-query mode each element must itself be an array of
-                                // hits. If the VRL function errored out the value may be a
-                                // plain object instead; skip gracefully rather than panic.
-                                v.as_array().map(|inner| {
-                                    let flattened_array = inner
-                                        .iter()
-                                        .map(|item| {
-                                            if !item.is_null() && item.is_object() {
-                                                // flatten() only errors when the value is not
-                                                // an object, which is already guarded above,
-                                                // but we keep .unwrap_or to be safe.
-                                                config::utils::flatten::flatten(item.clone())
-                                                    .unwrap_or_else(|_| item.clone())
-                                            } else {
-                                                item.clone()
-                                            }
-                                        })
-                                        .collect::<Vec<_>>();
-                                    serde_json::Value::Array(flattened_array)
-                                })
-                            } else if !v.is_null() && v.is_object() {
-                                config::utils::flatten::flatten(v.clone()).ok()
-                            } else {
-                                None
-                            }
-                        })
-                        .collect()
+                            .iter()
+                            .filter_map(|v| {
+                                if per_query_resp {
+                                    // In per-query mode each element must itself be an array of
+                                    // hits. If the VRL function errored out the value may be a
+                                    // plain object instead; skip gracefully rather than panic.
+                                    v.as_array().map(|inner| {
+                                        let flattened_array = inner
+                                            .iter()
+                                            .map(|item| {
+                                                if !item.is_null() && item.is_object() {
+                                                    // flatten() only errors when the value is not
+                                                    // an object, which is already guarded above,
+                                                    // but we keep .unwrap_or to be safe.
+                                                    config::utils::flatten::flatten(item.clone())
+                                                        .unwrap_or_else(|_| item.clone())
+                                                } else {
+                                                    item.clone()
+                                                }
+                                            })
+                                            .collect::<Vec<_>>();
+                                        serde_json::Value::Array(flattened_array)
+                                    })
+                                } else {
+                                    config::utils::flatten::flatten(v.clone()).ok()
+                                }
+                            })
+                            .collect(),
                     }
                 } else {
-                    let mut error = "".to_string();
+                    let mut error: Option<String> = None;
                     let res = multi_res
                         .hits
                         .into_iter()
@@ -636,17 +624,12 @@ pub async fn search_multi(
                                 &org_id,
                                 &[vrl_stream_name.clone()],
                             );
-                            if let Some(e) = err {
-                                error = e;
-                            }
-                            if !ret_val.is_null() && ret_val.is_object() {
-                                config::utils::flatten::flatten(ret_val.clone()).ok()
-                            } else {
-                                None
-                            }
+                            error = err;
+
+                            config::utils::flatten::flatten(ret_val).ok()
                         })
                         .collect();
-                    if !error.is_empty() {
+                    if let Some(error) = error {
                         log::error!("[trace_id {trace_id}] Error applying vrl function: {error}");
                     }
                     res
