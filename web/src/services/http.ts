@@ -103,9 +103,26 @@ const http = ({ headers } = {} as any) => {
             break;
           case 403:
             if (config.isEnterprise == "true" || config.isCloud == "true") {
+              const backendError = error.response.data["error"];
+              let resourceHint = "";
+              try {
+                const urlPath =
+                  error.request?.responseURL || error.config?.url || "";
+                // URL structure: /api/{org}/{resource}/...
+                const segments = new URL(urlPath).pathname
+                  .split("/")
+                  .filter(Boolean);
+                if (segments[2]) {
+                  resourceHint = ` on "${segments[2]}"`;
+                }
+              } catch {
+                // ignore URL parse errors
+              }
+              const notifyMessage = backendError
+                ? `Unauthorized Access: ${backendError}`
+                : `Unauthorized Access: You are not authorized to perform this operation${resourceHint}, please contact your administrator.`;
               Notify.create({
-                message:
-                  "Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.",
+                message: notifyMessage,
                 timeout: 0, // This ensures the notification does not close automatically
                 color: "negative", // Customize color as needed
                 position: "top",
