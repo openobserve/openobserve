@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Collapsible Header -->
     <div
       v-if="show"
-      class="dashboard-header q-px-sm q-py-xs tw:cursor-pointer tw:hover:bg-[var(--o2-hover-accent)]"
+      class="dashboard-header tw:bg-[var(--o2-section-header-bg)]! tw:flex! tw:items-center! tw:w-full q-px-sm q-py-xs tw:cursor-pointer tw:hover:bg-[var(--o2-hover-accent)] tw:h-[2.5rem]!"
       @click="toggleCollapse"
     >
-      <div class="flex items-center justify-between">
+      <div class="tw:w-full flex items-center justify-between">
         <div class="flex items-center gap-2 cursor-pointer flex-1">
           <q-icon
             name="expand_more"
@@ -32,8 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <div class="header-content tw:ml-[0.125rem]">
-            <span class="tw:text-[0.85rem] text-bold"
-              >Rate, Error and Duration</span
+            <span
+              class="tw:text-[0.75rem] tw:font-bold tw:tracking-[0.0625rem]! tw:text-[var(--o2-text-1)]!"
+              >RATE, ERROR & DURATION</span
             >
           </div>
         </div>
@@ -42,9 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           no-caps
           color="primary"
-          icon="analytics"
+          icon="timeline"
           :label="t('volumeInsights.insightsButtonLabel')"
-          class="analyze-button tw:h-[2rem]"
+          class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
           @click.stop="openUnifiedAnalysisDashboard"
           data-test="insights-button"
         >
@@ -129,7 +130,7 @@ const TracesAnalysisDashboard = defineAsyncComponent(
   () => import("./TracesAnalysisDashboard.vue"),
 );
 
-interface TimeRange {
+export interface TimeRange {
   startTime: number;
   endTime: number;
 }
@@ -767,7 +768,6 @@ defineExpose({
 
 // Dashboard header
 .dashboard-header {
-  border-bottom: 1px solid var(--o2-border-color);
   user-select: none;
   transition: background 0.2s ease;
 
