@@ -412,6 +412,7 @@ const getEventIcon = (event: any): string => {
     case "Resolved": return "check";
     case "Reopened": return "replay";
     case "DimensionsUpgraded": return "upgrade";
+    case "TitleChanged": return "edit";
     case "AssignmentChanged": return "person_add";
     case "ai_analysis_begin": return "psychology";
     case "ai_analysis_complete": return "check";
@@ -430,6 +431,7 @@ const getEventBadgeColor = (event: any): string => {
     case "Resolved": return "#059669"; // darker green
     case "Reopened": return "#F97316"; // orange
     case "DimensionsUpgraded": return "#8B5CF6"; // purple
+    case "TitleChanged": return "#6366F1"; // indigo
     case "AssignmentChanged": return "#06B6D4"; // cyan
     case "ai_analysis_begin":
     case "ai_analysis_complete": return "#8B5CF6"; // purple
@@ -448,6 +450,7 @@ const getEventBadgeText = (event: any): string => {
     case "Resolved": return "Resolved";
     case "Reopened": return "Reopened";
     case "DimensionsUpgraded": return "Dimensions Upgraded";
+    case "TitleChanged": return "Title Changed";
     case "AssignmentChanged": return "Assignment";
     case "ai_analysis_begin": return "AI Analysis";
     case "ai_analysis_complete": return "AI Complete";
@@ -504,6 +507,9 @@ const getInlineEventText = (event: any): string => {
       return isSystemEvent
         ? `Severity changed from ${severityBadge(data.from)} to ${severityBadge(data.to)}`
         : `changed the severity from ${severityBadge(data.from)} to ${severityBadge(data.to)}`;
+
+    case "TitleChanged":
+      return `renamed from ${bold(data.from)} to ${bold(data.to)}`;
 
     case "AssignmentChanged":
       return data.to

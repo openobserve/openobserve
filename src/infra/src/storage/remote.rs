@@ -24,7 +24,7 @@ use object_store::{
     PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore, path::Path,
 };
 
-use crate::storage::{CONCURRENT_REQUESTS, format_key};
+use crate::storage::CONCURRENT_REQUESTS;
 
 // test only
 const TEST_FILE: &str = "o2_test/check.txt";

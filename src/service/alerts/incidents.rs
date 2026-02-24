@@ -1183,8 +1183,29 @@ pub async fn update_title(
     org_id: &str,
     incident_id: &str,
     title: &str,
+    user_id: &str,
 ) -> Result<Incident, anyhow::Error> {
+    let current = infra::table::alert_incidents::get(org_id, incident_id).await?;
+    let from_title = current
+        .as_ref()
+        .and_then(|i| i.title.clone())
+        .unwrap_or_default();
+
     let updated = infra::table::alert_incidents::update_title(org_id, incident_id, title).await?;
+
+    if from_title != title
+        && let Err(e) = infra::table::incident_events::append(
+            org_id,
+            incident_id,
+            config::meta::alerts::incidents::IncidentEvent::title_changed(
+                from_title, title, user_id,
+            ),
+        )
+        .await
+    {
+        log::error!("[Incidents] Failed to record title change event: {e}");
+    }
+
     model_to_incident(updated).await
 }
 
@@ -1206,17 +1227,18 @@ pub async fn update_severity(
     let updated =
         infra::table::alert_incidents::update_severity(org_id, incident_id, severity).await?;
 
-    // Emit severity override event
-    if let Err(e) = infra::table::incident_events::append(
-        org_id,
-        incident_id,
-        config::meta::alerts::incidents::IncidentEvent::severity_override(
-            from_severity,
-            to_severity,
-            user_id,
-        ),
-    )
-    .await
+    // Emit severity override event only when the severity actually changed
+    if from_severity != to_severity
+        && let Err(e) = infra::table::incident_events::append(
+            org_id,
+            incident_id,
+            config::meta::alerts::incidents::IncidentEvent::severity_override(
+                from_severity,
+                to_severity,
+                user_id,
+            ),
+        )
+        .await
     {
         log::error!("[Incidents] Failed to record severity event: {e}");
     }
