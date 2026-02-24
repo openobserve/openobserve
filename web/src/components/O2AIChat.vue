@@ -2540,6 +2540,7 @@ export default defineComponent({
       resetTitleState(); // Clear AI-generated title for new chat
       resetTypewriterState(); // Clear typewriter animation state for new chat
       pendingAutoNavigation.value = false; // Reset auto navigation for new chat
+      showScrollToBottom.value = false; // Reset scroll-to-bottom button for new chat
       store.dispatch('setCurrentChatTimestamp', null);
       store.dispatch('setChatUpdated', true);
     };
