@@ -131,9 +131,12 @@ fn infer_json_schema_from_object(
                 } else if v.is_f64() {
                     convert_data_type(fields, key, DataType::Float64)?;
                 } else {
-                    return Err(ArrowError::SchemaError(format!(
-                        "Cannot infer schema from non-basic-number type value: {v:?}",
-                    )));
+                    // For numbers that are too large to fit in i64/u64/f64,
+                    // treat them as strings to preserve the data
+                    log::warn!(
+                        "Number value too large for standard numeric types, treating as string: {key:?} {v:?}"
+                    );
+                    convert_data_type(fields, key, DataType::Utf8)?;
                 }
             }
             Value::Bool(_) => {
