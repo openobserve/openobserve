@@ -2421,6 +2421,7 @@ export default defineComponent({
       showHistory.value = false;
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
+      showScrollToBottom.value = false; // Reset scroll-to-bottom button for new chat
       resetTitleState(); // Clear AI-generated title for new chat
       resetTypewriterState(); // Clear typewriter animation state for new chat
       store.dispatch('setCurrentChatTimestamp', null);

@@ -82,6 +82,7 @@ export default defineComponent({
     const editableDiv = ref<HTMLDivElement | null>(null);
     const isFocused = ref(false);
     const localReferences = ref<ReferenceChip[]>([...props.references]);
+    const lastEmittedValue = ref<string>(''); // Track last value we emitted
 
     // Detail card state
     const showDetailCard = ref(false);
@@ -332,12 +333,21 @@ export default defineComponent({
       return message.replace(/\u200B/g, '').trim();
     };
 
-    // Handle input changes
+    // Handle input changes from user
     const handleInput = () => {
       const plainText = getPlainText();
+      lastEmittedValue.value = plainText; // Track what we emitted
       emit('update:modelValue', plainText);
 
       // Update empty state for placeholder visibility
+      updateEmptyState();
+    };
+
+    // Emit model update without tracking (for programmatic changes)
+    const emitModelUpdate = () => {
+      const plainText = getPlainText();
+      lastEmittedValue.value = plainText; // Track what we emitted
+      emit('update:modelValue', plainText);
       updateEmptyState();
     };
 
@@ -352,6 +362,21 @@ export default defineComponent({
         editableDiv.value.classList.remove('is-empty');
       } else {
         editableDiv.value.classList.add('is-empty');
+
+        // When becoming empty, reset cursor to start position if focused
+        if (isFocused.value) {
+          nextTick(() => {
+            if (!editableDiv.value) return;
+            const selection = window.getSelection();
+            if (!selection) return;
+
+            const range = document.createRange();
+            range.setStart(editableDiv.value, 0);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          });
+        }
       }
     };
 
@@ -417,23 +442,93 @@ export default defineComponent({
     // Focus the input
     const focusInput = () => {
       if (editableDiv.value && !props.disabled) {
+        // Only move cursor to end if not already focused
+        // If already focused, preserve current cursor position
+        const wasAlreadyFocused = isFocused.value;
+
         editableDiv.value.focus();
 
-        // Move cursor to end
-        const range = document.createRange();
-        const selection = window.getSelection();
-        range.selectNodeContents(editableDiv.value);
-        range.collapse(false);
-        selection?.removeAllRanges();
-        selection?.addRange(range);
+        // Only move cursor to end if we weren't already focused AND have content
+        if (!wasAlreadyFocused) {
+          const isEmpty = !editableDiv.value.textContent?.trim() &&
+                          !editableDiv.value.querySelector('.reference-chip');
+
+          if (!isEmpty) {
+            // Has content - move cursor to end
+            const range = document.createRange();
+            const selection = window.getSelection();
+            range.selectNodeContents(editableDiv.value);
+            range.collapse(false);
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+          }
+          // If empty, just focus without moving cursor (stays at start)
+        }
       }
     };
 
     // Set content programmatically
-    const setContent = (text: string) => {
+    const setContent = (text: string, preserveCursor = false) => {
       if (!editableDiv.value) return;
+
+      // Save cursor position if preserving
+      let savedSelection: { start: number; end: number } | null = null;
+      if (preserveCursor && isFocused.value) {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          const preSelectionRange = range.cloneRange();
+          preSelectionRange.selectNodeContents(editableDiv.value);
+          preSelectionRange.setEnd(range.startContainer, range.startOffset);
+          const start = preSelectionRange.toString().length;
+          savedSelection = {
+            start,
+            end: start + range.toString().length
+          };
+        }
+      }
+
       editableDiv.value.textContent = text;
-      handleInput();
+      emitModelUpdate(); // Use emitModelUpdate instead of handleInput to avoid setting isInternalUpdate flag
+
+      // Restore cursor position if saved
+      if (savedSelection && isFocused.value) {
+        nextTick(() => {
+          if (!editableDiv.value) return;
+          const selection = window.getSelection();
+          if (!selection) return;
+
+          const range = document.createRange();
+          let charCount = 0;
+          let nodeStack: Node[] = [editableDiv.value];
+          let node: Node | undefined;
+          let foundStart = false;
+          let stop = false;
+
+          while (!stop && (node = nodeStack.pop())) {
+            if (node.nodeType === Node.TEXT_NODE) {
+              const nextCharCount = charCount + (node.textContent?.length || 0);
+              if (!foundStart && savedSelection.start >= charCount && savedSelection.start <= nextCharCount) {
+                range.setStart(node, savedSelection.start - charCount);
+                foundStart = true;
+              }
+              if (foundStart && savedSelection.end >= charCount && savedSelection.end <= nextCharCount) {
+                range.setEnd(node, savedSelection.end - charCount);
+                stop = true;
+              }
+              charCount = nextCharCount;
+            } else {
+              let i = node.childNodes.length;
+              while (i--) {
+                nodeStack.push(node.childNodes[i]);
+              }
+            }
+          }
+
+          selection.removeAllRanges();
+          selection.addRange(range);
+        });
+      }
     };
 
     // Clear all content
@@ -442,7 +537,7 @@ export default defineComponent({
       editableDiv.value.innerHTML = '';
       localReferences.value = [];
       emit('update:references', []);
-      handleInput();
+      emitModelUpdate(); // Use emitModelUpdate for programmatic clear
     };
 
     // Watch for external reference changes
@@ -452,9 +547,22 @@ export default defineComponent({
 
     // Watch for model value changes from parent
     watch(() => props.modelValue, (newValue) => {
-      if (editableDiv.value && getPlainText() !== newValue) {
-        setContent(newValue);
-      }
+      if (!editableDiv.value) return;
+
+      // CRITICAL: Never update while user is focused (actively typing)
+      // This is the #1 cause of cursor jumping
+      if (isFocused.value) return;
+
+      // Skip if this is the same value we just emitted (circular update from v-model)
+      if (newValue === lastEmittedValue.value) return;
+
+      const currentText = getPlainText();
+
+      // Skip if content is already the same
+      if (currentText === newValue) return;
+
+      // Update content
+      setContent(newValue, false);
     });
 
     onMounted(() => {
@@ -547,6 +655,9 @@ export default defineComponent({
         content: attr(data-placeholder);
         color: #a0aec0;
         pointer-events: none;
+        position: absolute;
+        left: 0;
+        top: 10;
       }
     }
 
@@ -591,6 +702,9 @@ export default defineComponent({
         content: attr(data-placeholder);
         color: #718096;
         pointer-events: none;
+        position: absolute;
+        left: 0;
+        top: 0;
       }
     }
 
@@ -621,6 +735,7 @@ export default defineComponent({
 }
 
 .rich-text-input {
+  position: relative;
   outline: none;
   font-size: 14px;
   line-height: 1.6;
