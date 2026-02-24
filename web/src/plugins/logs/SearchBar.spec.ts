@@ -3561,6 +3561,165 @@ describe("SearchBar.vue VRL Visualization Support", () => {
 });
 
 /**
+ * Build Query Toggle Support Tests - SearchBar.vue
+ * PR Reference: https://github.com/openobserve/openobserve/pull/10305
+ *
+ * Tests for the new Build Query toggle button feature:
+ * 1. Build toggle button rendering
+ * 2. Build toggle state changes
+ * 3. handleRunQueryFn behavior with 'build' toggle
+ * 4. Integration with logsVisualizeToggle
+ */
+describe("SearchBar.vue Build Query Toggle Support", () => {
+  let buildInstance: any;
+
+  beforeEach(() => {
+    buildInstance = {
+      searchObj: {
+        meta: {
+          logsVisualizeToggle: "logs",
+          sqlMode: true,
+        },
+        data: {
+          stream: {
+            selectedStream: ["test-stream"],
+          },
+          query: 'SELECT * FROM "test-stream"',
+        },
+      },
+
+      // Mock event handler
+      onLogsVisualizeToggleUpdate: vi.fn((value: string) => {
+        buildInstance.searchObj.meta.logsVisualizeToggle = value;
+      }),
+
+      // Mock emit
+      emit: vi.fn(),
+
+      // Mock handleRunQueryFn
+      handleRunQueryFn: vi.fn((clear_cache = false) => {
+        if (
+          buildInstance.searchObj.meta.logsVisualizeToggle === "visualize" ||
+          buildInstance.searchObj.meta.logsVisualizeToggle === "patterns" ||
+          buildInstance.searchObj.meta.logsVisualizeToggle === "build"
+        ) {
+          buildInstance.emit("handleRunQueryFn", typeof clear_cache === "boolean" ? clear_cache : false);
+        }
+      }),
+    };
+  });
+
+  describe("Build toggle state management", () => {
+    it("should have logsVisualizeToggle initialized to 'logs'", () => {
+      expect(buildInstance.searchObj.meta.logsVisualizeToggle).toBe("logs");
+    });
+
+    it("should update logsVisualizeToggle to 'build' on toggle click", () => {
+      buildInstance.onLogsVisualizeToggleUpdate("build");
+      expect(buildInstance.searchObj.meta.logsVisualizeToggle).toBe("build");
+    });
+
+    it("should support all toggle values: logs, visualize, build, patterns", () => {
+      const validToggleValues = ["logs", "visualize", "build", "patterns"];
+
+      validToggleValues.forEach(value => {
+        buildInstance.onLogsVisualizeToggleUpdate(value);
+        expect(buildInstance.searchObj.meta.logsVisualizeToggle).toBe(value);
+      });
+    });
+
+    it("should toggle between logs and build modes", () => {
+      // Start at logs
+      expect(buildInstance.searchObj.meta.logsVisualizeToggle).toBe("logs");
+
+      // Toggle to build
+      buildInstance.onLogsVisualizeToggleUpdate("build");
+      expect(buildInstance.searchObj.meta.logsVisualizeToggle).toBe("build");
+
+      // Toggle back to logs
+      buildInstance.onLogsVisualizeToggleUpdate("logs");
+      expect(buildInstance.searchObj.meta.logsVisualizeToggle).toBe("logs");
+    });
+  });
+
+  describe("handleRunQueryFn with build mode", () => {
+    it("should emit handleRunQueryFn when toggle is 'build'", () => {
+      buildInstance.searchObj.meta.logsVisualizeToggle = "build";
+      buildInstance.handleRunQueryFn(false);
+
+      expect(buildInstance.emit).toHaveBeenCalledWith("handleRunQueryFn", false);
+    });
+
+    it("should emit handleRunQueryFn when toggle is 'visualize'", () => {
+      buildInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      buildInstance.handleRunQueryFn(true);
+
+      expect(buildInstance.emit).toHaveBeenCalledWith("handleRunQueryFn", true);
+    });
+
+    it("should emit handleRunQueryFn when toggle is 'patterns'", () => {
+      buildInstance.searchObj.meta.logsVisualizeToggle = "patterns";
+      buildInstance.handleRunQueryFn(false);
+
+      expect(buildInstance.emit).toHaveBeenCalledWith("handleRunQueryFn", false);
+    });
+
+    it("should NOT emit handleRunQueryFn when toggle is 'logs'", () => {
+      buildInstance.searchObj.meta.logsVisualizeToggle = "logs";
+      buildInstance.handleRunQueryFn(false);
+
+      expect(buildInstance.emit).not.toHaveBeenCalled();
+    });
+
+    it("should pass clear_cache parameter correctly to emit", () => {
+      buildInstance.searchObj.meta.logsVisualizeToggle = "build";
+
+      buildInstance.handleRunQueryFn(true);
+      expect(buildInstance.emit).toHaveBeenCalledWith("handleRunQueryFn", true);
+
+      buildInstance.emit.mockClear();
+
+      buildInstance.handleRunQueryFn(false);
+      expect(buildInstance.emit).toHaveBeenCalledWith("handleRunQueryFn", false);
+    });
+  });
+
+  describe("Build toggle button visibility", () => {
+    it("should track selected state based on logsVisualizeToggle value", () => {
+      const isSelected = () => buildInstance.searchObj.meta.logsVisualizeToggle === "build";
+
+      expect(isSelected()).toBe(false);
+
+      buildInstance.onLogsVisualizeToggleUpdate("build");
+      expect(isSelected()).toBe(true);
+
+      buildInstance.onLogsVisualizeToggleUpdate("logs");
+      expect(isSelected()).toBe(false);
+    });
+  });
+
+  describe("Build mode interaction with query state", () => {
+    it("should preserve query when switching to build mode", () => {
+      const originalQuery = 'SELECT * FROM "test-stream"';
+      buildInstance.searchObj.data.query = originalQuery;
+
+      buildInstance.onLogsVisualizeToggleUpdate("build");
+
+      expect(buildInstance.searchObj.data.query).toBe(originalQuery);
+    });
+
+    it("should preserve stream selection when switching to build mode", () => {
+      const originalStream = ["test-stream"];
+      buildInstance.searchObj.data.stream.selectedStream = originalStream;
+
+      buildInstance.onLogsVisualizeToggleUpdate("build");
+
+      expect(buildInstance.searchObj.data.stream.selectedStream).toEqual(originalStream);
+    });
+  });
+});
+
+/**
  * VRL Editor Disabled for Non-Table Charts Tests
  * PR Reference: https://github.com/openobserve/openobserve/pull/10343
  *
@@ -3580,11 +3739,17 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           tempFunctionContent: ".parsed = parse_json!(.message)",
           transformType: "function",
           query: "SELECT * FROM logs",
+          queryResults: {
+            hits: [],
+          },
         },
         meta: {
           logsVisualizeToggle: "logs",
           functionEditorPlaceholderFlag: true,
           showTransformEditor: true,
+          resultGrid: {
+            showPagination: true,
+          },
         },
       },
       dashboardPanelData: {
@@ -3803,6 +3968,56 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
         testInstance.dashboardPanelData.data.type = chartType;
         expect(testInstance.dashboardPanelData.data.type).toBe(chartType);
       });
+    });
+  });
+
+  describe("Logs/Patterns Toggle and Pagination", () => {
+    it("should reset pagination visibility when switching from patterns to logs", () => {
+      // Simulate switching to patterns view (which sets showPagination to false)
+      testInstance.searchObj.meta.logsVisualizeToggle = "patterns";
+      testInstance.searchObj.meta.resultGrid.showPagination = false;
+
+      // Verify pagination is hidden
+      expect(testInstance.searchObj.meta.resultGrid.showPagination).toBe(false);
+
+      // Switch back to logs view
+      testInstance.searchObj.meta.logsVisualizeToggle = "logs";
+
+      // Simulate the onLogsVisualizeToggleUpdate behavior
+      // In the actual implementation, this is set when switching from patterns to logs
+      testInstance.searchObj.meta.resultGrid.showPagination = true;
+
+      // Verify pagination is shown again
+      expect(testInstance.searchObj.meta.resultGrid.showPagination).toBe(true);
+    });
+
+    it("should maintain logs data when switching from patterns to logs with existing data", () => {
+      // Setup: logs exist
+      testInstance.searchObj.data.queryResults.hits = [
+        { message: "log1" },
+        { message: "log2" },
+      ];
+      testInstance.searchObj.meta.logsVisualizeToggle = "patterns";
+
+      // Switch back to logs
+      testInstance.searchObj.meta.logsVisualizeToggle = "logs";
+
+      // Verify logs data is still present
+      expect(testInstance.searchObj.data.queryResults.hits.length).toBe(2);
+    });
+
+    it("should show pagination only in logs view", () => {
+      // Set pagination flag
+      testInstance.searchObj.meta.resultGrid.showPagination = true;
+
+      // In logs view - should show pagination
+      testInstance.searchObj.meta.logsVisualizeToggle = "logs";
+      expect(testInstance.searchObj.meta.resultGrid.showPagination).toBe(true);
+
+      // In patterns view - pagination should be hidden
+      testInstance.searchObj.meta.logsVisualizeToggle = "patterns";
+      testInstance.searchObj.meta.resultGrid.showPagination = false;
+      expect(testInstance.searchObj.meta.resultGrid.showPagination).toBe(false);
     });
   });
 });

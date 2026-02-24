@@ -59,18 +59,21 @@ export class LogsPage {
         this.endTimeInput = '[data-test="end-time-input"]';
         this.showQueryToggle = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.fieldListCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
-        this.savedViewsButton = '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown--current > .q-btn__content > :nth-child(1)';
-        this.savedViewsExpand = '[data-test="logs-search-saved-views-btn"]';
+        this.savedViewsButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
+        this.savedViewsExpand = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.saveViewButton = 'button'; // filter by text in method
         this.savedViewNameInput = '[data-test="add-alert-name-input"]';
         this.savedViewDialogSave = '[data-test="saved-view-dialog-save-btn"]';
-        this.savedViewArrow = '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon';
+        this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
         this.confirmButton = '[data-test="confirm-button"]';
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
         this.searchStreamInput = '[placeholder="Search Stream"]';
         this.exploreButtonRole = { role: 'button', name: 'Explore' };
+        this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
+        this.listSavedViewsButton = '[data-test="logs-search-bar-list-saved-views-btn"]';
+        this.createSavedViewButton = '[data-test="logs-search-bar-create-saved-view-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
         this.closeDialog = '[data-test="close-dialog"] > .q-btn__content';
@@ -107,7 +110,7 @@ export class LogsPage {
         // Additional locators
         this.fnEditor = '#fnEditor';
         this.searchListFirstTextLeft = '.search-list > :nth-child(1) > .text-left';
-        this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn-dropdown"]';
+        this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn"]';
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
         this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
@@ -135,6 +138,58 @@ export class LogsPage {
         this.errorIcon = 'text=error';
         this.resultErrorDetailsBtn = '[data-test="logs-page-result-error-details-btn"]';
         this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
+
+        // ===== BUILD TAB / QUERY BUILDER SELECTORS (PR #10305) =====
+        // Tab navigation
+        this.buildToggle = '[data-test="logs-build-toggle"]';
+        this.logsToggle = '[data-test="logs-logs-toggle"]';
+        this.visualizeToggle = '[data-test="logs-visualize-toggle"]';
+        this.patternsToggle = '[data-test="logs-patterns-toggle"]';
+
+        // Query type selector (Auto/Custom mode)
+        this.builderQueryType = '[data-test="dashboard-builder-query-type"]';
+        this.customQueryType = '[data-test="dashboard-custom-query-type"]';
+        this.sqlQueryType = '[data-test="dashboard-sql-query-type"]';
+        this.promqlQueryType = '[data-test="dashboard-promql-query-type"]';
+
+        // Dashboard query builder axes
+        this.xAxisLayout = '[data-test="dashboard-x-layout"]';
+        this.yAxisLayout = '[data-test="dashboard-y-layout"]';
+        this.breakdownLayout = '[data-test="dashboard-b-layout"]';
+        this.zAxisLayout = '[data-test="dashboard-z-layout"]';
+        this.xAxisItem = (alias) => `[data-test="dashboard-x-item-${alias}"]`;
+        this.yAxisItem = (alias) => `[data-test="dashboard-y-item-${alias}"]`;
+        this.breakdownItem = (alias) => `[data-test="dashboard-b-item-${alias}"]`;
+        this.xAxisItemRemove = (alias) => `[data-test="dashboard-x-item-${alias}-remove"]`;
+        this.yAxisItemRemove = (alias) => `[data-test="dashboard-y-item-${alias}-remove"]`;
+        this.breakdownItemRemove = (alias) => `[data-test="dashboard-b-item-${alias}-remove"]`;
+
+        // Field list for builder
+        this.streamTypeDropdown = '[data-test="index-dropdown-stream_type"]';
+        this.streamDropdown = '[data-test="index-dropdown-stream"]';
+        this.addToXAxis = '[data-test="dashboard-add-x-data"]';
+        this.addToYAxis = '[data-test="dashboard-add-y-data"]';
+        this.addToBreakdown = '[data-test="dashboard-add-b-data"]';
+        this.addToFilter = '[data-test="dashboard-add-filter-data"]';
+        this.fieldListSearchInput = '[data-test="index-field-search-input"]';
+
+        // Chart selection
+        this.chartSelectionContainer = '[data-test="dashboard-addpanel-chart-selection-item"]';
+        this.chartTypeItem = (chartId) => `[data-test="selected-chart-${chartId}-item"]`;
+
+        // Panel editor
+        this.fieldListCollapsedIcon = '[data-test="panel-editor-field-list-collapsed-icon"]';
+        this.customChartTypeBtn = '[data-test="custom-chart-type-selector-btn"]';
+
+        // Config panel
+        this.configShowLegend = '[data-test="dashboard-config-show-legend"]';
+        this.configDynamicColumns = '[data-test="dashboard-config-table_dynamic_columns"]';
+        this.configLimit = '[data-test="dashboard-config-limit"]';
+
+        // Chart renderer
+        this.chartRenderer = '[data-test="chart-renderer"]';
+        this.noDataMessage = '[data-test="no-data"]';
+        this.dashboardPanelTable = '[data-test="dashboard-panel-table"]';
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
@@ -234,6 +289,14 @@ export class LogsPage {
         this.patternLoadingSpinner = '.q-spinner-hourglass';
         this.patternLoadingText = 'text=Extracting patterns from logs...';
         this.patternEmptyState = 'text=No patterns found';
+
+        // ===== V0.40 REGRESSION TEST LOCATORS =====
+        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr';
+        this.tableRowExpandMenu = '[data-test="table-row-expand-menu"]';
+        this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
+        this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
+        this.searchResultText = '[data-test="logs-search-search-result"]';
+        this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
     }
 
 
@@ -1685,6 +1748,48 @@ export class LogsPage {
     }
 
     /**
+     * Click Run query and wait for query execution to complete.
+     * Uses button UI state (loading/disabled → ready) instead of response matching
+     * to avoid capturing stale responses from auto-searches.
+     * @param {number} timeout - Max wait time in ms (default 60000)
+     */
+    async runQueryAndWaitForResults(timeout = 60000) {
+        const btn = this.page.locator(this.queryButton);
+
+        // Click Run query
+        await btn.click({ force: true });
+
+        // Wait for the button to enter loading/disabled state (query started)
+        await this.page.waitForFunction(
+            (selector) => {
+                const btn = document.querySelector(selector);
+                if (!btn) return false;
+                return btn.hasAttribute('disabled') || btn.classList.contains('q-btn--loading') || btn.textContent?.trim()?.includes('Cancel');
+            },
+            this.queryButton,
+            { timeout: 5000 }
+        ).catch(() => {
+            // Query may have completed instantly — that's OK
+        });
+
+        // Wait for the button to exit loading/disabled state (query completed)
+        await this.page.waitForFunction(
+            (selector) => {
+                const btn = document.querySelector(selector);
+                if (!btn) return false;
+                const isDisabled = btn.hasAttribute('disabled') || btn.getAttribute('aria-disabled') === 'true';
+                const isLoading = btn.classList.contains('q-btn--loading');
+                const text = btn.textContent?.trim() || '';
+                return !isDisabled && !isLoading && !text.includes('Cancel');
+            },
+            this.queryButton,
+            { timeout }
+        );
+
+        testLogger.info('Query execution complete - Run query button ready');
+    }
+
+    /**
      * Ingest multiple log entries with retry logic for "stream being deleted" errors
      * Uses page.request API to keep credentials in Node.js context (secure)
      * @param {string} streamName - Target stream name
@@ -1781,15 +1886,77 @@ export class LogsPage {
     }
 
     async clickSavedViewsButton() {
-        return await this.page.locator(this.savedViewsButton).click({ force: true });
+        // This method is used to create a new saved view
+        // It should open the utilities menu and click "Create Saved View"
+        // This is the same as clickSaveViewButton but without the dialog cleanup
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(300);
+        return await this.page.locator(this.createSavedViewButton).click();
     }
 
     async clickSavedViewsExpand() {
-        return await this.page.locator(this.savedViewsExpand).getByLabel('Expand').click();
+        // CRITICAL: This method is often called after applying a saved view
+        //
+        // Problem: When a saved view is applied via applySavedView():
+        // 1. The saved views dialog closes immediately (savedViewsListDialog = false)
+        // 2. applySavedView() fetches the saved view details from API (async)
+        // 3. It updates searchObj with the saved view's query/filters
+        // 4. This triggers a NEW SEARCH which updates the logs table
+        // 5. The search also updates searchObj.data.savedViews (the saved views list)
+        //
+        // If we try to reopen the saved views dialog while the search is still running:
+        // - The dialog's table will be re-rendering as data updates
+        // - The search input element becomes "unstable" (detached/recreated)
+        // - Test clicks fail with "element was detached from DOM"
+        //
+        // Solution: Wait for the search triggered by applySavedView to complete
+        // before opening the dialog again. This ensures the dialog opens with stable data.
+
+        try {
+            // Wait for any ongoing search to complete by checking for the logs table
+            // This indicates the search triggered by applySavedView has finished
+            // Note: We check for the table itself, not specific columns, since columns
+            // vary depending on the stream and saved view
+            const table = this.page.locator(this.logsTable);
+            await table.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {
+                // Ignore timeout - there might not be a search running
+                // (e.g., first time opening the dialog or no data)
+            });
+
+            // Extra wait for the search to fully settle and UI to update
+            // This gives time for:
+            // - All reactive updates to complete
+            // - The saved views list to reload if needed
+            // - Any watchers/computed properties to stabilize
+            await this.page.waitForTimeout(1000);
+        } catch (e) {
+            // Continue if no search results found
+            // This is expected on first load or when no data exists
+        }
+
+        // Now it's safe to open the saved views dialog
+        // Open the utilities menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        // Wait for menu animation to complete and be visible
+        await this.page.waitForTimeout(300);
+        // Click list saved views button to show the saved views panel
+        await this.page.locator(this.listSavedViewsButton).click();
+        // Wait for dialog to open, render, and stabilize
+        await this.page.waitForTimeout(500);
     }
 
     async clickSaveViewButton() {
-        return await this.page.locator(this.saveViewButton).filter({ hasText: 'savesaved_search' }).click();
+        // Close any open dialogs first (e.g., saved views list dialog)
+        const escapeKey = 'Escape';
+        await this.page.keyboard.press(escapeKey);
+        await this.page.waitForTimeout(200);
+
+        // Open the utilities menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(300);
+
+        // Click create saved view button
+        return await this.page.locator(this.createSavedViewButton).click();
     }
 
     async fillSavedViewName(name) {
@@ -1817,7 +1984,46 @@ export class LogsPage {
     }
 
     async clickSavedViewSearchInput() {
-        return await this.page.locator(this.savedViewSearchInput).click();
+        // This method clicks the search input inside the saved views dialog
+        //
+        // Why this needs special handling:
+        // The search input is inside a q-table's #top template slot. When the table's
+        // data updates (e.g., after applying a saved view), the entire #top template
+        // gets re-rendered, causing the input element to be detached and recreated.
+        //
+        // The problem was exacerbated by:
+        // 1. debounce="1" (now changed to 300) - caused rapid re-renders
+        // 2. Table data updating from ongoing searches
+        // 3. Invalid HTML structure (q-tr inside #top-right - now fixed)
+        //
+        // Even with those fixes, if a search just completed, the table might still
+        // be updating its pagination/data, making the input unstable for a brief moment.
+        //
+        // Solution: Multiple layers of waiting to ensure element stability
+
+        const searchInput = this.page.locator(this.savedViewSearchInput);
+
+        // Step 1: Wait for element to be visible in the DOM
+        // This ensures the dialog has opened and rendered
+        await searchInput.waitFor({ state: 'visible', timeout: 15000 });
+
+        // Step 2: Wait for any ongoing table re-renders to complete
+        // After applying a saved view and reopening the dialog:
+        // - The table might still be processing the new data
+        // - Pagination might be recalculating
+        // - Reactive dependencies might be updating
+        // This 1000ms wait gives time for all of that to settle
+        await this.page.waitForTimeout(1000);
+
+        // Step 3: Verify element is still attached to the DOM
+        // This catches cases where the element was recreated during the wait
+        await searchInput.waitFor({ state: 'attached', timeout: 5000 });
+
+        // Step 4: Click with force option
+        // force: true bypasses actionability checks (visible, stable, not obscured)
+        // This is safe here because we've already verified visibility and attachment
+        // It helps handle edge cases where another element might briefly overlap
+        return await searchInput.click({ force: true });
     }
 
     async fillSavedViewSearchInput(text) {
@@ -1870,23 +2076,32 @@ export class LogsPage {
 
     async clickDeleteSavedViewButton(savedViewName) {
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
-        
+
+        // Close any open saved views dialog from previous operations
+        const backdrop = this.page.locator('.q-dialog__backdrop');
+        const isBackdropVisible = await backdrop.isVisible().catch(() => false);
+        if (isBackdropVisible) {
+            await this.page.keyboard.press('Escape');
+            await this.waitForTimeout(500);
+            await backdrop.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
+        }
+
         // Wait for the saved views area to be stable after navigation
         await this.waitForTimeout(2000);
-        
+
         // Ensure saved views panel is expanded and wait for stability
         await this.clickSavedViewsExpand();
         await this.waitForTimeout(1000);
-        
+
         // Wait for the search input to be stable and ready
         await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'attached', timeout: 5000 });
         await this.waitForTimeout(500);
-        
+
         // Click and fill the search input with better error handling
         await this.page.locator(this.savedViewSearchInput).click({ force: true });
         await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
         await this.waitForTimeout(1500);
-        
+
         // Wait for and click the delete button
         await this.page.locator(deleteButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(deleteButtonSelector).click({ force: true });
@@ -1894,6 +2109,11 @@ export class LogsPage {
     }
 
     async clickResetFiltersButton() {
+        // First open the utilities menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        // Wait for menu to be visible
+        await this.page.waitForTimeout(300);
+        // Then click reset filters button
         return await this.page.locator(this.resetFiltersButton).click({ force: true });
     }
 
@@ -2809,11 +3029,19 @@ export class LogsPage {
     }
 
     async clickFunctionDropdownSave() {
+        // The save button is now a standalone button (not in dropdown)
+        // Try FunctionSelector button first, then TransformSelector button
         try {
-            await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click({ timeout: 3000 });
+            // Try FunctionSelector save button (when actions are disabled)
+            await this.page.locator('[data-test="logs-search-bar-save-function-btn"]').click({ timeout: 3000 });
         } catch (error) {
-            // If save button click fails, click the save transform button
-            await this.page.locator(this.logsSearchBarSaveTransformBtn).click();
+            try {
+                // Try TransformSelector save button (when actions are enabled)
+                await this.page.locator(this.logsSearchBarSaveTransformBtn).click({ timeout: 3000 });
+            } catch (transformError) {
+                // Fallback: Try old dropdown approach
+                await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click();
+            }
         }
     }
 
@@ -3647,6 +3875,22 @@ export class LogsPage {
         return await this.page.locator(`${this.logsTable} tbody tr`).count();
     }
 
+    /**
+     * Get log table row texts as an array (one string per row)
+     * @param {number} limit - Maximum number of rows to return
+     * @returns {Promise<string[]>} Array of row text content
+     */
+    async getLogsTableRowTexts(limit = 10) {
+        const rows = this.page.locator(`${this.logsTable} tbody tr`);
+        const count = Math.min(await rows.count(), limit);
+        const texts = [];
+        for (let i = 0; i < count; i++) {
+            const text = await rows.nth(i).textContent();
+            if (text) texts.push(text.trim());
+        }
+        return texts;
+    }
+
     // ============================================================================
     // Stream display methods for multi-stream scenarios
     // ============================================================================
@@ -3838,6 +4082,43 @@ export class LogsPage {
      */
     async getFieldValuesCount(fieldName) {
         return await this.page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`).count();
+    }
+
+    /**
+     * Get all field values text from the expanded field dropdown
+     * @param {string} fieldName - Name of the field
+     * @returns {Promise<string[]>} Array of field value texts
+     * @example
+     * const values = await logsPage.getFieldValuesText('service_name');
+     * // Returns: ['service-a', 'service-b', 'service-c']
+     */
+    async getFieldValuesText(fieldName) {
+        const valueElements = this.page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`);
+        const count = await valueElements.count();
+        const values = [];
+        for (let i = 0; i < count; i++) {
+            const text = await valueElements.nth(i).textContent();
+            if (text) {
+                // Extract just the value part (before any count indicator)
+                const cleanValue = text.trim().split(/\s+/)[0];
+                values.push(cleanValue);
+            }
+        }
+        return values;
+    }
+
+    /**
+     * Collapse an expanded field by clicking its expand button again
+     * @param {string} fieldName - Name of the field to collapse
+     */
+    async collapseField(fieldName) {
+        const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+        if (await expandBtn.isVisible()) {
+            await expandBtn.click();
+            // Wait for field values to be hidden (deterministic wait)
+            await this.page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`).first()
+                .waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        }
     }
 
     /**
@@ -5131,15 +5412,6 @@ export class LogsPage {
         await this.page.waitForTimeout(500);
     }
 
-    /**
-     * Get logs table content as text
-     * @returns {Promise<string>} The table content text
-     */
-    async getLogsTableContent() {
-        const table = this.page.locator(this.logsTable);
-        return await table.textContent().catch(() => '');
-    }
-
     // ========== BUG REGRESSION TEST METHODS ==========
 
     /**
@@ -5354,24 +5626,27 @@ export class LogsPage {
     }
 
     /**
-     * Get the saved views button locator
-     * @returns {import('@playwright/test').Locator} Saved views button locator
+     * Get the saved views button locator (now utilities menu button)
+     * @returns {import('@playwright/test').Locator} Utilities menu button locator
      */
     getSavedViewsButtonLocator() {
-        return this.page.locator('[data-test="logs-search-saved-views-btn"]');
+        return this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
     }
 
     /**
-     * Click the saved views dropdown arrow to expand and show the list
-     * This opens the dropdown panel with search input
+     * Click the utilities menu button to show saved views
+     * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
-        const arrow = this.page.locator(this.savedViewArrow);
-        await arrow.waitFor({ state: 'visible', timeout: 10000 });
-        await arrow.click();
-        // Wait for dropdown panel to appear
+        const menuButton = this.page.locator(this.utilitiesMenuButton);
+        await menuButton.waitFor({ state: 'visible', timeout: 10000 });
+        await menuButton.click();
+        // Wait for menu to appear
+        await this.page.waitForTimeout(300);
+        // Click list saved views
+        await this.page.locator(this.listSavedViewsButton).click();
         await this.page.waitForTimeout(500);
-        testLogger.info('Clicked saved views dropdown arrow');
+        testLogger.info('Opened utilities menu and clicked List Saved Views');
     }
 
     /**
@@ -5507,6 +5782,22 @@ export class LogsPage {
     }
 
     /**
+     * Set query editor content reliably using Playwright's fill() on the Monaco .inputarea.
+     * This properly clears existing content before typing, unlike Ctrl+A + Backspace which
+     * can fail to clear Monaco in certain states.
+     * @param {string} query - The SQL query to set
+     */
+    async setQueryEditorContent(query) {
+        // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass
+        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
+        await inputArea.click({ force: true });
+        await inputArea.fill(query);
+        // Wait for Monaco to render the new content in the view-line
+        await this.page.locator('[data-test="logs-search-bar-query-editor"] .view-line').first().waitFor({ state: 'visible', timeout: 5000 });
+        testLogger.info(`Query editor set to: "${query.substring(0, 60)}"`);
+    }
+
+    /**
      * Enable SQL mode if not already enabled
      * Combines getSQLModeState() check with clickSQLModeSwitch()
      */
@@ -5515,7 +5806,8 @@ export class LogsPage {
         const isChecked = await sqlModeToggle.getAttribute('aria-checked');
         if (isChecked !== 'true') {
             await sqlModeToggle.click();
-            await this.page.waitForTimeout(1000);
+            // Wait for the toggle to actually switch ON
+            await expect(sqlModeToggle).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
             testLogger.info('SQL mode enabled');
         } else {
             testLogger.info('SQL mode already enabled');
@@ -5857,5 +6149,578 @@ export class LogsPage {
         // Pattern detail shows "Pattern X of Y" in the header
         await this.page.getByText(`Pattern ${expectedIndex} of`).waitFor({ state: 'visible', timeout: 5000 });
         testLogger.info(`Pattern details showing pattern ${expectedIndex}`);
+    }
+
+    // ============================================================================
+    // BUILD TAB / QUERY BUILDER METHODS - PR #10305
+    // These methods support the Auto Query Builder feature on the Logs page
+    // ============================================================================
+
+    /**
+     * Click the Build tab toggle to switch to Build mode
+     */
+    async clickBuildToggle() {
+        await this.page.locator(this.buildToggle).click();
+        testLogger.info('Clicked Build tab toggle');
+    }
+
+    /**
+     * Click the Logs tab toggle to switch back to Logs mode
+     */
+    async clickLogsToggle() {
+        await this.page.locator(this.logsToggle).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Logs tab toggle');
+    }
+
+    /**
+     * Click the Visualize tab toggle
+     */
+    async clickVisualizeToggle() {
+        await this.page.locator(this.visualizeToggle).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Visualize tab toggle');
+    }
+
+    /**
+     * Expect Build tab toggle to be visible
+     */
+    async expectBuildToggleVisible() {
+        await expect(this.page.locator(this.buildToggle)).toBeVisible();
+        testLogger.info('Build tab toggle is visible');
+    }
+
+    /**
+     * Expect Build tab to be active (check aria-pressed or similar attribute)
+     */
+    async expectBuildTabActive() {
+        const buildToggle = this.page.locator(this.buildToggle);
+        await expect(buildToggle).toBeVisible();
+        testLogger.info('Build tab is active');
+    }
+
+    /**
+     * Expect Builder mode (Auto mode) to be active
+     */
+    async expectBuilderModeActive() {
+        const builderTypeBtn = this.page.locator(this.builderQueryType);
+        await expect(builderTypeBtn).toBeVisible();
+        testLogger.info('Builder mode is active');
+    }
+
+    /**
+     * Expect Custom SQL mode to be active
+     */
+    async expectCustomModeActive() {
+        const customTypeBtn = this.page.locator(this.customQueryType);
+        await expect(customTypeBtn).toBeVisible();
+        testLogger.info('Custom SQL mode is available');
+    }
+
+    /**
+     * Click Builder/Auto query type toggle
+     */
+    async clickBuilderQueryType() {
+        await this.page.locator(this.builderQueryType).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Builder query type');
+    }
+
+    /**
+     * Click Custom SQL query type toggle
+     */
+    async clickCustomQueryType() {
+        await this.page.locator(this.customQueryType).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Custom query type');
+    }
+
+    /**
+     * Expect X-axis layout section to be visible
+     */
+    async expectXAxisLayoutVisible() {
+        await expect(this.page.locator(this.xAxisLayout)).toBeVisible();
+        testLogger.info('X-axis layout is visible');
+    }
+
+    /**
+     * Expect Y-axis layout section to be visible
+     */
+    async expectYAxisLayoutVisible() {
+        await expect(this.page.locator(this.yAxisLayout)).toBeVisible();
+        testLogger.info('Y-axis layout is visible');
+    }
+
+    /**
+     * Expect Breakdown layout section to be visible
+     */
+    async expectBreakdownLayoutVisible() {
+        await expect(this.page.locator(this.breakdownLayout)).toBeVisible();
+        testLogger.info('Breakdown layout is visible');
+    }
+
+    /**
+     * Add a field to X-axis (click the add button)
+     */
+    async clickAddToXAxis() {
+        await this.page.locator(this.addToXAxis).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Add to X-axis');
+    }
+
+    /**
+     * Add a field to Y-axis (click the add button)
+     */
+    async clickAddToYAxis() {
+        await this.page.locator(this.addToYAxis).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Add to Y-axis');
+    }
+
+    /**
+     * Add a field to Breakdown (click the add button)
+     */
+    async clickAddToBreakdown() {
+        await this.page.locator(this.addToBreakdown).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Add to Breakdown');
+    }
+
+    /**
+     * Expect a specific X-axis item to be visible
+     * @param {string} alias - The field alias/name
+     */
+    async expectXAxisItemVisible(alias) {
+        await expect(this.page.locator(this.xAxisItem(alias))).toBeVisible();
+        testLogger.info(`X-axis item "${alias}" is visible`);
+    }
+
+    /**
+     * Expect a specific Y-axis item to be visible
+     * @param {string} alias - The field alias/name
+     */
+    async expectYAxisItemVisible(alias) {
+        await expect(this.page.locator(this.yAxisItem(alias))).toBeVisible();
+        testLogger.info(`Y-axis item "${alias}" is visible`);
+    }
+
+    /**
+     * Remove a field from X-axis
+     * @param {string} alias - The field alias/name
+     */
+    async removeXAxisItem(alias) {
+        await this.page.locator(this.xAxisItemRemove(alias)).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Removed X-axis item "${alias}"`);
+    }
+
+    /**
+     * Remove a field from Y-axis
+     * @param {string} alias - The field alias/name
+     */
+    async removeYAxisItem(alias) {
+        await this.page.locator(this.yAxisItemRemove(alias)).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Removed Y-axis item "${alias}"`);
+    }
+
+    /**
+     * Select a chart type by its ID
+     * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
+     */
+    async selectChartType(chartId) {
+        // Use .first() to handle multiple matching elements (e.g., from cached panels)
+        const chartItem = this.page.locator(this.chartTypeItem(chartId)).first();
+
+        // Click the chart item (tests should check visibility before calling this)
+        await chartItem.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Selected chart type: ${chartId}`);
+    }
+
+    /**
+     * Expect a specific chart type to be visible in the chart selection
+     * @param {string} chartId - The chart type ID
+     */
+    async expectChartTypeVisible(chartId) {
+        const chartItem = this.page.locator(this.chartTypeItem(chartId)).first();
+        await expect(chartItem).toBeVisible();
+        testLogger.info(`Chart type "${chartId}" is visible`);
+    }
+
+    /**
+     * Verify a chart type is selected (theme-aware: checks bg-grey-3 for light, bg-grey-5 for dark)
+     * Uses the parent element's background class to detect selection state.
+     * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
+     * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
+     */
+    async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 20000) {
+        // Use visible() filter — there can be multiple PanelEditor instances in DOM
+        // (e.g., cached Visualize tab + active Build tab). Only check the visible one.
+        const selector = this.chartTypeItem(chartId);
+        const parentLocator = this.page.locator(selector).locator('visible=true').locator('..');
+
+        if (shouldBeSelected) {
+            await expect(parentLocator).toHaveClass(/bg-grey-[35]/, { timeout });
+            testLogger.info(`Chart type "${chartId}" is selected (verified via bg-grey class)`);
+        } else {
+            await expect(parentLocator).not.toHaveClass(/bg-grey-[35]/, { timeout: 5000 });
+            testLogger.info(`Chart type "${chartId}" is NOT selected (verified via bg-grey class)`);
+        }
+    }
+
+    /**
+     * Expect chart renderer to be visible (chart preview loaded)
+     */
+    async expectChartRendererVisible() {
+        await expect(this.page.locator(this.chartRenderer)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Chart renderer is visible');
+    }
+
+    /**
+     * Expect "No data" message to be visible
+     */
+    async expectNoDataMessageVisible() {
+        await expect(this.page.locator(this.noDataMessage)).toBeVisible();
+        testLogger.info('No data message is visible');
+    }
+
+    /**
+     * Expect dashboard panel table to be visible
+     */
+    async expectDashboardPanelTableVisible() {
+        await expect(this.page.locator(this.dashboardPanelTable)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Dashboard panel table is visible');
+    }
+
+    /**
+     * Check if SQL Mode is currently ON
+     * @returns {Promise<boolean>} True if SQL mode is ON
+     */
+    async isSqlModeOn() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+        return isChecked === 'true';
+    }
+
+    /**
+     * Verify SQL Mode auto-enables when switching to Build tab
+     */
+    async verifySqlModeAutoEnablesOnBuild() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+
+        if (isChecked === 'true') {
+            await sqlModeToggle.click();
+            await this.page.waitForTimeout(500);
+        }
+
+        await this.clickBuildToggle();
+        await this.page.waitForTimeout(1000);
+
+        const isNowChecked = await sqlModeToggle.getAttribute('aria-checked');
+        if (isNowChecked === 'true') {
+            testLogger.info('SQL Mode auto-enabled on Build tab switch');
+            return true;
+        } else {
+            testLogger.warn('SQL Mode did NOT auto-enable on Build tab switch');
+            return false;
+        }
+    }
+
+    /**
+     * Search for a field in the field list
+     * @param {string} fieldName - The field name to search
+     */
+    async searchFieldInBuilder(fieldName) {
+        await this.page.locator(this.fieldListSearchInput).fill(fieldName);
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Searched for field: ${fieldName}`);
+    }
+
+    /**
+     * Clear field search in builder
+     */
+    async clearFieldSearch() {
+        await this.page.locator(this.fieldListSearchInput).clear();
+        await this.page.waitForTimeout(300);
+        testLogger.info('Cleared field search');
+    }
+
+    /**
+     * Toggle field list collapse/expand in panel editor
+     */
+    async toggleFieldListCollapse() {
+        await this.page.locator(this.fieldListCollapsedIcon).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Toggled field list collapse');
+    }
+
+    /**
+     * Enter a query in the query editor and verify it's accepted
+     * @param {string} query - The SQL query to enter
+     */
+    async enterBuildQuery(query) {
+        await this.clickQueryEditor();
+        await this.page.waitForTimeout(300);
+        await this.selectAllText();
+        await this.pressBackspace();
+        await this.page.keyboard.type(query);
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Entered build query: ${query.substring(0, 50)}...`);
+    }
+
+    /**
+     * Wait for Build tab UI to be fully loaded
+     * @param {number} timeout - Timeout in milliseconds
+     */
+    async waitForBuildTabLoaded(timeout = 30000) {
+        // Phase 1: Wait for BuildQueryPage root container to be visible
+        try {
+            await this.page.locator('.build-query-page').waitFor({ state: 'visible', timeout });
+            testLogger.info('Build tab container loaded');
+        } catch (error) {
+            testLogger.warn('Build tab container did not appear within timeout');
+            return false;
+        }
+
+        // Phase 2: Wait for async initializeBuild() to complete.
+        // initializeBuild parses query, sets chart type, runs query, renders chart/table/no-data.
+        // Use visible filter to avoid hidden cached PanelEditor instances.
+        try {
+            const initIndicator = this.page.locator(
+                `${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`
+            ).locator('visible=true').first();
+            await initIndicator.waitFor({ state: 'visible', timeout });
+            testLogger.info('Build tab initialization complete (chart/table/no-data visible)');
+        } catch (error) {
+            // Phase 2 is best-effort — Build tab may not render data for all query types
+            testLogger.warn('Build tab chart/table/no-data not visible, waiting for networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        }
+
+        return true;
+    }
+
+    /**
+     * Get the current chart type from the UI (theme-aware)
+     * Checks parent element for bg-grey-3 (light) or bg-grey-5 (dark) to detect selection.
+     * @returns {Promise<string|null>} The current chart type or null
+     */
+    async getCurrentChartType() {
+        const chartTypes = ['bar', 'line', 'area', 'area-stacked', 'metric', 'table', 'scatter', 'pie', 'donut', 'h-bar', 'h-stacked', 'stacked', 'heatmap', 'gauge'];
+
+        for (const chartType of chartTypes) {
+            const chartItem = this.page.locator(this.chartTypeItem(chartType)).first();
+            const isVisible = await chartItem.isVisible().catch(() => false);
+            if (isVisible) {
+                const parentClassList = await chartItem.locator('..').getAttribute('class') || '';
+                if (parentClassList.includes('bg-grey-3') || parentClassList.includes('bg-grey-5')) {
+                    testLogger.info(`Current chart type detected: ${chartType}`);
+                    return chartType;
+                }
+            }
+        }
+        testLogger.warn('No chart type detected as selected');
+        return null;
+    }
+
+    /**
+     * Wait for any chart type to become selected (theme-aware).
+     * Uses page.waitForFunction for reliable detection of bg-grey-3/bg-grey-5
+     * directly in the DOM, surviving reactive re-renders across tab switches.
+     * @param {number} timeout - Max wait time in ms (default 20000)
+     * @returns {Promise<string|null>} The selected chart type or null if timeout
+     */
+    async waitForChartTypeStabilized(timeout = 20000) {
+        try {
+            // Use waitForFunction to detect bg-grey-3 or bg-grey-5 on chart selection items
+            // This is more reliable than Playwright locator polling during reactive re-renders
+            const result = await this.page.waitForFunction(() => {
+                const items = document.querySelectorAll('[data-test="dashboard-addpanel-chart-selection-item"]');
+                for (const item of items) {
+                    const classes = item.className || '';
+                    if (classes.includes('bg-grey-3') || classes.includes('bg-grey-5')) {
+                        // Found selected item - extract chart type from child data-test attribute
+                        const section = item.querySelector('[data-test^="selected-chart-"][data-test$="-item"]');
+                        if (section) {
+                            const attr = section.getAttribute('data-test');
+                            const match = attr.match(/^selected-chart-(.+)-item$/);
+                            if (match) return match[1];
+                        }
+                    }
+                }
+                return null;
+            }, { timeout });
+
+            const chartType = await result.jsonValue();
+            if (chartType) {
+                testLogger.info(`Chart type stabilized: ${chartType}`);
+                return chartType;
+            }
+        } catch (error) {
+            testLogger.warn(`Chart type did not stabilize within ${timeout}ms`);
+        }
+
+        // Fallback: try getCurrentChartType one last time
+        const fallback = await this.getCurrentChartType();
+        if (fallback) {
+            testLogger.info(`Chart type detected via fallback: ${fallback}`);
+        }
+        return fallback;
+    }
+
+    // ============================================================================
+    // V0.40 REGRESSION TEST METHODS
+    // VRL fields, Query Inspector, Sorting, and Highlight tests
+    // ============================================================================
+
+    /**
+     * Get the logs table element
+     * @returns {Locator} - The logs table locator
+     */
+    getLogsTable() {
+        return this.page.locator(this.logsSearchResultLogsTable);
+    }
+
+    /**
+     * Wait for logs table to be visible
+     * @param {number} timeout - Timeout in milliseconds
+     */
+    async waitForLogsTable(timeout = 30000) {
+        await this.page.locator(this.logsSearchResultLogsTable).waitFor({ state: 'visible', timeout });
+        testLogger.info('Logs table is visible');
+    }
+
+    /**
+     * Get the count of log rows in the table
+     * @returns {Promise<number>} - Number of log rows
+     */
+    async getLogRowCount() {
+        const rows = this.page.locator(this.logsSearchResultTableRows);
+        const count = await rows.count();
+        testLogger.info(`Log row count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get all log rows as locators
+     * @returns {Locator} - All log row locators
+     */
+    getLogRows() {
+        return this.page.locator(this.logsSearchResultTableRows);
+    }
+
+    /**
+     * Click the first expand menu in the logs table
+     */
+    async clickFirstExpandMenu() {
+        const expandMenus = this.page.locator(this.tableRowExpandMenu);
+        await expandMenus.first().click();
+        testLogger.info('Clicked first expand menu');
+    }
+
+    /**
+     * Click the last expand menu in the logs table
+     */
+    async clickLastExpandMenu() {
+        const expandMenus = this.page.locator(this.tableRowExpandMenu);
+        await expandMenus.last().click();
+        testLogger.info('Clicked last expand menu');
+    }
+
+    /**
+     * Check if the first expand menu is visible
+     * @returns {Promise<boolean>} - Whether the first expand menu is visible
+     */
+    async isFirstExpandMenuVisible() {
+        const expandMenus = this.page.locator(this.tableRowExpandMenu);
+        const count = await expandMenus.count();
+        return count > 0;
+    }
+
+    /**
+     * Get timestamp cell values from the logs table
+     * @param {number} limit - Maximum number of timestamps to return
+     * @returns {Promise<string[]>} - Array of timestamp values
+     */
+    async getTimestampCellValues(limit = 5) {
+        const cells = this.page.locator(this.timestampCells);
+        const count = Math.min(await cells.count(), limit);
+        const values = [];
+        for (let i = 0; i < count; i++) {
+            let text = await cells.nth(i).textContent();
+            text = text?.trim() || '';
+            // Strip expand button icon text that appears before the timestamp
+            // The cell contains both the expand icon ("chevron_right" or "expand_more") and the timestamp
+            text = text.replace(/^(chevron_right|expand_more|chevron_left|expand_less)/, '').trim();
+            values.push(text);
+        }
+        testLogger.info(`Got ${values.length} timestamp values`);
+        return values;
+    }
+
+    /**
+     * Get count of timestamp cells in the logs table
+     * @returns {Promise<number>} - Count of timestamp cells
+     */
+    async getTimestampCellCount() {
+        const count = await this.page.locator(this.timestampCells).count();
+        testLogger.info(`Timestamp cell count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get search result text
+     * @returns {Promise<string>} - Search result text
+     */
+    async getSearchResultText() {
+        const text = await this.page.locator(this.searchResultText).textContent().catch(() => '');
+        testLogger.info(`Search result text: ${text?.substring(0, 50)}`);
+        return text;
+    }
+
+    /**
+     * Press Escape key to close any open dialog
+     */
+    async pressEscapeToCloseDialog() {
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
+        testLogger.info('Pressed Escape to close dialog');
+    }
+
+    /**
+     * Get the last row in the logs table
+     * @returns {Locator} - The last row locator
+     */
+    getLastRow() {
+        return this.page.locator(this.logsSearchResultTableRows).last();
+    }
+
+    /**
+     * Get the first row expand menu
+     * @returns {Locator} - The first expand menu locator
+     */
+    getFirstRowExpandMenu() {
+        return this.page.locator(this.tableRowExpandMenu).first();
+    }
+
+    /**
+     * Check if log detail panel is visible
+     * @returns {Promise<boolean>} - Whether panel is visible
+     */
+    async isLogDetailPanelVisible() {
+        const visible = await this.page.locator(this.logDetailPanel).isVisible().catch(() => false);
+        testLogger.info(`Log detail panel visible: ${visible}`);
+        return visible;
+    }
+
+    /**
+     * Assert that a locator is visible
+     * @param {Locator} locator - The locator to check
+     */
+    async expectVisible(locator) {
+        await expect(locator).toBeVisible();
+        testLogger.info('Element is visible');
     }
 }

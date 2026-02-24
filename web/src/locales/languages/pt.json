@@ -112,7 +112,10 @@
     "id": "CARTEIRA DE IDENTIDADE",
     "getStarted": "Comece",
     "reset": "Redefinir",
-    "retry": "Tente novamente"
+    "retry": "Tente novamente",
+    "copy": "Copiar",
+    "copySuccess": "Copiado para a prancheta",
+    "copyError": "Falha ao copiar para a área de transferência"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -232,8 +235,10 @@
     "patternColumnHeader": "Padrão",
     "occurrenceColumnHeader": "Ocorrência",
     "percentageColumnHeader": "Porcentagem",
+    "anomalyColumnHeader": "Anomalia",
     "actionsColumnHeader": "Ações",
     "anomalyLabel": "ANOMALIA",
+    "anomalyDetected": "Anomalia detectada",
     "includePatternInSearch": "Incluir padrão na pesquisa",
     "excludePatternFromSearch": "Excluir padrão da pesquisa",
     "showPatternDetails": "Mostrar detalhes ({variáveis} variáveis, {exemplos} exemplos)",
@@ -307,7 +312,14 @@
     "show": "Mostra",
     "editor": "Editor",
     "webUrlNotConfigured": "O URL de compartilhamento é desativado até que ZO_WEB_URL seja configurado pelo administrador.",
-    "showHideColumns": "Mostrar/ocultar colunas"
+    "showHideColumns": "Mostrar/ocultar colunas",
+    "autoRefresh": "Atualização automática",
+    "createSavedView": "Criar visualização salva",
+    "listSavedViews": "Listar visualizações salvas",
+    "buildQuery": "Construir",
+    "enableSqlModeForBuild": "Ative o modo SQL e selecione um único fluxo para usar o construtor de consultas",
+    "applyToSearch": "Aplicar para pesquisar",
+    "complexQueryDetected": "Consulta complexa detectada. Usando o modo personalizado."
   },
   "menu": {
     "home": "Início",
@@ -1482,7 +1494,10 @@
     "SQL": "SQL",
     "builder": "Construtor",
     "custom": "Personalizado",
-    "sqlBuilder": "Construtor de SQL"
+    "sqlBuilder": "Construtor de SQL",
+    "generatedSql": "SQL gerado",
+    "enterCustomSql": "Insira sua consulta SQL personalizada...",
+    "customSql": "SQL personalizado"
   },
   "home": {
     "streams": "Transmissões",
@@ -2036,7 +2051,10 @@
     "customWebhook": "Personalizado (Webhook)",
     "customEmail": "Personalizado (e-mail)",
     "customAction": "Personalizado (Ação)",
-    "custom": "Personalizado"
+    "custom": "Personalizado",
+    "separator": "Separador",
+    "separator_placeholder": "Insira o separador (por exemplo, |,\\n,\\ t, espaço)",
+    "separator_hint": "Cadeia de caracteres separadora a ser usada entre registros (espaços permitidos)"
   },
   "metrics": {
     "searchMetric": "Pesquisar uma métrica",

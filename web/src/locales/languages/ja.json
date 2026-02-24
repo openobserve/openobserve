@@ -111,6 +111,9 @@
     "chunkLoadErrorMsg": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
     "id": "ID",
     "getStarted": "始めよう",
+    "copy": "[コピー]",
+    "copySuccess": "クリップボードにコピー",
+    "copyError": "クリップボードへのコピーに失敗しました",
     "reset": "リセット",
     "retry": "リトライ"
   },
@@ -232,8 +235,10 @@
     "patternColumnHeader": "パターン",
     "occurrenceColumnHeader": "発生",
     "percentageColumnHeader": "パーセンテージ",
+    "anomalyColumnHeader": "異常",
     "actionsColumnHeader": "[アクション]",
     "anomalyLabel": "異常",
+    "anomalyDetected": "異常を検出",
     "includePatternInSearch": "検索にパターンを含める",
     "excludePatternFromSearch": "検索からパターンを除外",
     "showPatternDetails": "詳細を表示 ({変数} 変数、{例} 例)",
@@ -307,7 +312,14 @@
     "show": "ショー",
     "editor": "エディター",
     "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。",
-    "showHideColumns": "列を表示/非表示"
+    "showHideColumns": "列を表示/非表示",
+    "autoRefresh": "自動更新",
+    "createSavedView": "保存済みビューを作成",
+    "listSavedViews": "保存済みビューを一覧表示",
+    "buildQuery": "ビルド",
+    "enableSqlModeForBuild": "SQL モードを有効にして、クエリビルダーを使用するストリームを 1 つ選択してください",
+    "applyToSearch": "検索に適用",
+    "complexQueryDetected": "複雑なクエリが検出されました。カスタムモードを使用する。"
   },
   "menu": {
     "home": "ホーム",
@@ -1499,7 +1511,10 @@
     "SQL": "SQL",
     "builder": "ビルダー",
     "custom": "カスタム",
-    "sqlBuilder": "SQL ビルダー"
+    "sqlBuilder": "SQL ビルダー",
+    "generatedSql": "生成された SQL",
+    "enterCustomSql": "カスタム SQL クエリを入力してください...",
+    "customSql": "カスタム SQL"
   },
   "home": {
     "streams": "ストリーム",
@@ -2053,7 +2068,10 @@
     "customWebhook": "カスタム (ウェブフック)",
     "customEmail": "カスタム (電子メール)",
     "customAction": "カスタム (アクション)",
-    "custom": "カスタム"
+    "custom": "カスタム",
+    "separator": "セパレーター",
+    "separator_placeholder": "セパレータを入力してください (例:|、\\n、\\ t、スペース)",
+    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)"
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",

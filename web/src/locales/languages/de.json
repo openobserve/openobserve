@@ -112,7 +112,10 @@
     "id": "ID",
     "getStarted": "Fangen Sie an",
     "reset": "Zurücksetzen",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "copy": "Kopieren",
+    "copySuccess": "In die Zwischenablage kopiert",
+    "copyError": "Fehler beim Kopieren in die Zwischenablage"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -232,8 +235,10 @@
     "patternColumnHeader": "Muster",
     "occurrenceColumnHeader": "Vorkommen",
     "percentageColumnHeader": "Prozentsatz",
+    "anomalyColumnHeader": "Anomalie",
     "actionsColumnHeader": "Aktionen",
     "anomalyLabel": "ANOMALIE",
+    "anomalyDetected": "Anomalie erkannt",
     "includePatternInSearch": "Muster in die Suche einbeziehen",
     "excludePatternFromSearch": "Muster von der Suche ausschließen",
     "showPatternDetails": "Details anzeigen ({Variablen} Variablen, {Beispiele} Beispiele)",
@@ -307,7 +312,14 @@
     "show": "Zeige",
     "editor": "Redakteur",
     "webUrlNotConfigured": "URL teilen ist deaktiviert, bis ZO_WEB_URL von Ihrem Administrator konfiguriert wurde.",
-    "showHideColumns": "Spalten ein-/ausblenden"
+    "showHideColumns": "Spalten ein-/ausblenden",
+    "autoRefresh": "Automatische Aktualisierung",
+    "createSavedView": "Gespeicherte Ansicht erstellen",
+    "listSavedViews": "Gespeicherte Ansichten auflisten",
+    "buildQuery": "Bauen",
+    "enableSqlModeForBuild": "Bitte aktivieren Sie den SQL-Modus und wählen Sie einen einzelnen Stream aus, um den Query Builder zu verwenden",
+    "applyToSearch": "Für die Suche bewerben",
+    "complexQueryDetected": "Eine komplexe Abfrage wurde erkannt. Im benutzerdefinierten Modus."
   },
   "menu": {
     "home": "Startseite",
@@ -1482,7 +1494,10 @@
     "SQL": "SQL",
     "builder": "Baumeister",
     "custom": "Benutzerdefiniert",
-    "sqlBuilder": "SQL-Generator"
+    "sqlBuilder": "SQL-Generator",
+    "generatedSql": "Generiertes SQL",
+    "enterCustomSql": "Geben Sie Ihre benutzerdefinierte SQL-Abfrage ein...",
+    "customSql": "Benutzerdefiniertes SQL"
   },
   "home": {
     "streams": "Streams",
@@ -2036,7 +2051,10 @@
     "customWebhook": "Benutzerdefiniert (Webhook)",
     "customEmail": "Benutzerdefiniert (E-Mail)",
     "customAction": "Benutzerdefiniert (Aktion)",
-    "custom": "Benutzerdefiniert"
+    "custom": "Benutzerdefiniert",
+    "separator": "Trennzeichen",
+    "separator_placeholder": "Geben Sie ein Trennzeichen ein (z. B. |,\\n,\\ t, Leerzeichen)",
+    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)"
   },
   "metrics": {
     "searchMetric": "Suchen Sie nach einer Metrik",

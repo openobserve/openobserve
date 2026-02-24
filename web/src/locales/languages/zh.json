@@ -111,6 +111,9 @@
     "chunkLoadErrorMsg": "该应用程序的新版本可用。请刷新页面继续。",
     "id": "身份证",
     "getStarted": "开始吧",
+    "copy": "复制",
+    "copySuccess": "已复制到剪贴板",
+    "copyError": "无法复制到剪贴板",
     "reset": "重置",
     "retry": "重试"
   },
@@ -232,8 +235,10 @@
     "patternColumnHeader": "模式",
     "occurrenceColumnHeader": "发生次数",
     "percentageColumnHeader": "百分比",
+    "anomalyColumnHeader": "异常",
     "actionsColumnHeader": "操作",
     "anomalyLabel": "异常",
+    "anomalyDetected": "检测到异常",
     "includePatternInSearch": "在搜索中加入模式",
     "excludePatternFromSearch": "从搜索中排除模式",
     "showPatternDetails": "显示详细信息（{变量} 变量，{示例} 示例）",
@@ -307,7 +312,14 @@
     "show": "显示",
     "editor": "编辑器",
     "webUrlNotConfigured": "在管理员配置 ZO_WEB_URL 之前，共享 URL 处于禁用状态。",
-    "showHideColumns": "显示/隐藏列"
+    "showHideColumns": "显示/隐藏列",
+    "autoRefresh": "自动刷新",
+    "createSavedView": "创建保存的视图",
+    "listSavedViews": "列出保存的视图",
+    "buildQuery": "构建",
+    "enableSqlModeForBuild": "请启用 SQL 模式并选择单个流来使用查询生成器",
+    "applyToSearch": "申请搜索",
+    "complexQueryDetected": "检测到复杂查询。使用自定义模式。"
   },
   "menu": {
     "home": "主页",
@@ -1482,7 +1494,10 @@
     "SQL": "SQL",
     "builder": "生成器",
     "custom": "自定义",
-    "sqlBuilder": "SQL 生成器"
+    "sqlBuilder": "SQL 生成器",
+    "generatedSql": "生成的 SQL",
+    "enterCustomSql": "输入您的自定义 SQL 查询...",
+    "customSql": "自定义 SQL"
   },
   "home": {
     "streams": "数据流",
@@ -2036,7 +2051,10 @@
     "customWebhook": "自定义（Webhook）",
     "customEmail": "自定义（电子邮件）",
     "customAction": "自定义（操作）",
-    "custom": "自定义"
+    "custom": "自定义",
+    "separator": "分隔符",
+    "separator_placeholder": "输入分隔符（例如，|、\\n、\\ t、空格）",
+    "separator_hint": "在记录之间使用的分隔字符串（允许空格）"
   },
   "metrics": {
     "searchMetric": "搜索指标",

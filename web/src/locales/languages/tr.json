@@ -112,7 +112,10 @@
     "id": "KİMLİK",
     "getStarted": "Başlayın",
     "reset": "Sıfırla",
-    "retry": "Tekrar dene"
+    "retry": "Tekrar dene",
+    "copy": "Kopyalama",
+    "copySuccess": "Panoya kopyalandı",
+    "copyError": "Panoya kopyalanamadı"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -232,8 +235,10 @@
     "patternColumnHeader": "Desen",
     "occurrenceColumnHeader": "Oluşum",
     "percentageColumnHeader": "Yüzde",
+    "anomalyColumnHeader": "Anomali",
     "actionsColumnHeader": "Eylemler",
     "anomalyLabel": "ANOMALİ",
+    "anomalyDetected": "Anomali tespit edildi",
     "includePatternInSearch": "Aramaya desen dahil et",
     "excludePatternFromSearch": "Deseni aramadan hariç tut",
     "showPatternDetails": "Ayrıntıları göster ({değişkenler} değişkenler, {örnekler} örnekler)",
@@ -307,7 +312,14 @@
     "show": "Göster",
     "editor": "Editör",
     "webUrlNotConfigured": "Paylaş URL, ZO_WEB_URL yöneticiniz tarafından yapılandırılana kadar devre dışı bırakılır.",
-    "showHideColumns": "Sütunları Göster/Gizle"
+    "showHideColumns": "Sütunları Göster/Gizle",
+    "autoRefresh": "Otomatik Yenileme",
+    "createSavedView": "Kayıtlı Görünüm Oluştur",
+    "listSavedViews": "Kayıtlı Görünümleri Listele",
+    "buildQuery": "İnşa",
+    "enableSqlModeForBuild": "Lütfen SQL modunu etkinleştirin ve sorgu oluşturucuyu kullanmak için tek bir akış seçin",
+    "applyToSearch": "Aramaya Uygula",
+    "complexQueryDetected": "Karmaşık sorgu algılandı. Özel modu kullanma."
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -1482,7 +1494,10 @@
     "SQL": "SQL",
     "builder": "inşaatçı",
     "custom": "Özel",
-    "sqlBuilder": "SQL Oluşturucu"
+    "sqlBuilder": "SQL Oluşturucu",
+    "generatedSql": "Oluşturulan SQL",
+    "enterCustomSql": "Özel SQL sorgunuzu girin...",
+    "customSql": "Özel SQL"
   },
   "home": {
     "streams": "Akışlar",
@@ -2036,7 +2051,10 @@
     "customWebhook": "Özel (Webhook)",
     "customEmail": "Özel (E-posta)",
     "customAction": "Özel (Eylem)",
-    "custom": "Özel"
+    "custom": "Özel",
+    "separator": "Ayırıcı",
+    "separator_placeholder": "Ayırıcı girin (örn. |,\\ n,\\ t, boşluk)",
+    "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)"
   },
   "metrics": {
     "searchMetric": "Bir Metrik Ara",

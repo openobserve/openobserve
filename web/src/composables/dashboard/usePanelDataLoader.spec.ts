@@ -71,7 +71,9 @@ vi.mock("@/utils/zincutils", () => ({
   })),
   isWebSocketEnabled: vi.fn(() => false),
   isStreamingEnabled: vi.fn(() => false),
-  escapeSingleQuotes: vi.fn((str) => str.replace(/\\/g, "\\\\").replace(/'/g, "\\'")),
+  escapeSingleQuotes: vi.fn((str) =>
+    str.replace(/\\/g, "\\\\").replace(/'/g, "\\'"),
+  ),
   useLocalWrapContent: vi.fn(() => null),
 }));
 
@@ -316,7 +318,7 @@ describe("usePanelDataLoader", () => {
 
     // Mock setTimeout to work with promise-based async flows
     vi.spyOn(global, "setTimeout").mockImplementation((fn: any, ms: number) => {
-      if (typeof fn === 'function') {
+      if (typeof fn === "function") {
         // Execute immediately for tests
         Promise.resolve().then(() => fn());
       }
@@ -327,7 +329,7 @@ describe("usePanelDataLoader", () => {
     vi.spyOn(global, "clearTimeout").mockImplementation(() => {});
 
     // Mock AbortController
-    global.AbortController = vi.fn(function() {
+    global.AbortController = vi.fn(function () {
       return {
         signal: {
           addEventListener: vi.fn(),
@@ -338,9 +340,9 @@ describe("usePanelDataLoader", () => {
       };
     }) as any;
 
-    // Mock window.addEventListener and removeEventListener 
-    vi.spyOn(window, 'addEventListener').mockImplementation(() => {});
-    vi.spyOn(window, 'removeEventListener').mockImplementation(() => {});
+    // Mock window.addEventListener and removeEventListener
+    vi.spyOn(window, "addEventListener").mockImplementation(() => {});
+    vi.spyOn(window, "removeEventListener").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -1101,9 +1103,9 @@ describe("usePanelDataLoader", () => {
           ref(null),
         );
 
-        // Start the load operation 
+        // Start the load operation
         const loadPromise = loader.loadData();
-        
+
         // Check loading state immediately (should be true if set synchronously)
         // Or we can just verify the final state is false
         await loadPromise;
@@ -1144,9 +1146,8 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Mock streaming enabled, WebSocket disabled
-        const { isWebSocketEnabled, isStreamingEnabled } = await import(
-          "@/utils/zincutils"
-        );
+        const { isWebSocketEnabled, isStreamingEnabled } =
+          await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(false);
         (isStreamingEnabled as any).mockReturnValue(true);
 
@@ -1228,9 +1229,7 @@ describe("usePanelDataLoader", () => {
           },
         };
 
-        mockSearchResults = [
-          { timestamp: Date.now(), value: 100 }
-        ];
+        mockSearchResults = [{ timestamp: Date.now(), value: 100 }];
 
         const loader = usePanelDataLoader(
           panelSchema,
@@ -1343,8 +1342,8 @@ describe("usePanelDataLoader", () => {
 
         // Check that some error state was set (either errorDetail has content or data is empty)
         expect(
-          loader.errorDetail.value.message.length > 0 || 
-          loader.data.value.length === 0
+          loader.errorDetail.value.message.length > 0 ||
+            loader.data.value.length === 0,
         ).toBe(true);
       });
     });
@@ -1356,9 +1355,8 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Enable WebSocket
-        const { isWebSocketEnabled, isStreamingEnabled } = await import(
-          "@/utils/zincutils"
-        );
+        const { isWebSocketEnabled, isStreamingEnabled } =
+          await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(true);
         (isStreamingEnabled as any).mockReturnValue(false);
 
@@ -1385,9 +1383,8 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Enable WebSocket with error
-        const { isWebSocketEnabled, isStreamingEnabled } = await import(
-          "@/utils/zincutils"
-        );
+        const { isWebSocketEnabled, isStreamingEnabled } =
+          await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(true);
         (isStreamingEnabled as any).mockReturnValue(false);
         shouldWebSocketThrow = true;
@@ -1417,9 +1414,8 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Enable streaming, disable WebSocket
-        const { isWebSocketEnabled, isStreamingEnabled } = await import(
-          "@/utils/zincutils"
-        );
+        const { isWebSocketEnabled, isStreamingEnabled } =
+          await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(false);
         (isStreamingEnabled as any).mockReturnValue(true);
 
@@ -1446,9 +1442,8 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Enable streaming with error
-        const { isWebSocketEnabled, isStreamingEnabled } = await import(
-          "@/utils/zincutils"
-        );
+        const { isWebSocketEnabled, isStreamingEnabled } =
+          await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(false);
         (isStreamingEnabled as any).mockReturnValue(true);
         shouldStreamingThrow = true;
@@ -1581,7 +1576,9 @@ describe("usePanelDataLoader", () => {
 
         await loader.loadData();
 
-        expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBeDefined();
+        expect(
+          loader.isCachedDataDifferWithCurrentTimeRange.value,
+        ).toBeDefined();
       });
 
       it("should handle cache retrieval errors", async () => {
@@ -1690,7 +1687,7 @@ describe("usePanelDataLoader", () => {
         const loadPromise = loader.loadData();
 
         // Give it a moment to attempt cache restore (happens before visibility wait)
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // With forceLoad=false and runCount=0, cache restore is attempted (line 803)
         // Cache operation count should be > 0 because getPanelCache was called
@@ -1817,7 +1814,8 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query: "SELECT * FROM logs WHERE time >= now() - INTERVAL '$__range'",
+              query:
+                "SELECT * FROM logs WHERE time >= now() - INTERVAL '$__range'",
               fields: { stream_type: "logs" },
             },
           ],
@@ -1853,7 +1851,8 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query: "SELECT * FROM logs WHERE time >= now() - INTERVAL '${__range}'",
+              query:
+                "SELECT * FROM logs WHERE time >= now() - INTERVAL '${__range}'",
               fields: { stream_type: "logs" },
             },
           ],
@@ -1888,7 +1887,8 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query: "SELECT * FROM logs WHERE time >= now() - INTERVAL '$__range'",
+              query:
+                "SELECT * FROM logs WHERE time >= now() - INTERVAL '$__range'",
               fields: { stream_type: "logs" },
             },
           ],
@@ -1978,7 +1978,8 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query: "SELECT * FROM logs WHERE service IN (${services:singlequote})",
+              query:
+                "SELECT * FROM logs WHERE service IN (${services:singlequote})",
               fields: { stream_type: "logs" },
             },
           ],
@@ -2120,7 +2121,8 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query: "SELECT * FROM logs WHERE service IN (${services:doublequote})",
+              query:
+                "SELECT * FROM logs WHERE service IN (${services:doublequote})",
               fields: { stream_type: "logs" },
             },
           ],
@@ -2429,7 +2431,8 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query: "SELECT * FROM logs WHERE service IN (${services:singlequote})",
+              query:
+                "SELECT * FROM logs WHERE service IN (${services:singlequote})",
               fields: { stream_type: "logs" },
             },
           ],
@@ -2778,9 +2781,8 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Enable WebSocket and simulate error
-        const { isWebSocketEnabled, isStreamingEnabled } = await import(
-          "@/utils/zincutils"
-        );
+        const { isWebSocketEnabled, isStreamingEnabled } =
+          await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(true);
         (isStreamingEnabled as any).mockReturnValue(false);
 
@@ -2834,10 +2836,10 @@ describe("usePanelDataLoader", () => {
 
         // Simulate abortion
         const loadPromise = loader.loadData();
-        
+
         // Wait a bit then check the state
         await loadPromise;
-        
+
         expect(loader.loading.value).toBe(false);
       });
 
@@ -2847,7 +2849,7 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Mock AbortController to throw abort error
-        global.AbortController = vi.fn(function() {
+        global.AbortController = vi.fn(function () {
           return {
             signal: {
               addEventListener: vi.fn(),
@@ -2891,7 +2893,8 @@ describe("usePanelDataLoader", () => {
         queryType: "sql",
         queries: [
           {
-            query: "SELECT * FROM logs WHERE service = $service AND time >= $__interval_ms",
+            query:
+              "SELECT * FROM logs WHERE service = $service AND time >= $__interval_ms",
             fields: {
               stream_type: "logs",
               x: [{ alias: "timestamp" }],
@@ -2904,8 +2907,13 @@ describe("usePanelDataLoader", () => {
         ],
       });
 
-      mockSearchResults = { hits: [[{ test: "data" }]], per_query_response: true };
-      mockAnnotations = [{ id: "test", title: "Test Annotation", time: Date.now() }];
+      mockSearchResults = {
+        hits: [[{ test: "data" }]],
+        per_query_response: true,
+      };
+      mockAnnotations = [
+        { id: "test", title: "Test Annotation", time: Date.now() },
+      ];
 
       const loader = usePanelDataLoader(
         panelSchema,

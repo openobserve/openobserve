@@ -70,10 +70,14 @@ pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
-pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
+
+#[inline]
+pub fn get_batch_size() -> usize {
+    get_config().limit.batch_size
+}
 
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
@@ -1678,6 +1682,12 @@ pub struct Limit {
         help = "Aggregates approximate number of seconds for executing search"
     )]
     pub aggs_min_num_partition_secs: usize,
+    #[env_config(
+        name = "ZO_BATCH_SIZE",
+        default = 0,
+        help = "Default is 8192, Batch size for parquet read/write operations and datafusion execution. Range: [1024, 8192]. Should carefully set this value, default is enough for most cases."
+    )]
+    pub batch_size: usize,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -2520,6 +2530,12 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.limit.ingest_allowed_in_future_micro =
         cfg.limit.ingest_allowed_in_future * 3600 * 1_000_000;
 
+    // clamp batch_size to [1024, 8192]
+    if cfg.limit.batch_size == 0 {
+        cfg.limit.batch_size = 8192;
+    }
+    cfg.limit.batch_size = cfg.limit.batch_size.clamp(1024, 8192);
+
     Ok(())
 }
 
@@ -3064,8 +3080,22 @@ fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if !cfg.s3.bucket_prefix.is_empty() && !cfg.s3.bucket_prefix.ends_with('/') {
-        cfg.s3.bucket_prefix = format!("{}/", cfg.s3.bucket_prefix);
+    // Ensure each bucket prefix ends with '/' for multi-bucket configurations
+    if !cfg.s3.bucket_prefix.is_empty() {
+        let prefixes: Vec<String> = cfg
+            .s3
+            .bucket_prefix
+            .split(',')
+            .map(|prefix| {
+                let trimmed = prefix.trim();
+                if trimmed.is_empty() || trimmed.ends_with('/') {
+                    trimmed.to_string()
+                } else {
+                    format!("{}/", trimmed)
+                }
+            })
+            .collect();
+        cfg.s3.bucket_prefix = prefixes.join(",");
     }
     if cfg.s3.provider.is_empty() {
         if cfg.s3.server_url.contains(".googleapis.com") {
