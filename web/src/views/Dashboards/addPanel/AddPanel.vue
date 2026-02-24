@@ -291,20 +291,6 @@ import {
 } from "@/composables/contextProviders";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
-
-const ConfigPanel = defineAsyncComponent(() => {
-  return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
-});
-
-const ShowLegendsPopup = defineAsyncComponent(() => {
-  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
-});
-import { getConsumableRelativeTime } from "@/utils/date";
-import {
-  getPanelTimeFromURL,
-  convertPanelTimeRangeToPicker,
-  convertTimeObjToPickerFormat,
-} from "@/utils/dashboard/panelTimeUtils";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 
 const QueryInspector = defineAsyncComponent(() => {
@@ -928,7 +914,6 @@ export default defineComponent({
     watch(selectedDate, () => {
       updateDateTime(selectedDate.value);
     });
-
     // Watch for panel-level time configuration changes and update URL
     watch(
       () => dashboardPanelData.data.config?.panel_time_range,
@@ -972,6 +957,7 @@ export default defineComponent({
       },
       { deep: true }
     );
+
 
     // resize the chart when config panel is opened and closed
     watch(
@@ -1072,7 +1058,6 @@ export default defineComponent({
           start_time: effectiveTime.start_time,
           end_time: effectiveTime.end_time,
         };
-
         router.replace({
           query: {
             ...route.query,
