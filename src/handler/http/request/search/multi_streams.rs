@@ -580,14 +580,15 @@ pub async fn search_multi(
                     // non-array value (or a flat array when per_query_resp expects an
                     // array-of-arrays), fall back to an empty result instead of
                     // panicking with `.unwrap()`.
-                    let Some(ret_arr) = ret_val.as_array() else {
-                        log::error!(
-                            "[trace_id {trace_id}] VRL function did not return an array; \
-                             returning empty hits"
-                        );
-                        return vec![];
-                    };
-                    ret_arr
+                    match ret_val.as_array() {
+                        None => {
+                            log::error!(
+                                "[trace_id {trace_id}] VRL function did not return an array; \
+                                 returning empty hits"
+                            );
+                            vec![]
+                        }
+                        Some(ret_arr) => ret_arr
                         .iter()
                         .filter_map(|v| {
                             if per_query_resp {
@@ -617,6 +618,7 @@ pub async fn search_multi(
                             }
                         })
                         .collect()
+                    }
                 } else {
                     let mut error = "".to_string();
                     let res = multi_res
