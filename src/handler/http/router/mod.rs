@@ -1006,7 +1006,6 @@ pub fn create_app_router() -> Router {
     app = Router::new()
         // We ensure basic routes like auth and health check are always available under root path
         // too in case user need access behind proxy
-        .merge(basic_routes())
         .merge(wrap_into_base_uri(&cfg.common.base_uri, app))
         .layer(cors_layer())
         // Set request body size limit (equivalent to actix-web's PayloadConfig)
