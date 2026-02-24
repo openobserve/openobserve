@@ -162,8 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Template Override for Real-Time Alerts -->
-        <div class="flex items-start tw:pb-4 tw:mb-4">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+        <div class="flex items-start tw-pb-4 tw-mb-4">
+          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.template") }}
             <q-icon
               name="info"
