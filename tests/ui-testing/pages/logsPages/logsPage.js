@@ -4009,6 +4009,43 @@ export class LogsPage {
     }
 
     /**
+     * Get all field values text from the expanded field dropdown
+     * @param {string} fieldName - Name of the field
+     * @returns {Promise<string[]>} Array of field value texts
+     * @example
+     * const values = await logsPage.getFieldValuesText('service_name');
+     * // Returns: ['service-a', 'service-b', 'service-c']
+     */
+    async getFieldValuesText(fieldName) {
+        const valueElements = this.page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`);
+        const count = await valueElements.count();
+        const values = [];
+        for (let i = 0; i < count; i++) {
+            const text = await valueElements.nth(i).textContent();
+            if (text) {
+                // Extract just the value part (before any count indicator)
+                const cleanValue = text.trim().split(/\s+/)[0];
+                values.push(cleanValue);
+            }
+        }
+        return values;
+    }
+
+    /**
+     * Collapse an expanded field by clicking its expand button again
+     * @param {string} fieldName - Name of the field to collapse
+     */
+    async collapseField(fieldName) {
+        const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+        if (await expandBtn.isVisible()) {
+            await expandBtn.click();
+            // Wait for field values to be hidden (deterministic wait)
+            await this.page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`).first()
+                .waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        }
+    }
+
+    /**
      * Expands a field and validates that values API does not return 400 error.
      * Used by Bug #7751 tests to verify field expansion works correctly with complex queries.
      *
