@@ -821,6 +821,18 @@ class="q-pr-sm q-pt-xs" />
                     </q-list>
                   </template>
               </q-btn-dropdown>
+               <!-- Compact Auto Refresh Button -->
+              <auto-refresh-interval
+                class="q-ml-xs"
+                v-model="searchObj.meta.refreshInterval"
+                :trigger="true"
+                :is-compact="true"
+                :min-refresh-interval="
+                  store.state?.zoConfig?.min_auto_refresh_interval ?? 0
+                "
+                @update:model-value="onRefreshIntervalUpdate"
+                @trigger="$emit('onAutoIntervalTrigger')"
+              />
             </div>
           </div>
         </div>
@@ -841,7 +853,7 @@ class="q-pr-sm q-pt-xs" />
           <template #before>
             <div
               class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
-              :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw:ml-[0.375rem]' : 'tw:mx-[0.375rem]'"
+              :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw:ml-[0.375rem]' : 'tw:ml-[0.375rem]'"
             >
               <!-- Unified Query Editor (with built-in AI bar) -->
               <unified-query-editor
@@ -856,9 +868,9 @@ class="q-pr-sm q-pt-xs" />
                 :disable-ai="!searchObj.data.stream.selectedStream.length || isSqlModeDisabled"
                 :disable-ai-reason="!searchObj.data.stream.selectedStream.length ? t('search.selectStreamForAI') : t('search.nlpModeDisabledForVisualization')"
                 data-test="logs-search-bar-query-editor"
+                v-model:query="searchObj.data.query"
                 data-test-prefix="logs-search-bar"
                 editor-height="100%"
-                @toggle-nlp-mode="handleToggleNlpMode"
                 :style="editorWidthToggleFunction"
                 :class="
                   searchObj.data.editorValue == '' &&
@@ -873,10 +885,6 @@ class="q-pr-sm q-pt-xs" />
                 @run-query="handleRunQueryFn"
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
-                @nlp-detected="handleNlpModeDetected"
-                @generation-start="handleGenerationStart"
-                @generation-end="handleGenerationEnd"
-                @generation-success="handleGenerationSuccess"
               />
               <!-- Mode Toggle for Build Mode -->
               <div
@@ -920,6 +928,7 @@ class="q-pr-sm q-pt-xs" />
                       :languages="['vrl']"
                       :default-language="'vrl'"
                       :query="searchObj.data.tempFunctionContent"
+                      :nlp-mode="vrlEditorNlpMode"
                       :hide-nl-toggle="false"
                       :disable-ai="isVrlEditorDisabled"
                       :disable-ai-reason="isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''"
@@ -935,6 +944,7 @@ class="q-pr-sm q-pt-xs" />
                           : ''
                       "
                       @update:query="searchObj.data.tempFunctionContent = $event"
+                      @update:nlp-mode="(val) => vrlEditorNlpMode = val"
                       @keydown="handleKeyDown"
                       @focus="
                         searchObj.meta.functionEditorPlaceholderFlag = false
@@ -942,10 +952,6 @@ class="q-pr-sm q-pt-xs" />
                       @blur="
                         searchObj.meta.functionEditorPlaceholderFlag = true
                       "
-                      @toggle-nlp-mode="handleFunctionEditorToggleNlpMode"
-                      @generation-start="handleFunctionEditorGenerationStart"
-                      @generation-end="handleFunctionEditorGenerationEnd"
-                      @generation-success="handleFunctionEditorGenerationSuccess"
                     />
                     <!-- VRL disabled warning for non-table charts -->
                     <div
@@ -1000,8 +1006,13 @@ class="q-pr-sm q-pt-xs" />
         size="10px"
         round
         @click="isFocused = !isFocused"
-        :class="searchObj.meta.showTransformEditor ? 'tw:right-[2.1rem]!' : 'tw:right-[2.4rem]!'"
-        class="q-pa-xs tw:absolute! tw:top-[6.5rem]! tw:z-50 fullscreen-hover-btn"
+        :class="searchObj.meta.showTransformEditor ? 'tw:right-[3.6rem]!' : 'tw:right-[4.2rem]!'"
+        class="q-pa-xs tw:absolute! tw:z-50 fullscreen-hover-btn"
+        :style="{
+          top: (searchObj.meta.nlpMode && !searchObj.meta.showTransformEditor) ||
+               (vrlEditorNlpMode && searchObj.meta.showTransformEditor && searchObj.data.transformType === 'function')
+               ? '6.5rem' : '3.5rem'
+        }"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />
@@ -2066,6 +2077,7 @@ export default defineComponent({
 
     const hasInteractedWithAI = ref(false); // Track if user has used AI in non-NLP mode
     const isNaturalLanguageDetected = ref(false); // Track NL detection without switching modes
+    const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
 
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
@@ -2300,7 +2312,7 @@ export default defineComponent({
       return columnNames;
     };
 
-    const updateQueryValue = (value: string) => {
+   const updateQueryValue = (value: string) => {
       // if (searchObj.meta.jobId != "") {
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
@@ -4578,6 +4590,9 @@ export default defineComponent({
       showExplainDialog,
       openExplainDialog,
       outlinedShowChart,
+      isNaturalLanguageDetected,
+      isGeneratingSQL,
+      vrlEditorNlpMode,
     };
   },
   computed: {
