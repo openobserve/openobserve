@@ -15,12 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="code-query-editor-container">
+  <div class="code-query-editor-container" v-bind="$attrs">
     <div
       data-test="query-editor"
       class="logs-query-editor"
       ref="editorRef"
-      v-bind="$attrs"
       :id="editorId"
     />
     <!-- AI Icon Button -->
@@ -1043,6 +1042,8 @@ export default defineComponent({
   position: relative;
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* AI Icon Button Styling */
@@ -1278,6 +1279,7 @@ export default defineComponent({
 
 <style lang="scss">
 .logs-query-editor {
+  flex: 1;
   .monaco-editor,
   .monaco-editor .monaco-editor {
     padding: 0px 0px 0px 0px !important;

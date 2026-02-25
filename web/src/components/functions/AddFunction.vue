@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disable-ai-reason="''"
                       :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('function.enterFunctionPrompt')"
-                      editor-height="300px"
+                      editor-height="calc(100vh - 194px)"
                       @update:query="handleFunctionUpdate"
                       @language-change="handleLanguageChange"
                       @toggle-nlp-mode="handleToggleNlpMode"
