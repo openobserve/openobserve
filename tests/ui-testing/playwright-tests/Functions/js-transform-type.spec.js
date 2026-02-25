@@ -116,9 +116,8 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.selectJavaScriptType();
       await pm.functionsPage.enterFunctionCode(jsCode1);
 
-      // Use default test events (loaded by TestFunction on mount) — they work for assertions
-      // since row.count is undefined, (undefined || 5) + 1 = 6
-      const output = await pm.functionsPage.testFunctionExecution();
+      // Explicit event without 'count' — tests the || 5 fallback: (undefined || 5) + 1 = 6
+      const output = await pm.functionsPage.testFunctionExecution('[{"name":"test"}]');
 
       // Assert output exists before checking content
       expect(output).toBeTruthy();
@@ -141,16 +140,15 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       // Trigger test execution using default events
       const errorOutput = await pm.functionsPage.testFunctionExecution();
 
-      if (errorOutput) {
-        testLogger.info(`Error test output: ${errorOutput}`);
+      expect(errorOutput).toBeTruthy();
+      testLogger.info(`Error test output: ${errorOutput}`);
 
-        const hasError = errorOutput.toLowerCase().includes('error') ||
-                        errorOutput.toLowerCase().includes('undefined') ||
-                        errorOutput.toLowerCase().includes('failed');
+      const hasError = errorOutput.toLowerCase().includes('error') ||
+                      errorOutput.toLowerCase().includes('undefined') ||
+                      errorOutput.toLowerCase().includes('failed');
 
-        expect(hasError).toBe(true);
-        testLogger.info('Error handling works - error message displayed');
-      }
+      expect(hasError).toBe(true);
+      testLogger.info('Error handling works - error message displayed');
       await pm.functionsPage.clickCancelButton();
     });
 

@@ -329,11 +329,14 @@ class FunctionsPage {
       await this.page.waitForTimeout(1000);
     }
 
-    // Click the "Test Function" button in the toolbar — this fires the API call immediately
-    await this.clickTestButton();
+    // Click the "Test Function" button and wait for the API response
+    const [response] = await Promise.all([
+      this.page.waitForResponse(resp => resp.url().includes('/functions/test'), { timeout: 15000 }),
+      this.clickTestButton(),
+    ]);
 
-    // Wait for the API response and output editor to update
-    await this.page.waitForTimeout(3000);
+    // Brief wait for the output editor to render the response
+    await this.page.waitForTimeout(500);
 
     return await this.getTestOutput();
   }
