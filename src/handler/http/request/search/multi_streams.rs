@@ -576,25 +576,42 @@ pub async fn search_multi(
                     if let Some(e) = err {
                         log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
                     }
-                    ret_val
-                        .as_array()
-                        .unwrap()
+                    // Use as_array() safely: if VRL execution failed and returned a
+                    // non-array value (or a flat array when per_query_resp expects an
+                    // array-of-arrays), fall back to an empty result instead of
+                    // panicking with `.unwrap()`.
+                    match ret_val.as_array() {
+                        None => {
+                            log::error!(
+                                "[trace_id {trace_id}] VRL function did not return an array; \
+                                 returning empty hits"
+                            );
+                            vec![]
+                        }
+                        Some(ret_arr) => ret_arr
                         .iter()
                         .filter_map(|v| {
                             if per_query_resp {
-                                let flattened_array = v
-                                    .as_array()
-                                    .unwrap()
-                                    .iter()
-                                    .map(|item| {
-                                        if !item.is_null() && item.is_object() {
-                                            config::utils::flatten::flatten(item.clone()).unwrap()
-                                        } else {
-                                            item.clone()
-                                        }
-                                    })
-                                    .collect::<Vec<_>>();
-                                Some(serde_json::Value::Array(flattened_array))
+                                // In per-query mode each element must itself be an array of
+                                // hits. If the VRL function errored out the value may be a
+                                // plain object instead; skip gracefully rather than panic.
+                                v.as_array().map(|inner| {
+                                    let flattened_array = inner
+                                        .iter()
+                                        .map(|item| {
+                                            if !item.is_null() && item.is_object() {
+                                                // flatten() only errors when the value is not
+                                                // an object, which is already guarded above,
+                                                // but we keep .unwrap_or to be safe.
+                                                config::utils::flatten::flatten(item.clone())
+                                                    .unwrap_or_else(|_| item.clone())
+                                            } else {
+                                                item.clone()
+                                            }
+                                        })
+                                        .collect::<Vec<_>>();
+                                    serde_json::Value::Array(flattened_array)
+                                })
                             } else if !v.is_null() && v.is_object() {
                                 config::utils::flatten::flatten(v.clone()).ok()
                             } else {
@@ -602,6 +619,7 @@ pub async fn search_multi(
                             }
                         })
                         .collect()
+                    }
                 } else {
                     let mut error = "".to_string();
                     let res = multi_res
