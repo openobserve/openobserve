@@ -878,6 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="streamCrossLinks"
                   title="Stream Cross-Links"
                   subtitle="Links specific to this stream. These take priority over organization-level links."
+                  :availableFields="streamFieldNames"
                   @change="formDirtyFlag = true"
                 />
 
@@ -933,7 +934,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </q-btn>
                   <q-btn
-                    v-if="activeMainTab != 'configuration'"
+                    v-if="activeMainTab != 'configuration' && activeMainTab != 'crossLinking'"
                     v-bind:disable="
                       !selectedFields.length && !selectedDateFields.length
                     "
@@ -1083,6 +1084,7 @@ export default defineComponent({
     DateTime,
     AssociatedRegexPatterns,
     PerformanceFieldsDialog,
+    CrossLinkManager,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -1128,6 +1130,9 @@ export default defineComponent({
     const streamCrossLinks = ref<any[]>([]);
     const orgCrossLinks = computed(() =>
       store.state?.organizationData?.organizationSettings?.cross_links || [],
+    );
+    const streamFieldNames = computed(() =>
+      (indexData.value.schema || []).map((f: any) => f.name).sort(),
     );
     const isDialogOpen = ref(false);
     const patternAssociations = ref([]);
@@ -2531,6 +2536,7 @@ export default defineComponent({
       redBtnRows,
       streamCrossLinks,
       orgCrossLinks,
+      streamFieldNames,
       selectedDateFields,
       redDaysList,
       deleteDates,

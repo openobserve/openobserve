@@ -245,18 +245,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
       </div>
       <div
-        style="
-          border: 1px solid gray;
-          border-radius: 4px;
-          padding: 3px;
-          position: absolute;
-          top: 0px;
-          left: 0px;
-          display: none;
-          text-wrap: nowrap;
-          z-index: 9999999;
-        "
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        class="crosslink-drilldown-menu"
+        :class="{ 'crosslink-drilldown-menu--dark': store.state.theme === 'dark' }"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
       >
@@ -264,31 +254,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(drilldown, index) in drilldownArray"
           :key="JSON.stringify(drilldown)"
         >
-          <!-- Separator before first cross-link -->
           <q-separator
-            v-if="drilldown._isCrossLink && (index === 0 || !drilldownArray[index - 1]._isCrossLink)"
-            class="q-my-xs"
+            v-if="drilldown._isCrossLink && index > 0 && !drilldownArray[index - 1]._isCrossLink"
           />
           <div
-            class="drilldown-item q-px-sm q-py-xs"
-            style="
-              display: flex;
-              flex-direction: row;
-              align-items: center;
-              position: relative;
-            "
+            class="crosslink-drilldown-menu-item"
+            @click="openDrilldown(index)"
           >
-            <div
-              @click="openDrilldown(index)"
-              style="cursor: pointer; display: flex; align-items: center"
-            >
-              <q-icon
-                class="q-mr-xs q-mt-xs"
-                size="16px"
-                :name="drilldown._isCrossLink ? 'open_in_new' : 'link'"
-              />
-              <span>{{ drilldown.name }}</span>
-            </div>
+            <q-icon size="xs" class="q-mr-sm" :name="drilldown._isCrossLink ? 'open_in_new' : 'link'" />
+            <span>{{ drilldown.name }}</span>
           </div>
         </template>
       </div>
@@ -1067,9 +1041,9 @@ export default defineComponent({
       { deep: true },
     );
 
-    // Cross-linking: fetch cross-links on query change
+    // Cross-linking: fetch cross-links when the executed query (with variables resolved) changes
     watch(
-      () => panelSchema.value?.queries?.[0]?.query,
+      () => metadata.value?.queries?.[0]?.query || panelSchema.value?.queries?.[0]?.query,
       async (newQuery: string) => {
         if (!store.state.zoConfig?.enable_cross_linking || !newQuery) {
           crossLinksData.value = { stream_links: [], org_links: [] };
@@ -1492,6 +1466,7 @@ export default defineComponent({
       // Store click parameters for drilldown (including cross-links)
       const crossLinkItems = getCrossLinkDrilldownItems();
       const shouldShowDrilldown = hasDrilldown || crossLinkItems.length > 0;
+
 
       if (shouldShowDrilldown) {
         drilldownParams = [params, args];
@@ -2630,6 +2605,62 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+// Cross-link drilldown popup — matches AlertContextMenu.vue exactly
+.crosslink-drilldown-menu {
+  position: absolute;
+  z-index: 9999999;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  padding: 4px 0;
+  display: none;
+  white-space: nowrap;
+  top: 0;
+  left: 0;
+}
+
+.crosslink-drilldown-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 14px;
+  color: #333;
+
+  &:hover {
+    background-color: #f5f5f5;
+  }
+
+  &:active {
+    background-color: #e0e0e0;
+  }
+
+  span {
+    user-select: none;
+  }
+}
+
+.crosslink-drilldown-menu--dark {
+  background: #2c2c2c;
+  border-color: #404040;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item {
+  color: #e0e0e0;
+}
+
+.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:hover {
+  background-color: #383838;
+}
+
+.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:active {
+  background-color: #444444;
+}
+
 .drilldown-item:hover {
   background-color: rgba(202, 201, 201, 0.908);
 }

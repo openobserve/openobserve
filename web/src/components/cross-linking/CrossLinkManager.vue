@@ -15,74 +15,75 @@
         no-caps
         icon="add"
         label="Add Cross-Link"
-        color="primary"
-        size="sm"
+        class="o2-secondary-button tw:h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         @click="onAddClick"
         data-test="add-cross-link-btn"
       />
     </div>
 
-    <!-- Links Table -->
-    <q-table
-      v-if="links.length > 0"
-      :rows="links"
-      :columns="columns"
-      row-key="name"
-      dense
-      flat
-      bordered
-      hide-bottom
-      :pagination="{ rowsPerPage: 0 }"
-      class="cross-link-table"
-      data-test="cross-link-table"
-    >
-      <template v-slot:body-cell-fields="props">
-        <q-td :props="props">
-          <q-chip
-            v-for="(field, idx) in props.row.fields"
-            :key="idx"
-            dense
-            size="sm"
-            class="q-mr-xs"
-          >
-            {{ field.name }}
-          </q-chip>
-        </q-td>
-      </template>
-
-      <template v-slot:body-cell-actions="props">
-        <q-td :props="props" v-if="!readonly">
-          <q-btn
-            dense
-            flat
-            round
-            icon="edit"
-            size="sm"
-            @click="editLink(props.row)"
-            :data-test="`cross-link-edit-${props.rowIndex}`"
-          />
-          <q-btn
-            dense
-            flat
-            round
-            icon="delete"
-            size="sm"
-            color="negative"
-            @click="removeLink(props.row)"
-            :data-test="`cross-link-delete-${props.rowIndex}`"
-          />
-        </q-td>
-      </template>
-
-      <template v-slot:body-cell-source="props">
-        <q-td :props="props">
-          <q-badge
-            :color="props.row._source === 'stream' ? 'primary' : 'grey'"
-            :label="props.row._source === 'stream' ? 'Stream' : 'Global'"
-          />
-        </q-td>
-      </template>
-    </q-table>
+    <!-- Links List -->
+    <div v-if="links.length > 0" class="cross-link-list" data-test="cross-link-list">
+      <div
+        v-for="(link, idx) in links"
+        :key="link.name"
+        class="cross-link-item el-border tw:rounded-md tw:mb-2 tw:p-3"
+        :data-test="`cross-link-item-${idx}`"
+      >
+        <div class="tw:flex tw:justify-between tw:items-start">
+          <div class="tw:flex-1 tw:min-w-0">
+            <!-- Name -->
+            <div class="tw:font-semibold tw:text-sm tw:truncate" :title="link.name" style="color: var(--o2-text-primary)">
+              {{ link.name }}
+              <q-badge
+                v-if="link._source"
+                :color="link._source === 'stream' ? 'primary' : 'grey'"
+                :label="link._source === 'stream' ? 'Stream' : 'Global'"
+                class="q-ml-xs"
+              />
+            </div>
+            <!-- URL -->
+            <div class="tw:text-xs tw:truncate tw:mt-1" :title="link.url" style="color: var(--o2-text-muted)">
+              {{ link.url }}
+            </div>
+            <!-- Fields -->
+            <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-2">
+              <q-chip
+                v-for="(field, fIdx) in link.fields"
+                :key="fIdx"
+                dense
+                size="xs"
+                class="tw:max-w-[150px]"
+              >
+                <span class="tw:truncate" :title="field.name">{{ field.name }}</span>
+              </q-chip>
+            </div>
+          </div>
+          <!-- Actions -->
+          <div v-if="!readonly" class="tw:flex tw:items-center tw:gap-1 tw:ml-2 tw:shrink-0">
+            <q-btn
+              dense
+              flat
+              round
+              icon="edit"
+              size="sm"
+              @click="editLink(link)"
+              :data-test="`cross-link-edit-${idx}`"
+            />
+            <q-btn
+              dense
+              flat
+              round
+              icon="delete"
+              size="sm"
+              color="negative"
+              @click="removeLink(link)"
+              :data-test="`cross-link-delete-${idx}`"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Empty State -->
     <div
@@ -98,6 +99,7 @@
     <CrossLinkDialog
       v-model="showAddDialog"
       :link="editingLink"
+      :availableFields="availableFields"
       @save="onSaveLink"
       @cancel="showAddDialog = false"
     />
@@ -106,6 +108,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, type PropType } from "vue";
+import { useStore } from "vuex";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 
 export interface CrossLink {
@@ -139,59 +142,19 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    availableFields: {
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
   },
   emits: ["update:modelValue", "change"],
   setup(props, { emit }) {
+    const store = useStore();
     const showAddDialog = ref(false);
     const editingLink = ref<CrossLink | null>(null);
     const editingOriginalName = ref("");
 
     const links = computed(() => props.modelValue);
-
-    const columns = computed(() => {
-      const cols: any[] = [
-        {
-          name: "name",
-          label: "Name",
-          align: "left",
-          field: "name",
-          sortable: true,
-        },
-        {
-          name: "url",
-          label: "URL Template",
-          align: "left",
-          field: "url",
-          style:
-            "max-width: 300px; overflow: hidden; text-overflow: ellipsis;",
-        },
-        {
-          name: "fields",
-          label: "Fields",
-          align: "left",
-          field: "fields",
-        },
-      ];
-
-      if (props.showSourceColumn) {
-        cols.push({
-          name: "source",
-          label: "Source",
-          align: "center",
-          field: "_source",
-        });
-      }
-
-      if (!props.readonly) {
-        cols.push({
-          name: "actions",
-          label: "Actions",
-          align: "center",
-        });
-      }
-
-      return cols;
-    });
 
     function onAddClick() {
       editingLink.value = null;
@@ -236,8 +199,8 @@ export default defineComponent({
     }
 
     return {
+      store,
       links,
-      columns,
       showAddDialog,
       editingLink,
       onAddClick,
