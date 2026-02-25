@@ -705,7 +705,7 @@ async function getQueryData() {
     const filter = searchObj.data.editorValue.trim();
     const combinedFilter = filter;
 
-    if (queryReq.query.from === 0) searchResultRef.value.getDashboardData();
+    if (queryReq.query.from === 0) searchResultRef?.value?.getDashboardData();
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {
