@@ -56,7 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Collapsible Charts Section -->
     <transition name="slide-fade">
-      <div v-show="searchObj.meta.showHistogram" class="charts-wrapper">
+      <div
+        v-show="searchObj.meta.showHistogram"
+        class="charts-wrapper tw:min-h-[13.5rem]"
+      >
         <div class="charts-container">
           <RenderDashboardCharts
             v-if="show"
