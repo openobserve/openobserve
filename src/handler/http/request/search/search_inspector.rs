@@ -189,7 +189,7 @@ pub async fn get_search_profile(
 
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
-    if let Some(res) = check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+    if let Some(res) = check_stream_permissions(&stream_name, org_id, &user_id, &stream_type).await
     {
         return res;
     }
@@ -225,7 +225,7 @@ pub async fn get_search_profile(
                         match USERS
                             .get(&format!("{org_id}/{user_id}"))
                             .and_then(|user_record| {
-                                DBUser::from(&(user_record.clone())).get_user(org_id.clone())
+                                DBUser::from(&(user_record.clone())).get_user(org_id.to_string())
                             }) {
                             Some(user) => user,
                             None => {
@@ -245,7 +245,7 @@ pub async fn get_search_profile(
                                     .map_or("cipher_keys", |model| model.key),
                                 key
                             ),
-                            org_id: org_id.clone(),
+                            org_id: org_id.to_string(),
                             bypass_check: false,
                             parent_id: "".to_string(),
                         },
