@@ -35,31 +35,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t("alerts.deduplication.fingerprintFieldsHint") }}
         </div>
-        <q-select
-          v-model="localDeduplication.fingerprint_fields"
-          :options="filteredColumns"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop no-case fingerprint-select tw:max-w-[600px] tw:min-w-[300px]"
-          dense
-          borderless
-          multiple
-          use-chips
-          use-input
-          input-debounce="0"
-          new-value-mode="add-unique"
-          emit-value
-          map-options
-          @filter="filterColumns"
-          @update:model-value="emitUpdate"
-        >
-          <template v-slot:hint>
-            <div class="tw:text-xs">
-              💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition
-              fields)
-            </div>
-          </template>
-        </q-select>
+        <div class="tw:relative">
+          <q-select
+            v-model="localDeduplication.fingerprint_fields"
+            :options="filteredColumns"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop no-case fingerprint-select tw:max-w-[600px] tw:min-w-[300px]"
+            dense
+            borderless
+            multiple
+            use-chips
+            use-input
+            input-debounce="300"
+            new-value-mode="add-unique"
+            emit-value
+            map-options
+            @filter="filterColumns"
+            @update:model-value="emitUpdate"
+          >
+            <template v-slot:hint>
+              <div class="tw:text-xs">
+                💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition
+                fields)
+              </div>
+            </template>
+          </q-select>
+          <q-tooltip v-if="localDeduplication.fingerprint_fields?.length > 0" max-width="400px">
+            {{ localDeduplication.fingerprint_fields.join(', ') }}
+          </q-tooltip>
+        </div>
       </div>
 
       <!-- Time Window -->
@@ -233,12 +238,16 @@ export default defineComponent({
 :deep(.fingerprint-select) {
   .q-field__control {
     min-height: 40px;
+    display: flex;
+    align-items: center;
   }
 
   .q-field__control-container {
-    padding-top: 4px;
-    padding-bottom: 4px;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
     padding-right: 36px; // Reserve space for dropdown arrow
+    display: flex;
+    align-items: center;
   }
 
   .q-field__native {
@@ -248,6 +257,9 @@ export default defineComponent({
     overflow-y: hidden;
     display: flex !important;
     flex-wrap: nowrap !important;
+    align-items: center !important; // Center align chips vertically
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
 
     // Hide scrollbar but keep scrolling functionality
     scrollbar-width: none; // Firefox
@@ -273,6 +285,44 @@ export default defineComponent({
   // Ensure dropdown icon is always visible
   .q-field__append {
     padding-left: 8px;
+  }
+}
+
+// Dark mode chip styling
+.dark-mode {
+  :deep(.fingerprint-select) {
+    .q-chip {
+      background-color: rgba(255, 255, 255, 0.1) !important;
+      color: #e0e0e0 !important;
+
+      .q-icon {
+        color: #e0e0e0 !important;
+        opacity: 0.8;
+
+        &:hover {
+          opacity: 1;
+        }
+      }
+    }
+  }
+}
+
+// Light mode chip styling
+.light-mode {
+  :deep(.fingerprint-select) {
+    .q-chip {
+      background-color: rgba(0, 0, 0, 0.08) !important;
+      color: #424242 !important;
+
+      .q-icon {
+        color: #424242 !important;
+        opacity: 0.7;
+
+        &:hover {
+          opacity: 1;
+        }
+      }
+    }
   }
 }
 </style>

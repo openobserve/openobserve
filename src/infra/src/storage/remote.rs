@@ -43,12 +43,24 @@ pub struct StorageConfig {
 
 pub struct Remote {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
+    bucket_prefix: String,
 }
 
 impl Remote {
     pub fn new(config: StorageConfig) -> Self {
+        let bucket_prefix = config.bucket_prefix.clone();
         Self {
             client: LimitStore::new(init_client(config), CONCURRENT_REQUESTS),
+            bucket_prefix,
+        }
+    }
+
+    /// Format the key with the bucket prefix for this specific Remote instance
+    fn format_key(&self, key: &str) -> String {
+        if !self.bucket_prefix.is_empty() && !key.starts_with(&self.bucket_prefix) {
+            format!("{}{}", self.bucket_prefix, key)
+        } else {
+            key.to_string()
         }
     }
 }
@@ -78,7 +90,7 @@ impl ObjectStore for Remote {
         let data_size = payload.content_length();
         match self
             .client
-            .put_opts(&(format_key(&file, true).into()), payload, opts)
+            .put_opts(&(self.format_key(&file).into()), payload, opts)
             .await
         {
             Ok(_) => {
@@ -116,7 +128,7 @@ impl ObjectStore for Remote {
         let file = location.to_string();
         match self
             .client
-            .put_multipart_opts(&(format_key(&file, true).into()), opts)
+            .put_multipart_opts(&(self.format_key(&file).into()), opts)
             .await
         {
             Ok(r) => Ok(r),
@@ -132,7 +144,7 @@ impl ObjectStore for Remote {
         let file = location.to_string();
         let result = self
             .client
-            .get(&(format_key(&file, true).into()))
+            .get(&(self.format_key(&file).into()))
             .await
             .map_err(|e| {
                 if file.ne(TEST_FILE) {
@@ -166,7 +178,7 @@ impl ObjectStore for Remote {
         let file = location.to_string();
         let result = self
             .client
-            .get_opts(&(format_key(&file, true).into()), options)
+            .get_opts(&(self.format_key(&file).into()), options)
             .await
             .map_err(|e| {
                 log::error!("[STORAGE] get_opts remote file: {file}, error: {e:?}");
@@ -197,7 +209,7 @@ impl ObjectStore for Remote {
         let file = location.to_string();
         let data = self
             .client
-            .get_range(&(format_key(&file, true).into()), range.clone())
+            .get_range(&(self.format_key(&file).into()), range.clone())
             .await
             .map_err(|e| {
                 log::error!(
@@ -230,7 +242,7 @@ impl ObjectStore for Remote {
         for _ in 0..3 {
             result = self
                 .client
-                .delete(&(format_key(location.as_ref(), true).into()))
+                .delete(&(self.format_key(location.as_ref()).into()))
                 .await;
             if result.is_ok() {
                 let file = location.to_string();
@@ -247,7 +259,7 @@ impl ObjectStore for Remote {
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.map(|p| p.as_ref());
-        let prefix = format_key(key.unwrap_or(""), true);
+        let prefix = self.format_key(key.unwrap_or(""));
         self.client.list(Some(&prefix.into()))
     }
 
