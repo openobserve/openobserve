@@ -19,7 +19,7 @@ use arrow::array::{
     Array, Int64Array, TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
 };
 use config::{
-    PARQUET_BATCH_SIZE,
+    get_batch_size,
     meta::{inverted_index::IndexOptimizeMode, stream::FileKey},
 };
 use datafusion::{
@@ -396,8 +396,9 @@ fn create_top_n_arrow_array(
     let mut batches = Vec::new();
 
     // Process data in batches of BATCH_SIZE
-    for chunk_start in (0..total_rows).step_by(PARQUET_BATCH_SIZE) {
-        let chunk_end = std::cmp::min(chunk_start + PARQUET_BATCH_SIZE, total_rows);
+    let batch_size = get_batch_size();
+    for chunk_start in (0..total_rows).step_by(batch_size) {
+        let chunk_end = std::cmp::min(chunk_start + batch_size, total_rows);
 
         let field_chunk = field_values[chunk_start..chunk_end].to_vec();
         let count_chunk = count_values[chunk_start..chunk_end].to_vec();

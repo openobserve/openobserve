@@ -405,7 +405,7 @@ pub async fn search_memtable(
         let batch_num = record_batches.len();
         let mut merge_groupes = Vec::new();
         let mut current_group = Vec::new();
-        let group_limit = config::PARQUET_BATCH_SIZE;
+        let group_limit = config::get_batch_size();
         let mut group_size = 0;
         for batch in record_batches {
             if group_size > 0 && group_size + batch.num_rows() > group_limit {

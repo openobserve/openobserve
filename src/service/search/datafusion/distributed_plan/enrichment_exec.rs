@@ -21,7 +21,7 @@ use arrow::{
     datatypes::DataType,
 };
 use bytes::Bytes;
-use config::{PARQUET_BATCH_SIZE, utils::record_batch_ext::convert_vrl_to_record_batch};
+use config::{get_batch_size, utils::record_batch_ext::convert_vrl_to_record_batch};
 use datafusion::{
     arrow::datatypes::SchemaRef,
     common::{Result, Statistics, internal_err},
@@ -294,10 +294,8 @@ async fn fetch_from_memory_cache(
 
         pool.install(|| {
             let vrl_to_record_batch_timer = metrics.vrl_to_record_batch_time.timer();
-            let chunks: Vec<&[vrl::value::Value]> = enrichment_data
-                .as_ref()
-                .chunks(PARQUET_BATCH_SIZE)
-                .collect();
+            let chunks: Vec<&[vrl::value::Value]> =
+                enrichment_data.as_ref().chunks(get_batch_size()).collect();
 
             let result = chunks
                 .into_par_iter()
@@ -313,10 +311,8 @@ async fn fetch_from_memory_cache(
         })
     } else {
         let vrl_to_record_batch_timer = metrics.vrl_to_record_batch_time.timer();
-        let chunks: Vec<&[vrl::value::Value]> = enrichment_data
-            .as_ref()
-            .chunks(PARQUET_BATCH_SIZE)
-            .collect();
+        let chunks: Vec<&[vrl::value::Value]> =
+            enrichment_data.as_ref().chunks(get_batch_size()).collect();
 
         let result = chunks
             .into_iter()
