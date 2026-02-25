@@ -140,20 +140,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Picker visible (time set or "+Set" was clicked) -->
         <div
           v-if="showTimePicker || (panelTimeRange !== null && panelTimeRange !== undefined)"
-          class="flex items-center"
+          class="flex items-center no-wrap panel-time-picker-container"
         >
-          <DateTimePickerDashboard
-            ref="panelTimePickerRef"
-            v-model="pickerValue"
-            :auto-apply-dashboard="true"
+          <div class="panel-time-picker-btn">
+            <DateTimePickerDashboard
+              ref="panelTimePickerRef"
+              v-model="pickerValue"
+              :auto-apply-dashboard="true"
             :hide-relative-timezone="true"
-            data-test="dashboard-config-panel-time-picker"
-          />
+              data-test="dashboard-config-panel-time-picker"
+            />
+            <q-tooltip
+              anchor="bottom middle"
+              self="top middle"
+              style="font-size: 11px"
+              max-width="320px"
+            >
+              {{ formattedPickerValue }}
+            </q-tooltip>
+          </div>
           <q-icon
-            class="q-mr-xs q-ml-sm"
+            class="q-mr-xs q-ml-sm flex-shrink-0"
             size="15px"
             name="close"
-            style="cursor: pointer"
+            style="cursor: pointer; flex-shrink: 0"
             data-test="dashboard-config-cancel-panel-time"
             @click="onCancelPanelTime"
           />
@@ -2654,6 +2664,17 @@ export default defineComponent({
     // Whether the picker is open (after clicking "+Set")
     const showTimePicker = ref(false);
 
+    // Ref to the DateTimePickerDashboard component
+    const panelTimePickerRef = ref(null);
+
+    // Format picker value for tooltip display using the DateTime component's display value
+    const formattedPickerValue = computed(() => {
+      if (!panelTimePickerRef.value?.dateTimePicker?.getDisplayValue) {
+        return "";
+      }
+      return panelTimePickerRef.value.dateTimePicker.getDisplayValue;
+    });
+
     // Toggle on/off
     const onToggleDefaultTime = (enabled: boolean) => {
       dashboardPanelData.data.config.panel_time_enabled = enabled;
@@ -2766,6 +2787,8 @@ export default defineComponent({
       panelTimeRange,
       pickerValue,
       showTimePicker,
+      panelTimePickerRef,
+      formattedPickerValue,
       onToggleDefaultTime,
       onCancelPanelTime,
     };
@@ -2844,5 +2867,32 @@ export default defineComponent({
   height: 36px;
   margin-top: 9px;
   width: 100px;
+}
+
+.panel-time-picker-container {
+  overflow: hidden;
+}
+
+.panel-time-picker-btn {
+  overflow: hidden;
+  min-width: 0;
+
+  :deep(.date-time-button) {
+    min-width: 0 !important;
+    max-width: 100%;
+
+    .q-btn__content {
+      flex-wrap: nowrap;
+      overflow: hidden;
+
+      .block {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+  }
 }
 </style>
