@@ -762,14 +762,18 @@ test.describe("VRL visualization support testcases", () => {
     await expect(vrlEditor.first()).toBeVisible();
 
     // Verify editor is ready to accept input
-    const editorInput = page.locator("#fnEditor").locator(".inputarea");
+    const editorInput = page.locator('[data-test="logs-vrl-function-editor"]')
+      .locator(".inputarea")
+      .first();
     await expect(editorInput).toBeVisible();
 
     // Add VRL function and verify it's entered correctly
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
 
     // Verify the VRL content was entered
-    const editorContent = page.locator("#fnEditor");
+    const editorContent = page.locator('[data-test="logs-vrl-function-editor"]')
+      .locator(".inputarea")
+      .first();
     await expect(editorContent).toBeVisible();
   });
 
