@@ -856,7 +856,6 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             synthetic_row,
             now,
             None,
-            None,
         )
         .await
         {
@@ -920,7 +919,6 @@ pub async fn trigger_by_name(
             &alert,
             synthetic_row,
             now,
-            None,
             None,
         )
         .await
