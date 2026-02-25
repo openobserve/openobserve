@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @on:date-change="updateDateTime"
     :initialTimezone="initialTimezone"
     :disable="disable"
+    :hide-relative-timezone="hideRelativeTimezone"
     @hide="onHide"
     @show="onShow"
   >
@@ -62,6 +63,11 @@ export default defineComponent({
     autoApplyDashboard: {
       required: false,
       default: false,
+    },
+    hideRelativeTimezone: {
+      required: false,
+      default: false,
+      type: Boolean,
     },
   },
   emits: ["update:modelValue", "hide", "show"],

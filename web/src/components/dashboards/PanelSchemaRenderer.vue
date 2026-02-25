@@ -339,6 +339,7 @@ import {
   defineComponent,
   watch,
   ref,
+  shallowRef,
   toRefs,
   computed,
   inject,
@@ -586,7 +587,7 @@ export default defineComponent({
     });
 
     // stores the converted data which can be directly used for rendering different types of panels
-    const panelData: any = ref({}); // holds the data to render the panel after getting data from the api based on panel config
+    const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
     const drilldownArray: any = ref([]);
     const selectedAnnotationData: any = ref([]);

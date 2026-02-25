@@ -54,19 +54,43 @@ export const buildVariablesDependencyGraph = (
   for (let item of variables) {
     let name = item.name;
     if (item.type == "query_values") {
+      // Use a Set to collect all unique dependencies from stream, field, and filters
+      const allDependencies = new Set<string>();
+
+      // 1. Check stream field for variable references
+      if (item.query_data?.stream) {
+        const streamDeps = extractVariableNames(
+          item.query_data.stream,
+          variablesNameList
+        );
+        streamDeps.forEach((dep: string) => allDependencies.add(dep));
+      }
+
+      // 2. Check field field for variable references
+      if (item.query_data?.field) {
+        const fieldDeps = extractVariableNames(
+          item.query_data.field,
+          variablesNameList
+        );
+        fieldDeps.forEach((dep: string) => allDependencies.add(dep));
+      }
+
+      // 3. Check filter values for variable references (existing logic)
       for (let filter of item?.query_data?.filter ?? []) {
-        let dependencies = extractVariableNames(
+        const filterDeps = extractVariableNames(
           filter.value,
           variablesNameList
         );
-        // loop on all dependencies and append them as child
-        dependencies.forEach((dep: any) => {
-          graph[dep].childVariables.push(name);
-        });
-
-        // append all dependencies as parent
-        graph[name].parentVariables.push(...dependencies);
+        filterDeps.forEach((dep: string) => allDependencies.add(dep));
       }
+
+      // 4. Build relationships from all dependencies
+      allDependencies.forEach((dep: string) => {
+        graph[dep].childVariables.push(name);
+      });
+
+      // 5. Set parent variables (convert Set to Array)
+      graph[name].parentVariables = Array.from(allDependencies);
     } else {
       // no dependencies for non query_values variables
       graph[item.name] = {
@@ -179,6 +203,8 @@ interface VariableRuntimeState {
   panelId?: string;
   type: string;
   query_data?: {
+    stream?: string;
+    field?: string;
     filter?: Array<{
       filter?: string;
       value?: string;
@@ -351,36 +377,57 @@ export const buildScopedDependencyGraph = (
     );
 
     if (variable.type === "query_values") {
+      // Use a Set to collect all unique parent variable names
+      const allParentNames = new Set<string>();
+
+      // 1. Check stream field for variable references
+      if (variable.query_data?.stream) {
+        const streamParents = extractVariableNames(variable.query_data.stream);
+        streamParents.forEach((name) => allParentNames.add(name));
+      }
+
+      // 2. Check field field for variable references
+      if (variable.query_data?.field) {
+        const fieldParents = extractVariableNames(variable.query_data.field);
+        fieldParents.forEach((name) => allParentNames.add(name));
+      }
+
+      // 3. Check filter values for variable references (existing logic)
       const filters = variable.query_data?.filter || [];
-
       filters.forEach((filter) => {
-        // Extract parent variable names from filter (e.g., "$country")
         const filterString = filter.filter || filter.value || "";
-        const parentNames = extractVariableNames(filterString);
+        const filterParents = extractVariableNames(filterString);
+        filterParents.forEach((name) => allParentNames.add(name));
+      });
 
-        parentNames.forEach((parentName) => {
-          // Resolve which parent variable this child should connect to
-          const parentKey = resolveParentVariable(
-            parentName,
-            variable.scope,
-            variable.tabId,
-            variable.panelId,
-            variables,
-            panelTabMapping
-          );
+      // 4. Build relationships from all parent dependencies
+      allParentNames.forEach((parentName) => {
+        // Resolve which parent variable this child should connect to
+        const parentKey = resolveParentVariable(
+          parentName,
+          variable.scope,
+          variable.tabId,
+          variable.panelId,
+          variables,
+          panelTabMapping
+        );
 
-          if (parentKey) {
-            // Validate dependency is allowed
-            if (isValidDependency(graph[parentKey], graph[childKey])) {
+        if (parentKey) {
+          // Validate dependency is allowed
+          if (isValidDependency(graph[parentKey], graph[childKey])) {
+            // Avoid duplicate entries
+            if (!graph[childKey].parents.includes(parentKey)) {
               graph[childKey].parents.push(parentKey);
-              graph[parentKey].children.push(childKey);
-            } else {
-              throw new Error(
-                `Invalid dependency: ${childKey} cannot depend on ${parentKey}`
-              );
             }
+            if (!graph[parentKey].children.includes(childKey)) {
+              graph[parentKey].children.push(childKey);
+            }
+          } else {
+            throw new Error(
+              `Invalid dependency: ${childKey} cannot depend on ${parentKey}`
+            );
           }
-        });
+        }
       });
     }
   });
