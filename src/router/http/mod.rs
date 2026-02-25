@@ -470,10 +470,9 @@ async fn send_and_respond(
         Ok(r) => r,
         Err(e) => {
             log::error!(
-                "proxy request failed: {} -> {}, error: {:?}, took: {} ms",
+                "proxy request failed: {} -> {}, error: {e:?}, took: {} ms",
                 target.path,
                 target.node_addr,
-                e,
                 start.elapsed().as_millis()
             );
             return (
@@ -521,14 +520,13 @@ async fn send_and_respond(
                     Ok(bytes) => Ok(bytes),
                     Err(e) => {
                         log::error!(
-                            "proxy streaming error: {} -> {}, error: {:?}",
+                            "proxy streaming error: {} -> {}, error: {e:?}",
                             path_for_log,
                             node_for_log,
-                            e
                         );
                         let error_event = serde_json::json!({
                             "type": "error",
-                            "error": format!("Stream interrupted: {}", e)
+                            "error": format!("Stream interrupted: {e}")
                         });
                         Ok(Bytes::from(format!("data: {}\n\n", error_event)))
                     }
@@ -547,10 +545,9 @@ async fn send_and_respond(
             Ok(b) => b,
             Err(e) => {
                 log::error!(
-                    "proxy response failed: {} -> {}, error: {:?}, took: {} ms",
+                    "proxy response failed: {} -> {}, error: {e:?}, took: {} ms",
                     target.path,
                     target.node_addr,
-                    e,
                     start.elapsed().as_millis()
                 );
                 return (

@@ -71,7 +71,9 @@ impl super::FileList for PostgresFileList {
     async fn health_check(&self) -> Result<()> {
         let pool = CLIENT.clone();
         let is_writable: bool = sqlx::query_scalar(
-            "SELECT NOT pg_is_in_recovery() AND current_setting('default_transaction_read_only')::bool = false",
+            r#"SELECT NOT pg_is_in_recovery() \
+            AND current_setting('transaction_read_only')::bool = false \
+            AND current_setting('default_transaction_read_only')::bool = false"#,
         )
         .fetch_one(&pool)
         .await

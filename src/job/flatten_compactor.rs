@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -47,9 +47,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         Ok(_) => {}
                         Err(e) => {
                             log::error!(
-                                "[FLATTEN_COMPACTOR:JOB] Error generate flatten file: {}, err: {}",
+                                "[FLATTEN_COMPACTOR:JOB] Error generate flatten file: {}, err: {e}",
                                 file.key,
-                                e
                             );
                         }
                     },

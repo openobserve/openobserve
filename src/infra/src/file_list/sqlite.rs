@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -55,26 +55,6 @@ impl Default for SqliteFileList {
 #[async_trait]
 impl super::FileList for SqliteFileList {
     async fn health_check(&self) -> Result<()> {
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
-        let pool = client.clone();
-        let mut tx = pool.begin().await.map_err(|e| {
-            crate::errors::Error::Message(format!("SQLite health check: failed to begin tx: {e}"))
-        })?;
-        sqlx::query(
-            r#"INSERT INTO file_list_jobs (org, stream, offsets, status, node, started_at, updated_at)
-               VALUES ('_health_check', '_health_check', 0, 0, '', 0, 0)"#,
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| {
-            crate::errors::Error::Message(format!(
-                "SQLite health check: write test failed: {e}"
-            ))
-        })?;
-        tx.rollback().await.map_err(|e| {
-            crate::errors::Error::Message(format!("SQLite health check: rollback failed: {e}"))
-        })?;
         Ok(())
     }
 
