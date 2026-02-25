@@ -747,7 +747,7 @@ mod tests {
         drop(w);
         let keys = get_stream_partition_keys("default", &StreamType::Logs, "olympics").await;
         assert_eq!(
-            keys.partition_keys,
+            keys,
             vec![
                 StreamPartition::new("country"),
                 StreamPartition::new("sport")
