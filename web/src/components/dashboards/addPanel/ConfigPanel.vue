@@ -146,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="panelTimePickerRef"
             v-model="pickerValue"
             :auto-apply-dashboard="true"
+            :hide-relative-timezone="true"
             data-test="dashboard-config-panel-time-picker"
           />
           <q-icon
@@ -2669,7 +2670,7 @@ export default defineComponent({
     watch(
       pickerValue,
       (newValue) => {
-        if (newValue && useDefaultTime.value) {
+        if (newValue && useDefaultTime.value && (showTimePicker.value || panelTimeRange.value !== null)) {
           const timeRange = buildPanelTimeRange(newValue as any);
           dashboardPanelData.data.config.panel_time_range = timeRange;
           panelTimeRange.value = timeRange;
@@ -2683,7 +2684,14 @@ export default defineComponent({
       dashboardPanelData.data.config.panel_time_range = null;
       panelTimeRange.value = null;
       showTimePicker.value = false;
+      // Reset pickerValue to default so next "+Set" shows fresh default
+      pickerValue.value = {
+        type: "relative",
+        valueType: "relative",
+        relativeTimePeriod: "15m",
+      };
     };
+
 
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {
