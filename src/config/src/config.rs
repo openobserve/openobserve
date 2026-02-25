@@ -1311,6 +1311,12 @@ pub struct Common {
     pub ingestion_log_enabled: bool,
 }
 
+impl Common {
+    pub fn should_create_span(&self) -> bool {
+        self.tracing_enabled || self.tracing_search_enabled || self.search_inspector_enabled
+    }
+}
+
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Limit {
     // no need set by environment

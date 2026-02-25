@@ -113,7 +113,7 @@ pub async fn get_search_profile(
 
     let (org_id, stream_name) = (path, "default".to_string());
     let mut range_error = String::new();
-    let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/search/profile",
             org_id = org_id.clone()
