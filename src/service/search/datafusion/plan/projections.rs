@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use config::{
@@ -61,6 +62,10 @@ pub struct ResultSchemaExtractor {
     temp_having: Option<HavingNode>,
     /// internal field, store projections for alias resolution in HAVING
     temp_projections: Vec<Expr>,
+    /// Mapping from original field name to alias (for cross-linking).
+    /// e.g., "namespace_name" -> "x_axis_1" when query has `namespace_name AS x_axis_1`
+    /// For unaliased fields: "trace_id" -> "trace_id"
+    pub field_alias_map: HashMap<String, String>,
 }
 
 impl ResultSchemaExtractor {
@@ -76,6 +81,7 @@ impl ResultSchemaExtractor {
             last_node_was_aggregate: false,
             temp_having: None,
             temp_projections: Vec::new(),
+            field_alias_map: HashMap::new(),
         }
     }
 }
@@ -432,6 +438,27 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                     }
                 }
                 self.projections = temp;
+
+                // Build field_alias_map from projection expressions
+                let mut field_alias_map = HashMap::new();
+                for expr in &proj.expr {
+                    match expr {
+                        Expr::Alias(alias) => {
+                            let original =
+                                get_col_name(&alias.expr.clone().unalias_nested().data);
+                            field_alias_map.insert(original, alias.name.clone());
+                        }
+                        Expr::Column(col) => {
+                            field_alias_map
+                                .insert(col.name.clone(), col.name.clone());
+                        }
+                        _ => {
+                            let name = get_col_name(expr);
+                            field_alias_map.insert(name.clone(), name);
+                        }
+                    }
+                }
+                self.field_alias_map = field_alias_map;
             }
             LogicalPlan::Aggregate(aggr) => {
                 // Mark that we just saw an aggregate node

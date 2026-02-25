@@ -744,6 +744,8 @@ pub struct UpdateStreamSettings {
     pub enable_distinct_fields: Option<bool>,
     #[serde(default)]
     pub enable_log_patterns_extraction: Option<bool>,
+    #[serde(default)]
+    pub cross_links: UpdateSettingsWrapper<CrossLink>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -765,6 +767,27 @@ impl MemorySize for DistinctField {
     fn mem_size(&self) -> usize {
         std::mem::size_of::<DistinctField>() + self.name.mem_size()
     }
+}
+
+/// A cross-link entry for drill-down/navigation from log/trace records
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct CrossLink {
+    /// Display name for the link
+    pub name: String,
+    /// URL template with {field_name} placeholders
+    pub url: String,
+    /// Show link only when at least one field matches the record.
+    /// If empty, the link is always shown.
+    #[serde(default)]
+    pub fields: Vec<CrossLinkField>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct CrossLinkField {
+    pub name: String,
+    /// Populated by result_schema: the alias used in the query for this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -891,6 +914,8 @@ pub struct StreamSettings {
     pub enable_log_patterns_extraction: bool,
     #[serde(default)]
     pub is_llm_stream: bool,
+    #[serde(default)]
+    pub cross_links: Vec<CrossLink>,
 }
 
 impl Default for StreamSettings {
@@ -915,6 +940,7 @@ impl Default for StreamSettings {
             enable_distinct_fields: true,
             enable_log_patterns_extraction: false,
             is_llm_stream: false,
+            cross_links: Vec::new(),
         }
     }
 }
@@ -969,6 +995,11 @@ impl Serialize for StreamSettings {
             }
         }
         state.serialize_field("is_llm_stream", &self.is_llm_stream)?;
+        if !self.cross_links.is_empty() {
+            state.serialize_field("cross_links", &self.cross_links)?;
+        } else {
+            state.skip_field("cross_links")?;
+        }
         state.end()
     }
 }
@@ -1118,6 +1149,14 @@ impl From<&str> for StreamSettings {
             .get("is_llm_stream")
             .and_then(Value::as_bool)
             .unwrap_or_default();
+        let mut cross_links = Vec::new();
+        if let Some(value) = settings.get("cross_links").and_then(|v| v.as_array()) {
+            for item in value {
+                if let Ok(link) = json::from_value::<CrossLink>(item.clone()) {
+                    cross_links.push(link);
+                }
+            }
+        }
         Self {
             partition_time_level,
             partition_keys,
@@ -1138,6 +1177,7 @@ impl From<&str> for StreamSettings {
             enable_distinct_fields,
             enable_log_patterns_extraction,
             is_llm_stream,
+            cross_links,
         }
     }
 }

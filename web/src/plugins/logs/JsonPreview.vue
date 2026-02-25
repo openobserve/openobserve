@@ -293,7 +293,11 @@ size="lg" color="primary" />
           :data-test="`log-expand-detail-key-${key}`"
           :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
-          <span class="log-key">"{{ key }}"</span><span class="log-separator">: </span><ChunkedContent
+          <span class="log-key">"{{ key }}"</span><span class="log-separator">: </span><span
+            :class="{ 'tw:cursor-pointer tw:underline tw:decoration-dotted': getCrossLinkUrl(key) }"
+            :title="getCrossLinkUrl(key) ? 'Click to open cross-link' : ''"
+            @click="getCrossLinkUrl(key) && onCrossLinkClick(key)"
+          ><ChunkedContent
             v-if="getContentSize(value[key]) > 50000"
             :data="value[key]"
             :field-key="`json_preview_${key}`"
@@ -304,7 +308,7 @@ size="lg" color="primary" />
             :data="value[key]"
             :show-braces="false"
             :query-string="highlightQuery"
-          /><span v-if="index < Object.keys(value).length - 1">,</span>
+          /></span><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
       }
@@ -536,6 +540,77 @@ export default {
       emit("addFieldToTable", value);
     };
     const { searchObj, searchAggData } = searchState();
+
+    // Cross-linking: get URL for a field value if a cross-link matches
+    const getCrossLinkUrl = (fieldName: string): string | null => {
+      if (!store.state.zoConfig?.enable_cross_linking) return null;
+
+      const orgLinks: any[] =
+        store.state.organizationData?.organizationSettings?.cross_links || [];
+
+      const streamType =
+        searchObj.data.stream.streamType || "logs";
+      const sName =
+        props.streamName || searchObj.data.stream.selectedStream?.[0] || "";
+      const streamIndex =
+        store.state.streams?.streamsIndexMapping?.[streamType]?.[sName];
+      const streamData =
+        streamIndex !== undefined
+          ? store.state.streams?.[streamType]?.list?.[streamIndex]
+          : null;
+      const streamLinks: any[] = streamData?.settings?.cross_links || [];
+
+      // Field-level priority: check stream first, then org
+      const streamMatch = streamLinks.find((link: any) =>
+        link.fields?.some((f: any) => f.name === fieldName),
+      );
+      if (streamMatch) {
+        return resolveUrl(streamMatch.url, props.value);
+      }
+
+      // Check if field is covered by any stream link (for org exclusion)
+      const streamCoveredFields = new Set<string>();
+      for (const link of streamLinks) {
+        for (const f of link.fields || []) {
+          streamCoveredFields.add(f.name);
+        }
+      }
+
+      // Only use org link if field is NOT covered by stream
+      if (!streamCoveredFields.has(fieldName)) {
+        const orgMatch = orgLinks.find((link: any) =>
+          link.fields?.some((f: any) => f.name === fieldName),
+        );
+        if (orgMatch) {
+          return resolveUrl(orgMatch.url, props.value);
+        }
+      }
+
+      return null;
+    };
+
+    const resolveUrl = (
+      urlTemplate: string,
+      record: Record<string, any>,
+    ): string | null => {
+      const resolved = urlTemplate.replace(
+        /\{(\w+)\}/g,
+        (match: string, name: string) => {
+          const val = record[name];
+          if (val === undefined || val === null) return match;
+          return encodeURIComponent(String(val));
+        },
+      );
+      if (resolved.includes("{")) return null;
+      return resolved;
+    };
+
+    const onCrossLinkClick = (fieldName: string) => {
+      const url = getCrossLinkUrl(fieldName);
+      if (url) {
+        window.open(url, "_blank");
+      }
+    };
     let multiStreamFields: any = ref([]);
 
     const showViewTraceBtn = ref(false);
@@ -949,6 +1024,8 @@ export default {
       regexPatternType,
       confirmRegexPatternType,
       getContentSize,
+      getCrossLinkUrl,
+      onCrossLinkClick,
     };
   },
 };

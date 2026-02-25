@@ -260,25 +260,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
       >
-        <div
+        <template
           v-for="(drilldown, index) in drilldownArray"
           :key="JSON.stringify(drilldown)"
-          class="drilldown-item q-px-sm q-py-xs"
-          style="
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            position: relative;
-          "
         >
+          <!-- Separator before first cross-link -->
+          <q-separator
+            v-if="drilldown._isCrossLink && (index === 0 || !drilldownArray[index - 1]._isCrossLink)"
+            class="q-my-xs"
+          />
           <div
-            @click="openDrilldown(index)"
-            style="cursor: pointer; display: flex; align-items: center"
+            class="drilldown-item q-px-sm q-py-xs"
+            style="
+              display: flex;
+              flex-direction: row;
+              align-items: center;
+              position: relative;
+            "
           >
-            <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
-            <span>{{ drilldown.name }}</span>
+            <div
+              @click="openDrilldown(index)"
+              style="cursor: pointer; display: flex; align-items: center"
+            >
+              <q-icon
+                class="q-mr-xs q-mt-xs"
+                size="16px"
+                :name="drilldown._isCrossLink ? 'open_in_new' : 'link'"
+              />
+              <span>{{ drilldown.name }}</span>
+            </div>
           </div>
-        </div>
+        </template>
       </div>
       <div
         style="
@@ -368,6 +380,7 @@ import {
 } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
+import searchService from "@/services/search";
 import { exportFile } from "quasar";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { throttle } from "lodash-es";
@@ -591,6 +604,9 @@ export default defineComponent({
     const drilldownArray: any = ref([]);
     const selectedAnnotationData: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
+
+    // Cross-linking: store cross-links from result_schema response
+    const crossLinksData: any = ref({ stream_links: [], org_links: [] });
     const annotationPopupRef: any = ref(null);
 
     const limitNumberOfSeriesWarningMessage: any = ref("");
@@ -1051,6 +1067,49 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Cross-linking: fetch cross-links on query change
+    watch(
+      () => panelSchema.value?.queries?.[0]?.query,
+      async (newQuery: string) => {
+        if (!store.state.zoConfig?.enable_cross_linking || !newQuery) {
+          crossLinksData.value = { stream_links: [], org_links: [] };
+          return;
+        }
+        try {
+          const response = await searchService.result_schema(
+            {
+              org_identifier: store.state.selectedOrganization.identifier,
+              query: {
+                query: {
+                  sql: store.state.zoConfig.sql_base64_enabled
+                    ? b64EncodeUnicode(newQuery)
+                    : newQuery,
+                  query_fn: null,
+                  size: -1,
+                  streaming_output: false,
+                  streaming_id: null,
+                },
+                ...(store.state.zoConfig.sql_base64_enabled
+                  ? { encoding: "base64" }
+                  : {}),
+              },
+              page_type: "dashboards",
+              is_streaming: false,
+              cross_linking: true,
+            },
+            "dashboards",
+          );
+          crossLinksData.value = response.data?.cross_links || {
+            stream_links: [],
+            org_links: [],
+          };
+        } catch {
+          crossLinksData.value = { stream_links: [], org_links: [] };
+        }
+      },
+      { immediate: true },
+    );
+
     watch(
       [
         data,
@@ -1430,10 +1489,14 @@ export default defineComponent({
         }
       }
 
-      // Store click parameters for drilldown
-      if (hasDrilldown) {
+      // Store click parameters for drilldown (including cross-links)
+      const crossLinkItems = getCrossLinkDrilldownItems();
+      const shouldShowDrilldown = hasDrilldown || crossLinkItems.length > 0;
+
+      if (shouldShowDrilldown) {
         drilldownParams = [params, args];
-        drilldownArray.value = panelSchema.value.config.drilldown ?? [];
+        const panelDrilldowns = panelSchema.value.config.drilldown ?? [];
+        drilldownArray.value = [...panelDrilldowns, ...crossLinkItems];
       }
 
       // Calculate offset values based on chart type
@@ -1448,7 +1511,7 @@ export default defineComponent({
       }
 
       // Handle popup displays with priority
-      if (hasDrilldown) {
+      if (shouldShowDrilldown) {
         // Show drilldown popup first
         drilldownPopUpRef.value.style.display = "block";
         await nextTick();
@@ -1486,7 +1549,7 @@ export default defineComponent({
 
       // Hide popups if no content to display
       if (
-        !hasDrilldown &&
+        !shouldShowDrilldown &&
         (!hasAnnotation || !params?.data?.annotationDetails?.text)
       ) {
         hidePopupsAndOverlays();
@@ -1721,6 +1784,63 @@ export default defineComponent({
 
       return logsUrl;
     };
+    // Cross-linking: convert URL using field→alias mapping
+    const crossLinkToDrilldownUrl = (
+      url: string,
+      fields: Array<{ name: string; alias?: string }>,
+    ): string => {
+      const aliasMap: Record<string, string> = {};
+      for (const f of fields) {
+        aliasMap[f.name] = f.alias || f.name;
+      }
+      return url.replace(/\{(\w+)\}/g, (_match: string, fieldName: string) => {
+        const resolved = aliasMap[fieldName] || fieldName;
+        return '${row.field["' + resolved + '"]}';
+      });
+    };
+
+    // Cross-linking: merge stream + org links with field-level replacement
+    const getCrossLinkDrilldownItems = (): any[] => {
+      const { stream_links = [], org_links = [] } =
+        crossLinksData.value || {};
+
+      // Collect all fields covered by stream links
+      const streamCoveredFields = new Set<string>();
+      for (const link of stream_links) {
+        for (const f of link.fields) {
+          if (f.alias) streamCoveredFields.add(f.name);
+        }
+      }
+
+      // Start with all stream links
+      const result: any[] = stream_links.map((link: any) => ({
+        name: link.name,
+        type: "byUrl",
+        targetBlank: true,
+        data: { url: crossLinkToDrilldownUrl(link.url, link.fields) },
+        _isCrossLink: true,
+      }));
+
+      // Add org links only if they have at least one matched field NOT covered by stream
+      for (const link of org_links) {
+        const matchedFields = link.fields.filter((f: any) => f.alias);
+        const hasUncovered = matchedFields.some(
+          (f: any) => !streamCoveredFields.has(f.name),
+        );
+        if (matchedFields.length > 0 && !hasUncovered) continue;
+
+        result.push({
+          name: link.name,
+          type: "byUrl",
+          targetBlank: true,
+          data: { url: crossLinkToDrilldownUrl(link.url, link.fields) },
+          _isCrossLink: true,
+        });
+      }
+
+      return result;
+    };
+
     const openDrilldown = async (index: any) => {
       // hide the drilldown pop up
       hidePopupsAndOverlays();

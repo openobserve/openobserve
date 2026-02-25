@@ -74,6 +74,17 @@
       </q-toggle>
     </div>
 
+    <!-- Cross-Linking Configuration -->
+    <template v-if="store.state.zoConfig?.enable_cross_linking">
+      <q-separator class="tw:my-4" />
+      <CrossLinkManager
+        v-model="crossLinks"
+        title="Cross-Linking Configuration"
+        subtitle="Define global cross-links that apply to all streams."
+        @change="formDirty = true"
+      />
+    </template>
+
     <div class="flex justify-start q-mt-md">
       <q-btn
         data-test="add-alert-cancel-btn"
@@ -104,6 +115,7 @@ import { useI18n } from "vue-i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 
 const { t } = useI18n();
 
@@ -125,6 +137,10 @@ const toggleIngestionLogs = ref(
   store.state?.organizationData?.organizationSettings?.toggle_ingestion_logs ||
     false,
 );
+const crossLinks = ref(
+  store.state?.organizationData?.organizationSettings?.cross_links || [],
+);
+const formDirty = ref(false);
 
 const isValidRoleName = computed(() => {
   const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
@@ -152,6 +168,7 @@ const saveOrgSettings = async () => {
       trace_id_field_name: traceIdFieldName.value,
       span_id_field_name: spanIdFieldName.value,
       toggle_ingestion_logs: toggleIngestionLogs.value,
+      cross_links: crossLinks.value,
     };
 
     await organizations.post_organization_settings(
@@ -164,6 +181,7 @@ const saveOrgSettings = async () => {
       trace_id_field_name: traceIdFieldName.value,
       span_id_field_name: spanIdFieldName.value,
       toggle_ingestion_logs: toggleIngestionLogs.value,
+      cross_links: crossLinks.value,
     };
 
     store.dispatch("setOrganizationSettings", updatedSettings);
