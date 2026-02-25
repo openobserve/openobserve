@@ -460,7 +460,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
     const traceCount = await pm.serviceGraphPage.getRecentTraceCount();
     testLogger.info(`Recent traces count: ${traceCount}`);
-    expect(traceCount).toBeGreaterThanOrEqual(0);
+    expect(traceCount).toBeGreaterThan(0);
 
     await pm.serviceGraphPage.closeSidePanel();
   });
