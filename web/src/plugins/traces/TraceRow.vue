@@ -71,8 +71,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="`+${extraServiceCount}`"
         class="spans-badge tw:bg-[var(--o2-tag-grey-2)]! tw:text-[var(--o2-text-1)]! tw:px-[0.5rem]! tw:py-[0.25rem]! tw:ml-[0.325rem]"
       >
-        <q-tooltip class="tw:text-[var(--o2-text-4)]!">
-          {{ extraServicesTooltip }}
+        <q-tooltip
+          class="extra-services-tooltip"
+          anchor="bottom middle"
+          self="top middle"
+        >
+          <div
+            v-for="svc in extraServicesData"
+            :key="svc.name"
+            class="tw:flex tw:items-center"
+          >
+            <div
+              class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:rounded tw:mr-[0.5rem] tw:pt-[0.06rem]"
+              :style="{
+                backgroundColor: svc.color,
+                boxShadow: `0 0 0.5rem ${svc.color}`,
+              }"
+            />
+            <span
+              class="text-weight-bold ellipsis tw:text-[var(--o2-text-4)]! tw:text-[0.875rem]! tw:tracking-[0.03rem]!"
+              >{{ svc.name }}</span
+            >
+          </div>
         </q-tooltip>
       </q-badge>
     </div>
@@ -294,11 +314,11 @@ const extraServiceCount = computed(() => {
   return Math.max(0, total - 1);
 });
 
-const extraServicesTooltip = computed(() => {
+const extraServicesData = computed(() => {
   const services = props.item.services ?? {};
   return Object.keys(services)
     .filter((s) => s !== props.item.service_name)
-    .join(" | ");
+    .map((s) => ({ name: s, color: serviceColors.value[s] ?? "#9e9e9e" }));
 });
 
 // ---------------------------------------------------------------------------
