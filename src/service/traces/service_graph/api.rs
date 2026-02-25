@@ -64,18 +64,30 @@ pub async fn get_current_topology(
 ) -> HttpResponse {
     use config::meta::service_graph::ServiceGraphData;
 
-    // Query edges from stream with optional time range
+    // Resolve the current window boundaries
+    let (start_time, end_time) =
+        if let (Some(start), Some(end)) = (query.start_time, query.end_time) {
+            (start, end)
+        } else {
+            let now = chrono::Utc::now().timestamp_micros();
+            let window_minutes = o2_enterprise::enterprise::common::config::get_config()
+                .service_graph
+                .query_time_range_minutes;
+            let window_micros = window_minutes * 60 * 1_000_000;
+            (now - window_micros, now)
+        };
+
+    // 1. Query current window
     let edges = match query_edges_from_stream_internal(
         &org_id,
         query.stream_name.as_deref(),
-        query.start_time,
-        query.end_time,
+        Some(start_time),
+        Some(end_time),
     )
     .await
     {
         Ok(edges) => edges,
         Err(e) => {
-            // Stream doesn't exist yet or query failed - return empty topology gracefully
             log::debug!(
                 "[ServiceGraph] Stream query failed (likely stream doesn't exist yet): {}",
                 e
@@ -98,16 +110,105 @@ pub async fn get_current_topology(
         });
     }
 
+    // 2. Query previous slot (same duration, one slot older) for baselines
+    let duration = end_time - start_time;
+    let prev_start = start_time - duration;
+    let prev_end = start_time;
+
+    log::debug!(
+        "[ServiceGraph] Querying previous slot for baselines: [{}, {}) (duration={}μs)",
+        prev_start,
+        prev_end,
+        duration
+    );
+
+    let prev_edges = query_edges_from_stream_internal(
+        &org_id,
+        query.stream_name.as_deref(),
+        Some(prev_start),
+        Some(prev_end),
+    )
+    .await
+    .unwrap_or_else(|e| {
+        log::debug!(
+            "[ServiceGraph] Previous-slot query failed (non-fatal): {}",
+            e
+        );
+        vec![]
+    });
+
+    log::debug!(
+        "[ServiceGraph] Previous-slot returned {} records, current slot has {} records",
+        prev_edges.len(),
+        edges.len()
+    );
+
+    // Aggregate previous-slot edges into a per-(client,server) weighted-average map
+    let baselines = aggregate_baselines(prev_edges);
+
+    log::debug!(
+        "[ServiceGraph] Baselines computed for {} edges",
+        baselines.len()
+    );
+
     log::debug!(
         "[ServiceGraph] Processing {} edge records for org '{}'",
         edges.len(),
         &org_id
     );
 
-    // Use enterprise business logic to build topology
-    let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology(edges);
+    let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology(edges, baselines);
 
     MetaHttpResponse::json(ServiceGraphData { nodes, edges })
+}
+
+/// Aggregate raw edge records from a slot into a per-(client,server) weighted-average
+/// baseline map: (client_service, server_service) → (p50, p95, p99).
+#[cfg(feature = "enterprise")]
+fn aggregate_baselines(
+    records: Vec<serde_json::Value>,
+) -> std::collections::HashMap<(Option<String>, String), (u64, u64, u64)> {
+    type EdgeKey = (Option<String>, String);
+    type WeightedSums = (u64, u64, u64, u64); // (sum_p50*req, sum_p95*req, sum_p99*req, total_req)
+
+    let mut acc: std::collections::HashMap<EdgeKey, WeightedSums> =
+        std::collections::HashMap::new();
+
+    let get = |k: &str, hit: &serde_json::Value| {
+        hit.get(k)
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(0.0) as u64
+    };
+
+    for hit in records {
+        let client = hit
+            .get("client_service")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let server = match hit.get("server_service").and_then(|v| v.as_str()) {
+            Some(s) => s.to_string(),
+            None => continue,
+        };
+        let p50 = get("p50_latency_ns", &hit);
+        let p95 = get("p95_latency_ns", &hit);
+        let p99 = get("p99_latency_ns", &hit);
+        let req = get("total_requests", &hit);
+
+        let e = acc.entry((client, server)).or_insert((0, 0, 0, 0));
+        e.0 += p50.saturating_mul(req);
+        e.1 += p95.saturating_mul(req);
+        e.2 += p99.saturating_mul(req);
+        e.3 += req;
+    }
+
+    acc.into_iter()
+        .filter_map(|(key, (sp50, sp95, sp99, total))| {
+            if total == 0 {
+                return None;
+            }
+            Some((key, (sp50 / total, sp95 / total, sp99 / total)))
+        })
+        .collect()
 }
 
 #[cfg(feature = "enterprise")]
@@ -332,9 +433,6 @@ pub async fn get_edge_history(
     let schema = infra::schema::get(&org_id, stream_name, StreamType::Logs).await;
     if schema.is_err() {
         return MetaHttpResponse::json(EdgeTrendResponse {
-            p50_avg: 0,
-            p95_avg: 0,
-            p99_avg: 0,
             data_points: vec![],
         });
     }
@@ -351,17 +449,13 @@ pub async fn get_edge_history(
     {
         Ok(r) => r,
         Err(e) => {
-            log::error!("[ServiceGraph] Edge trend query failed: {}", e);
+            log::error!("[ServiceGraph] Edge history query failed: {}", e);
             return MetaHttpResponse::json(EdgeTrendResponse {
-                p50_avg: 0,
-                p95_avg: 0,
-                p99_avg: 0,
                 data_points: vec![],
             });
         }
     };
 
-    // Parse raw records into data points
     let data_points: Vec<EdgeTrendDataPoint> = resp
         .hits
         .into_iter()
@@ -392,36 +486,7 @@ pub async fn get_edge_history(
         })
         .collect();
 
-    // Compute weighted averages (weighted by total_requests)
-    let total_weight: u64 = data_points.iter().map(|p| p.total_requests).sum();
-    let (p50_avg, p95_avg, p99_avg) = if total_weight > 0 {
-        (
-            data_points
-                .iter()
-                .map(|p| p.p50_latency_ns * p.total_requests)
-                .sum::<u64>()
-                / total_weight,
-            data_points
-                .iter()
-                .map(|p| p.p95_latency_ns * p.total_requests)
-                .sum::<u64>()
-                / total_weight,
-            data_points
-                .iter()
-                .map(|p| p.p99_latency_ns * p.total_requests)
-                .sum::<u64>()
-                / total_weight,
-        )
-    } else {
-        (0, 0, 0)
-    };
-
-    MetaHttpResponse::json(EdgeTrendResponse {
-        p50_avg,
-        p95_avg,
-        p99_avg,
-        data_points,
-    })
+    MetaHttpResponse::json(EdgeTrendResponse { data_points })
 }
 
 /// GetEdgeTrend (OSS - Not Supported)

@@ -100,6 +100,14 @@ pub struct ServiceEdge {
     pub p50_latency_ns: u64,
     pub p95_latency_ns: u64,
     pub p99_latency_ns: u64,
+    /// Baseline Pxx from the previous time slot (same duration, one slot older).
+    /// None when this edge had no data in the previous slot.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub baseline_p50_latency_ns: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub baseline_p95_latency_ns: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub baseline_p99_latency_ns: Option<u64>,
 }
 
 /// One time-series data point in an edge latency trend
@@ -113,15 +121,8 @@ pub struct EdgeTrendDataPoint {
     pub failed_requests: u64,
 }
 
-/// Response for the edge latency trend endpoint.
-/// Includes 24h weighted-average baselines alongside the raw data points.
+/// Response for the edge latency history endpoint.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct EdgeTrendResponse {
-    /// Weighted-average p50 across all data points (weighted by total_requests)
-    pub p50_avg: u64,
-    /// Weighted-average p95 across all data points (weighted by total_requests)
-    pub p95_avg: u64,
-    /// Weighted-average p99 across all data points (weighted by total_requests)
-    pub p99_avg: u64,
     pub data_points: Vec<EdgeTrendDataPoint>,
 }
