@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="trace-row"
-    class="trace-row row items-center q-px-sm cursor-pointer tw:bg-white!"
+    class="trace-row tw:flex-nowrap! tw:w-max! row items-center q-px-sm cursor-pointer tw:bg-white!"
     :class="{ 'trace-row--error': hasErrors }"
     @click="$emit('click', item)"
   >
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="extraServiceCount > 0"
         data-test="trace-row-extra-services"
         :label="`+${extraServiceCount}`"
-        class="spans-badge tw:bg-[var(--o2-tag-grey-2)]! tw:text-[var(--o2-text-1)]! tw:px-[0.5rem]! tw:py-[0.25rem]! tw:ml-[0.325rem]"
+        class="spans-badge tw:bg-[var(--o2-tag-grey-2)]! tw:text-[var(--o2-text-1)]! tw:px-[0.5rem]! tw:py-[0.25rem]! tw:ml-[0.5rem]"
       >
         <q-tooltip
           class="extra-services-tooltip"
@@ -100,38 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- DURATION -->
     <div
       data-test="trace-row-duration"
-      class="row-cell col-duration text-caption text-left"
+      class="row-cell col-duration text-caption text-right"
     >
       {{ duration }}
-    </div>
-
-    <!-- SPANS -->
-    <div
-      data-test="trace-row-spans"
-      class="row-cell col-spans flex justify-center"
-    >
-      <q-badge
-        data-test="trace-row-spans-badge"
-        :label="item.spans"
-        class="spans-badge tw:bg-[var(--o2-tag-grey-2)]! tw:text-[var(--o2-text-1)]! tw:px-[0.5rem]! tw:py-[0.325rem]!"
-      />
-    </div>
-
-    <!-- STATUS -->
-    <div
-      data-test="trace-row-status"
-      class="row-cell col-status flex justify-center"
-    >
-      <div
-        data-test="trace-row-status-pill"
-        class="status-pill row items-center q-px-sm"
-        :class="hasErrors ? 'status-pill--error' : 'status-pill--success'"
-      >
-        <span class="status-dot q-mr-xs" />
-        <span class="text-caption text-weight-bold status-label">
-          {{ statusLabel }}
-        </span>
-      </div>
     </div>
 
     <!-- LLM: INPUT TOKENS -->
@@ -159,6 +130,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ llmData ? `$${formatCost(llmData.cost.total)}` : "-" }}
       </div>
     </template>
+
+    <!-- STATUS -->
+    <div
+      data-test="trace-row-status"
+      class="row-cell col-status flex justify-center"
+    >
+      <div
+        data-test="trace-row-status-pill"
+        class="status-pill row items-center q-px-sm"
+        :class="hasErrors ? 'status-pill--error' : 'status-pill--success'"
+      >
+        <span class="status-dot q-mr-xs" />
+        <span class="text-caption text-weight-bold status-label">
+          {{ statusLabel }}
+        </span>
+      </div>
+    </div>
+
+    <!-- SPANS -->
+    <div
+      data-test="trace-row-spans"
+      class="row-cell col-spans flex justify-center"
+    >
+      <q-badge
+        data-test="trace-row-spans-badge"
+        :label="item.spans"
+        class="spans-badge tw:bg-[var(--o2-tag-grey-2)]! tw:text-[var(--o2-text-1)]! tw:px-[0.5rem]! tw:py-[0.325rem]!"
+      />
+    </div>
 
     <!-- SERVICE LATENCY mini-bar -->
     <div data-test="trace-row-latency" class="row-cell col-latency">
@@ -382,16 +382,16 @@ const llmData = computed(() => {
   flex: 0 0 120px;
 }
 .col-spans {
-  width: 100px;
-  flex: 0 0 100px;
+  width: 80px;
+  flex: 0 0 80px;
 }
 .col-status {
   width: 160px;
   flex: 0 0 160px;
 }
 .col-llm {
-  width: 110px;
-  flex: 0 0 110px;
+  width: 125px;
+  flex: 0 0 125px;
 }
 .col-cost {
   width: 80px;
