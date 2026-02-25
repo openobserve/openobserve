@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -91,7 +91,7 @@ pub async fn check_for_schema(
 
     // get infer schema
     let value_iter = record_vals.into_iter();
-    let inferred_schema = infer_json_schema_from_map(value_iter, stream_type)?;
+    let inferred_schema = infer_json_schema_from_map(stream_name, stream_type, value_iter)?;
 
     // fast path
     if schema.schema().fields.eq(&inferred_schema.fields) {
@@ -714,6 +714,6 @@ mod tests {
         record_val.push(record.as_object().unwrap());
         let stream_type = StreamType::Logs;
         let value_iter = record_val.into_iter();
-        infer_json_schema_from_map(value_iter, stream_type).unwrap();
+        infer_json_schema_from_map("test", stream_type, value_iter).unwrap();
     }
 }
