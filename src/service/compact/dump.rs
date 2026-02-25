@@ -22,9 +22,9 @@ use arrow::{
 use arrow_schema::Schema;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
-    PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
+    PARQUET_MAX_ROW_GROUP_SIZE,
     cluster::LOCAL_NODE,
-    get_config, get_parquet_compression,
+    get_batch_size, get_config, get_parquet_compression,
     meta::{
         cluster::Role,
         stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
@@ -648,12 +648,12 @@ async fn generate_dump(
 
     let mut buf = Vec::new();
     let mut writer = get_writer(FILE_LIST_SCHEMA.clone(), &mut buf)?;
-    // we split the file list into vec of vecs, with each sub-vec having PARQUET_BATCH_SIZE elements
+    // we split the file list into vec of vecs, with each sub-vec having batch_size elements
     // at most (last may be shorter) doing this the following way means we don't have to clone
     // anything, we simply shift the ownership via iterator
     let chunks: Vec<Vec<_>> = files
         .into_iter()
-        .chunks(PARQUET_BATCH_SIZE)
+        .chunks(get_batch_size())
         .into_iter()
         .map(|c| c.collect())
         .collect();
@@ -804,7 +804,7 @@ fn get_writer(
 ) -> Result<AsyncArrowWriter<&mut Vec<u8>>, errors::Error> {
     let cfg = get_config();
     let writer_props = WriterProperties::builder()
-        .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
+        .set_write_batch_size(get_batch_size()) // in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
         .set_compression(get_parquet_compression(&cfg.common.parquet_compression));
 

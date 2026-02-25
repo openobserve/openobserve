@@ -20,7 +20,7 @@ use arrow::array::{Array, Int64Array, RecordBatch};
 use arrow_schema::SchemaRef;
 use bytes::Bytes;
 use config::{
-    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, spawn_pausable_job,
+    TIMESTAMP_COL_NAME, get_batch_size, spawn_pausable_job,
     utils::{
         enrichment_local_cache::{
             get_key, get_metadata_content, get_metadata_path, get_table_dir, get_table_path,
@@ -150,7 +150,7 @@ impl Values {
             Values::RecordBatch(batches) => Ok(batches.clone()),
             Values::Vrl(data) => {
                 let chunks: Vec<&[vrl::value::Value]> =
-                    data.as_ref().chunks(PARQUET_BATCH_SIZE).collect();
+                    data.as_ref().chunks(get_batch_size()).collect();
 
                 chunks
                     .iter()
