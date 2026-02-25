@@ -110,7 +110,8 @@ class FunctionsPage {
     // Clear existing content and type new code
     await this.page.keyboard.press('Control+A');
     await this.page.keyboard.type(code);
-    await this.page.waitForTimeout(500);
+    // Wait longer than the Monaco editor's 500ms debounce so formData syncs via v-model
+    await this.page.waitForTimeout(1000);
   }
 
   async clickSaveButton() {
@@ -313,19 +314,28 @@ class FunctionsPage {
   }
 
   /**
-   * Test a function with input data and return output
-   * @param {string} testEventJson - Test event as JSON string
+   * Test a function with input data and return output.
+   * The toolbar "Test Function" button directly triggers the API call using
+   * the current function code and events editor content. Default test events
+   * are loaded by the TestFunction component on mount.
+   * @param {string} [testEventJson] - Optional custom test event JSON (entered before triggering test)
    * @returns {Promise<string>} Test output
    */
-  async testFunctionExecution(testEventJson) {
-    await this.clickTestButton();
-    await this.enterTestEvent(testEventJson);
-    const runSuccess = await this.clickRunTestButton();
-
-    if (runSuccess) {
-      return await this.getTestOutput();
+  async testFunctionExecution(testEventJson = null) {
+    // If custom events provided, enter them first (before triggering the test)
+    if (testEventJson) {
+      await this.enterTestEvent(testEventJson);
+      // Wait for the events editor debounce to sync
+      await this.page.waitForTimeout(1000);
     }
-    return null;
+
+    // Click the "Test Function" button in the toolbar — this fires the API call immediately
+    await this.clickTestButton();
+
+    // Wait for the API response and output editor to update
+    await this.page.waitForTimeout(3000);
+
+    return await this.getTestOutput();
   }
 
   /**
