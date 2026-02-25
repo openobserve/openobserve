@@ -271,7 +271,7 @@ pub struct LlmEvaluationParams {
     /// Backward-compat: ignored, LLM judge is always enabled.
     #[serde(default = "default_enable_llm_judge")]
     pub enable_llm_judge: bool,
-    /// Field name used to identify LLM spans within a trace (e.g., "gen_ai_system").
+    /// Field name used to identify LLM spans within a trace (e.g., "llm_input").
     /// Only spans containing this field (with a non-empty value) are considered LLM spans.
     #[serde(default = "default_llm_span_identifier")]
     pub llm_span_identifier: String,
@@ -286,7 +286,7 @@ fn default_enable_llm_judge() -> bool {
 }
 
 fn default_llm_span_identifier() -> String {
-    "gen_ai_system".to_string()
+    "llm_input".to_string()
 }
 
 mod sampling_rate_str {
