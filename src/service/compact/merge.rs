@@ -46,9 +46,8 @@ use infra::{
     dist_lock, file_list as infra_file_list,
     runtime::DATAFUSION_RUNTIME,
     schema::{
-        SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_created_at,
-        unwrap_stream_settings,
+        SchemaCache, get_partition_time_level, get_stream_setting_bloom_filter_fields,
+        get_stream_setting_fts_fields, get_stream_setting_index_fields, unwrap_stream_created_at,
     },
     storage,
 };
@@ -418,15 +417,12 @@ pub async fn merge_by_stream(
         return Ok(());
     }
 
-    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-
     log::debug!(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
 
     // check offset
+    let partition_time_level = get_partition_time_level(stream_type);
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
     let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
         (

@@ -1198,10 +1198,8 @@ fn _handle_auth_failure_for_redirect(req: &Request, error: &AuthError) -> AuthEr
         .with_query_param("short_url", &full_url)
         .build();
     log::warn!(
-        "Authentication failed for path: {}, err: {:?}, {}",
+        "Authentication failed for path: {}, err: {error:?}, {redirect_http}",
         req.uri().path(),
-        error,
-        &redirect_http,
     );
     AuthError::Unauthorized(redirect_http.to_string())
 }

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -31,9 +31,7 @@ use config::{
         alerts::alert::Alert,
         function::{VRLResultResolver, VRLRuntimeConfig},
         self_reporting::usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
-        stream::{
-            PartitionTimeLevel, PartitioningDetails, StreamParams, StreamPartition, StreamType,
-        },
+        stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
     metrics,
     utils::{flatten, json::*, schema::format_partition_key},
@@ -211,14 +209,11 @@ pub async fn get_stream_partition_keys(
     org_id: &str,
     stream_type: &StreamType,
     stream_name: &str,
-) -> PartitioningDetails {
+) -> Vec<StreamPartition> {
     let stream_settings = infra::schema::get_settings(org_id, stream_name, *stream_type)
         .await
         .unwrap_or_default();
-    PartitioningDetails {
-        partition_keys: stream_settings.partition_keys,
-        partition_time_level: stream_settings.partition_time_level,
-    }
+    stream_settings.partition_keys
 }
 
 #[inline(always)]
@@ -752,7 +747,7 @@ mod tests {
         drop(w);
         let keys = get_stream_partition_keys("default", &StreamType::Logs, "olympics").await;
         assert_eq!(
-            keys.partition_keys,
+            keys,
             vec![
                 StreamPartition::new("country"),
                 StreamPartition::new("sport")

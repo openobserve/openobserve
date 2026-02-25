@@ -301,14 +301,8 @@ pub(crate) async fn handle_diff_schema(
         {
             Err(e) => {
                 log::error!(
-                    "handle_diff_schema [{}/{}/{}] with hash {}, start_dt {}, error: {}, retrying...{}",
-                    org_id,
-                    stream_type,
-                    stream_name,
+                    "handle_diff_schema [{org_id}/{stream_type}/{stream_name}] with hash {}, start_dt {record_ts}, error: {e}, retrying...{retries}",
                     inferred_schema.hash_key(),
-                    record_ts,
-                    e,
-                    retries
                 );
                 err = Some(e);
                 retries += 1;
@@ -323,14 +317,8 @@ pub(crate) async fn handle_diff_schema(
     }
     if let Some(e) = err {
         log::error!(
-            "handle_diff_schema [{}/{}/{}] with hash {}, start_dt {}, abort after retry {} times, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
+            "handle_diff_schema [{org_id}/{stream_type}/{stream_name}] with hash {}, start_dt {record_ts}, abort after retry {retries} times, error: {e}",
             inferred_schema.hash_key(),
-            record_ts,
-            retries,
-            e
         );
         return Err(e);
     }
@@ -475,11 +463,7 @@ pub(crate) async fn handle_diff_schema(
     stream_schema_map.insert(stream_name.to_string(), final_schema);
 
     log::debug!(
-        "handle_diff_schema end for [{}/{}/{}] start_dt: {}, elapsed: {} ms",
-        org_id,
-        stream_type,
-        stream_name,
-        record_ts,
+        "handle_diff_schema end for [{org_id}/{stream_type}/{stream_name}] start_dt: {record_ts}, elapsed: {} ms",
         start.elapsed().as_millis()
     );
 
