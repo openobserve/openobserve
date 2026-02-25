@@ -34,12 +34,12 @@ use config::{
         alerts::alert::Alert,
         otlp::OtlpRequestType,
         self_reporting::usage::{RequestStats, UsageType},
-        stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
+        stream::{StreamParams, StreamPartition, StreamType},
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt, time::now_micros, util::DISTINCT_STREAM_PREFIX},
 };
-use infra::schema::{SchemaCache, unwrap_partition_time_level};
+use infra::schema::{SchemaCache, get_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::trace::v1::{
@@ -929,18 +929,14 @@ async fn write_traces(
         .unwrap_or_default();
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
-    let mut partition_time_level =
-        PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str());
+    let partition_time_level = get_partition_time_level(StreamType::Traces);
     if stream_schema.has_partition_keys {
-        let partition_det = crate::service::ingestion::get_stream_partition_keys(
+        partition_keys = crate::service::ingestion::get_stream_partition_keys(
             org_id,
             &StreamType::Traces,
             stream_name,
         )
-        .await;
-        partition_keys = partition_det.partition_keys;
-        partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Traces);
+        .await
     }
 
     // Start get stream alerts
