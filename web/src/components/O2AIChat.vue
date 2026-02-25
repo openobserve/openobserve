@@ -343,15 +343,16 @@
                       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
                       { 'has-details': hasToolCallDetails(block) },
                       { 'error': block.success === false && !block.pendingConfirmation },
-                      { 'pending-confirmation': block.pendingConfirmation },
+                      { 'pending-confirmation': block.pendingConfirmation && block.tool !== 'navigation_action' },
+                      { 'pending-navigation': block.pendingConfirmation && block.tool === 'navigation_action' },
                     ]"
                     @click="hasToolCallDetails(block) && !block.pendingConfirmation && toggleToolCallExpanded(index, blockIndex)"
                   >
                     <div class="tool-call-header">
                       <q-icon
-                        :name="block.pendingConfirmation ? 'help_outline' : (block.success === false ? 'error' : 'check_circle')"
+                        :name="block.pendingConfirmation ? (block.tool === 'navigation_action' ? 'open_in_new' : 'help_outline') : (block.success === false ? 'error' : 'check_circle')"
                         size="14px"
-                        :color="block.pendingConfirmation ? 'warning' : (block.success === false ? 'negative' : 'positive')"
+                        :color="block.pendingConfirmation ? (block.tool === 'navigation_action' ? 'primary' : 'warning') : (block.success === false ? 'negative' : 'positive')"
                       />
                       <span class="tool-call-name">
                         {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
@@ -373,39 +374,6 @@
                         size="16px"
                         class="expand-icon"
                       />
-                    </div>
-                    <!-- Inline confirmation buttons -->
-                    <div v-if="block.pendingConfirmation" class="tool-confirmation-inline" @click.stop>
-                      <span class="confirmation-message">{{ block.confirmationMessage }}</span>
-                      <div v-if="block.confirmationArgs && Object.keys(block.confirmationArgs).length" class="confirmation-args">
-                        <div v-for="(value, key) in block.confirmationArgs" :key="key" class="confirmation-arg">
-                          <span class="arg-key">{{ key }}:</span>
-                          <code class="arg-value">{{ typeof value === 'object' ? JSON.stringify(value) : value }}</code>
-                        </div>
-                      </div>
-                      <div class="confirmation-buttons">
-                        <q-btn
-                          dense
-                          no-caps
-                          size="sm"
-                          outline
-                          color="grey"
-                          label="Confirm"
-                          icon="check"
-                          class="confirmation-btn"
-                          @click="handleToolConfirm"
-                        />
-                        <q-btn
-                          dense
-                          no-caps
-                          size="sm"
-                          color="negative"
-                          label="Cancel"
-                          icon="close"
-                          class="confirmation-btn"
-                          @click="handleToolCancel"
-                        />
-                      </div>
                     </div>
                     <!-- Expandable details -->
                     <div v-if="isToolCallExpanded(index, blockIndex)" class="tool-call-details" @click.stop>
@@ -812,6 +780,15 @@
       </div>
 
       <div class="chat-input-container q-ma-md">
+        <!-- Confirmation dialog -->
+        <O2AIConfirmDialog
+          :visible="pendingConfirmation !== null"
+          :confirmation="pendingConfirmation"
+          @confirm="handleToolConfirm"
+          @cancel="handleToolCancel"
+          @always-confirm="handleToolAlwaysConfirm"
+        />
+
         <!-- Hidden file input for image upload -->
         <input
           ref="imageInputRef"
@@ -823,6 +800,7 @@
         />
 
         <div
+          v-if="!pendingConfirmation"
           class="unified-input-box"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
           @dragover="handleDragOver"
@@ -870,20 +848,45 @@
 
           <!-- Bottom bar with buttons -->
           <div class="input-bottom-bar">
-            <!-- Image upload button -->
-            <q-btn
-              v-if="!isLoading"
-              @click.stop="triggerImageUpload"
-              round
-              dense
-              flat
-              size="sm"
-              class="image-upload-btn"
-            >
-              <q-icon name="image" size="18px" :color="store.state.theme == 'dark' ? 'white' : 'grey-7'" />
-              <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
-            </q-btn>
-            <div v-else class="tw:w-8"></div>
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <!-- Image upload button -->
+              <q-btn
+                v-if="!isLoading"
+                @click.stop="triggerImageUpload"
+                round
+                dense
+                flat
+                size="sm"
+                class="image-upload-btn"
+              >
+                <q-icon name="image" size="18px" :color="store.state.theme == 'dark' ? 'white' : 'grey-7'" />
+                <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
+              </q-btn>
+              <div v-else class="tw:w-8"></div>
+
+              <!-- Auto navigation toggle button -->
+              <q-btn
+                v-if="!isLoading"
+                @click.stop="isAutoNavigationEnabled = !isAutoNavigationEnabled"
+                dense
+                flat
+                no-caps
+                size="sm"
+                class="auto-nav-toggle-btn"
+                :class="{ 'auto-nav-enabled': isAutoNavigationEnabled }"
+              >
+                <q-icon
+                  :name="isAutoNavigationEnabled ? 'check_circle' : 'radio_button_unchecked'"
+                  size="14px"
+                  :color="!isAutoNavigationEnabled ? (store.state.theme == 'dark' ? 'grey-5' : 'grey-7') : undefined"
+                  class="auto-nav-icon"
+                />
+                <span class="auto-nav-label tw:ml-1">Auto Navigation</span>
+                <q-tooltip>
+                  {{ isAutoNavigationEnabled ? 'Auto navigation enabled - O2 Assistant will auto navigate without confirmation' : 'Auto navigation disabled - O2 Assistant will ask before navigating' }}
+                </q-tooltip>
+              </q-btn>
+            </div>
 
             <div class="tw:flex tw:items-center tw:gap-2">
               <!-- Send button - shown when not loading -->
@@ -936,18 +939,38 @@ import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/m
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, NavigationAction, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
-import { useChatHistory } from '@/composables/useChatHistory';
-import RichTextInput from '@/components/RichTextInput.vue';
+import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
+import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
+
+// Add IndexedDB setup
+const DB_NAME = 'o2ChatDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'chatHistory';
 
 const { fetchAiChat } = useAiChat();
-const {
-  saveToHistory: dbSaveToHistory,
-  loadHistory: dbLoadHistory,
-  loadChat: dbLoadChat,
-  deleteChatById: dbDeleteChatById,
-  clearAllHistory: dbClearAllHistory,
-  updateChatTitle: dbUpdateChatTitle,
-} = useChatHistory();
+
+const initDB = () => {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    //this opens / creates(if not exists) the database with the name o2ChatDB and version 1
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+    //this is called when the database is successfully opened and returns the database object
+    request.onsuccess = () => resolve(request.result);
+    //this is called when the database is created for the first time / when the version is changed
+    request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        //this creates the object store with the name chatHistory and the key is id , autoIncrement is true
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+        //this creates the index with the name timestamp
+        store.createIndex('timestamp', 'timestamp', { unique: false });
+        //this creates the index with the name title
+        store.createIndex('title', 'title', { unique: false });
+      }
+    };
+  });
+};
 
 // Register VRL as a JavaScript alias (type assertion)
 hljs.registerLanguage('vrl', () => hljs.getLanguage('javascript') as any);
@@ -983,6 +1006,7 @@ export default defineComponent({
   components: {
     ConfirmDialog,
     RichTextInput,
+    O2AIConfirmDialog,
   },
   props: {
     isOpen: {
@@ -1039,7 +1063,31 @@ export default defineComponent({
     const chatToDelete = ref<number | null>(null);
 
     // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
-    const pendingConfirmation = ref<{ tool: string; args: Record<string, any>; message: string } | null>(null);
+    const pendingConfirmation = ref<{ tool: string; args: Record<string, any>; message: string; navAction?: NavigationAction } | null>(null);
+
+    // Auto navigation state - per chat ID
+    // Stores chat ID -> boolean mapping for auto navigation preference
+    const autoNavigationPreferences = ref<Map<number, boolean>>(new Map());
+
+    // Pending auto navigation preference for new chats (before chat ID is created)
+    const pendingAutoNavigation = ref(false);
+
+    // Current chat's auto navigation state
+    const isAutoNavigationEnabled = computed({
+      get: () => {
+        if (!currentChatId.value) return pendingAutoNavigation.value;
+        return autoNavigationPreferences.value.get(currentChatId.value) ?? false;
+      },
+      set: (value: boolean) => {
+        if (currentChatId.value) {
+          autoNavigationPreferences.value.set(currentChatId.value, value);
+          saveAutoNavigationPreferences();
+        } else {
+          // Store temporarily for new chats
+          pendingAutoNavigation.value = value;
+        }
+      }
+    });
 
     // AI-generated chat title state
     const aiGeneratedTitle = ref<string | null>(null);
@@ -1567,14 +1615,36 @@ export default defineComponent({
 
                   // Handle confirmation_required events - add inline confirmation block in chat
                   if (data && data.type === 'confirmation_required') {
-                    // Complete any active tool call indicator and turn it into a pending-confirmation block
+                    // Check if this is a navigation action and auto navigation is enabled
+                    if (data.tool === 'navigation_action' && isAutoNavigationEnabled.value) {
+                      // Auto-approve navigation without showing confirmation
+                      try {
+                        const orgId = store.state.selectedOrganization.identifier;
+                        await fetch(
+                          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
+                          {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ approved: true }),
+                          }
+                        );
+                      } catch (error) {
+                        console.error('Error auto-confirming navigation:', error);
+                      }
+                      continue;
+                    }
+
+                    // data.message is always set by the backend:
+                    // - Navigation: validated label (e.g. "View in Logs")
+                    // - Other tools: "Confirm execution of {tool}?"
                     const confirmBlock: ContentBlock = {
                       type: 'tool_call',
-                      tool: activeToolCall.value?.tool || data.tool,
-                      message: activeToolCall.value?.message || `Execute ${data.tool}`,
+                      tool: data.tool,
+                      message: activeToolCall.value?.message || data.message,
                       context: activeToolCall.value?.context || {},
                       pendingConfirmation: true,
-                      confirmationMessage: data.message || `Confirm execution of ${data.tool}?`,
+                      confirmationMessage: data.message,
                       confirmationArgs: data.args || {},
                     };
                     activeToolCall.value = null;
@@ -1804,7 +1874,7 @@ export default defineComponent({
                     continue;
                   }
 
-                  // Handle navigation_action events - always navigate immediately
+                  // Handle navigation_action events - check auto navigation setting
                   // (clickable buttons on tool results are generated by frontend from tool_result data)
                   if (data && data.type === 'navigation_action') {
                     const navAction: NavigationAction = {
@@ -1813,7 +1883,50 @@ export default defineComponent({
                       label: data.label,
                       target: data.target,
                     };
-                    await handleNavigationAction(navAction);
+
+                    // Check if auto navigation is enabled
+                    if (isAutoNavigationEnabled.value) {
+                      // Auto-navigate without confirmation
+                      await handleNavigationAction(navAction);
+                    } else {
+                      // Show confirmation dialog
+                      // Store the navigation action for later use
+                      const confirmBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: 'navigation_action',
+                        message: data.label || 'Navigate',
+                        context: { navAction },
+                        pendingConfirmation: true,
+                        confirmationMessage: data.label,
+                        confirmationArgs: data.target || {},
+                      };
+                      activeToolCall.value = null;
+
+                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(confirmBlock);
+                      } else {
+                        chatMessages.value.push({
+                          role: 'assistant',
+                          content: '',
+                          contentBlocks: [...pendingToolCalls.value, confirmBlock],
+                        });
+                        pendingToolCalls.value = [];
+                      }
+
+                      // Set pending confirmation with navigation action data
+                      pendingConfirmation.value = {
+                        tool: 'navigation_action',
+                        args: data.target || {},
+                        message: data.label || 'Navigate',
+                      };
+
+                      // Store the navigation action for later execution
+                      pendingConfirmation.value.navAction = navAction;
+
+                      await scrollToBottom();
+                    }
                     continue;
                   }
 
@@ -2269,24 +2382,80 @@ export default defineComponent({
       if (chatMessages.value.length === 0) return;
 
       try {
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const DbIndexStore = transaction.objectStore(STORE_NAME);
+
+        // Prefer AI-generated title, fallback to truncated first user message
+        const firstUserMessage = chatMessages.value.find(msg => msg.role === 'user');
+        const title = aiGeneratedTitle.value || (firstUserMessage ?
+          (firstUserMessage.content.length > 40 ?
+            firstUserMessage.content.substring(0, 40) + '...' :
+            firstUserMessage.content) :
+          'New Chat');
+
+        // Create a serializable version of the messages (including contentBlocks and images)
+        // Use JSON parse/stringify to strip Vue reactive proxies
+        const serializableMessages = chatMessages.value.map(msg => {
+          const serialized: any = {
+            role: msg.role,
+            content: msg.content
+          };
+          if (msg.contentBlocks && msg.contentBlocks.length > 0) {
+            // Deep clone to remove Vue reactivity
+            serialized.contentBlocks = JSON.parse(JSON.stringify(msg.contentBlocks));
+          }
+          if (msg.images && msg.images.length > 0) {
+            // Deep clone images to remove Vue reactivity
+            serialized.images = JSON.parse(JSON.stringify(msg.images));
+          }
+          return serialized;
+        });
+
         // Generate session ID if not already set for this chat
         if (!currentSessionId.value) {
           currentSessionId.value = getUUIDv7();
         }
 
-        const savedId = await dbSaveToHistory(
-          chatMessages.value,
-          currentSessionId.value,
-          aiGeneratedTitle.value || undefined,
-          currentChatId.value,
-        );
+        const chatData = {
+          timestamp: new Date().toISOString(),
+          title,
+          messages: serializableMessages,
+          sessionId: currentSessionId.value
+        };
 
-        if (savedId && !currentChatId.value) {
-          currentChatId.value = savedId;
-        }
+        // Always use put with the current chat ID to update existing chat
+        // instead of creating a new one
+        let chatId = currentChatId.value || Date.now();
+
+        // Wrap IndexedDB operation in a Promise to properly await it
+        await new Promise<void>((resolve, reject) => {
+          const request = DbIndexStore.put({
+            ...chatData,
+            id: chatId // Use timestamp as ID if no current ID
+          });
+
+          request.onsuccess = (event: Event) => {
+            if (!currentChatId.value) {
+              currentChatId.value = (event.target as IDBRequest).result as number;
+
+              // Apply pending auto navigation preference to the new chat
+              if (pendingAutoNavigation.value && currentChatId.value) {
+                autoNavigationPreferences.value.set(currentChatId.value, true);
+                saveAutoNavigationPreferences();
+              }
+            }
+            resolve();
+          };
+
+          request.onerror = () => {
+            reject(request.error);
+          };
+        });
       } catch (error) {
         console.error('Error saving chat history:', error);
-      } finally {
+      }
+      finally {
         saveHistoryLoading.value = false;
       }
     };
@@ -2304,10 +2473,57 @@ export default defineComponent({
       }
     };
 
+    const MAX_HISTORY_ITEMS = 100;
+
     const loadHistory = async () => {
       try {
-        chatHistory.value = await dbLoadHistory();
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.index('timestamp').openCursor(null, 'prev');
+        //one the promise is resolved we get the history here 
+        //this history length might be more than 100 so after resolving / finishing the indexDB call
+        // we do the filtering
+        const history: any[] = [];
+        
+        const loadResult = await new Promise((resolve, reject) => {
+          request.onsuccess = (event: Event) => {
+            const cursor = (event.target as IDBRequest).result as IDBCursorWithValue;
+            if (cursor) {
+              history.push(cursor.value);
+              cursor.continue();
+            } else {
+              resolve(history);
+            }
+          };
+          request.onerror = () => reject(request.error);
+        });
+
+        // If we have more than MAX_HISTORY_ITEMS, delete the oldest ones
+        //this will allows the user to see only top 100 chat histories and also delete the non required ones
+        //as we are not giving option to delete history manually we are doing this
+        //some times it takes time to delete the history from the indexDB so we only delete the history if user access the history menu
+        if (history.length > MAX_HISTORY_ITEMS) {
+          const itemsToDelete = history.slice(MAX_HISTORY_ITEMS);
+          const deleteTransaction = db.transaction(STORE_NAME, 'readwrite');
+          const deleteStore = deleteTransaction.objectStore(STORE_NAME);
+          
+          for (const item of itemsToDelete) {
+            deleteStore.delete(item.id);
+          }
+
+          // Wait for deletion transaction to complete
+          await new Promise((resolve, reject) => {
+            deleteTransaction.oncomplete = () => resolve(true);
+            deleteTransaction.onerror = () => reject(deleteTransaction.error);
+          });
+        }
+
+        //here we do assign the history to the actual chat history 
+        // Keep only the latest MAX_HISTORY_ITEMS
+        chatHistory.value = history.slice(0, MAX_HISTORY_ITEMS);
         return chatHistory.value;
+
       } catch (error) {
         console.error('Error loading chat history:', error);
         return [];
@@ -2323,6 +2539,8 @@ export default defineComponent({
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
       resetTitleState(); // Clear AI-generated title for new chat
       resetTypewriterState(); // Clear typewriter animation state for new chat
+      pendingAutoNavigation.value = false; // Reset auto navigation for new chat
+      showScrollToBottom.value = false; // Reset scroll-to-bottom button for new chat
       store.dispatch('setCurrentChatTimestamp', null);
       store.dispatch('setChatUpdated', true);
     };
@@ -2344,17 +2562,42 @@ export default defineComponent({
       }
 
       try {
-        const trimmedTitle = editingTitle.value.trim();
-        const success = await dbUpdateChatTitle(currentChatId.value, trimmedTitle);
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(currentChatId.value);
 
-        if (success) {
-          displayedTitle.value = trimmedTitle;
-          aiGeneratedTitle.value = trimmedTitle;
-          loadHistory();
-        }
+        request.onsuccess = () => {
+          const chat = request.result;
+          if (chat) {
+            // Update the title
+            chat.title = editingTitle.value.trim();
+            const updateRequest = store.put(chat);
+
+            updateRequest.onsuccess = () => {
+              // Update the displayed title
+              displayedTitle.value = editingTitle.value.trim();
+              aiGeneratedTitle.value = editingTitle.value.trim();
+
+              // Reload history to reflect changes
+              loadHistory();
+
+              showEditTitleDialog.value = false;
+            };
+
+            updateRequest.onerror = () => {
+              console.error('Error updating chat title:', updateRequest.error);
+              showEditTitleDialog.value = false;
+            };
+          }
+        };
+
+        request.onerror = () => {
+          console.error('Error retrieving chat for edit:', request.error);
+          showEditTitleDialog.value = false;
+        };
       } catch (error) {
         console.error('Error updating chat title:', error);
-      } finally {
         showEditTitleDialog.value = false;
       }
     };
@@ -2368,16 +2611,32 @@ export default defineComponent({
       if (!chatToDelete.value) return;
 
       try {
-        await dbDeleteChatById(chatToDelete.value);
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const deleteRequest = store.delete(chatToDelete.value);
 
-        if (currentChatId.value === chatToDelete.value) {
-          addNewChat();
-        }
+        deleteRequest.onsuccess = () => {
+          // If the deleted chat is the current one, reset to new chat
+          if (currentChatId.value === chatToDelete.value) {
+            addNewChat();
+          }
 
-        loadHistory();
+          // Reload history to reflect changes
+          loadHistory();
+
+          // Reset state
+          chatToDelete.value = null;
+          showDeleteChatConfirmDialog.value = false;
+        };
+
+        deleteRequest.onerror = () => {
+          console.error('Error deleting chat:', deleteRequest.error);
+          chatToDelete.value = null;
+          showDeleteChatConfirmDialog.value = false;
+        };
       } catch (error) {
         console.error('Error deleting chat:', error);
-      } finally {
         chatToDelete.value = null;
         showDeleteChatConfirmDialog.value = false;
       }
@@ -2407,6 +2666,17 @@ export default defineComponent({
 
     const handleToolConfirm = async () => {
       resolveConfirmationBlock(true);
+
+      // Check if this is a navigation action
+      if (pendingConfirmation.value?.tool === 'navigation_action') {
+        const navAction = pendingConfirmation.value?.navAction;
+        if (navAction) {
+          await handleNavigationAction(navAction);
+        }
+        pendingConfirmation.value = null;
+        return;
+      }
+
       if (!currentSessionId.value) return;
 
       try {
@@ -2428,6 +2698,14 @@ export default defineComponent({
 
     const handleToolCancel = async () => {
       resolveConfirmationBlock(false);
+
+      // Check if this is a navigation action
+      if (pendingConfirmation.value?.tool === 'navigation_action') {
+        // Just clear the confirmation, don't navigate
+        pendingConfirmation.value = null;
+        return;
+      }
+
       if (!currentSessionId.value) return;
 
       try {
@@ -2443,6 +2721,42 @@ export default defineComponent({
         );
       } catch (error) {
         console.error('Error cancelling action:', error);
+      }
+      pendingConfirmation.value = null;
+    };
+
+    const handleToolAlwaysConfirm = async () => {
+      // Enable auto navigation for this chat
+      isAutoNavigationEnabled.value = true;
+
+      // Then proceed with confirmation
+      resolveConfirmationBlock(true);
+
+      // Check if this is a navigation action
+      if (pendingConfirmation.value?.tool === 'navigation_action') {
+        const navAction = pendingConfirmation.value?.navAction;
+        if (navAction) {
+          await handleNavigationAction(navAction);
+        }
+        pendingConfirmation.value = null;
+        return;
+      }
+
+      if (!currentSessionId.value) return;
+
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ approved: true }),
+          }
+        );
+      } catch (error) {
+        console.error('Error confirming action:', error);
       }
       pendingConfirmation.value = null;
     };
@@ -2601,6 +2915,15 @@ export default defineComponent({
       // Helper to encode strings for URL (same as search history)
       const encodeForUrl = (str: string) => btoa(unescape(encodeURIComponent(str)));
 
+      // Extract page name for success message
+      let pageName = action.label || '';
+      if (!pageName) {
+        // Fallback: use target name or resource type
+        pageName = action.target.name ||
+                   action.resource_type.charAt(0).toUpperCase() + action.resource_type.slice(1);
+      }
+
+      // Perform navigation FIRST
       if (action.action === 'load_query') {
         const targetPath = `/${action.resource_type}`;
         const target = action.target;
@@ -2687,56 +3010,119 @@ export default defineComponent({
 
         await router.push({ path, query: queryParams });
       }
+
+      // Use setTimeout to add message AFTER navigation fully completes and settles
+      setTimeout(async () => {
+        try {
+          // Add success message AFTER navigation completes
+          const successMessage = `Successfully navigated to ${pageName}`;
+          let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+
+          if (!lastMessage || lastMessage.role !== 'assistant') {
+            // Create new assistant message
+            chatMessages.value.push({
+              role: 'assistant',
+              content: successMessage,
+              contentBlocks: [{ type: 'text', text: successMessage }]
+            });
+          } else {
+            // Append to existing assistant message
+            if (lastMessage.content) {
+              lastMessage.content += '\n\n' + successMessage;
+            } else {
+              lastMessage.content = successMessage;
+            }
+            if (!lastMessage.contentBlocks) {
+              lastMessage.contentBlocks = [];
+            }
+            lastMessage.contentBlocks.push({ type: 'text', text: successMessage });
+          }
+
+          // Save to history after adding message
+          await saveToHistory();
+          await scrollToBottom();
+        } catch (error) {
+          console.error('Error adding navigation success message:', error);
+        }
+      }, 500);
     };
 
     const confirmClearAllConversations = async () => {
       try {
-        await dbClearAllHistory();
-        addNewChat();
-        chatHistory.value = [];
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const clearRequest = store.clear();
+
+        clearRequest.onsuccess = () => {
+          // Reset to new chat
+          addNewChat();
+
+          // Clear the chat history array
+          chatHistory.value = [];
+
+          showClearAllConfirmDialog.value = false;
+        };
+
+        clearRequest.onerror = () => {
+          console.error('Error clearing all conversations:', clearRequest.error);
+          showClearAllConfirmDialog.value = false;
+        };
       } catch (error) {
         console.error('Error clearing all conversations:', error);
-      } finally {
         showClearAllConfirmDialog.value = false;
       }
     };
 
     const loadChat = async (chatId: number) => {
       try {
-        if (chatId == null) {
+
+        const db = await initDB();
+        const transaction = db.transaction(STORE_NAME, 'readonly');
+        const indexDbStore = transaction.objectStore(STORE_NAME);
+        if(chatId == null) {
           addNewChat();
           return;
         }
+        const request = indexDbStore.get(chatId);
 
-        const chat = await dbLoadChat(chatId);
-        if (chat) {
-          // Ensure messages are properly formatted (including contentBlocks)
-          const formattedMessages = chat.messages.map((msg: any) => ({
-            role: msg.role,
-            content: msg.content,
-            ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
-          }));
+        request.onsuccess = async () => {
+          const chat = request.result;
+          if (chat) {
+            // Ensure messages are properly formatted (including contentBlocks and images)
+            const formattedMessages = chat.messages.map((msg: any) => ({
+              role: msg.role,
+              content: msg.content,
+              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
+              ...(msg.images ? { images: msg.images } : {})
+            }));
+            
+            // Check if the last message is a user message without an assistant response
+            const lastMessage = formattedMessages[formattedMessages.length - 1];
+            
+            chatMessages.value = formattedMessages;
+            currentChatId.value = chatId;
+            currentSessionId.value = chat.sessionId || null; // Restore session ID from history
+            showHistory.value = false;
+            shouldAutoScroll.value = true; // Reset auto-scroll when loading chat
 
-          chatMessages.value = formattedMessages;
-          currentChatId.value = chatId;
-          currentSessionId.value = chat.sessionId || null;
-          showHistory.value = false;
-          shouldAutoScroll.value = true;
+            // Load title from history (no animation for existing chats)
+            displayedTitle.value = chat.title || '';
+            aiGeneratedTitle.value = chat.title || null;
+            isTypingTitle.value = false;
 
-          // Load title from history (no animation for existing chats)
-          displayedTitle.value = chat.title || '';
-          aiGeneratedTitle.value = chat.title || null;
-          isTypingTitle.value = false;
+            if(chatId !== store.state.currentChatTimestamp) {
+              store.dispatch('setCurrentChatTimestamp', chatId);
+              store.dispatch('setChatUpdated', true);
+            }
 
-          if (chatId !== store.state.currentChatTimestamp) {
-            store.dispatch('setCurrentChatTimestamp', chatId);
-            store.dispatch('setChatUpdated', true);
+
+            // Scroll to bottom after loading chat
+            await nextTick(() => {
+              scrollToBottom();
+            });
           }
-
-          await nextTick(() => {
-            scrollToBottom();
-          });
-        }
+        };
       } catch (error) {
         console.error('Error loading chat:', error);
       }
@@ -3366,6 +3752,31 @@ export default defineComponent({
       }
     };
 
+    // Auto navigation preferences localStorage functions
+    const AUTO_NAV_KEY = 'ai-chat-auto-navigation';
+
+    const loadAutoNavigationPreferences = () => {
+      try {
+        const stored = localStorage.getItem(AUTO_NAV_KEY);
+        if (stored) {
+          const data = JSON.parse(stored);
+          autoNavigationPreferences.value = new Map(Object.entries(data).map(([k, v]) => [parseInt(k), v as boolean]));
+        }
+      } catch (error) {
+        console.error('Error loading auto navigation preferences:', error);
+        autoNavigationPreferences.value = new Map();
+      }
+    };
+
+    const saveAutoNavigationPreferences = () => {
+      try {
+        const data = Object.fromEntries(autoNavigationPreferences.value);
+        localStorage.setItem(AUTO_NAV_KEY, JSON.stringify(data));
+      } catch (error) {
+        console.error('Error saving auto navigation preferences:', error);
+      }
+    };
+
     // Add query to history
     const addToHistory = (query: string) => {
       const trimmedQuery = query.trim();
@@ -3427,6 +3838,9 @@ export default defineComponent({
 
       // Load query history from localStorage
       loadQueryHistory();
+
+      // Load auto navigation preferences from localStorage
+      loadAutoNavigationPreferences();
     });
 
     onUnmounted(()=>{
@@ -3980,7 +4394,10 @@ export default defineComponent({
       pendingConfirmation,
       handleToolConfirm,
       handleToolCancel,
+      handleToolAlwaysConfirm,
       handleNavigationAction,
+      // Auto navigation
+      isAutoNavigationEnabled,
       processedMessages,
       pendingToolCalls,
       processTextBlock,
@@ -4283,6 +4700,7 @@ export default defineComponent({
   }
 
   .chat-input-container {
+    position: relative;
     flex-shrink: 0;
     max-width: 900px;
     width: calc(100% - 0px);
@@ -4333,6 +4751,46 @@ export default defineComponent({
     align-items: center;
     justify-content: space-between;
     padding-top: 8px;
+  }
+
+  .auto-nav-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+
+    .auto-nav-label {
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    &:hover {
+      .light-mode & {
+        background: #f3f4f6;
+      }
+      .dark-mode & {
+        background: #374151;
+      }
+    }
+
+    &.auto-nav-enabled {
+      .auto-nav-icon {
+        color: var(--q-primary) !important;
+      }
+
+      .auto-nav-label {
+        color: var(--q-primary);
+      }
+    }
+
+    .light-mode & .auto-nav-label {
+      color: #6b7280;
+    }
+    .dark-mode & .auto-nav-label {
+      color: #9ca3af;
+    }
   }
 
 
@@ -5138,79 +5596,37 @@ export default defineComponent({
     }
   }
 
-  .tool-confirmation-inline {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 193, 7, 0.3);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+  // Pending navigation confirmation styling (blue)
+  &.pending-navigation {
+    cursor: default;
 
-    .confirmation-message {
-      font-size: 13px;
-      font-weight: 500;
-
-      .light-mode & {
-        color: #6d5800;
-      }
-      .dark-mode & {
-        color: #ffd54f;
-      }
+    &.light-mode {
+      background: rgba(25, 118, 210, 0.08);
+      border: 1px solid rgba(25, 118, 210, 0.3);
     }
+    &.dark-mode {
+      background: rgba(66, 165, 245, 0.12);
+      border: 1px solid rgba(66, 165, 245, 0.25);
+    }
+  }
 
-    .confirmation-args {
+  .tool-confirmation-inline {
+    margin-top: 12px;
+
+    .confirmation-content {
+      padding: 16px;
+      border-radius: 8px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      padding: 6px 10px;
-      border-radius: 4px;
+      gap: 12px;
 
       .light-mode & {
-        background: rgba(255, 193, 7, 0.08);
+        background: #fffbeb;
+        border: 1px solid #fde68a;
       }
       .dark-mode & {
-        background: rgba(255, 193, 7, 0.06);
-      }
-
-      .confirmation-arg {
-        display: flex;
-        align-items: baseline;
-        gap: 6px;
-        font-size: 12px;
-
-        .arg-key {
-          font-weight: 600;
-          white-space: nowrap;
-
-          .light-mode & {
-            color: #6d5800;
-          }
-          .dark-mode & {
-            color: #ffd54f;
-          }
-        }
-
-        .arg-value {
-          font-family: 'Fira Code', 'Consolas', monospace;
-          word-break: break-all;
-
-          .light-mode & {
-            color: #4a5568;
-          }
-          .dark-mode & {
-            color: #e2e8f0;
-          }
-        }
-      }
-    }
-
-    .confirmation-buttons {
-      display: flex;
-      gap: 8px;
-
-      .confirmation-btn {
-        font-size: 12px;
-        padding: 2px 12px;
+        background: rgba(251, 191, 36, 0.15);
+        border: 1px solid rgba(251, 191, 36, 0.3);
       }
     }
   }

@@ -94,7 +94,7 @@ pub async fn get_latest_users(
         }
     }
 
-    let (http_span, trace_id) = if cfg.common.tracing_search_enabled {
+    let (http_span, trace_id) = if cfg.common.should_create_span() {
         let uuid_v7_trace_id = config::ider::generate_trace_id();
         let span = tracing::info_span!(
             "/api/{org_id}/{stream_name}/traces/user",

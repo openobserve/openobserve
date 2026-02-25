@@ -164,7 +164,7 @@ async fn query(
     headers: &HeaderMap,
 ) -> Response {
     let cfg = config::get_config();
-    let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!(
             "/api/{org_id}/prometheus/api/v1/query",
             org_id = org_id.to_string()
@@ -437,7 +437,7 @@ async fn query_range(
     query_exemplars: bool,
 ) -> Response {
     let cfg = config::get_config();
-    let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!(
             "/api/{org_id}/prometheus/api/v1/query_range",
             org_id = org_id.to_string()

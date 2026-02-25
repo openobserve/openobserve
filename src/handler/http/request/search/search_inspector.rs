@@ -103,7 +103,7 @@ use crate::{
     )
 )]
 pub async fn get_search_profile(
-    Path(path): Path<String>,
+    Path(_path): Path<String>,
     Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
     headers: HeaderMap,
@@ -111,13 +111,10 @@ pub async fn get_search_profile(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let (org_id, stream_name) = (path, "default".to_string());
+    let (org_id, stream_name) = ("_meta", "default".to_string());
     let mut range_error = String::new();
-    let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
-        tracing::info_span!(
-            "/api/{org_id}/{stream_name}/search/profile",
-            org_id = org_id.clone()
-        )
+    let http_span = if cfg.common.should_create_span() {
+        tracing::info_span!("/api/{org_id}/{stream_name}/search/profile")
     } else {
         Span::none()
     };
@@ -177,9 +174,9 @@ pub async fn get_search_profile(
     req.use_cache = get_use_cache_from_request(&query);
 
     // get stream settings
-    if let Some(settings) = infra::schema::get_settings(&org_id, &stream_name, stream_type).await {
+    if let Some(settings) = infra::schema::get_settings(org_id, &stream_name, stream_type).await {
         let max_query_range =
-            get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id)).await;
+            get_settings_max_query_range(settings.max_query_range, org_id, Some(&user_id)).await;
         if max_query_range > 0
             && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
         {
@@ -192,7 +189,7 @@ pub async fn get_search_profile(
 
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
-    if let Some(res) = check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+    if let Some(res) = check_stream_permissions(&stream_name, org_id, &user_id, &stream_type).await
     {
         return res;
     }
@@ -228,7 +225,7 @@ pub async fn get_search_profile(
                         match USERS
                             .get(&format!("{org_id}/{user_id}"))
                             .and_then(|user_record| {
-                                DBUser::from(&(user_record.clone())).get_user(org_id.clone())
+                                DBUser::from(&(user_record.clone())).get_user(org_id.to_string())
                             }) {
                             Some(user) => user,
                             None => {
@@ -248,7 +245,7 @@ pub async fn get_search_profile(
                                     .map_or("cipher_keys", |model| model.key),
                                 key
                             ),
-                            org_id: org_id.clone(),
+                            org_id: org_id.to_string(),
                             bypass_check: false,
                             parent_id: "".to_string(),
                         },
@@ -270,7 +267,7 @@ pub async fn get_search_profile(
     // run search with cache
     let res = crate::service::search::cache::search(
         &trace_id,
-        &org_id,
+        org_id,
         stream_type,
         Some(user_id),
         &req,
@@ -334,7 +331,7 @@ pub async fn get_search_profile(
                 .unwrap_or("".to_string());
             http_report_metrics(
                 start,
-                &org_id,
+                org_id,
                 stream_type,
                 "500",
                 "search/profile",

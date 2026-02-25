@@ -219,12 +219,12 @@ impl ObjectStore for Remote {
             })?;
 
         // metrics
-        let data_len = data.len();
+        let data_len = data.len() as u64;
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
-                .inc_by(data_len as u64);
+                .inc_by(data_len);
             metrics::STORAGE_READ_REQUESTS
                 .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
                 .inc();
