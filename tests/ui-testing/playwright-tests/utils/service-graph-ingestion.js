@@ -109,6 +109,7 @@ function getHeaders() {
 
 function getBaseUrl() {
   const url = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
+  if (!url) throw new Error('Neither INGESTION_URL nor ZO_BASE_URL is set');
   return url.endsWith('/') ? url.slice(0, -1) : url;
 }
 

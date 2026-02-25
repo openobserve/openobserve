@@ -59,7 +59,7 @@ export class ServiceGraphPage {
 
     // ===== TELEMETRY CORRELATION DIALOG =====
     this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
-    this.correlatedStreamsText = 'text=Correlated Streams';
+    this.correlationDashboardCard = '.correlation-dashboard-card';
     this.correlationDialogTabs = '.q-dialog .q-tab';
   }
 
@@ -359,11 +359,11 @@ export class ServiceGraphPage {
   }
 
   async expectCorrelationDialogVisible() {
-    await expect(this.page.locator(this.correlatedStreamsText)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.correlationDashboardCard)).toBeVisible({ timeout: 10000 });
   }
 
   async isCorrelationDialogVisible() {
-    return await this.page.locator(this.correlatedStreamsText)
+    return await this.page.locator(this.correlationDashboardCard)
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false);
@@ -371,7 +371,7 @@ export class ServiceGraphPage {
 
   async closeCorrelationDialog() {
     await this.page.locator(this.correlationDashboardClose).click();
-    await this.page.locator(this.correlatedStreamsText)
+    await this.page.locator(this.correlationDashboardCard)
       .waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 

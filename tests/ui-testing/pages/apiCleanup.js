@@ -2822,18 +2822,23 @@ class APICleanup {
      * @param {string[]} prefixes - File name prefixes to match for deletion
      * @param {string} screenshotDir - Absolute path to the screenshots directory
      */
-    cleanupScreenshots(prefixes = [], screenshotDir) {
-        const fs = require('fs');
+    async cleanupScreenshots(prefixes = [], screenshotDir) {
+        const fs = require('fs/promises');
         const path = require('path');
 
-        if (!fs.existsSync(screenshotDir)) return;
+        try {
+            await fs.access(screenshotDir);
+        } catch {
+            return;
+        }
 
-        const files = fs.readdirSync(screenshotDir).filter(f =>
+        const allFiles = await fs.readdir(screenshotDir);
+        const files = allFiles.filter(f =>
             prefixes.some(prefix => f.startsWith(prefix))
         );
 
         for (const file of files) {
-            fs.unlinkSync(path.join(screenshotDir, file));
+            await fs.unlink(path.join(screenshotDir, file));
         }
 
         if (files.length > 0) {

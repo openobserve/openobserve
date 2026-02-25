@@ -361,7 +361,7 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up service graph test screenshots
     const path = require('path');
     const screenshotDir = path.join(__dirname, '..', 'test-results', 'screenshots');
-    pm.apiCleanup.cleanupScreenshots(
+    await pm.apiCleanup.cleanupScreenshots(
       ['service-graph-', 'tree-view-', 'graph-view-', 'graph-debug'],
       screenshotDir
     );
