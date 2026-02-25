@@ -254,7 +254,6 @@ jobs:
                 "traceDetails.spec.js",
                 "traceAdvancedFiltering.spec.js",
                 "tracesAnalyzeDimensions.spec.js",
-                "service-graph.spec.js",
               ]
 
           - testfolder: "RegressionSet"

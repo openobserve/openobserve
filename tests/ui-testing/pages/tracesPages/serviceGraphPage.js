@@ -151,6 +151,10 @@ export class ServiceGraphPage {
         },
       }
     );
+    if (!response.ok()) {
+      const text = await response.text();
+      return { status: response.status(), data: null, error: text };
+    }
     const data = await response.json();
     return { status: response.status(), data };
   }

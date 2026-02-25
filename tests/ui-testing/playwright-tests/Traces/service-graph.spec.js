@@ -13,7 +13,7 @@ const {
   getTopology,
 } = require('../utils/service-graph-ingestion.js');
 
-test.describe("Service Graph testcases", () => {
+test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'parallel' });
 
   test.beforeAll(async ({ browser }) => {
