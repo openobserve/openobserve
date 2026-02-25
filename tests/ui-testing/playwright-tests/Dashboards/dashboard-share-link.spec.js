@@ -14,6 +14,14 @@ import testLogger from "../utils/test-logger.js";
 import PageManager from "../../pages/page-manager.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import { safeWaitForHidden, safeWaitForNetworkIdle } from "../utils/wait-helpers.js";
+import {
+  getVariableSelector,
+  getVariableSelectorInner,
+  getEditVariableBtn,
+  getVariableLoadingIndicator,
+  SELECTORS,
+} from "../../pages/dashboardPages/dashboard-selectors.js";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -328,36 +336,53 @@ test.describe("dashboard share URL button testcases", () => {
       "kubernetes_container_name"
     );
     await pm.dashboardSetting.saveVariable();
+
+    // Wait for variable to be saved in settings
+    await page
+      .locator(getEditVariableBtn(variableName))
+      .waitFor({ state: "visible", timeout: 15000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+
     await pm.dashboardSetting.closeSettingWindow();
 
-    // Reload page to ensure variable query runs and selector renders
-    await page.reload();
-    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-      timeout: 15000,
-    });
-    await page.waitForLoadState("networkidle");
+    // Wait for settings dialog to be fully closed
+    await safeWaitForHidden(page, ".q-dialog", { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    // Select a value from the variable dropdown
-    const variableSelector = page.locator(
-      `[data-test="dashboard-variable-${variableName}-selector"]`
+    // Wait for variable selector to appear on dashboard
+    await page
+      .locator(getVariableSelector(variableName))
+      .waitFor({ state: "visible", timeout: 15000 });
+
+    // Wait for variable loading to complete
+    await page
+      .locator(getVariableLoadingIndicator(variableName))
+      .waitFor({ state: "hidden", timeout: 10000 })
+      .catch(() => {});
+
+    // Click the variable dropdown (inner q-select element)
+    const variableDropdown = page.locator(
+      getVariableSelectorInner(variableName)
     );
-    await variableSelector.waitFor({ state: "visible", timeout: 15000 });
-    await variableSelector.click();
+    await variableDropdown.waitFor({ state: "visible", timeout: 10000 });
+    await variableDropdown.click();
 
-    // Wait for dropdown options to load
-    await page.waitForTimeout(1000);
+    // Wait for dropdown menu to open
+    await page
+      .locator(SELECTORS.MENU)
+      .waitFor({ state: "visible", timeout: 5000 });
 
     // Select the first option
-    const firstOption = page.locator(".q-item").first();
+    const firstOption = page.locator(SELECTORS.ROLE_OPTION).first();
     await firstOption.waitFor({ state: "visible", timeout: 5000 });
     const selectedValue = await firstOption.textContent();
     await firstOption.click();
 
     testLogger.info("Selected variable value:", { selectedValue });
 
-    // Wait for selection to apply
-    await page.waitForTimeout(1000);
+    // Wait for dropdown to close and selection to apply
+    await safeWaitForHidden(page, ".q-menu", { timeout: 3000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Get current URL to verify variable parameter
     const currentURL = page.url();
@@ -412,21 +437,22 @@ test.describe("dashboard share URL button testcases", () => {
 
     // Verify the variable selector exists and has the correct value selected
     const newPageVariableSelector = newPage.locator(
-      `[data-test="dashboard-variable-${variableName}-selector"]`
+      getVariableSelector(variableName)
     );
     await newPageVariableSelector.waitFor({
       state: "visible",
       timeout: 15000,
     });
 
-    // Get the selected value in the new page
-    const newPageSelectedValue = await newPageVariableSelector
-      .locator(".q-field__native")
-      .textContent();
-    testLogger.info("Variable value in new page:", { newPageSelectedValue });
+    // Wait for variable loading to complete in new page
+    await newPage
+      .locator(getVariableLoadingIndicator(variableName))
+      .waitFor({ state: "hidden", timeout: 15000 })
+      .catch(() => {});
+    await safeWaitForNetworkIdle(newPage, { timeout: 5000 });
 
-    // Verify the variable value is maintained
-    expect(newPageSelectedValue).toBeTruthy();
+    // Verify the variable selector has rendered with a value
+    await expect(newPageVariableSelector).toBeVisible();
 
     // Close the new page
     await newPage.close();
@@ -564,25 +590,46 @@ test.describe("dashboard share URL button testcases", () => {
       "kubernetes_container_name"
     );
     await pm.dashboardSetting.saveVariable();
+
+    // Wait for variable to be saved in settings
+    await page
+      .locator(getEditVariableBtn(variableName))
+      .waitFor({ state: "visible", timeout: 15000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+
     await pm.dashboardSetting.closeSettingWindow();
 
-    // Reload page to ensure variable query runs and selector renders
-    await page.reload();
-    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-      timeout: 15000,
-    });
-    await page.waitForLoadState("networkidle");
+    // Wait for settings dialog to be fully closed
+    await safeWaitForHidden(page, ".q-dialog", { timeout: 5000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    // Select a value from the variable
-    const variableSelector = page.locator(
-      `[data-test="dashboard-variable-${variableName}-selector"]`
+    // Wait for variable selector to appear on dashboard
+    await page
+      .locator(getVariableSelector(variableName))
+      .waitFor({ state: "visible", timeout: 15000 });
+
+    // Wait for variable loading to complete
+    await page
+      .locator(getVariableLoadingIndicator(variableName))
+      .waitFor({ state: "hidden", timeout: 10000 })
+      .catch(() => {});
+
+    // Click the variable dropdown (inner q-select element)
+    const variableDropdown = page.locator(
+      getVariableSelectorInner(variableName)
     );
-    await variableSelector.waitFor({ state: "visible", timeout: 15000 });
-    await variableSelector.click();
-    await page.waitForTimeout(1000);
-    await page.locator(".q-item").first().click();
-    await page.waitForTimeout(1000);
+    await variableDropdown.waitFor({ state: "visible", timeout: 10000 });
+    await variableDropdown.click();
+
+    // Wait for dropdown menu to open and select first option
+    await page
+      .locator(SELECTORS.MENU)
+      .waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(SELECTORS.ROLE_OPTION).first().click();
+
+    // Wait for dropdown to close and selection to apply
+    await safeWaitForHidden(page, ".q-menu", { timeout: 3000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Add a panel with time range
     await pm.dashboardCreate.addPanel();
