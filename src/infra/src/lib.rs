@@ -84,6 +84,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // for non-stateful set components this dir will be absent, so we create it anyways
     std::fs::create_dir_all(&cfg.common.data_db_dir)?;
     cache::init().await?;
+
+    // check for coordinator table
+    let coordinator = db::get_coordinator().await;
+    coordinator.create_table().await?;
+
+    // check for file_list table
     file_list::LOCAL_CACHE.create_table().await?;
     if config::cluster::LOCAL_NODE.is_ingester() || config::cluster::LOCAL_NODE.is_querier() {
         file_list::LOCAL_CACHE.create_table_index().await?;
@@ -95,6 +101,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if !config::is_local_disk_storage() {
         storage::test_remote_config().await?;
     }
+
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
