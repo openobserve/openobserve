@@ -163,17 +163,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- SERVICE LATENCY mini-bar -->
     <div data-test="trace-row-latency" class="row-cell col-latency">
       <div data-test="trace-row-latency-bar" class="latency-bar row no-wrap">
-        <template v-for="(count, service) in item.services" :key="service">
+        <template v-for="(svc, service) in item.services" :key="service">
           <div
             data-test="trace-row-latency-segment"
             class="latency-segment"
             :style="{
-              width: `${getServiceWidth(count)}%`,
+              width: `${getServiceWidth(svc.duration)}%`,
               backgroundColor: serviceColors[service] || '#9e9e9e',
             }"
           >
             <q-tooltip>
-              {{ service }}: {{ count }} span{{ count !== 1 ? "s" : "" }}
+              {{ service }}: {{ formatTimeWithSuffix(svc.duration) }}
             </q-tooltip>
           </div>
         </template>
@@ -324,18 +324,18 @@ const extraServicesData = computed(() => {
 // ---------------------------------------------------------------------------
 // Service latency mini-bar
 // ---------------------------------------------------------------------------
-const totalSpans = computed(() => {
+const totalDuration = computed(() => {
   const services = props.item.services ?? {};
   return (
     Object.values(services).reduce<number>(
-      (acc, c) => acc + (c as number),
+      (acc, svc) => acc + ((svc as any).duration ?? 0),
       0,
     ) || 1
   );
 });
 
-function getServiceWidth(count: number): number {
-  return (count / totalSpans.value) * 100;
+function getServiceWidth(duration: number): number {
+  return (duration / totalDuration.value) * 100;
 }
 
 // ---------------------------------------------------------------------------

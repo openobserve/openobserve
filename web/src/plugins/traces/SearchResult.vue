@@ -154,22 +154,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-search-result-list"
           class="traces-table-scroll-area"
         >
-          <!-- Sticky column header -->
-          <TracesTableHeader
-            :show-llm-columns="hasLlmTraces"
+          <OzTable
+            :columns="tracesColumns"
+            :rows="pagedHits"
+            :row-class="traceRowClass"
             class="tw:bg-white!"
-          />
-
-          <!-- Paginated trace rows -->
-          <TraceRow
-            v-for="(item, idx) in pagedHits"
-            :key="item.trace_id || idx"
-            data-test="traces-search-result-item"
-            :item="item"
-            :index="idx"
-            :show-llm-columns="hasLlmTraces"
-            @click="expandRowDetail(item)"
-          />
+            @row-click="expandRowDetail"
+          >
+            <template #empty />
+          </OzTable>
         </div>
       </div>
     </div>
@@ -192,8 +185,8 @@ import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import TraceBlock from "./TraceBlock.vue";
-import TraceRow from "./TraceRow.vue";
-import TracesTableHeader from "./TracesTableHeader.vue";
+import OzTable from "@/components/OzTable.vue";
+import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { useRouter } from "vue-router";
 import { isLLMTrace } from "../../utils/llmUtils";
 
@@ -201,8 +194,7 @@ export default defineComponent({
   name: "SearchResult",
   components: {
     TraceBlock,
-    TraceRow,
-    TracesTableHeader,
+    OzTable,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
     ),
@@ -302,6 +294,11 @@ export default defineComponent({
       ),
     );
 
+    const tracesColumns = useTracesTableColumns(hasLlmTraces);
+
+    const traceRowClass = (row: any) =>
+      (row.errors ?? 0) > 0 ? "oz-table__row--error" : "";
+
     // -----------------------------------------------------------------------
     // Pagination
     // -----------------------------------------------------------------------
@@ -376,6 +373,8 @@ export default defineComponent({
       onMetricsFiltersUpdated,
       getDashboardData,
       hasLlmTraces,
+      tracesColumns,
+      traceRowClass,
       // Pagination
       rowsPerPageOptions,
       rowsPerPage,

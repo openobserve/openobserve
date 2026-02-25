@@ -350,7 +350,7 @@ const useTraces = () => {
         spans: trace.spans?.[0] || 0,
         errors: trace.spans?.[1] || 0,
         duration: trace.duration || 0,
-        services: {} as Record<string, number>,
+        services: {} as Record<string, { count: number; duration: number }>,
         zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
         _o2_llm_usage_details_input: trace._o2_llm_usage_details_input,
         _o2_llm_usage_details_output: trace._o2_llm_usage_details_output,
@@ -373,10 +373,15 @@ const useTraces = () => {
             colorIndex += 1;
           }
 
-          // Track service span count
+          // Track service span count and duration
           const serviceCount =
             typeof service === "string" ? 1 : service.count || 1;
-          _trace.services[serviceName] = serviceCount;
+          const serviceDuration =
+            typeof service === "string" ? 0 : service.duration || 0;
+          _trace.services[serviceName] = {
+            count: serviceCount,
+            duration: serviceDuration,
+          };
         });
       }
 
