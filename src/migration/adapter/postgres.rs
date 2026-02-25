@@ -380,6 +380,35 @@ impl DbAdapter for PostgresAdapter {
         Ok(())
     }
 
+    async fn sync_sequences(&self, table: &str) -> Result<(), anyhow::Error> {
+        // Find all columns that have a sequence (SERIAL / GENERATED AS IDENTITY)
+        let seq_cols: Vec<(String,)> = sqlx::query_as(
+            "SELECT column_name
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name   = $1
+               AND (column_default LIKE 'nextval(%'
+                    OR identity_generation IS NOT NULL)",
+        )
+        .bind(table)
+        .fetch_all(&self.pool)
+        .await?;
+
+        for (col,) in seq_cols {
+            // setval to max(col); if the table is empty keep sequence at 1
+            let sql = format!(
+                "SELECT setval(\
+                    pg_get_serial_sequence('\"{}\"', '{}'), \
+                    COALESCE(MAX(\"{}\"), 1)\
+                 ) FROM \"{}\"",
+                table, col, col, table
+            );
+            sqlx::query(&sql).execute(&self.pool).await?;
+        }
+
+        Ok(())
+    }
+
     async fn close(&self) -> Result<(), anyhow::Error> {
         self.pool.close().await;
         Ok(())

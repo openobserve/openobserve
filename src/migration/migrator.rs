@@ -172,6 +172,12 @@ async fn run_migration(config: MigrationConfig, mode: MigrationMode) -> Result<(
             return Err(e);
         }
 
+        // Reset sequences so the next INSERT gets an ID > max(id)
+        if let Err(e) = target.sync_sequences(table).await {
+            print_error(table, &format!("sequence sync failed: {}", e));
+            return Err(e);
+        }
+
         stats.duration_ms = table_start.elapsed().as_millis() as u64;
     }
 
