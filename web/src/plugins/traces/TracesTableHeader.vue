@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="traces-table-header"
-    class="traces-table-header row items-center q-px-sm tw:flex-nowrap! tw:w-max!"
+    class="traces-table-header row items-center q-px-sm"
   >
     <div
       data-test="traces-table-header-timestamp"
@@ -35,9 +35,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       data-test="traces-table-header-duration"
-      class="header-cell col-duration text-caption text-weight-bold text-right"
+      class="header-cell col-duration text-caption text-weight-bold text-left"
     >
       DURATION
+    </div>
+
+    <div
+      data-test="traces-table-header-spans"
+      class="header-cell col-spans text-caption text-weight-bold text-center"
+    >
+      SPANS
+    </div>
+
+    <div
+      data-test="traces-table-header-status"
+      class="header-cell col-status text-caption text-weight-bold text-center"
+    >
+      STATUS
     </div>
 
     <template v-if="showLlmColumns">
@@ -62,20 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         COST
       </div>
     </template>
-
-    <div
-      data-test="traces-table-header-status"
-      class="header-cell col-status text-caption text-weight-bold text-center"
-    >
-      STATUS
-    </div>
-
-    <div
-      data-test="traces-table-header-spans"
-      class="header-cell col-spans text-caption text-weight-bold text-center"
-    >
-      SPANS
-    </div>
 
     <div
       data-test="traces-table-header-latency"
@@ -129,16 +129,16 @@ withDefaults(defineProps<TracesTableHeaderProps>(), {
   flex: 0 0 120px;
 }
 .col-spans {
-  width: 80px;
-  flex: 0 0 80px;
+  width: 100px;
+  flex: 0 0 100px;
 }
 .col-status {
   width: 160px;
   flex: 0 0 160px;
 }
 .col-llm {
-  width: 125px;
-  flex: 0 0 125px;
+  width: 110px;
+  flex: 0 0 110px;
 }
 .col-cost {
   width: 80px;

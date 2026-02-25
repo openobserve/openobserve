@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Section header: title + count badge (left) | pagination controls (right) -->
         <div
           data-test="traces-section-header"
-          class="traces-section-header tw:w-full row items-center q-px-sm q-py-xs tw:bg-[var(--o2-section-header-bg)]!"
+          class="traces-section-header row items-center q-px-sm q-py-xs tw:bg-[var(--o2-section-header-bg)]!"
           v-show="
             searchObj.data.stream.selectedStream.value &&
             !searchObj.data.errorMsg?.trim()?.length &&
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Table scroll area -->
         <div
           data-test="traces-search-result-list"
-          class="traces-table-scroll-area tw:w-full"
+          class="traces-table-scroll-area"
         >
           <!-- Sticky column header -->
           <TracesTableHeader
