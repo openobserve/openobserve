@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -721,8 +721,8 @@ impl Locker {
                 )));
             } else {
                 return Err(Error::Message(format!(
-                    "nats lock for key: {}, error: {}",
-                    self.key, err
+                    "nats lock for key: {}, error: {err}",
+                    self.key
                 )));
             }
         }
@@ -762,10 +762,10 @@ impl Locker {
         }
         self.state.store(2, Ordering::SeqCst);
         if let Err(e) = self.tx.as_ref().unwrap().send(()).await {
-            log::error!("nats unlock sender for key: {}, error: {}", self.key, e);
+            log::error!("nats unlock sender for key: {}, error: {e}", self.key);
         }
         if let Err(e) = bucket.purge(&key).await {
-            log::error!("nats unlock for key: {}, error: {}", self.key, e);
+            log::error!("nats unlock for key: {}, error: {e}", self.key);
             return Err(Error::Message("nats unlock error".to_string()));
         };
         Ok(())

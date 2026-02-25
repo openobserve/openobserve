@@ -48,6 +48,7 @@ pub fn connect_local_cache() -> Box<dyn FileList> {
 
 #[async_trait]
 pub trait FileList: Sync + Send + 'static {
+    async fn health_check(&self) -> Result<()>;
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
     async fn add(&self, account: &str, file: &str, meta: &FileMeta) -> Result<i64>;
@@ -200,6 +201,10 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         date_range: (String, String),
     ) -> Result<StreamStats>;
+}
+
+pub async fn health_check() -> Result<()> {
+    CLIENT.health_check().await
 }
 
 pub async fn create_table() -> Result<()> {

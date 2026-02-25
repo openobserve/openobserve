@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -133,9 +133,8 @@ pub async fn scan_files_with_channel(
     let mut files = Vec::with_capacity(std::cmp::max(16, limit));
     let dir = std::fs::read_dir(root).map_err(|e| {
         std::io::Error::other(format!(
-            "Error reading directory: {}, err: {}",
+            "Error reading directory: {}, err: {e}",
             root.display(),
-            e
         ))
     })?;
     for entry in dir {
