@@ -48,7 +48,6 @@ use infra::{
     schema::{
         SchemaCache, get_partition_time_level, get_stream_setting_bloom_filter_fields,
         get_stream_setting_fts_fields, get_stream_setting_index_fields, unwrap_stream_created_at,
-        unwrap_stream_settings,
     },
     storage,
 };

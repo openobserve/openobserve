@@ -39,8 +39,8 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        get_partition_time_level, get_settings, get_stream_setting_fts_fields,
-        unwrap_stream_created_at, unwrap_stream_is_derived, unwrap_stream_settings,
+        get_partition_time_level, get_stream_setting_fts_fields, unwrap_stream_created_at,
+        unwrap_stream_is_derived, unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
