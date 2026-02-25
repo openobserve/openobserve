@@ -44,7 +44,7 @@ use futures::StreamExt;
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::unwrap_partition_time_level,
+    schema::get_partition_time_level,
 };
 use ingester::WAL_PARQUET_METADATA;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -83,8 +83,7 @@ pub async fn search_parquet(
         infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
             .await
             .unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
+    let partition_time_level = get_partition_time_level(query.stream_type);
     let files = get_file_list(
         query.clone(),
         &stream_settings.partition_keys,

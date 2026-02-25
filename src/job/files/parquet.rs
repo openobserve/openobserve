@@ -129,6 +129,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
             .await;
         }
 
+        // check if db is available, skip this iteration to avoid generating
+        // orphaned files in object store when db is down
+        if let Err(e) = infra::file_list::health_check().await {
+            log::error!(
+                "[INGESTER:JOB] DB health check failed, skip uploading to avoid orphaned files in object store: {e}"
+            );
+            continue;
+        }
+
         // check pending delete files
         if let Err(e) = scan_pending_delete_files().await {
             log::error!("[INGESTER:JOB] Error scan pending delete files: {e}");

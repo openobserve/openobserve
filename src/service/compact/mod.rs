@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,7 @@ use config::{
 use infra::{
     cluster::get_node_from_consistent_hash,
     file_list as infra_file_list,
-    schema::{get_settings, unwrap_partition_time_level},
+    schema::{get_partition_time_level, get_settings},
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
@@ -297,8 +297,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
         let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        let partition_time_level = get_partition_time_level(stream_type);
         // to avoid compacting conflict with retention, need check the data retention time
         let stream_data_retention_end = if stream_settings.data_retention > 0 {
             now - Duration::try_days(stream_settings.data_retention).unwrap()

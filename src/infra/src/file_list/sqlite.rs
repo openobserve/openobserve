@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -54,6 +54,10 @@ impl Default for SqliteFileList {
 
 #[async_trait]
 impl super::FileList for SqliteFileList {
+    async fn health_check(&self) -> Result<()> {
+        Ok(())
+    }
+
     async fn create_table(&self) -> Result<()> {
         create_table().await
     }
