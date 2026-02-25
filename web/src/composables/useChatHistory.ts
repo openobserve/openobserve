@@ -93,6 +93,9 @@ export function useChatHistory() {
             JSON.stringify(msg.contentBlocks),
           );
         }
+        if (msg.images && msg.images.length > 0) {
+          serialized.images = JSON.parse(JSON.stringify(msg.images));
+        }
         return serialized;
       });
 
