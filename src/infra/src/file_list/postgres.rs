@@ -68,6 +68,23 @@ impl Default for PostgresFileList {
 
 #[async_trait]
 impl super::FileList for PostgresFileList {
+    async fn health_check(&self) -> Result<()> {
+        let pool = CLIENT.clone();
+        let is_writable: bool = sqlx::query_scalar(
+            "SELECT NOT pg_is_in_recovery() AND current_setting('default_transaction_read_only')::bool = false",
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| Error::Message(format!("PostgreSQL health check failed: {e}")))?;
+        if !is_writable {
+            return Err(Error::Message(
+                "PostgreSQL health check: database is not writable (in recovery or read-only mode)"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     async fn create_table(&self) -> Result<()> {
         create_table().await
     }
