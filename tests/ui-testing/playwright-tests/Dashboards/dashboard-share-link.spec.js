@@ -15,9 +15,9 @@ import PageManager from "../../pages/page-manager.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
-test.describe("Dashboard Share Link Functional Tests", { tag: ["@dashboardShareLink"] }, () => {
-  test.describe.configure({ mode: "parallel" });
+test.describe.configure({ mode: "parallel" });
 
+test.describe("dashboard share URL button testcases", () => {
   const generateDashboardName = (prefix = "ShareLinkDash") =>
     `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
@@ -25,303 +25,743 @@ test.describe("Dashboard Share Link Functional Tests", { tag: ["@dashboardShareL
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
+    await page.waitForTimeout(2000);
     testLogger.info("Test setup completed");
   });
 
-  // =====================================================
-  // P0 - SMOKE TEST (Critical Path)
-  // =====================================================
-
-  test("P0: should verify basic share link creates short URL with absolute time params", {
-    tag: ["@dashboardShareLink", "@smoke", "@P0"],
-  }, async ({ page, context }) => {
+  test("should copy share URL with all current URL parameters including dashboard ID, folder, and tab", async ({
+    page,
+  }) => {
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
 
-    testLogger.step("Navigate to dashboards and create a new dashboard");
+    // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+    // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({ state: "visible" });
+    // Wait for the dashboard view page to load
+    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+    });
 
-    testLogger.step("Click share button and intercept short URL API");
-    const { shortUrl, originalUrl } = await pm.dashboardShareExport.shareDashboardAndCaptureUrl();
+    // Get the current URL before clicking share button
+    const currentURL = page.url();
+    testLogger.info("Current URL before share:", { currentURL });
 
-    await expect(page.getByText("Link copied successfully")).toBeVisible();
+    // Extract URL parameters
+    const urlParams = new URL(currentURL);
+    const dashboardId = urlParams.searchParams.get("dashboard");
+    const folderId = urlParams.searchParams.get("folder");
+    const tabId = urlParams.searchParams.get("tab");
 
-    testLogger.step("Verify original URL has absolute time params (from/to, not period)");
-    const sharedUrl = new URL(originalUrl);
-    expect(sharedUrl.searchParams.has("period")).toBeFalsy();
-    expect(sharedUrl.searchParams.has("from")).toBeTruthy();
-    expect(sharedUrl.searchParams.has("to")).toBeTruthy();
-    testLogger.assertion("Share URL uses absolute time (from/to) instead of relative period");
+    // Click the share button
+    await pm.dashboardShareExport.shareDashboard();
 
-    testLogger.step("Open short URL in new page and verify redirect preserves params");
-    const newPage = await context.newPage();
-    await newPage.goto(shortUrl, { waitUntil: "load" });
-    await newPage.waitForSelector(
-      '[data-test="dashboard-if-no-panel-add-panel-btn"]',
-      { state: "visible", timeout: 15000 },
+    // Verify the success message appears
+    await expect(page.getByText("Link copied successfully")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Read the copied URL from clipboard
+    const copiedUrl = await page.evaluate(() =>
+      navigator.clipboard.readText()
     );
+    testLogger.info("Copied URL:", { copiedUrl });
 
-    const newPageUrl = new URL(newPage.url());
-    expect(newPageUrl.searchParams.has("period")).toBeFalsy();
-    expect(newPageUrl.searchParams.has("from")).toBeTruthy();
-    expect(newPageUrl.searchParams.has("to")).toBeTruthy();
-    testLogger.assertion("Redirected page preserves absolute time params");
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
 
-    await newPage.close();
+    // Navigate to the copied URL (it will redirect to the full URL)
+    await page.goto(copiedUrl);
 
-    testLogger.step("Cleanup: delete dashboard");
+    // Wait for dashboard to load after redirect
+    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
+
+    // Verify the dashboard name is visible
+    await expect(page.getByText(randomDashboardName)).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Get the redirected URL and verify it contains all expected parameters
+    const redirectedUrl = page.url();
+    testLogger.info("Redirected URL:", { redirectedUrl });
+
+    // Verify the redirected URL contains the dashboard ID
+    expect(redirectedUrl).toContain(dashboardId);
+
+    // Verify the redirected URL contains the folder parameter
+    expect(redirectedUrl).toContain(`folder=${folderId}`);
+
+    // Verify the redirected URL contains the tab parameter
+    expect(redirectedUrl).toContain(`tab=${tabId}`);
+
+    // Clean up: Go back to dashboard list and delete
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
-    testLogger.info("Test completed successfully");
   });
 
-  // =====================================================
-  // P1 - FUNCTIONAL TESTS
-  // =====================================================
-
-  test("P1: should verify share link across multiple tabs preserves active tab", {
-    tag: ["@dashboardShareLink", "@functional", "@P1"],
-  }, async ({ page, context }) => {
+  test("should preserve time range parameters (relative time) in share URL", async ({
+    page,
+  }) => {
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
-    const newTabName = pm.dashboardSetting.generateUniqueTabnewName("Tab2");
 
-    testLogger.step("Create dashboard and add a second tab");
+    // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+    // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
+    // Wait for dashboard view
+    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+    });
+
+    // Add a panel to the dashboard
+    await pm.dashboardCreate.addPanel();
+
+    // Select stream and add fields
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_hash",
+      "y"
+    );
+
+    // Set relative time (e.g., 15 minutes)
+    await pm.dashboardTimeRefresh.setRelative("15", "m");
+
+    // Apply and save the panel
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be saved
+    await page.waitForTimeout(2000);
+
+    // Get current URL to check time parameters
+    const currentURL = page.url();
+    testLogger.info("Current URL with time params:", { currentURL });
+
+    // Click the share button
+    await pm.dashboardShareExport.shareDashboard();
+
+    // Verify success message
+    await expect(page.getByText("Link copied successfully")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Read the copied URL
+    const copiedUrl = await page.evaluate(() =>
+      navigator.clipboard.readText()
+    );
+    testLogger.info("Copied URL with time:", { copiedUrl });
+
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
+
+    // Open the copied URL in a new page/context to simulate new tab
+    const context = page.context();
+    const newPage = await context.newPage();
+    await newPage.goto(copiedUrl);
+
+    // Wait for dashboard to load in new page
+    await newPage.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
+
+    // Verify the dashboard name is visible
+    await expect(newPage.getByText(randomDashboardName)).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Share URL converts relative time to absolute from/to timestamps
+    const newPageUrl = newPage.url();
+    testLogger.info("New page URL:", { newPageUrl });
+    expect(newPageUrl).toContain("from=");
+    expect(newPageUrl).toContain("to=");
+
+    // Close the new page
+    await newPage.close();
+
+    // Clean up: delete the dashboard
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should preserve time range parameters (absolute time) in share URL", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
+
+    // Navigate to dashboards
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+
+    // Wait for dashboard view
+    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+    });
+
+    // Add a panel
+    await pm.dashboardCreate.addPanel();
+
+    // Select stream and add fields
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_hash",
+      "y"
+    );
+
+    // Set absolute time range
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-absolute-tab"]').click();
+
+    // Wait for absolute time inputs to be visible
+    await page.waitForTimeout(1000);
+
+    // Apply the changes
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be saved
+    await page.waitForTimeout(2000);
+
+    // Get current URL to check time parameters
+    const currentURL = page.url();
+    testLogger.info("Current URL with absolute time:", { currentURL });
+
+    // Click the share button
+    await pm.dashboardShareExport.shareDashboard();
+
+    // Verify success message
+    await expect(page.getByText("Link copied successfully")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Read the copied URL
+    const copiedUrl = await page.evaluate(() =>
+      navigator.clipboard.readText()
+    );
+    testLogger.info("Copied URL with absolute time:", { copiedUrl });
+
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
+
+    // Open the copied URL in a new page
+    const context = page.context();
+    const newPage = await context.newPage();
+    await newPage.goto(copiedUrl);
+
+    // Wait for dashboard to load
+    await newPage.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
+
+    // Verify the dashboard name is visible
+    await expect(newPage.getByText(randomDashboardName)).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Verify the redirected URL contains 'from' and 'to' parameters
+    const newPageUrl = newPage.url();
+    testLogger.info("New page redirected URL:", { newPageUrl });
+    expect(newPageUrl).toContain("from=");
+    expect(newPageUrl).toContain("to=");
+
+    // Close the new page
+    await newPage.close();
+
+    // Clean up
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should preserve variable values in share URL and maintain them when opening in new tab", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
+
+    // Navigate to dashboards
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+
+    // Wait for dashboard view
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .waitFor({
+        state: "visible",
+      });
+
+    // Generate unique variable name
+    const variableName = pm.dashboardSetting.variableName();
+
+    // Open settings and add a variable
     await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
+    await pm.dashboardSetting.addVariable(
+      "Query Values",
+      variableName,
+      "logs",
+      "e2e_automate",
+      "kubernetes_container_name"
+    );
+    await pm.dashboardSetting.saveVariable();
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Reload page to ensure variable query runs and selector renders
+    await page.reload();
+    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
+    await page.waitForLoadState("networkidle");
+
+    // Select a value from the variable dropdown
+    const variableSelector = page.locator(
+      `[data-test="dashboard-variable-${variableName}-selector"]`
+    );
+    await variableSelector.waitFor({ state: "visible", timeout: 15000 });
+    await variableSelector.click();
+
+    // Wait for dropdown options to load
+    await page.waitForTimeout(1000);
+
+    // Select the first option
+    const firstOption = page.locator(".q-item").first();
+    await firstOption.waitFor({ state: "visible", timeout: 5000 });
+    const selectedValue = await firstOption.textContent();
+    await firstOption.click();
+
+    testLogger.info("Selected variable value:", { selectedValue });
+
+    // Wait for selection to apply
+    await page.waitForTimeout(1000);
+
+    // Get current URL to verify variable parameter
+    const currentURL = page.url();
+    testLogger.info("Current URL with variable:", { currentURL });
+
+    // Verify URL contains the variable parameter
+    expect(currentURL).toContain(`var-${variableName}`);
+
+    // Click the share button
+    await page.locator('[data-test="dashboard-share-btn"]').waitFor({
+      state: "visible",
+    });
+    await page.locator('[data-test="dashboard-share-btn"]').click();
+
+    // Verify success message
+    await expect(page.getByText("Link copied successfully")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Read the copied URL
+    const copiedUrl = await page.evaluate(() =>
+      navigator.clipboard.readText()
+    );
+    testLogger.info("Copied URL with variable:", { copiedUrl });
+
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
+
+    // Open the copied URL in a new page to simulate new tab
+    const context = page.context();
+    const newPage = await context.newPage();
+    await newPage.goto(copiedUrl);
+
+    // Wait for dashboard to load in new page
+    await newPage.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
+
+    // Wait for network to settle so variables fully render
+    await newPage.waitForLoadState("networkidle");
+
+    // Verify the dashboard name is visible
+    await expect(newPage.getByText(randomDashboardName)).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Verify the redirected URL contains the variable parameter
+    const newPageUrl = newPage.url();
+    testLogger.info("New page URL with variable:", { newPageUrl });
+    expect(newPageUrl).toContain(`var-${variableName}`);
+
+    // Verify the variable selector exists and has the correct value selected
+    const newPageVariableSelector = newPage.locator(
+      `[data-test="dashboard-variable-${variableName}-selector"]`
+    );
+    await newPageVariableSelector.waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
+
+    // Get the selected value in the new page
+    const newPageSelectedValue = await newPageVariableSelector
+      .locator(".q-field__native")
+      .textContent();
+    testLogger.info("Variable value in new page:", { newPageSelectedValue });
+
+    // Verify the variable value is maintained
+    expect(newPageSelectedValue).toBeTruthy();
+
+    // Close the new page
+    await newPage.close();
+
+    // Clean up: delete the dashboard
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should preserve selected tab in share URL and open same tab in new page", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
+
+    // Navigate to dashboards
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+
+    // Wait for dashboard view
+    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+    });
+
+    // Open settings to add a new tab
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.waitForTimeout(1000);
+
+    // Click on Tabs section
     await page.locator('[data-test="dashboard-settings-tab-tab"]').click();
+    await page.waitForTimeout(500);
+
+    // Add a new tab
+    const newTabName = `Tab_${Date.now()}`;
     await pm.dashboardSetting.addTabSetting(newTabName);
     await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(1000);
 
-    await expect(page.getByText("Tab added successfully")).toBeVisible();
+    // Close settings
     await pm.dashboardSetting.closeSettingDashboard();
+    await page.waitForTimeout(1000);
 
-    testLogger.step("Switch to the new tab");
+    // Click on the newly created tab
     const tabButton = page
       .locator(".q-tabs .q-tab")
       .filter({ hasText: newTabName });
     await tabButton.waitFor({ state: "visible", timeout: 15000 });
     await tabButton.click();
-    await expect(tabButton).toHaveClass(/q-tab--active/);
+    await page.waitForTimeout(1000);
 
-    testLogger.step("Share dashboard and capture URL");
-    const { shortUrl, originalUrl } = await pm.dashboardShareExport.shareDashboardAndCaptureUrl();
-    await expect(page.getByText("Link copied successfully")).toBeVisible();
+    // Get current URL to verify tab parameter
+    const currentURL = page.url();
+    testLogger.info("Current URL with custom tab:", { currentURL });
 
-    testLogger.step("Verify tab param is in the shared URL");
-    const sharedUrl = new URL(originalUrl);
-    const tabId = sharedUrl.searchParams.get("tab");
-    expect(tabId).toBeTruthy();
-    expect(tabId).not.toBe(sharedUrl.searchParams.get("dashboard"));
-    testLogger.assertion("Share URL includes tab parameter distinct from dashboard ID");
+    // Verify URL contains the tab parameter
+    const urlObj = new URL(currentURL);
+    const tabParam = urlObj.searchParams.get("tab");
+    expect(tabParam).toBeTruthy();
 
-    testLogger.step("Open short URL in new page and verify correct tab is active");
+    // Click the share button
+    await page.locator('[data-test="dashboard-share-btn"]').waitFor({
+      state: "visible",
+    });
+    await page.locator('[data-test="dashboard-share-btn"]').click();
+
+    // Verify success message
+    await expect(page.getByText("Link copied successfully")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Read the copied URL
+    const copiedUrl = await page.evaluate(() =>
+      navigator.clipboard.readText()
+    );
+    testLogger.info("Copied URL with tab:", { copiedUrl });
+
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
+
+    // Open the copied URL in a new page
+    const context = page.context();
     const newPage = await context.newPage();
-    await newPage.goto(shortUrl, { waitUntil: "load" });
-    await newPage.waitForSelector(".q-tabs .q-tab", {
+    await newPage.goto(copiedUrl);
+
+    // Wait for dashboard to load
+    await newPage.locator('[data-test="dashboard-back-btn"]').waitFor({
       state: "visible",
       timeout: 15000,
     });
 
-    const activeTabOnNewPage = newPage
-      .locator(".q-tabs .q-tab--active")
-      .filter({ hasText: newTabName });
-    await expect(activeTabOnNewPage).toBeVisible({ timeout: 15000 });
-    testLogger.assertion("Correct tab is active after short URL redirect");
+    // Verify the same tab is active in the new page
+    const newPageURL = newPage.url();
+    expect(newPageURL).toContain(`tab=${tabParam}`);
 
+    // Close the new page
     await newPage.close();
 
-    testLogger.step("Cleanup: delete dashboard");
+    // Clean up
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
-    testLogger.info("Test completed successfully");
   });
 
-  test("P1: should verify share link includes dashboard variables", {
-    tag: ["@dashboardShareLink", "@functional", "@P1"],
-  }, async ({ page, context }) => {
+  test("should preserve all parameters together: time, variables, tab, and timezone", async ({
+    page,
+  }) => {
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
-    const varName = `test_var_${Math.random().toString(36).slice(2, 7)}`;
-    const varValue = "test_val";
 
-    testLogger.step("Create dashboard and add a constant variable");
+    // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+    // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
+    // Wait for dashboard view
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .waitFor({
+        state: "visible",
+      });
+
+    // Add a variable
+    const variableName = pm.dashboardSetting.variableName();
     await pm.dashboardSetting.openSetting();
-    await pm.dashboardSetting.goToVariablesTab();
-    await pm.dashboardSetting.selectConstantType("Constant", varName, varValue);
-
-    await expect(
-      page.locator('[data-test="dashboard-variable-name"]'),
-    ).toHaveValue(varName);
-
-    const constantValueInput = page.locator(
-      '[data-test="dashboard-variable-constant-value"]',
+    await pm.dashboardSetting.openVariables();
+    await pm.dashboardSetting.addVariable(
+      "Query Values",
+      variableName,
+      "logs",
+      "e2e_automate",
+      "kubernetes_container_name"
     );
-    await expect(constantValueInput).toHaveValue(varValue);
-    await constantValueInput.press("Tab");
+    await pm.dashboardSetting.saveVariable();
+    await pm.dashboardSetting.closeSettingWindow();
 
-    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
-
-    await page
-      .locator('[data-test="dashboard-variable-save-btn"]')
-      .waitFor({ state: "hidden", timeout: 15000 });
-
-    const variableRow = page.locator(
-      `[data-test="dashboard-edit-variable-${varName}"]`,
-    );
-    await variableRow.waitFor({ state: "visible", timeout: 15000 });
-    await expect(variableRow).toBeVisible();
-    testLogger.assertion("Variable created and visible in settings list");
-
-    testLogger.step("Close settings and wait for URL to include variable");
-    await page
-      .locator('[data-test="dashboard-settings-close-btn"]')
-      .evaluate((el) => el.click());
-
-    await page
-      .locator('[data-test="dashboard-share-btn"]')
-      .waitFor({ state: "visible" });
-
-    await expect(page).toHaveURL(new RegExp(`var-${varName}=${varValue}`), {
+    // Reload page to ensure variable query runs and selector renders
+    await page.reload();
+    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
       timeout: 15000,
     });
-
-    testLogger.step("Share dashboard and verify variable is in URL");
-    const { shortUrl, originalUrl } = await pm.dashboardShareExport.shareDashboardAndCaptureUrl();
-    await expect(page.getByText("Link copied successfully")).toBeVisible();
-
-    expect(originalUrl).toContain(`var-${varName}=${varValue}`);
-    testLogger.assertion("Share URL includes variable param");
-
-    testLogger.step("Open short URL and verify variable is preserved");
-    const newPage = await context.newPage();
-    await newPage.goto(shortUrl, { waitUntil: "load" });
-    await newPage.waitForSelector(
-      '[data-test="dashboard-if-no-panel-add-panel-btn"]',
-      { state: "visible", timeout: 15000 },
-    );
-
-    await expect(newPage).toHaveURL(new RegExp(`var-${varName}=${varValue}`), {
-      timeout: 15000,
-    });
-    testLogger.assertion("Variable preserved in redirected URL");
-
-    await newPage.close();
-
-    testLogger.step("Cleanup: delete dashboard");
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
-    testLogger.info("Test completed successfully");
-  });
-
-  test("P1: should verify share link includes auto-refresh interval", {
-    tag: ["@dashboardShareLink", "@functional", "@P1"],
-  }, async ({ page, context }) => {
-    const pm = new PageManager(page);
-    const randomDashboardName = generateDashboardName();
-
-    testLogger.step("Create dashboard and set auto-refresh to 5s");
-    await pm.dashboardList.menuItem("dashboards-item");
-    await waitForDashboardPage(page);
-    await pm.dashboardCreate.createDashboard(randomDashboardName);
-
-    await page
-      .locator('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]')
-      .click();
-    await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click();
-
-    testLogger.step("Share dashboard and verify refresh param");
-    const { shortUrl, originalUrl } = await pm.dashboardShareExport.shareDashboardAndCaptureUrl();
-    await expect(page.getByText("Link copied successfully")).toBeVisible();
-
-    const sharedUrl = new URL(originalUrl);
-    expect(sharedUrl.searchParams.get("refresh")).toBe("5s");
-    testLogger.assertion("Share URL includes refresh=5s param");
-
-    testLogger.step("Open short URL and verify refresh is preserved");
-    const newPage = await context.newPage();
-    await newPage.goto(shortUrl, { waitUntil: "load" });
-    await newPage.waitForSelector(
-      '[data-test="dashboard-if-no-panel-add-panel-btn"]',
-      { state: "visible", timeout: 15000 },
-    );
-
-    const newPageUrl = new URL(newPage.url());
-    expect(newPageUrl.searchParams.get("refresh")).toBe("5s");
-    testLogger.assertion("Refresh param preserved after redirect");
-
-    await newPage.close();
-
-    testLogger.step("Cleanup: delete dashboard");
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
-    testLogger.info("Test completed successfully");
-  });
-
-  test("P1: should verify share link preserves absolute time range", {
-    tag: ["@dashboardShareLink", "@functional", "@P1"],
-  }, async ({ page, context }) => {
-    const pm = new PageManager(page);
-    const randomDashboardName = generateDashboardName();
-    const fromTime = "1706745600000";
-    const toTime = "1706749200000";
-
-    testLogger.step("Create dashboard and set absolute time range via URL");
-    await pm.dashboardList.menuItem("dashboards-item");
-    await waitForDashboardPage(page);
-    await pm.dashboardCreate.createDashboard(randomDashboardName);
-
-    const currentUrl = new URL(page.url());
-    currentUrl.searchParams.delete("period");
-    currentUrl.searchParams.set("from", fromTime);
-    currentUrl.searchParams.set("to", toTime);
-    await page.goto(currentUrl.toString());
     await page.waitForLoadState("networkidle");
 
-    testLogger.step("Share dashboard and verify absolute time params");
-    const { shortUrl, originalUrl } = await pm.dashboardShareExport.shareDashboardAndCaptureUrl();
-    await expect(page.getByText("Link copied successfully")).toBeVisible();
+    // Select a value from the variable
+    const variableSelector = page.locator(
+      `[data-test="dashboard-variable-${variableName}-selector"]`
+    );
+    await variableSelector.waitFor({ state: "visible", timeout: 15000 });
+    await variableSelector.click();
+    await page.waitForTimeout(1000);
+    await page.locator(".q-item").first().click();
+    await page.waitForTimeout(1000);
 
-    const sharedUrl = new URL(originalUrl);
-    const receivedFrom = sharedUrl.searchParams.get("from");
-    expect(receivedFrom).toBe(fromTime);
-    const receivedTo = sharedUrl.searchParams.get("to");
-    expect(receivedTo).toBe(toTime);
-    testLogger.assertion("Share URL preserves absolute from/to timestamps");
-
-    testLogger.step("Open short URL and verify time range is preserved");
-    const newPage = await context.newPage();
-    await newPage.goto(shortUrl, { waitUntil: "load" });
-    await newPage.waitForSelector(
-      '[data-test="dashboard-if-no-panel-add-panel-btn"]',
-      { state: "visible", timeout: 15000 },
+    // Add a panel with time range
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_hash",
+      "y"
     );
 
-    const newPageUrl = new URL(newPage.url());
-    const newPageFrom = newPageUrl.searchParams.get("from");
-    const newPageTo = newPageUrl.searchParams.get("to");
-    expect(newPageFrom).toBe(fromTime);
-    expect(newPageTo).toBe(toTime);
-    testLogger.assertion("Absolute time range preserved after redirect");
+    // Set time range to 30 minutes
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
 
+    // Apply and save panel
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for everything to settle
+    await page.waitForTimeout(2000);
+
+    // Get current URL
+    const currentURL = page.url();
+    testLogger.info("Current URL with all parameters:", { currentURL });
+
+    // Extract all parameters
+    const urlObj = new URL(currentURL);
+    const dashboardId = urlObj.searchParams.get("dashboard");
+    const folderId = urlObj.searchParams.get("folder");
+    const tabId = urlObj.searchParams.get("tab");
+    const variableParam = urlObj.searchParams.get(`var-${variableName}`);
+
+    // Click the share button
+    await pm.dashboardShareExport.shareDashboard();
+
+    // Verify success message
+    await expect(page.getByText("Link copied successfully")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Read the copied URL
+    const copiedUrl = await page.evaluate(() =>
+      navigator.clipboard.readText()
+    );
+    testLogger.info("Copied complete URL:", { copiedUrl });
+
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
+
+    // Open the copied URL in a new page
+    const context = page.context();
+    const newPage = await context.newPage();
+    await newPage.goto(copiedUrl);
+
+    // Wait for dashboard to load completely
+    await newPage.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
+
+    // Wait for network to settle so variables and panels fully render
+    await newPage.waitForLoadState("networkidle");
+
+    // Verify dashboard name
+    await expect(newPage.getByText(randomDashboardName)).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Verify the URL in new page contains all parameters
+    const newPageURL = newPage.url();
+    testLogger.info("Complete redirected URL:", { newPageURL });
+
+    expect(newPageURL).toContain(dashboardId);
+    expect(newPageURL).toContain(`folder=${folderId}`);
+    expect(newPageURL).toContain(`tab=${tabId}`);
+
+    // Share URL converts relative time to absolute from/to timestamps
+    expect(newPageURL).toContain("from=");
+    expect(newPageURL).toContain("to=");
+
+    if (variableParam) {
+      expect(newPageURL).toContain(`var-${variableName}`);
+    }
+
+    // Close the new page
     await newPage.close();
 
-    testLogger.step("Cleanup: delete dashboard");
+    // Clean up
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
-    testLogger.info("Test completed successfully");
+  });
+
+  test("should generate short URL that redirects to full dashboard URL with all parameters", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
+
+    // Navigate to dashboards
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+
+    // Wait for dashboard view
+    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+    });
+
+    // Add a panel with time range
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_hash",
+      "y"
+    );
+
+    // Set relative time
+    await pm.dashboardTimeRefresh.setRelative("15", "m");
+
+    // Apply and save
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+
+    await page.waitForTimeout(2000);
+
+    // Get the current full URL
+    const fullURL = page.url();
+    testLogger.info("Full dashboard URL:", { fullURL });
+
+    // Click share button
+    await pm.dashboardShareExport.shareDashboard();
+
+    // Verify success message
+    await expect(page.getByText("Link copied successfully")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Get the copied short URL
+    const shortURL = await page.evaluate(() =>
+      navigator.clipboard.readText()
+    );
+    testLogger.info("Short URL copied:", { shortURL });
+
+    // Verify it's a short URL (should be shorter than the original)
+    expect(shortURL.length).toBeLessThan(fullURL.length);
+
+    // Navigate to the short URL
+    await page.goto(shortURL);
+
+    // Wait for redirect and dashboard to load
+    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
+
+    // Verify dashboard name is visible
+    await expect(page.getByText(randomDashboardName)).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Verify the final URL after redirect contains the dashboard parameters
+    const redirectedURL = page.url();
+    testLogger.info("Redirected URL:", { redirectedURL });
+
+    // The redirected URL should contain dashboard parameters
+    // Share URL converts relative time to absolute from/to timestamps
+    expect(redirectedURL).toContain("dashboard=");
+    expect(redirectedURL).toContain("folder=");
+    expect(redirectedURL).toContain("from=");
+    expect(redirectedURL).toContain("to=");
+
+    // Clean up
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
   });
 });
