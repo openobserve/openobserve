@@ -8,5 +8,7 @@
 - **Never build the UI**: The UI is running in dev mode separately, so skip any `npm run build` or UI build steps
 - **Use debug profile**: When running cargo commands (build, test, run, etc.), always use the debug/non-release profile
 - **Always check env file for any environment variables**: .env (in project root)
+- **Always check format**: Use `cargo fmt && cargo clippy` to check code style before done
+- **Check license header year**: Check license header `Copyright 2025 OpenObserve Inc.` for all the changed file and update to `2026`.
 
 These instructions apply to all cargo operations unless explicitly told otherwise by the user.

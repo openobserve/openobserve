@@ -68,6 +68,25 @@ impl Default for PostgresFileList {
 
 #[async_trait]
 impl super::FileList for PostgresFileList {
+    async fn health_check(&self) -> Result<()> {
+        let pool = CLIENT.clone();
+        let is_writable: bool = sqlx::query_scalar(
+            r#"SELECT NOT pg_is_in_recovery() 
+            AND current_setting('transaction_read_only')::bool = false 
+            AND current_setting('default_transaction_read_only')::bool = false"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| Error::Message(format!("PostgreSQL health check failed: {e}")))?;
+        if !is_writable {
+            return Err(Error::Message(
+                "PostgreSQL health check: database is not writable (in recovery or read-only mode)"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     async fn create_table(&self) -> Result<()> {
         create_table().await
     }
@@ -135,8 +154,12 @@ impl super::FileList for PostgresFileList {
         DB_QUERY_NUMS
             .with_label_values(&["insert", "file_list"])
             .inc();
-        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT DO NOTHING;"#
+        if let Err(e) = sqlx::query(
+            r#"INSERT INTO file_list 
+              (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at) 
+            VALUES 
+              ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) 
+            ON CONFLICT DO NOTHING"#
                 )
                 .bind(&dump_file.account)
                 .bind(org_id)
