@@ -294,7 +294,7 @@ size="lg" color="primary" />
           :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
           <span class="log-key">"{{ key }}"</span><span class="log-separator">: </span><span
-            :class="{ 'tw:cursor-pointer tw:underline tw:decoration-dotted': getCrossLinkUrl(key) }"
+            :class="{ 'cross-link-value': getCrossLinkUrl(key) }"
             :title="getCrossLinkUrl(key) ? 'Click to open cross-link' : ''"
             @click="getCrossLinkUrl(key) && onCrossLinkClick(key)"
           ><ChunkedContent
@@ -1033,4 +1033,15 @@ export default {
 
 <style lang="scss" scoped>
 @import "@/styles/logs/json-preview.scss";
+
+.cross-link-value {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-color: var(--o2-theme-color);
+  text-underline-offset: 2px;
+
+  &:hover {
+    background: var(--o2-hover-gray);
+  }
+}
 </style>

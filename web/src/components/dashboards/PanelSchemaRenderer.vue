@@ -1845,6 +1845,45 @@ export default defineComponent({
       // hide the drilldown pop up
       hidePopupsAndOverlays();
 
+      // Handle cross-link items (they exist in drilldownArray but not in panelSchema.config.drilldown)
+      const drilldownItem = drilldownArray.value[index];
+      if (drilldownItem?._isCrossLink) {
+        try {
+          // Cross-link items already have the URL with ${row.field["alias"]} placeholders
+          // Use the existing replacePlaceholders logic with drilldownVariables
+          const drilldownVariables: any = {};
+          // Build variables from click params
+          if (panelSchema.value?.type === "table" && drilldownParams[1]?.[0]) {
+            const fields: any = {};
+            const panelFields: any = [
+              ...(panelSchema.value.queries?.[0]?.fields?.x || []),
+              ...(panelSchema.value.queries?.[0]?.fields?.y || []),
+              ...(panelSchema.value.queries?.[0]?.fields?.z || []),
+            ];
+            panelFields.forEach((field: any) => {
+              fields[field.label] = drilldownParams[1][0][field.alias];
+              fields[field.alias] = drilldownParams[1][0][field.alias];
+            });
+            drilldownVariables.row = { field: fields };
+          } else {
+            drilldownVariables.series = {
+              __name: drilldownParams[0]?.seriesName,
+              __value: Array.isArray(drilldownParams[0]?.value)
+                ? drilldownParams[0]?.value[drilldownParams[0]?.value?.length - 1]
+                : drilldownParams[0]?.value,
+            };
+          }
+          const resolvedUrl = replacePlaceholders(
+            drilldownItem.data.url,
+            drilldownVariables,
+          );
+          window.open(resolvedUrl, "_blank");
+        } catch (error) {
+          console.error("Failed to open cross-link:", error);
+        }
+        return;
+      }
+
       // if panelSchema exists
       if (panelSchema.value) {
         // check if drilldown data exists

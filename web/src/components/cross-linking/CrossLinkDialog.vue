@@ -33,7 +33,7 @@
           <!-- Fields -->
           <div>
             <div class="tw:text-sm tw:font-medium tw:mb-1">Fields *</div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mb-2">
+            <div class="tw:text-xs tw:mb-2" style="color: var(--o2-text-muted)">
               Show link only when at least one field is present in the record
             </div>
             <div class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2">

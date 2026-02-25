@@ -4,7 +4,7 @@
     <div class="tw:flex tw:justify-between tw:items-center tw:mb-3">
       <div>
         <div class="tw:font-semibold tw:text-sm">{{ title }}</div>
-        <div v-if="subtitle" class="tw:text-xs tw:text-gray-500">
+        <div v-if="subtitle" class="tw:text-xs" style="color: var(--o2-text-muted)">
           {{ subtitle }}
         </div>
       </div>
@@ -87,7 +87,8 @@
     <!-- Empty State -->
     <div
       v-else
-      class="tw:text-center tw:py-6 tw:text-gray-400 tw:text-sm"
+      class="tw:text-center tw:py-6 tw:text-sm"
+      style="color: var(--o2-text-muted)"
       data-test="cross-link-empty"
     >
       No cross-links configured. Click "Add Cross-Link" to create one.
