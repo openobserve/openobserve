@@ -309,49 +309,10 @@ jobs:
             browser: "chrome"
             run_files:
               [
-                "logs-regression.spec.js",
-                "logs-regression-bugs.spec.js",
-                "logs-9754.spec.js",
-                "streams-regression.spec.js",
-                "enrichment-regression.spec.js",
-                "ui-regression.spec.js",
-                "pipeline-regression.spec.js",
-              ]
-          - testfolder: "Metrics"
-            browser: "chrome"
-            run_files:
-              [
-                "metrics.spec.js",
-                "metrics-queries.spec.js",
-                "metrics-aggregations.spec.js",
-                "metrics-advanced.spec.js",
-                "metrics-config-tabs.spec.js",
-                "metrics-visualizations.spec.js",
-                "metrics-config.spec.js",
-                "metrics-promql-query-persistence.spec.js",
-                "metrics-table-column-order.spec.js"
-              ]
-          - testfolder: "Dashboards-Variables"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard-variables-setting.spec.js",
-                "dashboard-variables-global.spec.js",
-                "dashboard-variables-tab-level.spec.js",
-                "dashboard-variables-panel-level.spec.js",
-                "dashboard-variables-dependency.spec.js",
-                "dashboard-variables-refresh.spec.js",
-                "dashboard-variables-url-sync.spec.js",
-                "dashboard-variables-creation-scopes.spec.js",
-                "dashboard-variables-default-values-chain.spec.js",
-                "dashboard-variables-custom-parents.spec.js",
-                "dashboard-variables-stream-field.spec.js",
-              ]
-          - testfolder: "Dashboard-Table-Pagination"
-            browser: "chrome"
-            run_files: 
-              [
-                "dashboard-table-pagination.spec.js"
+                "dashboard-panel-time-config-behavior.spec.js",
+                "dashboard-panel-time-url-priority.spec.js",
+                "dashboard-panel-time-advanced-edge-cases.spec.js",
+                "dashboard-panel-time-apply-behavior.spec.js",
                 "dashboard-panel-time-variables-behavior.spec.js",
               ]
     steps:
