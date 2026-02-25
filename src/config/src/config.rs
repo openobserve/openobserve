@@ -1440,12 +1440,19 @@ pub struct Limit {
     pub ingest_allowed_in_future_micro: i64,
     #[env_config(name = "ZO_INGEST_FLATTEN_LEVEL", default = 3)] // default flatten level
     pub ingest_flatten_level: u32,
+    // Deprecated: use ZO_LOGS_QUERY_RETENTION instead. Will be removed in a future version.
     #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]
     pub logs_file_retention: String,
+    // Deprecated: use ZO_TRACES_QUERY_RETENTION instead. Will be removed in a future version.
     #[env_config(name = "ZO_TRACES_FILE_RETENTION", default = "hourly")]
     pub traces_file_retention: String,
+    // Deprecated: use ZO_METRICS_QUERY_RETENTION instead. Will be removed in a future version.
     #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "hourly")]
     pub metrics_file_retention: String,
+    #[env_config(name = "ZO_LOGS_QUERY_RETENTION", default = "hourly")]
+    pub logs_query_retention: String,
+    #[env_config(name = "ZO_TRACES_QUERY_RETENTION", default = "hourly")]
+    pub traces_query_retention: String,
     #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "daily")]
     pub metrics_query_retention: String,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
@@ -2530,6 +2537,23 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.calculate_stats_step_limit_secs > 86400 {
         cfg.limit.calculate_stats_step_limit_secs = 86400;
     }
+
+    // migrate deprecated *_file_retention ENVs to *_query_retention for backward compatibility
+    // if the user explicitly set a non-hourly file retention, apply it to query retention
+    if cfg.limit.logs_file_retention != "hourly" && cfg.limit.logs_query_retention == "hourly" {
+        cfg.limit.logs_query_retention = cfg.limit.logs_file_retention.clone();
+    }
+    if cfg.limit.traces_file_retention != "hourly" && cfg.limit.traces_query_retention == "hourly" {
+        cfg.limit.traces_query_retention = cfg.limit.traces_file_retention.clone();
+    }
+    if cfg.limit.metrics_file_retention != "hourly" && cfg.limit.metrics_query_retention == "hourly"
+    {
+        cfg.limit.metrics_query_retention = cfg.limit.metrics_file_retention.clone();
+    }
+    // file retention is always hourly now
+    cfg.limit.logs_file_retention = "hourly".to_string();
+    cfg.limit.traces_file_retention = "hourly".to_string();
+    cfg.limit.metrics_file_retention = "hourly".to_string();
 
     // format ingest allowed upto and in future to micro
     cfg.limit.ingest_allowed_upto_micro = cfg.limit.ingest_allowed_upto * 3600 * 1_000_000;
