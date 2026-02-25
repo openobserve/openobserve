@@ -349,7 +349,8 @@
     "collapseFields": "Felder ausblenden",
     "openFields": "Felder öffnen",
     "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
-    "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren"
+    "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren",
+    "recordsPerPage": "Datensätze pro Seite"
   },
   "menu": {
     "home": "Startseite",

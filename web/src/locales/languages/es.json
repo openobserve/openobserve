@@ -349,7 +349,8 @@
     "collapseFields": "Campos colapsados",
     "openFields": "Campos abiertos",
     "askAIFunctionPlaceholder": "Pídele a la IA que te ayude con tu función...",
-    "enterFunctionPrompt": "Introduzca un mensaje para generar la función"
+    "enterFunctionPrompt": "Introduzca un mensaje para generar la función",
+    "recordsPerPage": "Registros por página"
   },
   "menu": {
     "home": "Inicio",

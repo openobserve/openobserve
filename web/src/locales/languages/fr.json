@@ -349,7 +349,8 @@
     "collapseFields": "Effondrer les champs",
     "openFields": "Champs ouverts",
     "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
-    "enterFunctionPrompt": "Entrez une invite pour générer une fonction"
+    "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
+    "recordsPerPage": "Enregistrements par page"
   },
   "menu": {
     "home": "Accueil",

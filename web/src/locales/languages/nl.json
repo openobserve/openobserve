@@ -349,7 +349,8 @@
     "collapseFields": "Velden samenvouwen",
     "openFields": "Open velden",
     "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
-    "enterFunctionPrompt": "Voer een prompt in om een functie te genereren"
+    "enterFunctionPrompt": "Voer een prompt in om een functie te genereren",
+    "recordsPerPage": "Records per pagina"
   },
   "menu": {
     "home": "Home",

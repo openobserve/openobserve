@@ -349,7 +349,8 @@
     "collapseFields": "Alanları Daralt",
     "openFields": "Açık Alanlar",
     "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
-    "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin"
+    "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin",
+    "recordsPerPage": "Sayfa başına kayıtlar"
   },
   "menu": {
     "home": "Ana Sayfa",

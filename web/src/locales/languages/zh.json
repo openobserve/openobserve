@@ -349,7 +349,8 @@
     "collapseFields": "折叠字段",
     "openFields": "打开字段",
     "askAIFunctionPlaceholder": "让 AI 帮你完成任务...",
-    "enterFunctionPrompt": "输入提示生成函数"
+    "enterFunctionPrompt": "输入提示生成函数",
+    "recordsPerPage": "每页记录数"
   },
   "menu": {
     "home": "主页",
