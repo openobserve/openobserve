@@ -179,6 +179,7 @@ jobs:
                 "maxquery.spec.js",
                 "dashboard-chartJson.spec.js",
                 "dashboard-promql-suggestions.spec.js",
+                "dashboard-share-link.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
