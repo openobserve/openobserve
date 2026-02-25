@@ -106,7 +106,7 @@ pub async fn submit_job(
     {
         let cfg = get_config();
 
-        let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+        let http_span = if cfg.common.should_create_span() {
             tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone())
         } else {
             Span::none()
