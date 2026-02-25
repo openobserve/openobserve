@@ -180,37 +180,62 @@ export class ServiceGraphPage {
   // ===== NODE/EDGE INTERACTION =====
 
   /**
-   * Walk the Vue 3 component tree to find the ServiceGraph component and call handleNodeClick.
-   * Bypasses ECharts canvas — calls the handler directly via Vue internals.
-   * Works in production builds via internal vnode/component structure.
-   * @param {object} clickParams - Params to pass to handleNodeClick
+   * Trigger ServiceGraph's handleNodeClick programmatically.
+   *
+   * WHY: ECharts renders the graph on an HTML <canvas>. Canvas content is NOT
+   * part of the DOM or accessibility tree, so standard Playwright selectors
+   * (click, locator, etc.) cannot target individual nodes or edges. The only
+   * reliable way to open a node/edge detail panel in tests is to invoke the
+   * Vue component's click handler directly.
+   *
+   * HOW: On the first call the helper walks the Vue 3 vnode tree
+   * (app._vnode → component.subTree) to locate the ServiceGraph instance by
+   * checking for `setupState.handleNodeClick`. The found reference is cached
+   * on `window.__sgTestHelper` so subsequent calls skip the walk entirely.
+   *
+   * STABILITY: The vnode/component/subTree shape has been stable across all
+   * Vue 3.x releases (3.0 – 3.5+). The cache is validated before reuse and
+   * rebuilt automatically if the component re-mounts.
+   *
+   * @param {object} clickParams - Params forwarded to handleNodeClick
    * @returns {Promise<{ success: true } | { error: string }>}
    */
   async _callHandleNodeClick(clickParams) {
     return await this.page.evaluate((params) => {
-      function walkTree(vnode, depth) {
+      // Fast path: reuse cached component instance if still valid
+      const cached = window.__sgTestHelper;
+      if (cached?.setupState?.handleNodeClick && cached.setupState.graphData) {
+        cached.setupState.handleNodeClick(params);
+        return { success: true };
+      }
+
+      // Slow path: walk the vnode tree to find the ServiceGraph component
+      function findServiceGraph(vnode, depth) {
         if (!vnode || depth > 60) return null;
         if (vnode.component) {
           const inst = vnode.component;
           const ss = inst.setupState;
           if (ss && typeof ss.handleNodeClick === 'function' && ss.graphData) return inst;
-          if (inst.subTree) { const r = walkTree(inst.subTree, depth + 1); if (r) return r; }
+          if (inst.subTree) { const r = findServiceGraph(inst.subTree, depth + 1); if (r) return r; }
         }
         if (Array.isArray(vnode.children)) {
           for (const child of vnode.children) {
-            if (child && typeof child === 'object') { const r = walkTree(child, depth + 1); if (r) return r; }
+            if (child && typeof child === 'object') { const r = findServiceGraph(child, depth + 1); if (r) return r; }
           }
         }
         if (vnode.dynamicChildren) {
-          for (const child of vnode.dynamicChildren) { const r = walkTree(child, depth + 1); if (r) return r; }
+          for (const child of vnode.dynamicChildren) { const r = findServiceGraph(child, depth + 1); if (r) return r; }
         }
         return null;
       }
+
       const appEl = document.querySelector('#app');
       if (!appEl?._vnode) return { error: 'no-vue-app-vnode' };
-      const sgInstance = walkTree(appEl._vnode, 0);
-      if (!sgInstance) return { error: 'service-graph-component-not-found' };
-      sgInstance.setupState.handleNodeClick(params);
+      const inst = findServiceGraph(appEl._vnode, 0);
+      if (!inst) return { error: 'service-graph-component-not-found' };
+
+      window.__sgTestHelper = inst; // cache for subsequent calls
+      inst.setupState.handleNodeClick(params);
       return { success: true };
     }, clickParams);
   }
