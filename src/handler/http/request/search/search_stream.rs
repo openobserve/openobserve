@@ -117,7 +117,7 @@ pub async fn search_http2_stream(
     let cfg = get_config();
 
     // Create a tracing span
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!("/api/{org_id}/_search_stream", org_id = org_id.clone())
     } else {
         Span::none()
@@ -679,7 +679,7 @@ pub async fn values_http2_stream(
     let cfg = get_config();
 
     // Create a tracing span
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!("/api/{org_id}/_values_stream", org_id = org_id.clone())
     } else {
         Span::none()

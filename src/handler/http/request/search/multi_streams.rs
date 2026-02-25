@@ -156,7 +156,7 @@ pub async fn search_multi(
     let cfg = get_config();
 
     let started_at = Utc::now().timestamp_micros();
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!("/api/{org_id}/_search_multi", org_id = org_id.clone())
     } else {
         Span::none()
@@ -757,7 +757,7 @@ pub async fn _search_partition_multi(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!(
             "/api/{org_id}/_search_partition_multi",
             org_id = org_id.clone()
@@ -806,7 +806,7 @@ pub async fn _search_partition_multi(
         &req,
         enable_align_histogram,
     );
-    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
+    let search_res = if cfg.common.should_create_span() {
         search_fut.instrument(http_span).await
     } else {
         search_fut.await
@@ -923,7 +923,7 @@ pub async fn around_multi(
     let cfg = get_config();
 
     let (org_id, stream_names) = path;
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!(
             "/api/{org_id}/{stream_names}/_around_multi",
             org_id = org_id.clone(),
@@ -1141,7 +1141,7 @@ pub async fn search_multi_stream(
 ) -> Response {
     let cfg = get_config();
     // Create a tracing span
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!("/api/{org_id}/_search_multi_stream")
     } else {
         Span::none()

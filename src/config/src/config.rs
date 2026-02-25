@@ -1311,6 +1311,12 @@ pub struct Common {
     pub ingestion_log_enabled: bool,
 }
 
+impl Common {
+    pub fn should_create_span(&self) -> bool {
+        self.tracing_enabled || self.tracing_search_enabled || self.search_inspector_enabled
+    }
+}
+
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Limit {
     // no need set by environment
@@ -2582,12 +2588,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("search job retention is set to zero"));
     }
 
-    if cfg.common.tracing_search_enabled
+    if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled)
         && cfg.common.otel_otlp_url.is_empty()
         && cfg.common.otel_otlp_grpc_url.is_empty()
     {
         return Err(anyhow::anyhow!(
-            "Either grpc or http url should be set when enabling tracing search"
+            "Either grpc or http url should be set when enabling tracing"
         ));
     }
 
