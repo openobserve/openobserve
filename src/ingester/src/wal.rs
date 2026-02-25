@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -184,8 +184,9 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
                 org_id
             };
 
+            let stream_name = entry.stream.as_ref();
             let infer_schema =
-                infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
+                infer_json_schema_from_values(stream_name, stream_type, entry.data.iter().cloned())
                     .context(InferJsonSchemaSnafu)?;
             let latest_schema = infra::schema::get_cache(org_id, &entry.stream, stream_type.into())
                 .await

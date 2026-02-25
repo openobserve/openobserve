@@ -267,8 +267,11 @@ impl Metadata for DistinctValues {
                 }
             }
 
-            let inferred_schema =
-                infer_json_schema_from_map(items.iter().map(|(v, _)| v), stream_type)?;
+            let inferred_schema = infer_json_schema_from_map(
+                &distinct_stream_name,
+                stream_type,
+                items.iter().map(|(v, _)| v),
+            )?;
             let schema = if is_new || get_schema_changes(&db_schema, &inferred_schema).0 {
                 match db::schema::merge(
                     &org_id,

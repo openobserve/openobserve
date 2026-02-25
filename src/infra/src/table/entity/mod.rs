@@ -16,6 +16,7 @@ pub mod distinct_value_fields;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod folders;
+pub mod incident_events;
 pub mod kv_store;
 pub mod org_users;
 pub mod organizations;

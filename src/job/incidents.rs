@@ -72,7 +72,7 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
     // Convert minutes to microseconds
     let threshold_micros = (threshold_minutes as i64) * 60 * 1_000_000;
 
-    let resolved_count =
+    let (resolved_count, resolved_ids) =
         infra::table::alert_incidents::auto_resolve_stale(threshold_micros).await?;
 
     if resolved_count > 0 {
@@ -81,6 +81,22 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
             resolved_count,
             threshold_minutes
         );
+
+        // Emit Resolved events for each auto-resolved incident
+        for (org_id, incident_id) in &resolved_ids {
+            if let Err(e) = infra::table::incident_events::append(
+                org_id,
+                incident_id,
+                config::meta::alerts::incidents::IncidentEvent::resolved(None),
+            )
+            .await
+            {
+                log::warn!(
+                    "[INCIDENTS::JOB] Failed to record auto-resolve event for {}: {e}",
+                    incident_id
+                );
+            }
+        }
     } else {
         log::debug!("[INCIDENTS::JOB] No stale incidents to auto-resolve");
     }

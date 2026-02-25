@@ -17,7 +17,7 @@ use config::utils::rand::get_rand_element;
 use infra::cluster::get_cached_schedulable_ingester_nodes;
 use tonic::transport::Channel;
 
-pub(crate) async fn get_ingester_channel() -> Result<(String, Channel), tonic::Status> {
+pub async fn get_ingester_channel() -> Result<(String, Channel), tonic::Status> {
     let grpc_addr = get_rand_ingester_addr().await?;
     infra::client::grpc::get_cached_channel(&grpc_addr)
         .await
