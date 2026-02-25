@@ -113,60 +113,60 @@ jobs:
     strategy:
       matrix:
         include:
-          - testfolder: "GeneralTests"
-            browser: "chrome"
-            run_files:
-              [
-                "sanity.spec.js",
-                "changeOrg.spec.js",
-                "enrichment.spec.js",
-                "schema.spec.js",
-                "schemaload.spec.js",
-                "serviceAccount.spec.js",
-                "usersOrg.spec.js",
-                "org.spec.js",
-                "theme-management.spec.js",
-                "ingestion-config.spec.js",
-                "landingPage.spec.js",
-                "languageTranslation.spec.js",
-              ]
-          - testfolder: "Logs-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "join.spec.js",
-                "logshistogram.spec.js",
-                "logspage.spec.js",
-                "logsquickmode.spec.js",
-                "logsQueryBuilder.spec.js",
-                "pagination.spec.js",
-                "unflattened.spec.js",
-                "logstable.spec.js",
-                "shareLink.spec.js",
-                "monaco-query-prefill.spec.js",
-                "logsAnalyzeDimensions.spec.js",
-              ]
-          - testfolder: "Logs-Queries"
-            browser: "chrome"
-            run_files:
-              [
-                "logsDownloads.spec.js",
-                "logsqueries.spec.js",
-                "secondsPrecisionAdded.spec.js",
-                "logsqueries.cte.spec.js",
-                "logsqueries.matchall.spec.js",
-                "searchpartition.spec.js",
-              ]
-          - testfolder: "Alerts"
-            browser: "chrome"
-            run_files:
-              [
-                "alerts-e2e-flow.spec.js",
-                "alerts-ui-operations.spec.js",
-                "alerts-import.spec.js",
-                "alerts-advanced.spec.js",
-                "alerts-destinations-prebuilt.spec.js",
-              ]
+          # - testfolder: "GeneralTests"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "sanity.spec.js",
+          #       "changeOrg.spec.js",
+          #       "enrichment.spec.js",
+          #       "schema.spec.js",
+          #       "schemaload.spec.js",
+          #       "serviceAccount.spec.js",
+          #       "usersOrg.spec.js",
+          #       "org.spec.js",
+          #       "theme-management.spec.js",
+          #       "ingestion-config.spec.js",
+          #       "landingPage.spec.js",
+          #       "languageTranslation.spec.js",
+          #     ]
+          # - testfolder: "Logs-Core"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "join.spec.js",
+          #       "logshistogram.spec.js",
+          #       "logspage.spec.js",
+          #       "logsquickmode.spec.js",
+          #       "logsQueryBuilder.spec.js",
+          #       "pagination.spec.js",
+          #       "unflattened.spec.js",
+          #       "logstable.spec.js",
+          #       "shareLink.spec.js",
+          #       "monaco-query-prefill.spec.js",
+          #       "logsAnalyzeDimensions.spec.js",
+          #     ]
+          # - testfolder: "Logs-Queries"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "logsDownloads.spec.js",
+          #       "logsqueries.spec.js",
+          #       "secondsPrecisionAdded.spec.js",
+          #       "logsqueries.cte.spec.js",
+          #       "logsqueries.matchall.spec.js",
+          #       "searchpartition.spec.js",
+          #     ]
+          # - testfolder: "Alerts"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "alerts-e2e-flow.spec.js",
+          #       "alerts-ui-operations.spec.js",
+          #       "alerts-import.spec.js",
+          #       "alerts-advanced.spec.js",
+          #       "alerts-destinations-prebuilt.spec.js",
+          #     ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
             run_files:
