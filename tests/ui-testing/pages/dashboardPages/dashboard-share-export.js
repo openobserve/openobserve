@@ -1,6 +1,5 @@
 //Dashboard Share and Export Page Object
-//Methods: Share dashboard, Export dashboard, Share and capture short URL
-import testLogger from '../../playwright-tests/utils/test-logger.js';
+//Methods: Share dashboard, Export dashboard
 
 export default class DashboardShareExportPage {
   constructor(page) {
@@ -15,47 +14,6 @@ export default class DashboardShareExportPage {
       state: "visible",
     });
     await this.shareBtn.click();
-  }
-
-  /**
-   * Share dashboard and capture the short URL from the API response.
-   * Intercepts the POST /short API call to extract the original and short URLs.
-   * @returns {{ shortUrl: string, originalUrl: string }} The captured URLs with port corrected for test env
-   */
-  async shareDashboardAndCaptureUrl() {
-    await this.page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-    });
-
-    const shortenResponsePromise = this.page.waitForResponse(
-      (response) =>
-        response.url().includes("/short") &&
-        response.request().method() === "POST",
-    );
-
-    await this.shareBtn.click();
-
-    const shortenResponse = await shortenResponsePromise;
-    const responseData = await shortenResponse.json();
-
-    // Replace the API-returned origin with the test base URL origin
-    const baseUrl = new URL(process.env.ZO_BASE_URL || 'http://localhost:5080');
-    const rawShortUrl = new URL(responseData.short_url);
-    rawShortUrl.protocol = baseUrl.protocol;
-    rawShortUrl.host = baseUrl.host;
-    const shortUrl = rawShortUrl.toString();
-
-    // Extract original URL from request body
-    const postData = shortenResponse.request().postData();
-    if (!postData) {
-      throw new Error('Share API request had no body - postData() returned null');
-    }
-    const requestBody = JSON.parse(postData);
-    const originalUrl = requestBody.original_url;
-
-    testLogger.info('Share URL captured', { shortUrl, originalUrl });
-
-    return { shortUrl, originalUrl };
   }
 
   //Export dashboard

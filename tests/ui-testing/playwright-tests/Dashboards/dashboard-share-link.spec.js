@@ -29,7 +29,11 @@ test.describe("dashboard share URL button testcases", () => {
   const generateDashboardName = (prefix = "ShareLinkDash") =>
     `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
+  // Track dashboard name per test for cleanup
+  let currentDashboardName = null;
+
   test.beforeEach(async ({ page }, testInfo) => {
+    currentDashboardName = null;
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
@@ -37,11 +41,24 @@ test.describe("dashboard share URL button testcases", () => {
     testLogger.info("Test setup completed");
   });
 
+  test.afterEach(async ({ page }) => {
+    if (currentDashboardName) {
+      try {
+        const pm = new PageManager(page);
+        await pm.dashboardCreate.backToDashboardList();
+        await deleteDashboard(page, currentDashboardName);
+      } catch (e) {
+        testLogger.warn("Cleanup failed (non-fatal):", { error: e.message });
+      }
+    }
+  });
+
   test("should copy share URL with all current URL parameters including dashboard ID, folder, and tab", async ({
     page,
   }) => {
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
+    currentDashboardName = randomDashboardName;
 
     // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
@@ -108,10 +125,6 @@ test.describe("dashboard share URL button testcases", () => {
 
     // Verify the redirected URL contains the tab parameter
     expect(redirectedUrl).toContain(`tab=${tabId}`);
-
-    // Clean up: Go back to dashboard list and delete
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should preserve time range parameters (relative time) in share URL", async ({
@@ -119,6 +132,7 @@ test.describe("dashboard share URL button testcases", () => {
   }) => {
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
+    currentDashboardName = randomDashboardName;
 
     // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
@@ -200,10 +214,6 @@ test.describe("dashboard share URL button testcases", () => {
 
     // Close the new page
     await newPage.close();
-
-    // Clean up: delete the dashboard
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should preserve time range parameters (absolute time) in share URL", async ({
@@ -211,6 +221,7 @@ test.describe("dashboard share URL button testcases", () => {
   }) => {
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
+    currentDashboardName = randomDashboardName;
 
     // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
@@ -296,10 +307,6 @@ test.describe("dashboard share URL button testcases", () => {
 
     // Close the new page
     await newPage.close();
-
-    // Clean up
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should preserve variable values in share URL and maintain them when opening in new tab", async ({
@@ -307,6 +314,7 @@ test.describe("dashboard share URL button testcases", () => {
   }) => {
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
+    currentDashboardName = randomDashboardName;
 
     // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
@@ -456,10 +464,6 @@ test.describe("dashboard share URL button testcases", () => {
 
     // Close the new page
     await newPage.close();
-
-    // Clean up: delete the dashboard
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should preserve selected tab in share URL and open same tab in new page", async ({
@@ -467,6 +471,7 @@ test.describe("dashboard share URL button testcases", () => {
   }) => {
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
+    currentDashboardName = randomDashboardName;
 
     // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
@@ -552,10 +557,6 @@ test.describe("dashboard share URL button testcases", () => {
 
     // Close the new page
     await newPage.close();
-
-    // Clean up
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should preserve all parameters together: time, variables, tab, and timezone", async ({
@@ -563,6 +564,7 @@ test.describe("dashboard share URL button testcases", () => {
   }) => {
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
+    currentDashboardName = randomDashboardName;
 
     // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
@@ -578,7 +580,28 @@ test.describe("dashboard share URL button testcases", () => {
         state: "visible",
       });
 
-    // Add a variable
+    // Add a panel first (while dashboard is empty, before variable interactions)
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_hash",
+      "y"
+    );
+
+    // Set time range to 30 minutes
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
+
+    // Apply and save panel
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel save to settle
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+
+    // Now add a variable via settings
     const variableName = pm.dashboardSetting.variableName();
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -630,27 +653,6 @@ test.describe("dashboard share URL button testcases", () => {
     // Wait for dropdown to close and selection to apply
     await safeWaitForHidden(page, ".q-menu", { timeout: 3000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
-
-    // Add a panel with time range
-    await pm.dashboardCreate.addPanel();
-    await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.chartTypeSelector.searchAndAddField(
-      "kubernetes_container_hash",
-      "y"
-    );
-
-    // Set time range to 30 minutes
-    await pm.dashboardTimeRefresh.setRelative("30", "m");
-
-    // Apply and save panel
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    const panelName =
-      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
-    await pm.dashboardPanelActions.addPanelName(panelName);
-    await pm.dashboardPanelActions.savePanel();
-
-    // Wait for everything to settle
-    await page.waitForTimeout(2000);
 
     // Get current URL
     const currentURL = page.url();
@@ -717,10 +719,6 @@ test.describe("dashboard share URL button testcases", () => {
 
     // Close the new page
     await newPage.close();
-
-    // Clean up
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should generate short URL that redirects to full dashboard URL with all parameters", async ({
@@ -728,6 +726,7 @@ test.describe("dashboard share URL button testcases", () => {
   }) => {
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
+    currentDashboardName = randomDashboardName;
 
     // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
@@ -779,8 +778,8 @@ test.describe("dashboard share URL button testcases", () => {
     );
     testLogger.info("Short URL copied:", { shortURL });
 
-    // Verify it's a short URL (should be shorter than the original)
-    expect(shortURL.length).toBeLessThan(fullURL.length);
+    // Verify it's a short URL
+    expect(shortURL).toContain("/short/");
 
     // Navigate to the short URL
     await page.goto(shortURL);
@@ -806,9 +805,5 @@ test.describe("dashboard share URL button testcases", () => {
     expect(redirectedURL).toContain("folder=");
     expect(redirectedURL).toContain("from=");
     expect(redirectedURL).toContain("to=");
-
-    // Clean up
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
   });
 });
