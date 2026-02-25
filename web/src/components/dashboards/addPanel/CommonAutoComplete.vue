@@ -64,7 +64,7 @@ export default defineComponent({
       default: (selectedValue) => selectedValue,
     },
   },
-  emits: ["update:modelValue"],
+  emits: ["update:modelValue", "select"],
   setup(props, { emit }) {
     const store = useStore();
     const showOptions = ref(false);
@@ -106,7 +106,9 @@ export default defineComponent({
 
     // when any item is selected, replace it with the value and hide the options
     const selectOption = (option) => {
-      emit("update:modelValue", props.valueReplaceFn(option?.value));
+      const value = props.valueReplaceFn(option?.value);
+      emit("update:modelValue", value);
+      emit("select", value);
       showOptions.value = false;
     };
 

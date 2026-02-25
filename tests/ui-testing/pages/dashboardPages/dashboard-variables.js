@@ -3,6 +3,7 @@
 //addDashboardVariable params: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
 import { expect } from "@playwright/test";
 import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
+import { selectStreamFromDropdown, selectFieldFromDropdown } from "./dashboard-stream-field-utils.js";
 
 export default class DashboardVariables {
   constructor(page) {
@@ -48,89 +49,9 @@ export default class DashboardVariables {
       .nth(2)
       .click();
 
-    // Stream Select
-    const streamSelect = this.page.locator(
-      '[data-test="dashboard-variable-stream-select"]'
-    );
-    await streamSelect.click();
-    await streamSelect.fill(streamName);
-    await this.page
-      .getByRole("option", { name: streamName, exact: true })
-      .click();
-    // Select Field
-    const fieldSelect = await this.page.locator('[data-test="dashboard-variable-field-select"]');
-    await fieldSelect.click();
-    await this.page.keyboard.type(field, {delay:100});
-
-    // Wait for dropdown to have options available
-    await this.page.waitForFunction(
-        () => {
-            const options = document.querySelectorAll('[role="option"]');
-            return options.length > 0;
-          },
-          { timeout: 10000, polling: 100 }
-        );
-        
-    // Try to select the field from dropdown - use multiple strategies
-    let fieldSelected = false;
-
-    // Strategy 1: Try exact match
-    try {
-      const fieldOption = this.page.getByRole("option", { name: field, exact: true });
-      await fieldOption.waitFor({ state: "visible", timeout: 5000 });
-      await fieldOption.click();
-      fieldSelected = true;
-    } catch (e) {
-      // Strategy 2: Try partial match
-      try {
-        const fieldOption = this.page.getByRole("option", { name: field, exact: false }).first();
-        await fieldOption.waitFor({ state: "visible", timeout: 5000 });
-        await fieldOption.click();
-        fieldSelected = true;
-      } catch (e2) {
-        // Strategy 3: Use keyboard to select the first visible option
-        try {
-          await this.page.keyboard.press('ArrowDown');
-          // Wait for selection to be highlighted
-          await this.page.waitForFunction(
-            () => {
-              const highlighted = document.querySelector('[role="option"][aria-selected="true"]') ||
-                                 document.querySelector('[role="option"].q-manual-focusable--focused') ||
-                                 document.querySelector('[role="option"].q-focusable--focused');
-              return highlighted !== null;
-            },
-            { timeout: 3000, polling: 100 }
-          );
-          await this.page.keyboard.press('Enter');
-          fieldSelected = true;
-        } catch (e3) {
-          // Strategy 4: Use JavaScript to directly click matching option (for deploy environment)
-          try {
-            const clicked = await this.page.evaluate((fieldName) => {
-              const options = document.querySelectorAll('[role="option"]');
-              for (const option of options) {
-                if (option.textContent.trim() === fieldName) {
-                  option.click();
-                  return true;
-                }
-              }
-              return false;
-            }, field);
-
-            if (clicked) {
-              await this.page.waitForTimeout(500);
-              fieldSelected = true;
-            }
-          } catch (e4) {
-            fieldSelected = false;
-          }
-        }
-      }
-    }
-
-    if (!fieldSelected) {
-      throw new Error(`Failed to select field: ${field}`);
-    }
+    // Select Stream and Field using shared utilities
+    await selectStreamFromDropdown(this.page, streamName);
+    await selectFieldFromDropdown(this.page, field);
 
     // Add Filter Configuration if provided
     if (filterConfig) {
