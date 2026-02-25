@@ -112,6 +112,12 @@ pub trait DbAdapter: Send + Sync {
     /// Truncate a table
     async fn truncate_table(&self, table: &str) -> Result<(), anyhow::Error>;
 
+    /// Reset sequences for IDENTITY/SERIAL columns to max(col) after bulk insert.
+    /// No-op by default; only meaningful for databases that use sequences (e.g. PostgreSQL).
+    async fn sync_sequences(&self, _table: &str) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+
     /// Close the connection
     async fn close(&self) -> Result<(), anyhow::Error>;
 }
