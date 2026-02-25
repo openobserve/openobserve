@@ -152,7 +152,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
             template: '<div data-test="date-time-picker"></div>',
           },
           ServiceGraphSidePanel: true,
-          ServiceGraphEdgePanel: true,
           QCard: false,
           QCardSection: false,
           QSelect: false,

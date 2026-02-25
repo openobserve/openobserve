@@ -485,6 +485,7 @@ export default defineComponent({
 
     // --- Tree edge tooltip: show node tooltip when hovering edge lines ---
     let edgeTooltipCleanup: (() => void) | null = null;
+    let pendingTooltipSetup: ReturnType<typeof setTimeout> | null = null;
 
     // Shared across ALL setupTreeEdgeTooltips invocations so multiple registrations
     // (due to chart re-renders) share one debounce timer and one in-flight guard.
@@ -555,7 +556,8 @@ export default defineComponent({
         const last = points.length - 1;
         const sf = '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
 
-        const COLORS = { p99: '#FF3B30', p95: '#007AFF', p50: '#34C759' };
+        // Use purple-blue-teal gradient to avoid red=danger, green=good semantic confusion
+        const COLORS = { p99: '#8B5CF6', p95: '#3B82F6', p50: '#06B6D4' };
 
         const hexArea = (hex: string, alpha: number) => {
           const r = parseInt(hex.slice(1, 3), 16);
@@ -1144,8 +1146,14 @@ export default defineComponent({
           edgeTooltipCleanup();
           edgeTooltipCleanup = null;
         }
+        // Cancel any pending setup to avoid duplicates
+        if (pendingTooltipSetup) {
+          clearTimeout(pendingTooltipSetup);
+          pendingTooltipSetup = null;
+        }
         await nextTick();
-        setTimeout(() => {
+        pendingTooltipSetup = setTimeout(() => {
+          pendingTooltipSetup = null;
           const chart = chartRendererRef.value?.chart;
           if (chart) {
             edgeTooltipCleanup = setupTreeEdgeTooltips(chart);
@@ -1167,10 +1175,16 @@ export default defineComponent({
             edgeTooltipCleanup();
             edgeTooltipCleanup = null;
           }
+          // Cancel any pending setup to avoid duplicates
+          if (pendingTooltipSetup) {
+            clearTimeout(pendingTooltipSetup);
+            pendingTooltipSetup = null;
+          }
 
           await nextTick();
           // Longer delay to ensure chart is fully rendered with new data
-          setTimeout(() => {
+          pendingTooltipSetup = setTimeout(() => {
+            pendingTooltipSetup = null;
             const chart = chartRendererRef.value?.chart;
             if (chart) {
               edgeTooltipCleanup = setupTreeEdgeTooltips(chart);
@@ -1190,8 +1204,14 @@ export default defineComponent({
           edgeTooltipCleanup();
           edgeTooltipCleanup = null;
         }
+        // Cancel any pending setup to avoid duplicates
+        if (pendingTooltipSetup) {
+          clearTimeout(pendingTooltipSetup);
+          pendingTooltipSetup = null;
+        }
         await nextTick();
-        setTimeout(() => {
+        pendingTooltipSetup = setTimeout(() => {
+          pendingTooltipSetup = null;
           const chart = chartRendererRef.value?.chart;
           if (chart) {
             edgeTooltipCleanup = setupTreeEdgeTooltips(chart);
@@ -1201,6 +1221,11 @@ export default defineComponent({
     );
 
     onBeforeUnmount(() => {
+      // Clear any pending tooltip setup
+      if (pendingTooltipSetup) {
+        clearTimeout(pendingTooltipSetup);
+        pendingTooltipSetup = null;
+      }
       if (edgeTooltipCleanup) {
         edgeTooltipCleanup();
         edgeTooltipCleanup = null;
