@@ -1396,7 +1396,7 @@ export const usePanelDataLoader = (
                         }
                       }
                       state.errorDetail = { message: "", code: "" };
-                      saveCurrentStateToCache();
+                      // saveCurrentStateToCache();
                     }
 
                     if (response.type === "search_response") {
@@ -1570,6 +1570,9 @@ export const usePanelDataLoader = (
               // Wait for annotations to complete if they were started
               if (annotationsPromise) {
                 state.annotations = await annotationsPromise;
+                if(!state.loading) {
+                  saveCurrentStateToCache();
+                }
               }
             }
           }
