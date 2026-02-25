@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #after>
         <div class="tw:pr-[0.625rem] tw:h-full">
-          <div class="card-container tw:h-full">
+          <div class="card-container tw:h-[calc(100%-46px)]">
             <template v-if="isLoading.length">
               <div
                 class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-18.75rem)]"

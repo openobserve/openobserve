@@ -81,6 +81,13 @@ const sourcemapsService = {
     const url = `/api/${org_identifier}/sourcemaps`;
     return http().delete(url, { params });
   },
+
+  getSourceMapsValues: (
+    org_identifier: string
+  ): Promise<{ data: { services: string[]; envs: string[]; versions: string[] } }> => {
+    const url = `/api/${org_identifier}/sourcemaps/values`;
+    return http().get(url);
+  },
 };
 
 export default sourcemapsService;

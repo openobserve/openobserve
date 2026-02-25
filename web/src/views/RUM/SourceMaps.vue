@@ -23,48 +23,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Version Filter -->
           <q-select
             v-model="filters.version"
-            :options="versionOptions"
+            :options="filteredVersionOptions"
             label="Version"
             borderless
             dense
             clearable
-            emit-value
-            map-options
+            use-input
+            input-debounce="0"
+            @filter="filterVersions"
+            @new-value="addNewVersion"
             style="width: 200px;"
             class="o2-custom-select-dashboard"
-          />
+          >
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  Type to add custom version
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
 
         <!-- Service Filter -->
           <q-select
             v-model="filters.service"
-            :options="serviceOptions"
+            :options="filteredServiceOptions"
             label="Service"
             borderless
             dense
             clearable
-            emit-value
-            map-options
+            use-input
+            input-debounce="0"
+            @filter="filterServices"
+            @new-value="addNewService"
             style="width: 200px;"
             class="o2-custom-select-dashboard"
-          />
+          >
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  Type to add custom service
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
 
         <!-- Environment Filter -->
           <q-select
             v-model="filters.environment"
-            :options="environmentOptions"
+            :options="filteredEnvironmentOptions"
             label="Environment"
             borderless
             dense
             clearable
-            emit-value
-            map-options
+            use-input
+            input-debounce="0"
+            @filter="filterEnvironments"
+            @new-value="addNewEnvironment"
             style="width: 200px;"
             class="o2-custom-select-dashboard"
-          />
+          >
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  Type to add custom environment
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
 
         <!-- Apply Button -->
           <q-btn
-            class="o2-primary-button tw:h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             flat
             no-caps
             label="Apply Filters"
@@ -77,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Upload Button -->
 
           <q-btn
-            class="o2-primary-button tw:h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             flat
             no-caps
             label="Upload Source Maps"
@@ -109,13 +139,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Source Maps Table -->
       <template v-else-if="groupedSourceMaps.length > 0">
         <q-table
+          ref="qTableRef"
           :rows="groupedSourceMaps"
           :columns="columns"
           :row-key="(row) => `${row.service}-${row.version}-${row.env}`"
           flat
           bordered
           :pagination="pagination"
-          @request="onRequest"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           style="width: 100%; height: calc(100vh - 200px)"
         >
@@ -178,6 +208,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-td>
             </q-tr>
           </template>
+
+          <template #bottom="scope">
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
+          </template>
         </q-table>
       </template>
 
@@ -228,17 +268,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import sourcemapsService from "@/services/sourcemaps";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
 
 const store = useStore();
 const router = useRouter();
 const $q = useQuasar();
 
+const qTableRef = ref<any>(null);
 
 // Delete dialog state
 const deleteDialog = ref({
@@ -248,47 +290,109 @@ const deleteDialog = ref({
   data: null as any,
 });
 
-// Filter Options (Hardcoded for now)
-const versionOptions = ref([
-  { label: "0.0.1", value: "0.0.1" },
-  { label: "0.0.2", value: "0.0.2" },
-  { label: "0.0.3", value: "0.0.3" },
-  { label: "0.0.4", value: "0.0.4" },
-  { label: "0.0.5", value: "0.0.5" },
-  { label: "0.0.6", value: "0.0.6" },
-  { label: "0.0.7", value: "0.0.7" },
-  { label: "0.0.8", value: "0.0.8" },
-  { label: "0.0.9", value: "0.0.9" },
-  { label: "0.1.0", value: "0.1.0" },
-]);
+// Filter Options from API
+const versionOptions = ref<string[]>([]);
+const serviceOptions = ref<string[]>([]);
+const environmentOptions = ref<string[]>([]);
 
-const serviceOptions = ref([
-  { label: "my-web-application", value: "my-web-application" },
-  { label: "my-web-application-1", value: "my-web-application-1" },
-  { label: "my-web-application-2", value: "my-web-application-2" },
-  { label: "my-web-application-3", value: "my-web-application-3" },
-  { label: "my-web-application-4", value: "my-web-application-4" },
-  { label: "my-web-application-5", value: "my-web-application-5" },
-  { label: "my-web-application-6", value: "my-web-application-6" },
-  { label: "my-web-application-7", value: "my-web-application-7" },
-  { label: "my-web-application-8", value: "my-web-application-8" },
-  { label: "my-web-application-9", value: "my-web-application-9" },
-  { label: "my-web-application-10", value: "my-web-application-10" },
-]);
-
-const environmentOptions = ref([
-  { label: "production", value: "production" },
-  { label: "development", value: "development" },
-  { label: "staging", value: "staging" },
-  { label: "local", value: "local" },
-]);
+// Filtered options for search
+const filteredVersionOptions = ref<string[]>([]);
+const filteredServiceOptions = ref<string[]>([]);
+const filteredEnvironmentOptions = ref<string[]>([]);
 
 // Filters
 const filters = ref({
-  version: null,
-  service: null,
-  environment: null,
+  version: null as string | null,
+  service: null as string | null,
+  environment: null as string | null,
 });
+
+// Fetch filter values from API
+const fetchFilterValues = async () => {
+  try {
+    const response = await sourcemapsService.getSourceMapsValues(
+      store.state.selectedOrganization.identifier
+    );
+
+    // Store the top 10 values from API
+    versionOptions.value = response.data.versions || [];
+    serviceOptions.value = response.data.services || [];
+    environmentOptions.value = response.data.envs || [];
+
+    // Initialize filtered options
+    filteredVersionOptions.value = versionOptions.value;
+    filteredServiceOptions.value = serviceOptions.value;
+    filteredEnvironmentOptions.value = environmentOptions.value;
+  } catch (error) {
+    console.error("Error fetching filter values:", error);
+    // Initialize with empty arrays on error
+    versionOptions.value = [];
+    serviceOptions.value = [];
+    environmentOptions.value = [];
+    filteredVersionOptions.value = [];
+    filteredServiceOptions.value = [];
+    filteredEnvironmentOptions.value = [];
+  }
+};
+
+// Filter functions for dropdowns
+const filterVersions = (val: string, update: (fn: () => void) => void) => {
+  update(() => {
+    if (val === '') {
+      filteredVersionOptions.value = versionOptions.value;
+    } else {
+      const needle = val.toLowerCase();
+      filteredVersionOptions.value = versionOptions.value.filter(
+        v => v.toLowerCase().includes(needle)
+      );
+    }
+  });
+};
+
+const filterServices = (val: string, update: (fn: () => void) => void) => {
+  update(() => {
+    if (val === '') {
+      filteredServiceOptions.value = serviceOptions.value;
+    } else {
+      const needle = val.toLowerCase();
+      filteredServiceOptions.value = serviceOptions.value.filter(
+        s => s.toLowerCase().includes(needle)
+      );
+    }
+  });
+};
+
+const filterEnvironments = (val: string, update: (fn: () => void) => void) => {
+  update(() => {
+    if (val === '') {
+      filteredEnvironmentOptions.value = environmentOptions.value;
+    } else {
+      const needle = val.toLowerCase();
+      filteredEnvironmentOptions.value = environmentOptions.value.filter(
+        e => e.toLowerCase().includes(needle)
+      );
+    }
+  });
+};
+
+// Add new value functions (for manual input)
+const addNewVersion = (val: string, done: (item?: string) => void) => {
+  if (val.length > 0) {
+    done(val);
+  }
+};
+
+const addNewService = (val: string, done: (item?: string) => void) => {
+  if (val.length > 0) {
+    done(val);
+  }
+};
+
+const addNewEnvironment = (val: string, done: (item?: string) => void) => {
+  if (val.length > 0) {
+    done(val);
+  }
+};
 
 // State
 const isLoading = ref(false);
@@ -360,9 +464,25 @@ const pagination = ref({
   sortBy: "created_at",
   descending: true,
   page: 1,
-  rowsPerPage: 10,
-  rowsNumber: 0,
+  rowsPerPage: 20,
 });
+
+const selectedPerPage = ref<number>(20);
+
+const perPageOptions = [
+  { label: "20", value: 20 },
+  { label: "50", value: 50 },
+  { label: "100", value: 100 },
+  { label: "250", value: 250 },
+];
+
+const resultTotal = computed(() => groupedSourceMaps.value.length);
+
+const changePagination = (val: { label: string; value: any }) => {
+  selectedPerPage.value = val.value;
+  pagination.value.rowsPerPage = val.value;
+  qTableRef.value?.setPagination(pagination.value);
+};
 
 // Fetch source maps
 const fetchSourceMaps = async () => {
@@ -384,8 +504,6 @@ const fetchSourceMaps = async () => {
 
     // Group source maps by service, version, and environment
     groupSourceMaps();
-
-    pagination.value.rowsNumber = groupedSourceMaps.value.length;
   } catch (error) {
     console.error("Error fetching source maps:", error);
     sourceMaps.value = [];
@@ -501,15 +619,6 @@ const deleteSourceMap = async () => {
   }
 };
 
-// Table request handler
-const onRequest = (props: any) => {
-  const { page, rowsPerPage, sortBy, descending } = props.pagination;
-  pagination.value.page = page;
-  pagination.value.rowsPerPage = rowsPerPage;
-  pagination.value.sortBy = sortBy;
-  pagination.value.descending = descending;
-};
-
 // Navigate to upload page
 const navigateToUpload = () => {
   router.push({
@@ -521,7 +630,8 @@ const navigateToUpload = () => {
 };
 
 // On mount
-onMounted(() => {
+onMounted(async () => {
+  await fetchFilterValues();
   fetchSourceMaps();
 });
 </script>

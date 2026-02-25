@@ -28,21 +28,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- No source maps available message -->
-    <div v-else-if="allSourceInfoNull" class="no-source-maps-container q-pa-xl text-center">
-      <q-icon name="code_off" size="3em" color="grey-6" class="q-mb-md" />
-      <div class="text-h6 text-grey-8 q-mb-sm" style="font-weight: 500;">
+    <div v-else-if="allSourceInfoNull" class="no-source-maps-container q-pa-md text-center">
+      <q-icon name="code_off" size="2em" color="grey-6" class="q-mb-sm" />
+      <div class="text-subtitle1 text-grey-8 q-mb-xs" style="font-weight: 500;">
         Source Maps Not Available
       </div>
-      <div class="text-body2 text-grey-6 tw:pb-2" style="max-width: 500px; margin: 0 auto;">
+      <div class="text-body2 text-grey-6" style="max-width: 500px; margin: 0 auto; font-size: 13px;">
         To view detailed stack traces with original source code and line numbers, please upload source maps for this application.
+      </div>
+      <div v-if="props.error.service || props.error.version" class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:mt-2 tw:mb-2">
+        <span v-if="props.error.service" class="service-version-badge service-badge">
+          <span class="badge-label">Service:</span>
+          <span class="badge-value">{{ props.error.service }}</span>
+        </span>
+        <span v-if="props.error.version" class="service-version-badge version-badge">
+          <span class="badge-label">Version:</span>
+          <span class="badge-value">{{ props.error.version }}</span>
+        </span>
       </div>
       <q-btn
         unelevated
         no-caps
-        color="primary"
         label="Upload Source Maps"
         icon="cloud_upload"
-        class="o2-primary-button tw:mt-2"
+        class="o2-primary-button tw:my-2"
+        size="sm"
         @click="navigateToUpload"
       />
     </div>
@@ -495,11 +505,24 @@ const translateStackTrace = async () => {
 
 // Navigate to upload source maps page
 const navigateToUpload = () => {
+  const query: any = {
+    org_identifier: store.state.selectedOrganization.identifier,
+  };
+
+  // Pre-fill service, version, and environment if available
+  if (props.error.service) {
+    query.service = props.error.service;
+  }
+  if (props.error.version) {
+    query.version = props.error.version;
+  }
+  if (props.error.env) {
+    query.environment = props.error.env;
+  }
+
   router.push({
     name: "UploadSourceMaps",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
+    query,
   });
 };
 
@@ -530,8 +553,6 @@ watch(
 }
 
 .no-source-maps-container {
-  min-height: 150px;
-  height: 220px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -539,6 +560,49 @@ watch(
   background-color: v-bind(backgroundColor);
   border: 1px solid v-bind(borderColor);
   border-radius: 6px;
+  padding: 20px 24px !important;
+
+  .service-version-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+
+    .badge-label {
+      opacity: 0.8;
+    }
+
+    .badge-value {
+      font-weight: 600;
+    }
+  }
+
+  .service-badge {
+    background-color: rgba(103, 58, 183, 0.12);
+    color: #5e35b1;
+  }
+
+  .version-badge {
+    background-color: rgba(25, 118, 210, 0.12);
+    color: #1976d2;
+  }
+}
+
+:deep(.q-dark) {
+  .no-source-maps-container {
+    .service-badge {
+      background-color: rgba(149, 117, 205, 0.2);
+      color: #b39ddb;
+    }
+
+    .version-badge {
+      background-color: rgba(66, 165, 245, 0.2);
+      color: #90caf9;
+    }
+  }
 }
 
 .pretty-stack-container {

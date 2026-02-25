@@ -70,13 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Environment Input -->
           <div>
-            <div class="text-subtitle2 text-weight-medium tw:mb-2">Environment *</div>
+            <div class="text-subtitle2 text-weight-medium tw:mb-2">Environment</div>
             <q-input
               v-model="formData.environment"
-              placeholder="Enter environment"
+              placeholder="Enter environment (optional)"
               borderless
               dense
-              :rules="[val => !!val || 'Environment is required']"
             />
           </div>
         </div>
@@ -158,14 +157,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import sourcemapsService from "@/services/sourcemaps";
 
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
 const $q = useQuasar();
 
 // Form data
@@ -179,6 +179,19 @@ const formData = ref({
 const isUploading = ref(false);
 const isDragging = ref(false);
 const fileInputRef = ref<HTMLInputElement | null>(null);
+
+// Pre-fill form data from query parameters on mount
+onMounted(() => {
+  if (route.query.service) {
+    formData.value.service = route.query.service as string;
+  }
+  if (route.query.version) {
+    formData.value.version = route.query.version as string;
+  }
+  if (route.query.environment) {
+    formData.value.environment = route.query.environment as string;
+  }
+});
 
 // Navigate back to source maps list
 const navigateBack = () => {
@@ -252,7 +265,7 @@ const uploadSourceMaps = async () => {
     return;
   }
 
-  if (!formData.value.service || !formData.value.version || !formData.value.environment) {
+  if (!formData.value.service || !formData.value.version) {
     $q.notify({
       type: "negative",
       message: "Please fill in all required fields",
