@@ -113,6 +113,7 @@
     "getStarted": "Başlayın",
     "reset": "Sıfırla",
     "retry": "Tekrar dene",
+    "set": "+ Ayarla",
     "copy": "Kopyalama",
     "copySuccess": "Panoya kopyalandı",
     "copyError": "Panoya kopyalanamadı"
@@ -1415,7 +1416,19 @@
     "noColumnsOrdered": "Sıralı sütun yok",
     "columnsDefaultOrder": "Sütunlar varsayılan sıralarında görüntülenecektir",
     "moveUp": "Yukarı hareket et",
-    "moveDown": "Aşağı hareket et"
+    "moveDown": "Aşağı hareket et",
+    "panelTimeSettings": "Panel Zaman Ayarları",
+    "panelTimeEnabled": "Panel seviyesi süresine izin ver",
+    "useGlobalTime": "Küresel zamanı kullan",
+    "useIndividualTime": "Bireysel zaman kullanın",
+    "panelTimeGlobalHint": "Panel, küresel gösterge paneli zamanını izleyecektir. Genel saatteki değişiklikler bu paneli güncelleyecektir.",
+    "panelTimeIndividualHint": "Panel kendi zaman aralığını kullanacaktır. Aşağıdaki tarih seçiciyi kullanarak saati ayarlayın. Genel zaman değişiklikleri bu paneli etkilemez.",
+    "panelTimeRange": "Panel Zaman Aralığı",
+    "panelTimeRangeTooltip": "Bu zaman aralığı yalnızca bu panel için geçerlidir. Diğer paneller kendi yapılandırılmış zamanlarını veya genel gösterge paneli zamanını kullanacaktır.",
+    "panelTimeSettingsTooltip": "Bu panelin zaman aralığını nasıl belirlediğini yapılandırın. Gösterge panelinin zaman aralığını kullanabilir veya bu panel için özel bir tane ayarlayabilirsiniz.",
+    "panelTimeMode": "Zaman Aralığı Kaynağı (Gösterge Tablosu Yüklemesinde)",
+    "useDefaultTimeTooltip": "Etkinleştirildiğinde, bu panel genel gösterge paneli zamanı yerine gösterge tablosu yüklenmesinde zaman aralığı olarak yapılandırılmış varsayılan süreyi kullanır.",
+    "defaultDuration": "Varsayılan Süre"
   },
   "panel": {
     "header": "Panel",

@@ -15,7 +15,7 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: calc(100vh - 57px)">
+  <div style="height: calc(100vh - 57px)" data-test="view-panel-screen">
     <div class="flex justify-between items-center q-pa-md">
       <div class="flex items-center q-table__title q-mr-md">
         <span data-test="dashboard-viewpanel-title">
@@ -237,6 +237,7 @@ import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
@@ -659,6 +660,17 @@ export default defineComponent({
 
     watch(selectedDate, () => {
       updateDateTime(selectedDate.value);
+
+      // CRITICAL FIX: When date time changes (user clicked Apply), also commit any pending variable changes
+      // This ensures that if user changed both variables and date time,
+      // both changes are applied to the chart when Apply is clicked
+      Object.assign(
+        currentVariablesDataRef,
+        JSON.parse(JSON.stringify(variablesData)),
+      );
+
+      // Mark variables as in sync (flag logic is inverted)
+      isVariablesChanged.value = true;
     });
 
     const dateTimeForVariables = ref(null);
@@ -668,7 +680,9 @@ export default defineComponent({
       const startTime = new Date(date.startTime);
       const endTime = new Date(date.endTime);
 
-      // Update only the variables time object
+      // Update the variables time object for query_values variables
+      // This allows variables to load with the new time range
+      // NOTE: This does NOT commit variables to the chart - only refreshData() does that
       dateTimeForVariables.value = {
         start_time: startTime,
         end_time: endTime,
@@ -676,6 +690,10 @@ export default defineComponent({
     };
 
     const updateDateTime = (value: object) => {
+      // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
+      // In view panel mode, when time changes, this panel should always refresh
+      panelIdToBeRefreshed.value = null;
+
       dashboardPanelData.meta.dateTime = {
         start_time: new Date(selectedDate.value.startTime),
         end_time: new Date(selectedDate.value.endTime),

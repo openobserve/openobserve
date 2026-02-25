@@ -305,6 +305,16 @@ jobs:
               [
                 "dashboard-table-pagination.spec.js"
               ]
+          - testfolder: "Dashboards-Panel-Level-DateTime-Config"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-panel-time-config-behavior.spec.js",
+                "dashboard-panel-time-url-priority.spec.js",
+                "dashboard-panel-time-advanced-edge-cases.spec.js",
+                "dashboard-panel-time-apply-behavior.spec.js",
+                "dashboard-panel-time-variables-behavior.spec.js",
+              ]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -464,7 +474,7 @@ jobs:
               "Logs-Core"|"Logs-Queries")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboards-Panel-Level-DateTime-Config")
                 ACTUAL_FOLDER="Dashboards"
                 ;;
               *)
