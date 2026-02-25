@@ -822,30 +822,25 @@ export const convertServiceGraphToNetwork = (
     const p95 = formatLatency(edge.p95_latency_ns || 0);
     const p99 = formatLatency(edge.p99_latency_ns || 0);
 
-    // Determine color based on error rate AND latency (P95)
-    // Priority: errors first, then latency vs baseline (if available) or absolute thresholds
+    // Edge color is latency-only (error rate belongs on nodes, not edges)
     const p95Ms = (edge.p95_latency_ns || 0) / 1000000;
     const baselineKey = `${edge.from}->${edge.to}`;
     const baseline = edgeBaselines?.get(baselineKey);
     let edgeColor;
-    if (errorRate > 5) {
-      edgeColor = "#f5222d"; // Red for high errors
-    } else if (errorRate > 1) {
-      edgeColor = "#faad14"; // Orange for medium errors
-    } else if (baseline && baseline.p95_avg > 0) {
-      // Baseline-relative coloring: compare current p95 to 24h weighted average
+    if (baseline && baseline.p95_avg > 0) {
+      // Baseline-relative coloring: compare current p95 to previous-slot weighted average
       const ratio = (edge.p95_latency_ns || 0) / baseline.p95_avg;
       if (ratio > 2.0) {
-        edgeColor = "#ff7875"; // Light red: >2x baseline
+        edgeColor = "#ff7875"; // >2x baseline
       } else if (ratio > 1.5) {
-        edgeColor = "#ffc069"; // Light orange: >1.5x baseline
+        edgeColor = "#ffc069"; // 1.5–2x baseline
       } else {
-        edgeColor = "#52c41a"; // Green: within baseline
+        edgeColor = "#52c41a"; // Within baseline
       }
     } else if (p95Ms > 1000) {
-      edgeColor = "#ff7875"; // Light red for high latency (>1s)
+      edgeColor = "#ff7875"; // >1s absolute threshold
     } else if (p95Ms > 500) {
-      edgeColor = "#ffc069"; // Light orange for medium latency (>500ms)
+      edgeColor = "#ffc069"; // >500ms absolute threshold
     } else {
       edgeColor = "#52c41a"; // Green for healthy
     }

@@ -954,7 +954,10 @@ pub async fn enrich_with_topology(
                 };
 
                 let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
-                    o2_enterprise::enterprise::service_graph::build_topology(raw_sg_edges)
+                    o2_enterprise::enterprise::service_graph::build_topology(
+                        raw_sg_edges,
+                        std::collections::HashMap::new(),
+                    )
                 } else {
                     (vec![], vec![])
                 };

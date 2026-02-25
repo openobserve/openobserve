@@ -986,12 +986,7 @@ export default defineComponent({
           });
           const data = res.data;
           edgeTrendCache.set(edgeKey, data);
-          edgeBaselines.value.set(edgeKey, {
-            p50_avg: data.p50_avg ?? 0,
-            p95_avg: data.p95_avg ?? 0,
-            p99_avg: data.p99_avg ?? 0,
-          });
-          edgeBaselines.value = new Map(edgeBaselines.value);
+          // Baselines come from the topology response, not from history
           if (sharedCurrentHoverEdgeKey === edgeKey) {
             renderTrendChart(data);
             positionTooltip(lastMouseX, lastMouseY);
@@ -1233,6 +1228,9 @@ export default defineComponent({
     });
 
     const loadServiceGraph = async () => {
+      // Prevent concurrent loads — if already loading, skip
+      if (loading.value) return;
+
       loading.value = true;
       error.value = null;
 
@@ -1249,27 +1247,6 @@ export default defineComponent({
           throw new Error("No organization selected");
         }
 
-        // If a specific stream is selected but we don't have available streams yet,
-        // first fetch all streams to populate the dropdown
-        if (
-          availableStreams.value.length === 0 &&
-          streamFilter.value !== "all"
-        ) {
-          const allStreamsResponse =
-            await serviceGraphService.getCurrentTopology(orgId, {
-              startTime: searchObj.data.datetime.startTime,
-              endTime: searchObj.data.datetime.endTime,
-            });
-          if (
-            allStreamsResponse.data.availableStreams &&
-            allStreamsResponse.data.availableStreams.length > 0
-          ) {
-            availableStreams.value = allStreamsResponse.data.availableStreams;
-          }
-        }
-
-        // Stream-only implementation - no store stats needed
-        // Use JSON topology endpoint with time range
         const response = await serviceGraphService.getCurrentTopology(orgId, {
           streamName:
             streamFilter.value && streamFilter.value !== "all"
@@ -1320,12 +1297,28 @@ export default defineComponent({
             p50_latency_ns: edge.p50_latency_ns || 0,
             p95_latency_ns: edge.p95_latency_ns || 0,
             p99_latency_ns: edge.p99_latency_ns || 0,
+            baseline_p50_latency_ns: edge.baseline_p50_latency_ns ?? null,
+            baseline_p95_latency_ns: edge.baseline_p95_latency_ns ?? null,
+            baseline_p99_latency_ns: edge.baseline_p99_latency_ns ?? null,
           }));
 
         graphData.value = {
           nodes,
           edges,
         };
+
+        // Populate edgeBaselines from topology prev-slot data for edge coloring
+        const newBaselines = new Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>();
+        for (const edge of edges) {
+          if (edge.baseline_p95_latency_ns != null) {
+            newBaselines.set(`${edge.from}->${edge.to}`, {
+              p50_avg: edge.baseline_p50_latency_ns ?? 0,
+              p95_avg: edge.baseline_p95_latency_ns ?? 0,
+              p99_avg: edge.baseline_p99_latency_ns ?? 0,
+            });
+          }
+        }
+        edgeBaselines.value = newBaselines;
 
         // Calculate stats
         const totalRequests = graphData.value.edges.reduce(
