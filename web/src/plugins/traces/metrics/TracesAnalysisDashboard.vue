@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :viewOnly="false"
                   :allowAlertCreation="false"
                   :simplifiedPanelView="true"
-                  searchType="dashboards"
+                  :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
                   @variablesManagerReady="onVariablesManagerReady"
                   @onDeletePanel="handlePanelDelete"
                 />
