@@ -413,10 +413,11 @@ export class TracesPage {
 
   async enterSQLQuery(query) {
     // Try different editor selectors - check visibility for each
+    // Note: Use .fill() to avoid pointer interception issues
     const editorSelectors = [
+      this.page.locator('.monaco-editor .inputarea').first(),
       this.page.locator('.monaco-editor textarea').first(),
-      this.page.locator(this.queryEditor),
-      this.page.locator('.view-lines')
+      this.page.locator(this.queryEditor).locator('.inputarea, textarea').first()
     ];
 
     let editor = null;
@@ -428,13 +429,11 @@ export class TracesPage {
     }
 
     if (!editor) {
-      throw new Error('No visible editor found');
+      throw new Error('No visible editor input found');
     }
 
-    await editor.click();
-    await this.page.keyboard.press('Control+A');
-    await this.page.keyboard.press('Delete');
-    await this.page.keyboard.type(query);
+    // Use fill() instead of click + type to avoid pointer interception
+    await editor.fill(query);
   }
 
   async runQuery() {
@@ -660,19 +659,14 @@ export class TracesPage {
 
     try {
       await expect(queryEditor).toBeVisible({ timeout: 5000 });
-      await queryEditor.click();
 
-      const viewLines = this.page.locator('.view-lines');
-      await expect(viewLines).toBeVisible({ timeout: 3000 });
-      await viewLines.click();
-      await this.page.waitForTimeout(500);
+      // Use .fill() method to avoid pointer interception issues
+      // Try different selectors: .inputarea (Monaco's input area) or textarea (fallback)
+      const monacoInput = queryEditor.locator('.inputarea, textarea').first();
+      await expect(monacoInput).toBeVisible({ timeout: 3000 });
 
-      // Clear existing content
-      await this.page.keyboard.press('Control+A');
-      await this.page.keyboard.press('Delete');
-
-      // Type new query
-      await this.page.keyboard.type(query);
+      // Fill directly without clicking to avoid pointer interception
+      await monacoInput.fill(query);
       await this.page.waitForTimeout(500);
 
     } catch (error) {
