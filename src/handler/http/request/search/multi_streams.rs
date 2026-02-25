@@ -823,7 +823,7 @@ pub async fn _search_partition_multi(
         &req,
         enable_align_histogram,
     );
-    let search_res = if !cfg.common.tracing_enabled && cfg.common.should_create_span() {
+    let search_res = if cfg.common.should_create_span() {
         search_fut.instrument(http_span).await
     } else {
         search_fut.await

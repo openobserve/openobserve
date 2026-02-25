@@ -183,10 +183,7 @@ async fn main() -> Result<(), anyhow::Error> {
             log::set_max_level(LevelFilter::from_str(&cfg.log.level).unwrap_or(LevelFilter::Info))
         })?;
         None
-    } else if cfg.common.tracing_enabled
-        || cfg.common.tracing_search_enabled
-        || cfg.common.search_inspector_enabled
-    {
+    } else if cfg.common.should_create_span() {
         log::info!("OpenTelemetry tracing enabled - initializing tracer provider");
         tracer_provider = Some(enable_tracing()?);
         log::info!("Tracer provider initialized successfully");
