@@ -19,20 +19,16 @@ phases:
       # simd version
       - docker build -t openobserve:latest-arm64 -f deploy/build/Dockerfile.tag.aarch64 .
       - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-simd
-      - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve:latest-arm64-simd
       
       - docker push public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-simd
-      - docker push public.ecr.aws/zinclabs/openobserve:latest-arm64-simd
 
       # common version
       # ARM version default enable NEON feature, so don't need build again
       # - docker build -t openobserve:latest-arm64-simd -f deploy/build/Dockerfile.tag.aarch64 .
       
       - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64
-      - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve:latest-arm64
       
       - docker push public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64
-      - docker push public.ecr.aws/zinclabs/openobserve:latest-arm64
 
       # debug version
       - docker build -t openobserve:latest-arm64-debug -f deploy/build/Dockerfile.tag-debug.aarch64 .
@@ -42,14 +38,10 @@ phases:
       # push to docker hub
       - echo 'Pull arm64 image'
       - docker tag openobserve:latest-arm64 openobserve/openobserve:$GIT_TAG-arm64
-      - docker tag openobserve:latest-arm64 openobserve/openobserve:latest-arm64
       - docker push openobserve/openobserve:$GIT_TAG-arm64
-      - docker push openobserve/openobserve:latest-arm64
       - echo 'Pull arm64-simd image'
       - docker tag openobserve:latest-arm64 openobserve/openobserve:$GIT_TAG-arm64-simd
-      - docker tag openobserve:latest-arm64 openobserve/openobserve:latest-arm64-simd
       - docker push openobserve/openobserve:$GIT_TAG-arm64-simd
-      - docker push openobserve/openobserve:latest-arm64-simd
       - echo 'Pull arm64-debug image'
       - docker tag openobserve:latest-arm64-debug openobserve/openobserve:$GIT_TAG-arm64-debug
       - docker push openobserve/openobserve:$GIT_TAG-arm64-debug
