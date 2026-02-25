@@ -358,6 +358,14 @@ test.describe("Pre-Test Cleanup", () => {
     // These are created by ensureSemanticGroupsExist() in correlationSettingsPage.js
     await pm.apiCleanup.cleanupCorrelationSettings();
 
+    // Clean up service graph test screenshots
+    const path = require('path');
+    const screenshotDir = path.join(__dirname, '..', 'test-results', 'screenshots');
+    pm.apiCleanup.cleanupScreenshots(
+      ['service-graph-', 'tree-view-', 'graph-view-', 'graph-debug'],
+      screenshotDir
+    );
+
     testLogger.info('Pre-test cleanup completed successfully');
   });
 });
