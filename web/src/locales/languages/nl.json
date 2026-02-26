@@ -1417,6 +1417,7 @@
     "columnsDefaultOrder": "De kolommen worden in hun standaardvolgorde weergegeven",
     "moveUp": "Ga omhoog",
     "moveDown": "Naar beneden gaan",
+    "connectNullValuesTooltip": "Verbind datapunten over ontbrekende waarden met een lijn.",
     "panelTimeSettings": "Instellingen voor paneeltijd",
     "panelTimeEnabled": "Tijd op paneelniveau toestaan",
     "useGlobalTime": "Gebruik wereldwijde tijd",

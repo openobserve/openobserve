@@ -1428,7 +1428,8 @@
     "panelTimeSettingsTooltip": "Configure la forma en que este panel determina su intervalo de tiempo. Puede usar el intervalo de tiempo del panel de control o establecer uno personalizado para este panel.",
     "panelTimeMode": "Fuente de rango de tiempo (al cargar el tablero)",
     "useDefaultTimeTooltip": "Cuando esté activado, este panel utilizará la duración predeterminada configurada como intervalo de tiempo al cargar el panel, en lugar del tiempo global del panel.",
-    "defaultDuration": "Duración predeterminada"
+    "defaultDuration": "Duración predeterminada",
+    "connectNullValuesTooltip": "Conecte los puntos de datos de los valores faltantes con una línea."
   },
   "panel": {
     "header": "Panel",

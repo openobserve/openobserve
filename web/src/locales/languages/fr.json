@@ -1428,7 +1428,8 @@
     "panelTimeSettingsTooltip": "Configurez la façon dont ce panneau détermine son intervalle de temps. Vous pouvez utiliser la plage horaire du tableau de bord ou en définir une personnalisée pour ce panneau.",
     "panelTimeMode": "Source de plage horaire (lors du chargement du tableau de bord)",
     "useDefaultTimeTooltip": "Lorsqu'il est activé, ce panneau utilise la durée par défaut configurée comme plage de temps lors du chargement du tableau de bord, au lieu de l'heure globale du tableau de bord.",
-    "defaultDuration": "Durée par défaut"
+    "defaultDuration": "Durée par défaut",
+    "connectNullValuesTooltip": "Connectez les points de données entre les valeurs manquantes à l'aide d'une ligne."
   },
   "panel": {
     "header": "Panneau",
