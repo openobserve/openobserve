@@ -229,12 +229,14 @@ test.describe("Dashboard Create Alert testcases", () => {
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Save the panel to get back to dashboard view
+      // Save the panel and wait for dashboard to reload chart data
+      const dashboardStreamPromise = page.waitForResponse(
+        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
+        { timeout: 30000 }
+      ).catch(() => {});
       await pm.dashboardPanelActions.savePanel();
-
-      // Wait for dashboard view to stabilize
-      await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
-      await page.locator('[data-test="chart-renderer"]').first().waitFor({ state: "visible", timeout: 10000 });
+      await dashboardStreamPromise;
+      await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
 
       // Right-click on the chart renderer
       await pm.dashboardPanelEdit.rightClickChartForAlert();
@@ -415,52 +417,52 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       // Step 1 (Setup) - pre-filled → Continue
       await continueBtn.click();
-      await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+      await page.waitForLoadState("networkidle", { timeout: 5000 });
 
       // Step 2 (SQL/Conditions) - pre-filled → Continue
       await continueBtn.click();
-      await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+      await page.waitForLoadState("networkidle", { timeout: 5000 });
 
       // Step 3 (Compare with Past) → Skip, Continue
       await continueBtn.click();
-      await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+      await page.waitForLoadState("networkidle", { timeout: 5000 });
 
       // Step 4 (Settings) → Set threshold and select destination
-      // data-test selectors added in AlertSettings.vue; fallback for pre-build compat
-      const thresholdOperator = page
-        .locator('[data-test="alert-threshold-operator-select"]')
-        .or(page.locator(".step-alert-conditions .q-select").first());
-      await thresholdOperator.first().waitFor({ state: "visible", timeout: 10000 });
-      await thresholdOperator.first().click();
+      const thresholdOperator = page.locator(
+        '[data-test="alert-threshold-operator-select"]'
+      );
+      await thresholdOperator.waitFor({ state: "visible", timeout: 10000 });
+      await thresholdOperator.click();
       await page.getByText(">=", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
       await page.getByText(">=", { exact: true }).click();
 
-      const thresholdInput = page
-        .locator('[data-test="alert-threshold-value-input"] input')
-        .or(page.locator(".step-alert-conditions input[type='number']").first());
-      await thresholdInput.first().waitFor({ state: "visible", timeout: 5000 });
-      await thresholdInput.first().fill("1");
+      const thresholdInput = page.locator(
+        '[data-test="alert-threshold-value-input"] input'
+      );
+      await thresholdInput.waitFor({ state: "visible", timeout: 5000 });
+      await thresholdInput.fill("1");
 
       // Select destination
-      const destinationDropdown = page
-        .locator('[data-test="alert-destinations-select"]')
-        .or(page.locator(".destinations-select-field").first());
-      await destinationDropdown.first().waitFor({ state: "visible", timeout: 5000 });
-      await destinationDropdown.first().click();
+      const destinationDropdown = page.locator(
+        '[data-test="alert-destinations-select"]'
+      );
+      await destinationDropdown.waitFor({ state: "visible", timeout: 5000 });
+      await destinationDropdown.click();
 
-      // Quasar q-select renders items as q-item in a popup menu
-      const destOption = page.locator(".q-item").filter({ hasText: destinationName }).first();
+      const destOption = page.locator(
+        `[data-test="alert-destination-option-${destinationName}"]`
+      );
       await expect(destOption).toBeVisible({ timeout: 5000 });
       await destOption.click();
       await page.keyboard.press("Escape");
 
       // Step 5 (Dedup) → Skip, Continue
       await continueBtn.click();
-      await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+      await page.waitForLoadState("networkidle", { timeout: 5000 });
 
       // Step 6 (Advanced) → Skip, Continue
       await continueBtn.click();
-      await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+      await page.waitForLoadState("networkidle", { timeout: 5000 });
 
       // Submit the alert
       await page.locator('[data-test="add-alert-submit-btn"]').click();

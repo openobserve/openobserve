@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-slot:option="option">
                   <q-list dense>
-                    <q-item tag="label">
+                    <q-item tag="label" :data-test="`alert-destination-option-${option.opt}`">
                       <q-item-section avatar>
                         <q-checkbox
                           size="xs"
@@ -634,7 +634,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-slot:option="option">
                   <q-list dense>
-                    <q-item tag="label">
+                    <q-item tag="label" :data-test="`alert-destination-option-${option.opt}`">
                       <q-item-section avatar>
                         <q-checkbox
                           size="xs"
