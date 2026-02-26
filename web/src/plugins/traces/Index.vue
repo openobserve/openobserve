@@ -225,26 +225,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-splitter>
       </div>
     </div>
-
-    <!-- Color Preview Dialog (Test) -->
-    <q-dialog
-      v-model="showColorPreview"
-      maximized
-      transition-show="slide-up"
-      transition-hide="slide-down"
-    >
-      <q-card class="tw:bg-[var(--o2-primary-background)]">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">Span Color Palette Preview</div>
-          <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
-        </q-card-section>
-
-        <q-card-section class="tw:h-[calc(100vh-60px)] tw:overflow-auto">
-          <span-color-preview />
-        </q-card-section>
-      </q-card>
-    </q-dialog>
   </q-page>
 </template>
 
@@ -267,7 +247,6 @@ import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
 
-import searchService from "@/services/search";
 import TransformService from "@/services/jstransform";
 import {
   b64EncodeUnicode,
@@ -319,7 +298,6 @@ const toggleErrorDetails = () => {
   disableMoreErrorDetails.value = !disableMoreErrorDetails.value;
 };
 const indexListRef = ref(null);
-const showColorPreview = ref(false);
 const { getStreams, getStream } = useStreams();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =

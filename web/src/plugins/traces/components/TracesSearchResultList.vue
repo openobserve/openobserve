@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="margin: 0 auto; display: block"
         />
         <span class="text-center">
-          Hold on tight, we're fetching your traces.
+          {{ t('traces.fetchingTraces') }}
         </span>
       </div>
     </div>
@@ -38,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="noResults"
       class="text-center tw:mx-[10%] tw:my-[40px] tw:text-[20px]"
     >
-      <q-icon name="info" color="primary" size="md" /> No traces found. Please
-      adjust the filters and try again.
+      <q-icon name="info" color="primary" size="md" /> {{ t('traces.noTracesFoundAdjust') }}
     </div>
 
     <!-- ════════════════════ Traces List Section ════════════════════ -->
@@ -59,12 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-section-title"
           class="tw:text-[0.75rem] tw:font-bold tw:tracking-[0.0625rem]! tw:text-[var(--o2-text-1)]! tw:mr-[0.85rem]"
         >
-          TRACES
+          {{ t('traces.tracesTitle') }}
         </span>
         <q-badge
           data-test="traces-count-badge"
           rounded
-          :label="`${hits.length} Traces Found`"
+          :label="`${hits.length} ${t('traces.tracesFound')}`"
           class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
         />
       </div>
@@ -150,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import TracesTable from "@/components/traces/TracesTable.vue";
 import { useTracesTableColumns } from "../composables/useTracesTableColumns";
 import TraceTimestampCell from "./TraceTimestampCell.vue";
@@ -172,6 +172,8 @@ interface Props {
   /** Show the "TRACES X Traces Found" section header. Default: true */
   showHeader?: boolean;
 }
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<Props>(), {
   searchPerformed: true,

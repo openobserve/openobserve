@@ -53,6 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   item: Record<string, any>;
@@ -62,8 +65,8 @@ const hasErrors = computed(() => (props.item.errors ?? 0) > 0);
 
 const label = computed(() =>
   hasErrors.value
-    ? `${props.item.errors} ERROR${props.item.errors !== 1 ? "S" : ""}`
-    : "SUCCESS",
+    ? `${props.item.errors} ${props.item.errors !== 1 ? t('traces.errors') : t('traces.error')}`
+    : t('traces.success'),
 );
 
 const pillBg = computed(() =>

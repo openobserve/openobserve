@@ -37,6 +37,7 @@ const _momentReady = import("moment-timezone").then((m) => {
 import { ref, watch, onBeforeMount } from "vue";
 import { date as qDate } from "quasar";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -57,6 +58,7 @@ const props = defineProps<{
 }>();
 
 const store = useStore();
+const { t } = useI18n();
 const formatted = ref({ day: "", time: "" });
 
 function buildFormatted() {
@@ -70,8 +72,8 @@ function buildFormatted() {
 
   const d = tsMoment.toDate();
   let day = "";
-  if (diffSec < 86400) day = "Today";
-  else if (diffSec < 86400 * 2) day = "Yesterday";
+  if (diffSec < 86400) day = t('traces.today');
+  else if (diffSec < 86400 * 2) day = t('traces.yesterday');
   else day = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 
   formatted.value = { day, time: formatTimeTo12Hour(d) };

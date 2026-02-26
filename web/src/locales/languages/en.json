@@ -2701,7 +2701,17 @@
     "openFields": "Open Fields",
     "timeRangeUpdated": "The selected time range did not include this trace. The time range has been updated to match the trace's timestamp.",
     "fetchingMoreTraces": "Fetching more traces...",
-    "errorRetrievingTraces": "Error occurred while retrieving traces."
+    "errorRetrievingTraces": "Error occurred while retrieving traces.",
+    "fetchingTraces": "Hold on tight, we're fetching your traces.",
+    "noTracesFoundAdjust": "No traces found. Please adjust the filters and try again.",
+    "tracesTitle": "TRACES",
+    "tracesFound": "Traces Found",
+    "error": "ERROR",
+    "errors": "ERRORS",
+    "success": "SUCCESS",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "spanColorPalettePreview": "Span Color Palette Preview"
   },
   "actions": {
     "testAction": "Test action",
