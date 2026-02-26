@@ -2547,7 +2547,8 @@
     "timeRangeUpdated": "Seçilen zaman aralığı bu izi içermiyordu. Zaman aralığı, izlemenin zaman damgasıyla eşleşecek şekilde güncellendi.",
     "fetchingMoreTraces": "Daha fazla iz getiriyor...",
     "showErrorOnly": "Yalnızca Hatayı Göster",
-    "openInTraces": "Traces'te aç"
+    "openInTraces": "Traces'te aç",
+    "errorRetrievingTraces": "İzler alınırken hata oluştu."
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -2945,7 +2946,8 @@
     "tracesErrorDetails": "İzleme verileri alınırken bir hata oluştu. Lütfen tekrar deneyin.",
     "metricsError": "Metrikler Yüklenemiyor",
     "metricsErrorDetails": "Metrik verileri alınırken bir hata oluştu. Lütfen tekrar deneyin.",
-    "noMetricsDescription": "Seçilen zaman aralığında bu korelasyon için hiçbir metrik bulunamadı."
+    "noMetricsDescription": "Seçilen zaman aralığında bu korelasyon için hiçbir metrik bulunamadı.",
+    "errorRetrievingTraces": "İzler alınırken hata oluştu."
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

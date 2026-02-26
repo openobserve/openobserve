@@ -2545,7 +2545,8 @@
     "timeRangeUpdated": "El intervalo de tiempo seleccionado no incluía este seguimiento. El intervalo de tiempo se actualizó para que coincida con la marca de tiempo del rastreo.",
     "fetchingMoreTraces": "Buscando más rastros...",
     "showErrorOnly": "Mostrar solo error",
-    "openInTraces": "Abrir en Traces"
+    "openInTraces": "Abrir en Traces",
+    "errorRetrievingTraces": "Se ha producido un error al recuperar los rastros."
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -2943,7 +2944,8 @@
     "tracesErrorDetails": "Se ha producido un error al obtener los datos de seguimiento. Vuelva a intentarlo.",
     "metricsError": "No se pueden cargar las métricas",
     "metricsErrorDetails": "Se ha producido un error al obtener los datos de las métricas. Por favor, inténtalo de nuevo.",
-    "noMetricsDescription": "No se han encontrado métricas para esta correlación en el intervalo de tiempo seleccionado."
+    "noMetricsDescription": "No se han encontrado métricas para esta correlación en el intervalo de tiempo seleccionado.",
+    "errorRetrievingTraces": "Se ha producido un error al recuperar los rastros."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",

@@ -2547,7 +2547,8 @@
     "timeRangeUpdated": "선택한 시간 범위에는 이 추적이 포함되지 않았습니다.트레이스의 타임스탬프와 일치하도록 시간 범위가 업데이트되었습니다.",
     "fetchingMoreTraces": "더 많은 트레이스를 가져오는 중...",
     "showErrorOnly": "오류만 보기",
-    "openInTraces": "오픈 인 트레이스"
+    "openInTraces": "오픈 인 트레이스",
+    "errorRetrievingTraces": "추적을 가져오는 동안 오류가 발생했습니다."
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -2945,7 +2946,8 @@
     "tracesErrorDetails": "추적 데이터를 가져오는 동안 오류가 발생했습니다.다시 시도해 주세요.",
     "metricsError": "지표를 로드할 수 없음",
     "metricsErrorDetails": "지표 데이터를 가져오는 동안 오류가 발생했습니다.다시 시도해 주세요.",
-    "noMetricsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 메트릭을 찾을 수 없습니다."
+    "noMetricsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 메트릭을 찾을 수 없습니다.",
+    "errorRetrievingTraces": "추적을 가져오는 동안 오류가 발생했습니다."
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",
