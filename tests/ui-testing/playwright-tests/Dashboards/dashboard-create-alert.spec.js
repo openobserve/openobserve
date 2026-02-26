@@ -20,7 +20,7 @@ const randomDashboardName =
   "Dashboard_Alert_" + Math.random().toString(36).slice(2, 11);
 
 test.describe("Dashboard Create Alert testcases", () => {
-  test.describe.configure({ mode: "serial" });
+  test.describe.configure({ mode: "parallel" });
 
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
