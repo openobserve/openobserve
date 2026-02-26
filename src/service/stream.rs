@@ -853,10 +853,6 @@ pub async fn update_stream_settings(
             .retain(|field| !new_settings.partition_keys.remove.contains(field));
     }
 
-    if let Some(partition_time_level) = new_settings.partition_time_level {
-        settings.partition_time_level = Some(partition_time_level);
-    }
-
     // Handle cross_links updates
     if !new_settings.cross_links.add.is_empty() || !new_settings.cross_links.remove.is_empty() {
         // Remove links by name
