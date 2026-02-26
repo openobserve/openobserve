@@ -1727,7 +1727,7 @@ export class LogsPage {
     }
 
     async clickQueryEditorTextbox() {
-        return await this.page.locator(this.queryEditor).locator('.monaco-editor').click();
+        return await this.page.locator(this.queryEditor).getByRole('code').click();
     }
 
     async fillQueryEditor(query) {
