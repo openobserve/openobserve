@@ -1,5 +1,5 @@
 //dashboard panel edit page
-// Methods: Duplicate panel, Edit panel, Delete panel, Download json, Download csv, Move to another tab, Fullscreen panel, Refresh panel, Edit layout, Go to logs
+// Methods: Duplicate panel, Edit panel, Delete panel, Download json, Download csv, Move to another tab, Fullscreen panel, Refresh panel, Edit layout, Go to logs, Create alert from panel
 export default class DashboardPanel {
   constructor(page) {
     this.page = page;
@@ -44,6 +44,17 @@ export default class DashboardPanel {
     this.queryInspector = page.locator(
       '[data-test="dashboard-query-inspector-panel"]'
     );
+
+    // VERIFIED: Create Alert from Panel Menu (PanelContainer.vue:289)
+    this.createAlertFromPanel = page.locator('[data-test="dashboard-create-alert-from-panel"]');
+
+    // VERIFIED: Alert Context Menu selectors (AlertContextMenu.vue)
+    this.alertContextMenu = page.locator('[data-test="alert-context-menu"]');
+    this.alertContextMenuAbove = page.locator('[data-test="alert-context-menu-above"]');
+    this.alertContextMenuBelow = page.locator('[data-test="alert-context-menu-below"]');
+
+    // VERIFIED: Chart renderer (ChartRenderer.vue:19)
+    this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
   }
 
   // Duplicate panel
@@ -151,6 +162,51 @@ export default class DashboardPanel {
       .click();
     await this.goToLogs.waitFor({ state: "visible" });
     await this.goToLogs.click();
+  }
+
+  // Create Alert from panel dropdown menu
+  async createAlertFromPanelMenu(panelName) {
+    await this.page
+      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+      .click();
+    await this.createAlertFromPanel.waitFor({ state: "visible" });
+    await this.createAlertFromPanel.click();
+  }
+
+  // Right-click on chart to open alert context menu
+  async rightClickChartForAlert() {
+    const chartCanvas = this.chartRendererCanvas.first();
+    await chartCanvas.waitFor({ state: "visible", timeout: 15000 });
+    // Click center of the chart canvas with right-click
+    await chartCanvas.click({ button: "right", position: { x: 200, y: 100 } });
+  }
+
+  // Verify alert context menu is visible
+  async expectAlertContextMenuVisible() {
+    const { expect } = require('@playwright/test');
+    await expect(this.alertContextMenu).toBeVisible({ timeout: 10000 });
+  }
+
+  // Verify alert context menu is hidden
+  async expectAlertContextMenuHidden() {
+    const { expect } = require('@playwright/test');
+    await expect(this.alertContextMenu).not.toBeVisible({ timeout: 5000 });
+  }
+
+  // Select "above threshold" from alert context menu
+  // Uses dispatchEvent because the teleported context menu is covered by the app overlay
+  // which intercepts pointer events - dispatchEvent fires directly on the DOM node
+  async selectAlertAboveThreshold() {
+    await this.alertContextMenuAbove.waitFor({ state: "visible" });
+    await this.alertContextMenuAbove.dispatchEvent("click");
+  }
+
+  // Select "below threshold" from alert context menu
+  // Uses dispatchEvent because the teleported context menu is covered by the app overlay
+  // which intercepts pointer events - dispatchEvent fires directly on the DOM node
+  async selectAlertBelowThreshold() {
+    await this.alertContextMenuBelow.waitFor({ state: "visible" });
+    await this.alertContextMenuBelow.dispatchEvent("click");
   }
 
   //open Query inspector
