@@ -1458,6 +1458,7 @@
     "vrlExtractionTooltip": "Grafikte çıkarılan VRL alanlarını kullanmak için bir VRL işlevi yazın ve Uygula düğmesine tıklayın. Alanlar çıkarılacak ve bunları grafiği oluşturmak için kullanmanıza izin verecektir.",
     "errorFetchingFunctions": "İşlevleri getirirken hata oluştu",
     "functionAppliedSuccess": "{name} işlevi başarıyla uygulandı.",
+    "connectNullValuesTooltip": "Veri noktalarını eksik değerler arasında bir çizgi ile bağlayın.",
     "panelTimeSettings": "Panel Zaman Ayarları",
     "panelTimeEnabled": "Panel seviyesi süresine izin ver",
     "useGlobalTime": "Küresel zamanı kullan",

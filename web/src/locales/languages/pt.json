@@ -1458,6 +1458,7 @@
     "vrlExtractionTooltip": "Para usar campos VRL extraídos no gráfico, escreva uma função VRL e clique no botão Aplicar. Os campos serão extraídos, permitindo que você os use para criar o gráfico.",
     "errorFetchingFunctions": "Erro ao buscar funções",
     "functionAppliedSuccess": "função {name} aplicada com sucesso.",
+    "connectNullValuesTooltip": "Conecte pontos de dados entre valores ausentes com uma linha.",
     "panelTimeSettings": "Configurações de tempo do painel",
     "panelTimeEnabled": "Permitir tempo no nível do painel",
     "useGlobalTime": "Use a hora global",

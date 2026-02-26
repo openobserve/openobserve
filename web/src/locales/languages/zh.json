@@ -1458,6 +1458,7 @@
     "vrlExtractionTooltip": "要在图表中使用提取的 VRL 字段，请编写 VRL 函数，然后单击 “应用” 按钮。这些字段将被提取，允许您使用它们来构建图表。",
     "errorFetchingFunctions": "获取函数时出错",
     "functionAppliedSuccess": "{name} 函数成功应用。",
+    "connectNullValuesTooltip": "用一条线将缺失值上的数据点连接起来。",
     "panelTimeSettings": "小组讨论时间设置",
     "panelTimeEnabled": "允许面板关卡时间",
     "useGlobalTime": "使用全球时间",

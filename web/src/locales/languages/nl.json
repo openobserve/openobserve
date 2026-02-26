@@ -1458,6 +1458,7 @@
     "vrlExtractionTooltip": "Om geëxtraheerde VRL-velden in het diagram te gebruiken, schrijft u een VRL-functie en klikt u op de knop Toepassen. De velden worden geëxtraheerd, zodat u ze kunt gebruiken om de grafiek samen te stellen.",
     "errorFetchingFunctions": "Fout bij het ophalen van functies",
     "functionAppliedSuccess": "De functie {name} is succesvol toegepast.",
+    "connectNullValuesTooltip": "Verbind datapunten over ontbrekende waarden met een lijn.",
     "panelTimeSettings": "Instellingen voor paneeltijd",
     "panelTimeEnabled": "Tijd op paneelniveau toestaan",
     "useGlobalTime": "Gebruik wereldwijde tijd",

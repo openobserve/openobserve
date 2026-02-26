@@ -1469,7 +1469,8 @@
     "panelTimeSettingsTooltip": "Configura il modo in cui questo pannello determina il suo intervallo di tempo. Puoi utilizzare l'intervallo di tempo della dashboard o impostarne uno personalizzato per questo pannello.",
     "panelTimeMode": "Origine dell'intervallo di tempo (al caricamento del dashboard)",
     "useDefaultTimeTooltip": "Se abilitato, questo pannello utilizzerà la durata predefinita configurata come intervallo di tempo al caricamento del dashboard, anziché il tempo globale del dashboard.",
-    "defaultDuration": "Durata predefinita"
+    "defaultDuration": "Durata predefinita",
+    "connectNullValuesTooltip": "Collega i punti dati tra i valori mancanti con una linea."
   },
   "panel": {
     "header": "Pannello",
