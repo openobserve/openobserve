@@ -10,6 +10,7 @@ const {
   generateAllEdgeCases,
   ingestTraces,
   waitForServiceGraphData,
+  waitForServiceRegistry,
   getTopology,
 } = require('../utils/service-graph-ingestion.js');
 
@@ -53,6 +54,22 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
       const topoResult = await getTopology(page);
       const topoData = topoResult.data?.nodes ? topoResult.data : topoResult.data?.data;
       testLogger.info(`Topology available: ${topoData?.nodes?.length || 0} nodes, ${topoData?.edges?.length || 0} edges`);
+
+      // Wait for service discovery pipeline to populate the service registry.
+      // The "Show Telemetry" correlation flow requires getGroupedServices() to
+      // return the service's FQN — without it, the dialog won't open.
+      testLogger.info('Waiting for service registry to populate (for telemetry correlation)...');
+      const registryResult = await waitForServiceRegistry(page, {
+        serviceName: 'api-gateway',
+        maxWaitMs: 120000,
+        pollIntervalMs: 10000,
+      });
+
+      if (registryResult.success) {
+        testLogger.info(`Service registry ready: api-gateway found with FQN '${registryResult.fqn}' after ${registryResult.waitedMs}ms`);
+      } else {
+        testLogger.warn(`Service registry not populated after ${registryResult.waitedMs}ms — telemetry correlation test may fail`);
+      }
     } finally {
       await page.close();
       await context.close();
@@ -348,35 +365,28 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     await pm.serviceGraphPage.expectSidePanelVisible();
     testLogger.info('Side panel opened for api-gateway');
 
-    // Click Show Telemetry and wait for the async API call to complete.
-    // The button triggers fetchCorrelatedStreams() which calls getGroupedServices()
-    // then correlateStreams(). If the service isn't in the registry yet (freshly
-    // ingested data), a notification toast appears instead of the dialog.
-    const dialogOpened = await pm.serviceGraphPage.clickShowTelemetryAndWait();
-    testLogger.info(`Show Telemetry result: dialog opened = ${dialogOpened}`);
+    // Click Show Telemetry and wait for the correlation dialog to open.
+    // beforeAll already waited for the service registry to populate, so the
+    // fetchCorrelatedStreams() call should find the service FQN and open the dialog.
+    await pm.serviceGraphPage.clickShowTelemetry();
+    testLogger.info('Clicked Show Telemetry button');
 
-    if (dialogOpened) {
-      testLogger.info('Correlation dialog is visible');
+    // Assert the correlation dialog opens
+    await pm.serviceGraphPage.expectCorrelationDialogVisible();
+    testLogger.info('Correlation dialog is visible');
 
-      // Verify tabs exist (Logs, Metrics, Traces)
-      const tabs = await pm.serviceGraphPage.getCorrelationTabs();
-      testLogger.info(`Correlation tabs: ${tabs.join(', ')}`);
+    // Verify tabs exist (Logs, Metrics, Traces)
+    const tabs = await pm.serviceGraphPage.getCorrelationTabs();
+    testLogger.info(`Correlation tabs: ${tabs.join(', ')}`);
 
-      // At minimum, Traces tab should be present
-      const hasTracesTab = tabs.some(t => t.toLowerCase().includes('traces'));
-      expect(hasTracesTab).toBeTruthy();
-      testLogger.info('Traces tab found in correlation dialog');
+    // At minimum, Traces tab should be present
+    const hasTracesTab = tabs.some(t => t.toLowerCase().includes('traces'));
+    expect(hasTracesTab).toBeTruthy();
+    testLogger.info('Traces tab found in correlation dialog');
 
-      // Close the dialog
-      await pm.serviceGraphPage.closeCorrelationDialog();
-      testLogger.info('Correlation dialog closed');
-    } else {
-      // Service not found in registry — the service discovery pipeline
-      // may not have processed the ingested traces yet. This is expected
-      // in short-lived CI environments. Verify the button at least responded.
-      testLogger.info('Correlation dialog did not open — service likely not in registry yet');
-      testLogger.info('Show Telemetry button click was handled (loading completed without dialog)');
-    }
+    // Close the dialog
+    await pm.serviceGraphPage.closeCorrelationDialog();
+    testLogger.info('Correlation dialog closed');
   });
 
   test("P1: Refresh button reloads graph data", {

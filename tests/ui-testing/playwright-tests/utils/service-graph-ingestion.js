@@ -2045,6 +2045,76 @@ async function waitForServiceGraphData(page, {
 }
 
 /**
+ * Poll the service_streams/_grouped API until a target service appears.
+ *
+ * The "Show Telemetry" correlation flow in ServiceGraphSidePanel.vue calls
+ * getGroupedServices() to look up the service's FQN. If the service isn't
+ * in the registry yet, the dialog won't open. This poller ensures the
+ * service discovery pipeline has processed the ingested traces before tests
+ * that depend on correlation run.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {object} opts
+ * @param {string} opts.serviceName - Service name to look for in groups
+ * @param {number} [opts.maxWaitMs=120000] - Max time to poll
+ * @param {number} [opts.pollIntervalMs=10000] - Interval between polls
+ * @returns {{ success: boolean, fqn: string|null, waitedMs: number }}
+ */
+async function waitForServiceRegistry(page, {
+  serviceName,
+  maxWaitMs = 120000,
+  pollIntervalMs = 10000,
+} = {}) {
+  const headers = getHeaders();
+  const baseUrl = getBaseUrl();
+  const orgId = getOrgId();
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const response = await page.request.get(
+        `${baseUrl}/api/${orgId}/service_streams/_grouped`,
+        { headers }
+      );
+
+      if (response.status() === 200) {
+        const data = await response.json().catch(() => null);
+        const groups = data?.groups || data?.data?.groups || [];
+
+        for (const group of groups) {
+          const services = group.services || [];
+          if (services.some(s => s.service_name === serviceName)) {
+            testLogger.info('Service found in registry', {
+              serviceName,
+              fqn: group.fqn,
+              waitedMs: Date.now() - startTime,
+            });
+            return { success: true, fqn: group.fqn, waitedMs: Date.now() - startTime };
+          }
+        }
+
+        testLogger.debug('Polling service registry', {
+          serviceName,
+          groupCount: groups.length,
+          elapsedMs: Date.now() - startTime,
+        });
+      } else if (response.status() === 403) {
+        // Enterprise-only endpoint — not available in OSS builds
+        testLogger.warn('Service registry endpoint returned 403 (enterprise-only)');
+        return { success: false, fqn: null, waitedMs: Date.now() - startTime };
+      }
+    } catch (e) {
+      testLogger.debug('Service registry poll error', { error: e.message });
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  testLogger.warn('Service registry poll timed out', { serviceName, maxWaitMs });
+  return { success: false, fqn: null, waitedMs: maxWaitMs };
+}
+
+/**
  * Get current service graph topology
  */
 async function getTopology(page) {
@@ -2129,5 +2199,6 @@ module.exports = {
 
   // Wait / polling
   waitForServiceGraphData,
+  waitForServiceRegistry,
   getTopology,
 };
