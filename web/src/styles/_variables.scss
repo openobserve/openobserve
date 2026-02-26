@@ -491,7 +491,7 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --tw-border-style: #e5e7eb;
 
-  --o2-section-header-bg: #F8FAFC;
+  --o2-section-header-bg: color-mix(in srgb, var(--o2-theme-color) 4%, rgb(247, 247, 247));
 
   --o2-text-3: #94A3B8;
   --o2-text-1: #64748B;
@@ -499,7 +499,7 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-text-4: #334155;
 
   --o2-tag-grey-1: #E2E8F0;
-  --o2-tag-grey-2: #F1F5F9;
+  --o2-tag-grey-2: #eaebec;
 
 
   // Span Colors for Traces (Light Mode)
@@ -713,6 +713,17 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-trace-text-secondary: #{$o2-dark-gray-1000};
   --o2-trace-hover: #{$o2-dark-gray-300};
   --o2-trace-selected: #{$o2-dark-blue-300};
+
+
+  --o2-section-header-bg: #28292a;
+
+  --o2-text-3: #94A3B8;
+  --o2-text-1: #94A3B8;
+  --o2-text-2: #a5b2c5;
+  --o2-text-4: #bacce6;
+
+  --o2-tag-grey-1: #565b60;
+  --o2-tag-grey-2: #313234;
 
   
 }

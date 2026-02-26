@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="trace-row"
-    class="trace-row row items-center q-px-sm cursor-pointer tw:bg-white!"
+    class="trace-row row items-center q-px-sm cursor-pointer"
     :class="{ 'trace-row--error': hasErrors }"
     @click="$emit('click', item)"
   >

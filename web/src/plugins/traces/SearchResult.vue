@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="traces-search-result" class="overflow-hidden tw:h-full">
     <!-- ════════════════════ RED Metrics Section ════════════════════ -->
-    <div class="card-container tw:bg-white! tw:h-fit tw:overflow-hidden">
+    <div class="card-container tw:h-fit tw:overflow-hidden">
       <transition
         enter-active-class="transition-all duration-300 ease-in-out"
         leave-active-class="transition-all duration-300 ease-in-out"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </transition>
     </div>
     <div
-      class="card-container tw:bg-white! tw:overflow-hidden tw:mt-[0.625rem] tw:duration-300 tw:ease-in"
+      class="card-container tw:overflow-hidden tw:mt-[0.625rem] tw:duration-300 tw:ease-in"
       :class="
         searchObj.meta.showHistogram
           ? 'tw:h-[calc(100%-16.8rem)]!'
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               borderless
               data-test="traces-rows-per-page"
-              class="tw:m-0! select-pagination"
+              class="tw:m-0! select-pagination tw:mr-[0.325rem]!"
               @update:model-value="onRowsPerPageChange"
             />
             <q-pagination
@@ -152,17 +152,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Table scroll area -->
         <div
           data-test="traces-search-result-list"
-          class="traces-table-scroll-area"
+          class="traces-table-scroll-area tw:w-full"
         >
-          <OzTable
+          <TracesTable
             :columns="tracesColumns"
             :rows="pagedHits"
             :row-class="traceRowClass"
-            class="tw:bg-white!"
             @row-click="expandRowDetail"
           >
             <template #empty />
-          </OzTable>
+          </TracesTable>
         </div>
       </div>
     </div>
@@ -184,8 +183,7 @@ import { useI18n } from "vue-i18n";
 import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
-import TraceBlock from "./TraceBlock.vue";
-import OzTable from "@/components/OzTable.vue";
+import TracesTable from "@/components/traces/TracesTable.vue";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { useRouter } from "vue-router";
 import { isLLMTrace } from "../../utils/llmUtils";
@@ -193,8 +191,7 @@ import { isLLMTrace } from "../../utils/llmUtils";
 export default defineComponent({
   name: "SearchResult",
   components: {
-    TraceBlock,
-    OzTable,
+    TracesTable,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
     ),
