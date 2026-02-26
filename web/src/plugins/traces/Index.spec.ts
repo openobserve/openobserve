@@ -272,6 +272,7 @@ describe("Index.vue (Main Traces Page)", () => {
     mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
     mockSearchObj.data.queryResults = { hits: [] };
     mockSearchObj.data.errorMsg = "";
+    mockSearchObj.data.errorCode = 0;
     mockSearchObj.data.editorValue = "";
 
     // Mock router query params
@@ -574,7 +575,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="logs-search-result-not-found-text"]').exists()
+        wrapper.find('[data-test="traces-search-result-not-found-text"]').exists()
       ).toBe(true);
     });
 
@@ -637,6 +638,7 @@ describe("Index.vue (Main Traces Page)", () => {
   describe("Error Handling", () => {
     it("should display error message when query fails", async () => {
       mockSearchObj.data.errorMsg = "Query failed";
+      mockSearchObj.data.errorCode = 429; // Non-zero code → real error, not "no data"
       mockSearchObj.loading = false;
 
       wrapper = mount(Index, {
@@ -657,7 +659,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="logs-search-error-message"]').exists()
+        wrapper.find('[data-test="traces-search-error-message"]').exists()
       ).toBe(true);
     });
 
@@ -687,7 +689,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="logs-search-result-not-found-text"]').exists()
+        wrapper.find('[data-test="traces-search-result-not-found-text"]').exists()
       ).toBe(true);
     });
 
@@ -717,7 +719,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      expect(wrapper.find('[data-test="logs-search-error-20003"]').exists()).toBe(
+      expect(wrapper.find('[data-test="traces-search-error-20003"]').exists()).toBe(
         true
       );
     });

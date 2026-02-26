@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div ref="scrollerRef" class="oz-table" @scroll.passive="handleScroll">
     <!-- ── Sticky header ─────────────────────────────────────────────────── -->
     <div
-      class="oz-table__head tw:bg-[var(--o2-card-bg)]! row no-wrap items-center q-px-sm tw:border-[var(--o2-border-color)]!"
+      class="oz-table__head tw:bg-[var(--o2-card-bg-solid)]! row no-wrap items-center q-px-sm tw:border-[var(--o2-border-color)]!"
     >
       <div
         v-for="header in table.getHeaderGroups()[0].headers"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="virtualRow in rowVirtualizer.getVirtualItems()"
           :key="virtualRow.key"
-          class="oz-table__row tw:bg-[var(--o2-card-bg)]! row no-wrap items-center q-px-sm cursor-pointer tw:border-b tw:border-[var(--o2-border-2)]!"
+          class="oz-table__row tw:bg-[var(--o2-card-bg)] row no-wrap items-center q-px-sm cursor-pointer tw:border-b tw:border-[var(--o2-border-2)]!"
           :class="rowClass?.(allRows[virtualRow.index].original)"
           :style="{
             position: 'absolute',
@@ -269,7 +269,7 @@ function getAlignClass(column: Column<T, unknown>): string {
       in srgb,
       var(--o2-theme-color) 15%,
       rgb(255, 255, 255)
-    );
+    ) !important;
   }
 
   /**
@@ -292,9 +292,9 @@ body.body--dark {
     &:hover {
       background: color-mix(
         in srgb,
-        var(--o2-theme-color) 15%,
-        rgb(37, 37, 37)
-      );
+        var(--o2-theme-color) 10%,
+        rgb(39, 39, 39)
+      ) !important;
     }
   }
 }
