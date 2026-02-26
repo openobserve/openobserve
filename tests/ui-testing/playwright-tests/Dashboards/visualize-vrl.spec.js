@@ -621,7 +621,7 @@ test.describe("VRL visualization support testcases", () => {
     const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
     if (await vrlEditor.first().isVisible().catch(() => false)) {
       await vrlEditor.first().click();
-      await page.locator("#fnEditor").locator(".inputarea").fill("");
+      await page.locator('[data-test="logs-vrl-function-editor"]').locator(".inputarea").fill("");
     }
 
     // Apply query without VRL

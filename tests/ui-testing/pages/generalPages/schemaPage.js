@@ -38,7 +38,7 @@ class SchemaPage {
             saveStreamBtn: '[data-test="save-stream-btn"]',
             menuHomeItem: '[data-test="menu-link-\\/-item"]',
             menuLogsItem: '[data-test="menu-link-\\/logs-item"]',
-            fnEditor: '#fnEditor',
+            fnEditor: '[data-test="logs-vrl-function-editor"]',
             logSearchIndexSelectStream: '[data-test="log-search-index-list-select-stream"]',
             logStreamRefreshStatsBtn: '[data-test="log-stream-refresh-stats-btn"]',
             deleteButton: 'Delete',
