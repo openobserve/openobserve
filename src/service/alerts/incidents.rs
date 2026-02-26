@@ -66,9 +66,8 @@ fn extract_service_name_from_dimensions(
 /// Called after deduplication, before notification.
 ///
 /// Correlation priority:
-/// 1. trace_id (if present) - groups all alerts from same distributed trace
-/// 2. Service Discovery hash - uses pre-computed correlation_key from service_streams table
-/// 3. Manual extraction - computes blake3 hash from stable dimensions
+/// 1. Service Discovery hash - uses pre-computed correlation_key from service_streams table
+/// 2. Manual extraction - computes blake3 hash from stable dimensions
 ///
 /// Returns the incident ID if the alert was correlated to an existing or new incident.
 pub async fn correlate_alert_to_incident(
@@ -76,7 +75,6 @@ pub async fn correlate_alert_to_incident(
     result_row: &Map<String, Value>,
     triggered_at: i64,
     _service_name_hint: Option<&str>,
-    trace_id: Option<&str>,
 ) -> Result<Option<(String, String)>, anyhow::Error> {
     // Semantic groups from system_settings — the single source of truth,
     // configured via /settings/v2/semantic_field_groups API.
@@ -148,7 +146,6 @@ pub async fn correlate_alert_to_incident(
         service_discovery_result
             .as_ref()
             .map(|r| r.correlation_key.as_str()),
-        trace_id,
         &semantic_groups,
     );
 
@@ -418,6 +415,22 @@ async fn find_or_create_incident(
         )
         .await?;
 
+        // Record alert event (compacted)
+        if let Err(e) = infra::table::incident_events::record_alert(
+            org_id,
+            &existing.id,
+            &alert.get_unique_key(),
+            &alert.name,
+            triggered_at,
+        )
+        .await
+        {
+            log::error!(
+                "[Incidents] Failed to record alert event for incident {}: {e}",
+                existing.id
+            );
+        }
+
         if dimensions_changed {
             let updated = infra::table::alert_incidents::get(org_id, &existing.id)
                 .await?
@@ -525,6 +538,7 @@ async fn find_or_create_incident(
             // Upgrade correlation key if new key is stronger (NewIsSuperset)
             // Otherwise just update dimensions if they changed
             if matches!(relationship, DimensionRelationship::NewIsSuperset) {
+                let old_key = upgradeable_incident.correlation_key.clone();
                 infra::table::alert_incidents::upgrade_incident_correlation(
                     org_id,
                     &upgradeable_incident.id,
@@ -534,6 +548,20 @@ async fn find_or_create_incident(
                     updated.last_alert_at,
                 )
                 .await?;
+
+                // Record dimensions upgrade event
+                if let Err(e) = infra::table::incident_events::append(
+                    org_id,
+                    &upgradeable_incident.id,
+                    config::meta::alerts::incidents::IncidentEvent::dimensions_upgraded(
+                        old_key,
+                        correlation_key,
+                    ),
+                )
+                .await
+                {
+                    log::error!("[Incidents] Failed to record dimensions upgrade event: {e}");
+                }
             } else if dimensions_changed {
                 infra::table::alert_incidents::update_incident_metadata(
                     org_id,
@@ -581,6 +609,14 @@ async fn find_or_create_incident(
     )
     .await?;
 
+    // Initialize event timeline for new incident
+    if let Err(e) = infra::table::incident_events::init(org_id, &incident.id).await {
+        log::error!(
+            "[Incidents] Failed to init events for incident {}: {e}",
+            incident.id
+        );
+    }
+
     // Add the first alert to the incident
     infra::table::alert_incidents::add_alert_to_incident(
         &incident.id,
@@ -590,6 +626,22 @@ async fn find_or_create_incident(
         correlation_reason,
     )
     .await?;
+
+    // Record alert event
+    if let Err(e) = infra::table::incident_events::record_alert(
+        org_id,
+        &incident.id,
+        &alert.get_unique_key(),
+        &alert.name,
+        triggered_at,
+    )
+    .await
+    {
+        log::error!(
+            "[Incidents] Failed to record alert event for incident {}: {e}",
+            incident.id
+        );
+    }
 
     log::info!(
         "[incidents] Created new incident {} for alert '{}' (correlation_key: {}, severity: {})",
@@ -902,7 +954,10 @@ pub async fn enrich_with_topology(
                 };
 
                 let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
-                    o2_enterprise::enterprise::service_graph::build_topology(raw_sg_edges)
+                    o2_enterprise::enterprise::service_graph::build_topology(
+                        raw_sg_edges,
+                        std::collections::HashMap::new(),
+                    )
                 } else {
                     (vec![], vec![])
                 };
@@ -1090,8 +1145,23 @@ pub async fn update_status(
     org_id: &str,
     incident_id: &str,
     status: &str,
+    user_id: &str,
 ) -> Result<Incident, anyhow::Error> {
     let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
+
+    // Emit status change event
+    use config::meta::alerts::incidents::IncidentEvent;
+    let event = match status {
+        "acknowledged" => Some(IncidentEvent::acknowledged(user_id)),
+        "resolved" => Some(IncidentEvent::resolved(Some(user_id.to_string()))),
+        "open" => Some(IncidentEvent::reopened(user_id, "Manually reopened")),
+        _ => None,
+    };
+    if let Some(evt) = event
+        && let Err(e) = infra::table::incident_events::append(org_id, incident_id, evt).await
+    {
+        log::error!("[Incidents] Failed to record status event: {e}");
+    }
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -1116,8 +1186,29 @@ pub async fn update_title(
     org_id: &str,
     incident_id: &str,
     title: &str,
+    user_id: &str,
 ) -> Result<Incident, anyhow::Error> {
+    let current = infra::table::alert_incidents::get(org_id, incident_id).await?;
+    let from_title = current
+        .as_ref()
+        .and_then(|i| i.title.clone())
+        .unwrap_or_default();
+
     let updated = infra::table::alert_incidents::update_title(org_id, incident_id, title).await?;
+
+    if from_title != title
+        && let Err(e) = infra::table::incident_events::append(
+            org_id,
+            incident_id,
+            config::meta::alerts::incidents::IncidentEvent::title_changed(
+                from_title, title, user_id,
+            ),
+        )
+        .await
+    {
+        log::error!("[Incidents] Failed to record title change event: {e}");
+    }
+
     model_to_incident(updated).await
 }
 
@@ -1126,8 +1217,34 @@ pub async fn update_severity(
     org_id: &str,
     incident_id: &str,
     severity: &str,
+    user_id: &str,
 ) -> Result<Incident, anyhow::Error> {
+    // Get current severity before update
+    let current = infra::table::alert_incidents::get(org_id, incident_id).await?;
+    let from_severity: config::meta::alerts::incidents::IncidentSeverity = current
+        .map(|i| i.severity.parse().unwrap_or_default())
+        .unwrap_or_default();
+    let to_severity: config::meta::alerts::incidents::IncidentSeverity =
+        severity.parse().unwrap_or_default();
+
     let updated =
         infra::table::alert_incidents::update_severity(org_id, incident_id, severity).await?;
+
+    // Emit severity override event only when the severity actually changed
+    if from_severity != to_severity
+        && let Err(e) = infra::table::incident_events::append(
+            org_id,
+            incident_id,
+            config::meta::alerts::incidents::IncidentEvent::severity_override(
+                from_severity,
+                to_severity,
+                user_id,
+            ),
+        )
+        .await
+    {
+        log::error!("[Incidents] Failed to record severity event: {e}");
+    }
+
     model_to_incident(updated).await
 }

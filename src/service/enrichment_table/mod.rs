@@ -179,9 +179,12 @@ pub async fn save_enrichment_data(
 
     // disallow schema change for enrichment tables
     let value_iter = record_vals.iter().take(1).cloned().collect::<Vec<_>>();
-    let inferred_schema =
-        infer_json_schema_from_map(value_iter.into_iter(), StreamType::EnrichmentTables)
-            .map_err(|_e| std::io::Error::other("Error inferring schema"))?;
+    let inferred_schema = infer_json_schema_from_map(
+        &stream_name,
+        StreamType::EnrichmentTables,
+        value_iter.into_iter(),
+    )
+    .map_err(|_e| std::io::Error::other("Error inferring schema"))?;
     let db_schema = stream_schema_map
         .get(&stream_name)
         .map(|s| s.schema().as_ref().clone())

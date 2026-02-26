@@ -16,6 +16,7 @@ import DashboardImport from "./dashboardPages/dashboard-import.js";
 import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
 import DateTimeHelper from "./dashboardPages/dashboard-time";
+import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
@@ -35,6 +36,7 @@ import { HomePage } from "./generalPages/homePage.js";
 import { MetricsPage } from "./metricsPages/metricsPage.js";
 import { MetricsQueryEditorPage } from "./metricsPages/metricsQueryEditorPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
+import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { RumPage } from "./logsPages/rumPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { DataPage } from "./generalPages/dataPage.js";
@@ -91,6 +93,7 @@ class PageManager {
     this.dashboardShareExport = new DashboardShareExportPage(page);
     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
     this.dateTimeHelper = new DateTimeHelper(page);
+    this.dashboardPanelTime = new DashboardPanelTime(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
 
@@ -115,6 +118,7 @@ class PageManager {
     this.metricsPage = new MetricsPage(page);
     this.metricsQueryEditorPage = new MetricsQueryEditorPage(page);
     this.tracesPage = new TracesPage(page);
+    this.serviceGraphPage = new ServiceGraphPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
     this.dataPage = new DataPage(page);

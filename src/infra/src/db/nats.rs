@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -70,10 +70,19 @@ async fn get_bucket_by_key<'a>(
         history: cfg.nats.history,
         ..Default::default()
     };
-    if bucket_name == "nodes" || bucket_name == "clusters" {
+    if bucket_name == "nodes"
+        || bucket_name == "clusters"
+        || bucket_name == "locker"
+        || bucket_name == "lockers"
+    {
         // if changed ttl need recreate the bucket
         // CMD: nats kv del -f o2_nodes
-        let ttl = Duration::from_secs(cfg.limit.node_heartbeat_ttl as u64);
+        let ttl = if bucket_name.starts_with("locker") {
+            cfg.nats.lock_max_age
+        } else {
+            cfg.limit.node_heartbeat_ttl as u64
+        };
+        let ttl = Duration::from_secs(ttl);
         bucket.max_age = ttl;
         if cfg.nats.v211_support {
             bucket.limit_markers = Some(ttl);
@@ -721,8 +730,8 @@ impl Locker {
                 )));
             } else {
                 return Err(Error::Message(format!(
-                    "nats lock for key: {}, error: {}",
-                    self.key, err
+                    "nats lock for key: {}, error: {err}",
+                    self.key
                 )));
             }
         }
@@ -762,10 +771,10 @@ impl Locker {
         }
         self.state.store(2, Ordering::SeqCst);
         if let Err(e) = self.tx.as_ref().unwrap().send(()).await {
-            log::error!("nats unlock sender for key: {}, error: {}", self.key, e);
+            log::error!("nats unlock sender for key: {}, error: {e}", self.key);
         }
         if let Err(e) = bucket.purge(&key).await {
-            log::error!("nats unlock for key: {}, error: {}", self.key, e);
+            log::error!("nats unlock for key: {}, error: {e}", self.key);
             return Err(Error::Message("nats unlock error".to_string()));
         };
         Ok(())

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -298,16 +298,13 @@ impl FileData {
             // delete file from local disk
             let file_path = self.get_file_path(key.as_str());
             log::debug!(
-                "[CacheType:{}] File disk cache gc remove file: {}",
+                "[CacheType:{}] File disk cache gc remove file: {key}",
                 self.file_type,
-                key
             );
             if let Err(e) = tokio::fs::remove_file(&file_path).await {
                 log::error!(
-                    "[CacheType:{}] File disk cache gc remove file: {}, error: {}",
+                    "[CacheType:{}] File disk cache gc remove file: {file_path}, error: {e}",
                     self.file_type,
-                    file_path,
-                    e
                 );
             }
 
@@ -731,7 +728,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             fp.display()
                         );
                         if let Err(e) = tokio::fs::remove_file(&fp).await {
-                            log::warn!("Failed to remove tmp file: {}, error: {}", fp.display(), e);
+                            log::warn!("Failed to remove tmp file: {}, error: {e}", fp.display());
                         }
                         continue;
                     }

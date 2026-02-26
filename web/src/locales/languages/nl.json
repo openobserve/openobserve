@@ -113,6 +113,7 @@
     "getStarted": "Ga aan de slag",
     "reset": "Resetten",
     "retry": "Probeer het opnieuw",
+    "set": "+ Set",
     "copy": "Kopiëren",
     "copySuccess": "Gekopieerd naar klembord",
     "copyError": "Kopiëren naar klembord is mislukt"
@@ -1415,7 +1416,20 @@
     "noColumnsOrdered": "Geen kolommen besteld",
     "columnsDefaultOrder": "De kolommen worden in hun standaardvolgorde weergegeven",
     "moveUp": "Ga omhoog",
-    "moveDown": "Naar beneden gaan"
+    "moveDown": "Naar beneden gaan",
+    "connectNullValuesTooltip": "Verbind datapunten over ontbrekende waarden met een lijn.",
+    "panelTimeSettings": "Instellingen voor paneeltijd",
+    "panelTimeEnabled": "Tijd op paneelniveau toestaan",
+    "useGlobalTime": "Gebruik wereldwijde tijd",
+    "useIndividualTime": "Gebruik individuele tijd",
+    "panelTimeGlobalHint": "Het paneel houdt de wereldwijde dashboardtijd bij. Wijzigingen in de globale tijd zullen dit paneel updaten.",
+    "panelTimeIndividualHint": "Panel zal zijn eigen tijdbereik gebruiken. Stel de tijd in met behulp van de datumkiezer hieronder. Wereldwijde tijdwijzigingen hebben geen invloed op dit paneel.",
+    "panelTimeRange": "Tijdbereik van het paneel",
+    "panelTimeRangeTooltip": "Dit tijdbereik is alleen van toepassing op dit paneel. Andere panels gebruiken hun eigen geconfigureerde tijden of de globale dashboardtijd.",
+    "panelTimeSettingsTooltip": "Configureer hoe dit paneel het tijdbereik bepaalt. U kunt het tijdbereik van het dashboard gebruiken of een aangepaste tijdsperiode instellen voor dit paneel.",
+    "panelTimeMode": "Bron voor tijdbereik (bij laden van het dashboard)",
+    "useDefaultTimeTooltip": "Indien ingeschakeld, gebruikt dit paneel de ingestelde standaardduur als tijdsbereik bij het laden van het dashboard, in plaats van de globale dashboardtijd.",
+    "defaultDuration": "Standaardduur"
   },
   "panel": {
     "header": "Paneel",

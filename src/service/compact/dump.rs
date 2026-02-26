@@ -39,7 +39,7 @@ use infra::{
     cluster::get_node_from_consistent_hash,
     errors, file_list as infra_file_list,
     file_list::FileRecord,
-    schema::{STREAM_SCHEMAS_LATEST, SchemaCache, get_settings, unwrap_partition_time_level},
+    schema::{STREAM_SCHEMAS_LATEST, SchemaCache, get_partition_time_level, get_settings},
 };
 use itertools::Itertools;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
@@ -92,8 +92,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
         let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        let partition_time_level = get_partition_time_level(stream_type);
         // to avoid compacting conflict with retention, need check the data retention time
         let stream_data_retention_end = if stream_settings.data_retention > 0 {
             now - Duration::try_days(stream_settings.data_retention).unwrap()
@@ -201,13 +200,8 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         job.offset
     );
 
-    let stream_settings = get_settings(&job.org_id, &job.stream_name, job.stream_type)
-        .await
-        .unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, job.stream_type);
-
     // check offset
+    let partition_time_level = get_partition_time_level(job.stream_type);
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(job.offset * 1000);
     let offset_hour = Utc
         .with_ymd_and_hms(

@@ -28,7 +28,7 @@ use config::{
         alerts::alert::Alert,
         promql::{HASH_LABEL, METADATA_LABEL, Metadata, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
         self_reporting::usage::UsageType,
-        stream::{PartitioningDetails, StreamParams, StreamType},
+        stream::{StreamParams, StreamPartition, StreamType},
     },
     metrics,
     utils::{
@@ -39,7 +39,7 @@ use config::{
     },
 };
 use datafusion::arrow::datatypes::Schema;
-use infra::schema::{SchemaCache, unwrap_partition_time_level};
+use infra::schema::{SchemaCache, get_partition_time_level};
 
 use super::get_exclude_labels;
 use crate::{
@@ -94,7 +94,7 @@ pub async fn ingest(
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_status_map: HashMap<String, StreamStatus> = HashMap::new();
     let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
-    let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
+    let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
 
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
@@ -324,10 +324,11 @@ pub async fn ingest(
             stream_partitioning_map.insert(stream_name.to_string(), partition_det);
         }
         // get partition key
-        let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
-        let partition_keys = partition_det.partition_keys.clone();
-        let partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
+        let partition_keys = stream_partitioning_map
+            .get(&stream_name)
+            .cloned()
+            .unwrap_or_default();
+        let partition_time_level = get_partition_time_level(StreamType::Metrics);
 
         for (mut record, metric_type) in json_data {
             // Start get stream alerts

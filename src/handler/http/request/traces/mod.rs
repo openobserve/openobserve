@@ -34,7 +34,7 @@ use tracing::{Instrument, Span};
 #[cfg(feature = "cloud")]
 use crate::service::ingestion::check_ingestion_allowed;
 // Re-export service graph API handlers
-pub use crate::service::traces::service_graph::{self, get_current_topology};
+pub use crate::service::traces::service_graph::{self, get_current_topology, get_edge_history};
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -189,7 +189,7 @@ pub async fn get_latest_traces(
         }
     }
 
-    let (http_span, trace_id) = if cfg.common.tracing_search_enabled {
+    let (http_span, trace_id) = if cfg.common.should_create_span() {
         let uuid_v7_trace_id = config::ider::generate_trace_id();
         let span = tracing::info_span!(
             "/api/{org_id}/{stream_name}/traces/latest",
@@ -666,7 +666,7 @@ pub async fn get_latest_traces_stream(
         }
     }
 
-    let (http_span, trace_id) = if cfg.common.tracing_search_enabled {
+    let (http_span, trace_id) = if cfg.common.should_create_span() {
         let uuid_v7_trace_id = config::ider::generate_trace_id();
         let span = tracing::info_span!(
             "/api/{org_id}/{stream_name}/traces/latest_stream",

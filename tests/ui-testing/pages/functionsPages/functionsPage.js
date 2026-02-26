@@ -103,14 +103,21 @@ class FunctionsPage {
   }
 
   async enterFunctionCode(code) {
-    const editor = this.page.locator(this.functionEditor);
-    await editor.click();
-    await this.page.waitForTimeout(500);
+    // Focus the actual textarea inside the Monaco editor (not the container div).
+    // On headless Linux, clicking the wrapper div doesn't transfer focus to Monaco's
+    // internal textarea, so keyboard.type() sends keystrokes to nothing.
+    const textarea = this.page.locator(`${this.functionEditor} textarea`);
+    await textarea.focus();
+    await this.page.waitForTimeout(300);
 
     // Clear existing content and type new code
-    await this.page.keyboard.press('Control+A');
+    const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+    await this.page.keyboard.press(selectAll);
+    await this.page.keyboard.press('Backspace');
+    await this.page.waitForTimeout(200);
     await this.page.keyboard.type(code);
-    await this.page.waitForTimeout(500);
+    // Wait longer than the Monaco editor's 500ms debounce so formData syncs via v-model
+    await this.page.waitForTimeout(1000);
   }
 
   async clickSaveButton() {
@@ -127,7 +134,8 @@ class FunctionsPage {
 
   async clickTestButton() {
     const testButton = this.page.locator(this.testButton);
-    await testButton.click();
+    // force: true needed — button can be obscured by overlapping editor chrome
+    await testButton.click({ force: true });
     await this.page.waitForTimeout(1000);
   }
 
@@ -168,11 +176,20 @@ class FunctionsPage {
   // ==================== Test Function Methods ====================
 
   async enterTestEvent(eventJson) {
-    const testInput = this.page.locator(this.testEventsEditor);
-    await testInput.click();
-    await this.page.keyboard.press('Control+A');
+    // Focus the actual textarea inside the Monaco editor (not the container div).
+    // Using .focus() ensures keyboard shortcuts work correctly in Monaco.
+    const textarea = this.page.locator(`${this.testEventsEditor} textarea`);
+    await textarea.focus();
+    await this.page.waitForTimeout(300);
+
+    // Select all existing content, delete it, then type new content
+    const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+    await this.page.keyboard.press(selectAll);
+    await this.page.keyboard.press('Backspace');
+    await this.page.waitForTimeout(200);
     await this.page.keyboard.type(eventJson);
-    await this.page.waitForTimeout(500);
+    // Wait for Monaco editor v-model debounce to sync
+    await this.page.waitForTimeout(600);
   }
 
   async clickRunTestButton() {
@@ -180,16 +197,11 @@ class FunctionsPage {
     const runButton = testSection.getByRole('button', { name: /run|execute|test/i });
 
     if (await runButton.isVisible({ timeout: 2000 })) {
-      // Wait for button to be enabled (it may be disabled initially)
-      await runButton.waitFor({ state: 'visible', timeout: 5000 });
-      // Try to click with force if needed (button validation may be preventing click)
-      try {
-        await runButton.click({ timeout: 5000 });
-      } catch (e) {
-        // If regular click fails due to disabled state, force click
-        await runButton.click({ force: true });
-      }
-      await this.page.waitForTimeout(2000);
+      // force: true needed — button can be obscured by overlapping editor chrome
+      await runButton.click({ force: true });
+      // Wait for output to load (>10 chars distinguishes real content from Monaco line numbers)
+      const outputLocator = this.page.locator(this.testOutputEditor);
+      await expect(outputLocator).toHaveText(/.{10,}/, { timeout: 15000 });
       return true;
     }
     return false;
@@ -313,19 +325,29 @@ class FunctionsPage {
   }
 
   /**
-   * Test a function with input data and return output
-   * @param {string} testEventJson - Test event as JSON string
+   * Test a function with input data and return output.
+   * The toolbar "Test Function" button directly triggers the API call using
+   * the current function code and events editor content. Default test events
+   * are loaded by the TestFunction component on mount.
+   * @param {string} [testEventJson] - Optional custom test event JSON (entered before triggering test)
    * @returns {Promise<string>} Test output
    */
-  async testFunctionExecution(testEventJson) {
-    await this.clickTestButton();
-    await this.enterTestEvent(testEventJson);
-    const runSuccess = await this.clickRunTestButton();
-
-    if (runSuccess) {
-      return await this.getTestOutput();
+  async testFunctionExecution(testEventJson = null) {
+    // The TestFunction component is always visible (rendered in splitter v-slot:after).
+    // If custom events provided, enter them before triggering the test.
+    if (testEventJson) {
+      await this.enterTestEvent(testEventJson);
     }
-    return null;
+
+    // The toolbar "Test Function" button calls testFunction() on the TestFunction
+    // component, which POSTs to /api/{org}/functions/test and populates the output editor.
+    await this.clickTestButton();
+
+    // Wait for output editor to have real content (>10 chars to skip Monaco line numbers)
+    const outputLocator = this.page.locator(this.testOutputEditor);
+    await expect(outputLocator).toHaveText(/.{10,}/, { timeout: 15000 });
+
+    return await this.getTestOutput();
   }
 
   /**
