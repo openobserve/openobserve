@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 31;
+pub const DB_SCHEMA_VERSION: u64 = 32;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1317,6 +1317,12 @@ pub struct Common {
     pub enable_cross_linking: bool,
 }
 
+impl Common {
+    pub fn should_create_span(&self) -> bool {
+        self.tracing_enabled || self.tracing_search_enabled || self.search_inspector_enabled
+    }
+}
+
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Limit {
     // no need set by environment
@@ -1440,12 +1446,19 @@ pub struct Limit {
     pub ingest_allowed_in_future_micro: i64,
     #[env_config(name = "ZO_INGEST_FLATTEN_LEVEL", default = 3)] // default flatten level
     pub ingest_flatten_level: u32,
+    // Deprecated: use ZO_LOGS_QUERY_RETENTION instead. Will be removed in a future version.
     #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]
     pub logs_file_retention: String,
+    // Deprecated: use ZO_TRACES_QUERY_RETENTION instead. Will be removed in a future version.
     #[env_config(name = "ZO_TRACES_FILE_RETENTION", default = "hourly")]
     pub traces_file_retention: String,
+    // Deprecated: use ZO_METRICS_QUERY_RETENTION instead. Will be removed in a future version.
     #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "hourly")]
     pub metrics_file_retention: String,
+    #[env_config(name = "ZO_LOGS_QUERY_RETENTION", default = "hourly")]
+    pub logs_query_retention: String,
+    #[env_config(name = "ZO_TRACES_QUERY_RETENTION", default = "hourly")]
+    pub traces_query_retention: String,
     #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "daily")]
     pub metrics_query_retention: String,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
@@ -2531,6 +2544,23 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.calculate_stats_step_limit_secs = 86400;
     }
 
+    // migrate deprecated *_file_retention ENVs to *_query_retention for backward compatibility
+    // if the user explicitly set a non-hourly file retention, apply it to query retention
+    if cfg.limit.logs_file_retention != "hourly" && cfg.limit.logs_query_retention == "hourly" {
+        cfg.limit.logs_query_retention = cfg.limit.logs_file_retention.clone();
+    }
+    if cfg.limit.traces_file_retention != "hourly" && cfg.limit.traces_query_retention == "hourly" {
+        cfg.limit.traces_query_retention = cfg.limit.traces_file_retention.clone();
+    }
+    if cfg.limit.metrics_file_retention != "hourly" && cfg.limit.metrics_query_retention == "hourly"
+    {
+        cfg.limit.metrics_query_retention = cfg.limit.metrics_file_retention.clone();
+    }
+    // file retention is always hourly now
+    cfg.limit.logs_file_retention = "hourly".to_string();
+    cfg.limit.traces_file_retention = "hourly".to_string();
+    cfg.limit.metrics_file_retention = "hourly".to_string();
+
     // format ingest allowed upto and in future to micro
     cfg.limit.ingest_allowed_upto_micro = cfg.limit.ingest_allowed_upto * 3600 * 1_000_000;
     cfg.limit.ingest_allowed_in_future_micro =
@@ -2588,12 +2618,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("search job retention is set to zero"));
     }
 
-    if cfg.common.tracing_search_enabled
+    if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled)
         && cfg.common.otel_otlp_url.is_empty()
         && cfg.common.otel_otlp_grpc_url.is_empty()
     {
         return Err(anyhow::anyhow!(
-            "Either grpc or http url should be set when enabling tracing search"
+            "Either grpc or http url should be set when enabling tracing"
         ));
     }
 

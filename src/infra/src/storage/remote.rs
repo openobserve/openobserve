@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,7 @@ use object_store::{
     PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore, path::Path,
 };
 
-use crate::storage::{CONCURRENT_REQUESTS, format_key};
+use crate::storage::CONCURRENT_REQUESTS;
 
 // test only
 const TEST_FILE: &str = "o2_test/check.txt";
@@ -159,7 +159,7 @@ impl ObjectStore for Remote {
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[2], "get", "remote"])
-                .inc_by(data_len as u64);
+                .inc_by(data_len);
             metrics::STORAGE_READ_REQUESTS
                 .with_label_values(&[columns[1], columns[2], "get", "remote"])
                 .inc();
@@ -191,7 +191,7 @@ impl ObjectStore for Remote {
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[2], "get_opts", "remote"])
-                .inc_by(data_len as u64);
+                .inc_by(data_len);
             metrics::STORAGE_READ_REQUESTS
                 .with_label_values(&[columns[1], columns[2], "get_opts", "remote"])
                 .inc();
@@ -219,12 +219,12 @@ impl ObjectStore for Remote {
             })?;
 
         // metrics
-        let data_len = data.len();
+        let data_len = data.len() as u64;
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
-                .inc_by(data_len as u64);
+                .inc_by(data_len);
             metrics::STORAGE_READ_REQUESTS
                 .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
                 .inc();

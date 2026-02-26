@@ -39,8 +39,8 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        get_settings, get_stream_setting_fts_fields, unwrap_partition_time_level,
-        unwrap_stream_created_at, unwrap_stream_is_derived, unwrap_stream_settings,
+        get_partition_time_level, get_stream_setting_fts_fields, unwrap_stream_created_at,
+        unwrap_stream_is_derived, unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -207,11 +207,6 @@ pub fn stream_res(
             .common
             .use_stream_settings_for_partitions_enabled;
     }
-
-    settings.partition_time_level = Some(unwrap_partition_time_level(
-        settings.partition_time_level,
-        stream_type,
-    ));
 
     #[cfg(not(feature = "vectorscan"))]
     let pattern_associations = vec![];
@@ -1113,11 +1108,7 @@ pub async fn delete_stream_data_by_time_range(
 
     // Convert the time range to RFC3339 format
     // we need check the date is hour or day, user can't delete data with minute and second
-    let stream_settings = get_settings(org_id, stream_name, stream_type)
-        .await
-        .unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+    let partition_time_level = get_partition_time_level(stream_type);
     let start_time = Utc.timestamp_nanos(time_range.start * 1000);
     let end_time = Utc.timestamp_nanos(time_range.end * 1000);
     let (start_time, end_time) = if partition_time_level == PartitionTimeLevel::Daily {
@@ -1605,26 +1596,6 @@ mod tests {
 
         let stream = stream_res("org1", "derived_stream", StreamType::Logs, schema, None);
         assert_eq!(stream.is_derived, Some(true));
-    }
-
-    #[test]
-    fn test_stream_res_partition_time_level() {
-        let settings = StreamSettings {
-            partition_time_level: Some(config::meta::stream::PartitionTimeLevel::Hourly),
-            ..Default::default()
-        };
-
-        let mut metadata = HashMap::new();
-        metadata.insert(
-            "settings".to_string(),
-            serde_json::to_string(&settings).unwrap(),
-        );
-
-        let schema =
-            Schema::new_with_metadata(vec![Field::new("field1", DataType::Utf8, true)], metadata);
-
-        let stream = stream_res("org1", "test", StreamType::Logs, schema, None);
-        assert!(stream.settings.partition_time_level.is_some());
     }
 
     #[test]

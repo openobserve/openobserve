@@ -29,7 +29,7 @@ use config::{
         promql::*,
         search::default_use_cache,
         self_reporting::usage::UsageType,
-        stream::{PartitioningDetails, StreamParams, StreamType},
+        stream::{StreamParams, StreamPartition, StreamType},
     },
     metrics,
     utils::{
@@ -43,7 +43,7 @@ use datafusion::arrow::datatypes::Schema;
 use infra::{
     cache::stats,
     errors::{Error, Result},
-    schema::{SchemaCache, unwrap_partition_time_level},
+    schema::{SchemaCache, get_partition_time_level},
 };
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -88,7 +88,7 @@ pub async fn remote_write(
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
-    let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
+    let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
 
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
@@ -504,10 +504,11 @@ pub async fn remote_write(
     let step_start = std::time::Instant::now();
     for (stream_name, json_data) in json_data_by_stream {
         // get partition keys
-        let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
-        let partition_keys = partition_det.partition_keys.clone();
-        let partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
+        let partition_keys = stream_partitioning_map
+            .get(&stream_name)
+            .cloned()
+            .unwrap_or_default();
+        let partition_time_level = get_partition_time_level(StreamType::Metrics);
 
         for (mut val_map, timestamp) in json_data {
             let hash = super::signature_without_labels(&val_map, &[VALUE_LABEL]);

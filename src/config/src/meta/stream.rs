@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -708,8 +708,6 @@ pub struct StreamField {
 pub struct UpdateStreamSettings {
     #[serde(skip_serializing, default)]
     pub fields: UpdateSettingsWrapper<StreamField>,
-    #[serde(skip_serializing_if = "Option::None")]
-    pub partition_time_level: Option<PartitionTimeLevel>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub partition_keys: UpdateSettingsWrapper<StreamPartition>,
     #[serde(default)]
@@ -877,8 +875,6 @@ impl TimeRange {
 #[derive(Clone, Debug, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
     #[serde(default)]
-    pub partition_time_level: Option<PartitionTimeLevel>,
-    #[serde(default)]
     pub partition_keys: Vec<StreamPartition>,
     #[serde(default)]
     pub full_text_search_keys: Vec<String>,
@@ -921,7 +917,6 @@ pub struct StreamSettings {
 impl Default for StreamSettings {
     fn default() -> Self {
         Self {
-            partition_time_level: None,
             partition_keys: Vec::new(),
             full_text_search_keys: Vec::new(),
             index_fields: Vec::new(),
@@ -955,10 +950,6 @@ impl Serialize for StreamSettings {
         for (index, key) in self.partition_keys.iter().enumerate() {
             part_keys.insert(format!("L{index}"), key);
         }
-        state.serialize_field(
-            "partition_time_level",
-            &self.partition_time_level.unwrap_or_default(),
-        )?;
         state.serialize_field("partition_keys", &part_keys)?;
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("index_fields", &self.index_fields)?;
@@ -1025,11 +1016,6 @@ impl From<&str> for StreamSettings {
                     _ => {}
                 }
             }
-        }
-
-        let mut partition_time_level = None;
-        if let Some(value) = settings.get("partition_time_level") {
-            partition_time_level = Some(PartitionTimeLevel::from(value.as_str().unwrap()));
         }
 
         let mut full_text_search_keys = Vec::new();
@@ -1158,7 +1144,6 @@ impl From<&str> for StreamSettings {
             }
         }
         Self {
-            partition_time_level,
             partition_keys,
             full_text_search_keys,
             index_fields,
@@ -1279,13 +1264,6 @@ impl Display for StreamPartitionType {
             StreamPartitionType::Prefix => write!(f, "prefix"),
         }
     }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub struct PartitioningDetails {
-    pub partition_keys: Vec<StreamPartition>,
-    pub partition_time_level: Option<PartitionTimeLevel>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

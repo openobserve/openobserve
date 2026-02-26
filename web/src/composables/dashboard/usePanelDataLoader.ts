@@ -21,6 +21,7 @@ import {
   onMounted,
   onUnmounted,
   toRaw,
+  markRaw,
   nextTick,
 } from "vue";
 import queryService from "../../services/search";
@@ -47,6 +48,7 @@ import useHttpStreamingSearch from "../useStreamingSearch";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import logsUtils from "@/composables/useLogs/logsUtils";
 import { createPromQLChunkProcessor } from "./promqlChunkProcessor";
+import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -422,22 +424,22 @@ export const usePanelDataLoader = (
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
-      state.data[payload?.meta?.currentQueryIndex] = [
+      state.data[payload?.meta?.currentQueryIndex] = markRaw([
         ...(searchRes?.content?.results?.hits ?? {}),
-      ];
+      ]);
     }
     // if order by is desc, append new partition response at end
     else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
       // else append new partition response at start
-      state.data[payload?.meta?.currentQueryIndex] = [
+      state.data[payload?.meta?.currentQueryIndex] = markRaw([
         ...(searchRes?.content?.results?.hits ?? {}),
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
-      ];
+        ...toRaw(state.data[payload?.meta?.currentQueryIndex] ?? []),
+      ]);
     } else {
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
+      state.data[payload?.meta?.currentQueryIndex] = markRaw([
+        ...toRaw(state.data[payload?.meta?.currentQueryIndex] ?? []),
         ...(searchRes?.content?.results?.hits ?? {}),
-      ];
+      ]);
     }
 
     // Push metadata for each partition
@@ -496,9 +498,9 @@ export const usePanelDataLoader = (
     if (streaming_aggs) {
       // handle empty hits case
       if (searchRes?.content?.results?.hits?.length > 0) {
-        state.data[payload?.meta?.currentQueryIndex] = [
+        state.data[payload?.meta?.currentQueryIndex] = markRaw([
           ...(searchRes?.content?.results?.hits ?? {}),
-        ];
+        ]);
       }
     }
     // if order by is desc, append new partition response at end
@@ -508,15 +510,15 @@ export const usePanelDataLoader = (
       ]?.order_by?.toLowerCase() === "asc"
     ) {
       // else append new partition response at start
-      state.data[payload?.meta?.currentQueryIndex] = [
+      state.data[payload?.meta?.currentQueryIndex] = markRaw([
         ...(searchRes?.content?.results?.hits ?? {}),
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
-      ];
+        ...toRaw(state.data[payload?.meta?.currentQueryIndex] ?? []),
+      ]);
     } else {
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
+      state.data[payload?.meta?.currentQueryIndex] = markRaw([
+        ...toRaw(state.data[payload?.meta?.currentQueryIndex] ?? []),
         ...(searchRes?.content?.results?.hits ?? {}),
-      ];
+      ]);
     }
 
     // update result metadata - update the first partition result
@@ -536,17 +538,14 @@ export const usePanelDataLoader = (
     try {
       if (response.type === "search_response_metadata") {
         handleStreamingHistogramMetadata(payload, response);
-        saveCurrentStateToCache();
       }
 
       if (response.type === "search_response_hits") {
         handleStreamingHistogramHits(payload, response);
-        saveCurrentStateToCache();
       }
 
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
-        saveCurrentStateToCache();
       }
 
       if (response.type === "error") {
@@ -572,7 +571,6 @@ export const usePanelDataLoader = (
       if (response.type === "event_progress") {
         state.loadingProgressPercentage = response?.content?.percent ?? 0;
         state.isPartialData = true;
-        saveCurrentStateToCache();
       }
     } catch (error: any) {
       state.loading = false;
@@ -1012,7 +1010,6 @@ export const usePanelDataLoader = (
                 if (res.type === "event_progress") {
                   state.loadingProgressPercentage = res?.content?.percent ?? 0;
                   state.isPartialData = true;
-                  saveCurrentStateToCache();
                 }
                 if (res?.type === "promql_response") {
                   const newData = res?.content?.results;
@@ -1024,7 +1021,7 @@ export const usePanelDataLoader = (
                   );
 
                   // Update state with accumulated results
-                  state.data = [...queryResults];
+                  state.data = markRaw([...queryResults]);
                   state.metadata = {
                     queries: queryMetadata,
                   };
@@ -1072,7 +1069,7 @@ export const usePanelDataLoader = (
                 const stats = chunkProcessor.getStats();
 
                 // Final update with complete results
-                state.data = [...queryResults];
+                state.data = markRaw([...queryResults]);
                 state.metadata = {
                   queries: queryMetadata,
                   // Add series limiting information for warning message
@@ -1370,7 +1367,7 @@ export const usePanelDataLoader = (
 
                         // If streaming_aggs, replace the data (aggregation query)
                         if (streaming_aggs) {
-                          state.data[queryIndex] = [...hits];
+                          state.data[queryIndex] = markRaw([...hits]);
                         }
                         // Otherwise, append/prepend based on order_by (multiple partitions)
                         else {
@@ -1381,16 +1378,16 @@ export const usePanelDataLoader = (
 
                           if (orderBy === "asc") {
                             // For ascending order, prepend new data at start
-                            state.data[queryIndex] = [
+                            state.data[queryIndex] = markRaw([
                               ...hits,
-                              ...(state.data[queryIndex] ?? []),
-                            ];
+                              ...toRaw(state.data[queryIndex] ?? []),
+                            ]);
                           } else {
                             // For descending order, append new data at end
-                            state.data[queryIndex] = [
-                              ...(state.data[queryIndex] ?? []),
+                            state.data[queryIndex] = markRaw([
+                              ...toRaw(state.data[queryIndex] ?? []),
                               ...hits,
-                            ];
+                            ]);
                           }
                         }
 
@@ -1400,7 +1397,7 @@ export const usePanelDataLoader = (
                         }
                       }
                       state.errorDetail = { message: "", code: "" };
-                      saveCurrentStateToCache();
+                      // saveCurrentStateToCache();
                     }
 
                     if (response.type === "search_response") {
@@ -1409,14 +1406,13 @@ export const usePanelDataLoader = (
                       const queryIndex = results?.query_index ?? 0;
 
                       if (results?.hits && Array.isArray(results.hits)) {
-                        state.data[queryIndex] = [...results.hits];
+                        state.data[queryIndex] = markRaw([...results.hits]);
                         state.resultMetaData[queryIndex] = {
                           ...(state.resultMetaData[queryIndex] ?? {}),
                           ...results,
                         };
                       }
                       state.errorDetail = { message: "", code: "" };
-                      saveCurrentStateToCache();
                     }
 
                     if (response.type === "error") {
@@ -1520,7 +1516,9 @@ export const usePanelDataLoader = (
 
                 const currentQueryIndex = state.data.length - 1;
 
-                state.data[currentQueryIndex] = searchResponse.value.hits;
+                state.data[currentQueryIndex] = markRaw(
+                  searchResponse.value.hits ?? [],
+                );
                 state.resultMetaData[currentQueryIndex] = [
                   searchResponse.value,
                 ]; // Wrap in array
@@ -1574,9 +1572,9 @@ export const usePanelDataLoader = (
               if (annotationsPromise) {
                 state.annotations = await annotationsPromise;
               }
-
-              // this is async task, which will be executed in background(await is not required)
-              saveCurrentStateToCache();
+              if(!state.loading) {
+                saveCurrentStateToCache();
+              }
             }
           }
 
@@ -1604,8 +1602,17 @@ export const usePanelDataLoader = (
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
     () => [selectedTimeObj?.value, forceLoad?.value],
-    async () => {
+    async (newVal, oldVal) => {
       log("PanelSchema/Time Wather: called");
+
+      // CRITICAL FIX: Check if this specific panel should refresh
+      // If panelIdToBeRefreshed is set and doesn't match this panel, skip loading
+      // This prevents all panels from refreshing when only one panel's time changes
+      if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.value.id) {
+        log("PanelSchema/Time Wather: skipping - different panel is being refreshed");
+        return;
+      }
+
       loadData(); // Loading the data
     },
   );
@@ -2367,6 +2374,13 @@ export const usePanelDataLoader = (
       }
       abortController.abort();
     }
+    // Save current state to cache only if still loading on unmount ΓÇö
+    // MUST come after isPartialData is set above so the cache stores the correct flag.
+    // (handles tab-switch / navigate-away mid-load scenario)
+    // If loading is already done, the end/complete handlers already saved the cache.
+    if (state.loading) {
+      saveCurrentStateToCache();
+    }
     if (observer) {
       observer.disconnect();
     }
@@ -2474,7 +2488,7 @@ export const usePanelDataLoader = (
       cacheKeysMatch
     ) {
       // const cache = getPanelCache();
-      state.data = tempPanelCacheValue.data;
+      state.data = markRaw(tempPanelCacheValue.data ?? []);
       state.loading = tempPanelCacheValue.loading;
       state.errorDetail = tempPanelCacheValue.errorDetail;
       state.metadata = tempPanelCacheValue.metadata;

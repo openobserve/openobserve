@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager.js";
 import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-variables-scoped.js";
+import { selectStreamFromDropdown, selectFieldFromDropdown, selectStreamType } from "../../pages/dashboardPages/dashboard-stream-field-utils.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import {
   monitorVariableAPICalls,
@@ -400,20 +401,10 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await page.keyboard.press('Escape');
     await safeWaitForNetworkIdle(page, { timeout: 2000 });
 
-    // Select stream type, stream, and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
-    await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
-
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
-    await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_container_name");
-    await page.locator(SELECTORS.OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.OPTION).first().click();
+    // Select stream type, stream, and field using shared utilities
+    await selectStreamType(page, "logs");
+    await selectStreamFromDropdown(page, "e2e_automate");
+    await selectFieldFromDropdown(page, "kubernetes_container_name");
 
     // Add a filter to check dependency dropdown - panel variables should NOT be in the list
     await page.locator(SELECTORS.ADD_FILTER_BTN).click();

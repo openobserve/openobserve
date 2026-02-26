@@ -321,6 +321,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Add C (depends on B, custom default, multi-select)
+    // Note: Use "IN" operator because B is multi-select
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await scopedVars.addScopedVariable(
@@ -332,6 +333,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
         scope: "global",
         dependsOn: varB,
         dependsOnField: "kubernetes_container_name",
+        dependsOnOperator: "IN",
         showMultipleValues: true,
         defaultValueType: "custom",
         customValues: ["custom_pod_1", "custom_pod_2"]
@@ -341,6 +343,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Add D (depends on C, first value default)
+    // Note: Use "IN" operator because C is multi-select
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await scopedVars.addScopedVariable(
@@ -351,7 +354,8 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
       {
         scope: "global",
         dependsOn: varC,
-        dependsOnField: "kubernetes_pod_name"
+        dependsOnField: "kubernetes_pod_name",
+        dependsOnOperator: "IN"
       }
     );
     await pm.dashboardSetting.closeSettingWindow();

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,7 @@ use config::{
     meta::stream::{StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
-use infra::schema::unwrap_partition_time_level;
+use infra::schema::get_partition_time_level;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
@@ -97,7 +97,7 @@ impl Metadata for TraceListIndex {
             let hour_key = ingestion::get_write_partition_key(
                 timestamp,
                 &vec![],
-                unwrap_partition_time_level(None, StreamType::Metadata),
+                get_partition_time_level(StreamType::Metadata),
                 data,
                 Some(&schema_key),
             );
@@ -204,7 +204,6 @@ impl TraceListIndex {
             }
 
             let settings = StreamSettings {
-                partition_time_level: None,
                 partition_keys: vec![],
                 full_text_search_keys: vec![],
                 index_fields: vec![],
@@ -244,7 +243,7 @@ mod tests {
         meta::stream::StreamType,
         utils::{json, time::now_micros},
     };
-    use infra::schema::unwrap_partition_time_level;
+    use infra::schema::get_partition_time_level;
 
     use crate::{
         common::meta::stream::SchemaRecords,
@@ -287,7 +286,7 @@ mod tests {
         let hour_key = ingestion::get_write_partition_key(
             timestamp,
             &vec![],
-            unwrap_partition_time_level(None, StreamType::Metadata),
+            get_partition_time_level(StreamType::Metadata),
             data,
             Some(schema_key),
         );
