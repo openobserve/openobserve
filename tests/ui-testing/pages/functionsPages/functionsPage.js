@@ -190,7 +190,10 @@ class FunctionsPage {
         // If regular click fails due to disabled state, force click
         await runButton.click({ force: true });
       }
-      await this.page.waitForTimeout(2000);
+      await this.page.waitForResponse(
+        resp => resp.url().includes('/functions/test'),
+        { timeout: 15000 }
+      ).catch(() => {});
       return true;
     }
     return false;
