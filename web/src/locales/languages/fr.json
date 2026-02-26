@@ -113,6 +113,7 @@
     "getStarted": "Commencez",
     "reset": "Réinitialiser",
     "retry": "Réessayez",
+    "set": "+ Ensemble",
     "copy": "Copier",
     "copySuccess": "Copié dans le presse-papiers",
     "copyError": "Impossible de copier dans le presse-papiers",
@@ -1456,7 +1457,19 @@
     "hideQueryResults": "Masquer les résultats de la requête",
     "vrlExtractionTooltip": "Pour utiliser les champs VRL extraits dans le graphique, écrivez une fonction VRL et cliquez sur le bouton Appliquer. Les champs seront extraits, ce qui vous permettra de les utiliser pour créer le graphique.",
     "errorFetchingFunctions": "Erreur lors de la récupération des fonctions",
-    "functionAppliedSuccess": "La fonction {name} a été appliquée avec succès."
+    "functionAppliedSuccess": "La fonction {name} a été appliquée avec succès.",
+    "panelTimeSettings": "Réglages de l'heure du panneau",
+    "panelTimeEnabled": "Laisser passer du temps au niveau du panneau",
+    "useGlobalTime": "Utiliser l'heure mondiale",
+    "useIndividualTime": "Utilisez le temps individuel",
+    "panelTimeGlobalHint": "Le panneau suivra l'heure globale du tableau de bord. Les modifications apportées à l'heure mondiale mettront à jour ce panneau.",
+    "panelTimeIndividualHint": "Le panneau utilisera sa propre plage de temps. Réglez l'heure à l'aide du sélecteur de date ci-dessous. Les changements d'heure globaux n'affecteront pas ce panneau.",
+    "panelTimeRange": "Plage horaire du panneau",
+    "panelTimeRangeTooltip": "Cette plage de temps s'applique uniquement à ce panneau. Les autres panneaux utiliseront leurs propres heures configurées ou l'heure globale du tableau de bord.",
+    "panelTimeSettingsTooltip": "Configurez la façon dont ce panneau détermine son intervalle de temps. Vous pouvez utiliser la plage horaire du tableau de bord ou en définir une personnalisée pour ce panneau.",
+    "panelTimeMode": "Source de plage horaire (lors du chargement du tableau de bord)",
+    "useDefaultTimeTooltip": "Lorsqu'il est activé, ce panneau utilise la durée par défaut configurée comme plage de temps lors du chargement du tableau de bord, au lieu de l'heure globale du tableau de bord.",
+    "defaultDuration": "Durée par défaut"
   },
   "panel": {
     "header": "Panneau",

@@ -117,7 +117,8 @@
     "reset": "重置",
     "retry": "重试",
     "goBack": "回去",
-    "stopGenerating": "停止生成"
+    "stopGenerating": "停止生成",
+    "set": "+ 设置"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -1456,7 +1457,19 @@
     "hideQueryResults": "隐藏查询结果",
     "vrlExtractionTooltip": "要在图表中使用提取的 VRL 字段，请编写 VRL 函数，然后单击 “应用” 按钮。这些字段将被提取，允许您使用它们来构建图表。",
     "errorFetchingFunctions": "获取函数时出错",
-    "functionAppliedSuccess": "{name} 函数成功应用。"
+    "functionAppliedSuccess": "{name} 函数成功应用。",
+    "panelTimeSettings": "小组讨论时间设置",
+    "panelTimeEnabled": "允许面板关卡时间",
+    "useGlobalTime": "使用全球时间",
+    "useIndividualTime": "使用个人时间",
+    "panelTimeGlobalHint": "面板将跟踪全球仪表板时间。对全球时间的更改将更新此面板。",
+    "panelTimeIndividualHint": "小组将使用自己的时间范围。使用下面的日期选择器设置时间。全球时间更改不会影响此面板。",
+    "panelTimeRange": "小组讨论时间范围",
+    "panelTimeRangeTooltip": "此时间范围仅适用于此面板。其他面板将使用自己配置的时间或全球仪表板时间。",
+    "panelTimeSettingsTooltip": "配置此面板如何确定其时间范围。您可以使用仪表板的时间范围，也可以为该面板设置自定义时间范围。",
+    "panelTimeMode": "时间范围来源（仪表板加载时）",
+    "useDefaultTimeTooltip": "启用后，此面板将使用配置的默认持续时间作为仪表板加载的时间范围，而不是全局仪表板时间。",
+    "defaultDuration": "默认持续时间"
   },
   "panel": {
     "header": "面板",

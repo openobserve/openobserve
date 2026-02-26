@@ -32,7 +32,7 @@ use config::{
 };
 use infra::{
     errors::{Error, Result},
-    schema::{SchemaCache, unwrap_partition_time_level},
+    schema::{SchemaCache, get_partition_time_level},
 };
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -308,7 +308,7 @@ impl Metadata for DistinctValues {
                 let hour_key = ingestion::get_write_partition_key(
                     timestamp,
                     &vec![],
-                    unwrap_partition_time_level(None, StreamType::Metadata),
+                    get_partition_time_level(StreamType::Metadata),
                     data,
                     Some(schema_key),
                 );

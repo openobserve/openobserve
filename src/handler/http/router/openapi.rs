@@ -241,7 +241,6 @@ use crate::{common::meta, handler::http::request};
             config::meta::stream::StreamPartition,
             config::meta::stream::StreamPartitionType,
             config::meta::stream::StreamStats,
-            config::meta::stream::PartitionTimeLevel,
             config::meta::stream::UpdateStreamSettings,
             config::meta::dashboards::Dashboard,
             config::meta::dashboards::v1::AxisItem,

@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderless
                   dense
                   stack-label
-                  class="showLabelOnTop col no-case q-mr-sm"
+                  class="showLabelOnTop col no-case q-mr-sm q-mb-xs"
                   @update:model-value="streamTypeUpdated"
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-type-select"
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-select
                   v-model="variableData.query_data.stream"
                   :label="t('dashboard.selectIndex') + ' *'"
-                  :options="streamsFilteredOptions"
+                  :options="mergedStreamsFilteredOptions"
                   input-debounce="0"
                   behavior="menu"
                   use-input
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   hide-bottom-space
                   dense
                   stack-label
-                  @filter="streamsFilterFn"
+                  @filter="mergedStreamsFilterFn"
                   @update:model-value="streamUpdated"
                   option-value="name"
                   option-label="name"
@@ -274,6 +274,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-select"
                 >
+                  <template v-slot:label>
+                    <div class="row items-center all-pointer-events">
+                      {{ t("dashboard.selectIndex") + " *" }}
+                      <div>
+                        <q-icon
+                          class="q-ml-xs"
+                          size="16px"
+                          name="info"
+                          data-test="dashboard-variable-add-stream-info"
+                        />
+                        <q-tooltip
+                          class="bg-grey-8"
+                          anchor="top middle"
+                          self="bottom middle"
+                          max-width="250px"
+                        >
+                          Select a stream or use a variable like $streamVariable
+                          to dynamically choose the stream based on another
+                          value.
+                        </q-tooltip>
+                      </div>
+                    </div>
+                  </template>
+                  <template v-slot:option="scope">
+                    <q-item v-bind="scope.itemProps">
+                      <q-item-section>
+                        <q-item-label>
+                          {{ scope.opt.name }}
+                          <span
+                            v-if="scope.opt.name?.startsWith('$')"
+                            class="text-grey-6 text-caption"
+                          >
+                            (variable)
+                          </span>
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </template>
                 </q-select>
               </div>
               <q-select
@@ -287,8 +325,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 fill-input
                 behavior="menu"
                 input-debounce="0"
-                :options="fieldsFilteredOptions"
-                @filter="fieldsFilterFn"
+                :options="mergedFieldsFilteredOptions"
+                @filter="mergedFieldsFilterFn"
                 class="showLabelOnTop no-case"
                 option-value="name"
                 option-label="name"
@@ -296,6 +334,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :rules="[(val: any) => !!val || 'Field is required!']"
                 data-test="dashboard-variable-field-select"
               >
+                <template v-slot:label>
+                  <div class="row items-center all-pointer-events">
+                    {{ t("dashboard.selectField") + " *" }}
+                    <div>
+                      <q-icon
+                        class="q-ml-xs"
+                        size="16px"
+                        name="info"
+                        data-test="dashboard-variable-add-field-info"
+                      />
+                      <q-tooltip
+                        class="bg-grey-8"
+                        anchor="top middle"
+                        self="bottom middle"
+                        max-width="250px"
+                      >
+                        Select a field or use a variable like $fieldVariable. If
+                        stream uses a variable, field list will be empty - type
+                        field name manually.
+                      </q-tooltip>
+                    </div>
+                  </div>
+                </template>
+                <template v-slot:option="scope">
+                  <q-item v-bind="scope.itemProps">
+                    <q-item-section>
+                      <q-item-label>
+                        {{ scope.opt.name }}
+                        <span
+                          v-if="scope.opt.name?.startsWith('$')"
+                          class="text-grey-6 text-caption"
+                        >
+                          (variable)
+                        </span>
+                      </q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
               </q-select>
               <div>
                 <q-input
@@ -1235,15 +1311,23 @@ export default defineComponent({
 
               // if stream type and stream is exists
               if (variableData?.query_data?.stream) {
-                // get schema of that field using getstream
-                const fieldWithSchema: any = await getStream(
-                  variableData?.query_data?.stream,
-                  variableData.query_data.stream_type,
-                  true,
-                );
+                // Check if stream is a variable reference (contains $)
+                const isVariableReference = variableData.query_data.stream?.includes('$');
 
-                // assign the schema
-                data.currentFieldsList = fieldWithSchema?.schema ?? [];
+                if (isVariableReference) {
+                  // Don't fetch schema for variable references - field list will be empty
+                  data.currentFieldsList = [];
+                } else {
+                  // get schema of that field using getstream (only for real streams)
+                  const fieldWithSchema: any = await getStream(
+                    variableData?.query_data?.stream,
+                    variableData.query_data.stream_type,
+                    true,
+                  );
+
+                  // assign the schema
+                  data.currentFieldsList = fieldWithSchema?.schema ?? [];
+                }
               } else {
                 // reset field list array
                 data.currentFieldsList = [];
@@ -1254,9 +1338,15 @@ export default defineComponent({
               data.currentFieldsList = [];
             }
           } catch (error: any) {
-            showErrorNotification(error ?? "Failed to get stream fields", {
-              timeout: 2000,
-            });
+            // Check if the error is for a variable reference (should be suppressed)
+            const isVariableReference = variableData?.query_data?.stream?.includes('$');
+
+            if (!isVariableReference) {
+              // Only show error if it's NOT a variable reference
+              showErrorNotification(error ?? "Failed to get stream fields", {
+                timeout: 2000,
+              });
+            }
           }
         }
       },
@@ -1515,11 +1605,25 @@ export default defineComponent({
     };
 
     const streamUpdated = async () => {
-      // reset field list value
-      variableData.query_data.field = "";
 
       try {
-        // if stream type and stream is exists
+        // Check if stream is a variable reference FIRST (contains $)
+        const isVariableReference = variableData.query_data.stream?.includes('$');
+
+        if (isVariableReference) {
+          // Don't reset field if it already has a value (editing mode)
+          if (!variableData.query_data.field) {
+            variableData.query_data.field = "";
+          }
+          // Don't fetch schema for variable references
+          data.currentFieldsList = [];
+          return;
+        }
+
+        // Only reset field list if NOT a variable reference
+        variableData.query_data.field = "";
+
+        // if stream type and stream exists and NOT a variable
         if (
           variableData.query_data.stream &&
           variableData.query_data.stream_type
@@ -1538,9 +1642,14 @@ export default defineComponent({
           data.currentFieldsList = [];
         }
       } catch (error: any) {
-        showErrorNotification(error ?? "Failed to get stream fields", {
-          timeout: 2000,
-        });
+        // Only show error if it's not a variable reference
+        const isVariableReference = variableData.query_data.stream?.includes('$');
+
+        if (!isVariableReference) {
+          showErrorNotification(error ?? "Failed to get stream fields", {
+            timeout: 2000,
+          });
+        }
       }
     };
 
@@ -1617,6 +1726,30 @@ export default defineComponent({
         value: "$" + it.name,
       }));
     });
+
+    // Merged stream options: variables + streams for q-select
+    const mergedStreamOptions = computed(() => {
+      const variableItems = dashboardVariablesFilterItems.value.map(
+        (v: any) => ({ name: v.value }),
+      );
+      return [...variableItems, ...(data.streams || [])];
+    });
+    const {
+      filterFn: mergedStreamsFilterFn,
+      filteredOptions: mergedStreamsFilteredOptions,
+    } = useSelectAutoComplete(mergedStreamOptions, "name");
+
+    // Merged field options: variables + fields for q-select
+    const mergedFieldOptions = computed(() => {
+      const variableItems = dashboardVariablesFilterItems.value.map(
+        (v: any) => ({ name: v.value }),
+      );
+      return [...variableItems, ...(data.currentFieldsList || [])];
+    });
+    const {
+      filterFn: mergedFieldsFilterFn,
+      filteredOptions: mergedFieldsFilteredOptions,
+    } = useSelectAutoComplete(mergedFieldOptions, "name");
 
     // Add new custom value to the array
     const addCustomValue = () => {
@@ -1706,6 +1839,10 @@ export default defineComponent({
       filterUpdated,
       filterCycleError,
       dashboardVariablesFilterItems,
+      mergedStreamsFilterFn,
+      mergedStreamsFilteredOptions,
+      mergedFieldsFilterFn,
+      mergedFieldsFilteredOptions,
       addCustomValue,
       removeCustomValue,
       onCheckboxClick,

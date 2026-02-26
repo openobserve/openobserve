@@ -113,6 +113,7 @@
     "getStarted": "Inizia",
     "reset": "Reimposta",
     "retry": "Riprova",
+    "set": "+ Set",
     "copy": "Copia",
     "copySuccess": "Copiato negli appunti",
     "copyError": "Copia negli appunti non riuscita",
@@ -1456,7 +1457,19 @@
     "hideQueryResults": "Nascondi i risultati delle query",
     "vrlExtractionTooltip": "Per utilizzare i campi VRL estratti nel grafico, scrivi una funzione VRL e fai clic sul pulsante Applica. I campi verranno estratti, consentendoti di utilizzarli per creare il grafico.",
     "errorFetchingFunctions": "Errore durante il recupero delle funzioni",
-    "functionAppliedSuccess": "Funzione {name} applicata correttamente."
+    "functionAppliedSuccess": "Funzione {name} applicata correttamente.",
+    "panelTimeSettings": "Impostazioni dell'ora del pannello",
+    "panelTimeEnabled": "Consenti tempo a livello di pannello",
+    "useGlobalTime": "Usa l'ora globale",
+    "useIndividualTime": "Usa il tempo individuale",
+    "panelTimeGlobalHint": "Il pannello terrà traccia del tempo del dashboard globale. Le modifiche all'ora globale aggiorneranno questo pannello.",
+    "panelTimeIndividualHint": "Il pannello utilizzerà il proprio intervallo di tempo. Imposta l'ora utilizzando il selettore di date qui sotto. Le modifiche temporali globali non influiranno su questo pannello.",
+    "panelTimeRange": "Intervallo di tempo del pannello",
+    "panelTimeRangeTooltip": "Questo intervallo di tempo si applica solo a questo pannello. Gli altri pannelli utilizzeranno i propri orari configurati o l'ora globale del dashboard.",
+    "panelTimeSettingsTooltip": "Configura il modo in cui questo pannello determina il suo intervallo di tempo. Puoi utilizzare l'intervallo di tempo della dashboard o impostarne uno personalizzato per questo pannello.",
+    "panelTimeMode": "Origine dell'intervallo di tempo (al caricamento del dashboard)",
+    "useDefaultTimeTooltip": "Se abilitato, questo pannello utilizzerà la durata predefinita configurata come intervallo di tempo al caricamento del dashboard, anziché il tempo globale del dashboard.",
+    "defaultDuration": "Durata predefinita"
   },
   "panel": {
     "header": "Pannello",

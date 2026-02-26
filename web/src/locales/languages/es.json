@@ -113,6 +113,7 @@
     "getStarted": "Comenzar",
     "reset": "Reiniciar",
     "retry": "Reintentar",
+    "set": "+ Set",
     "copy": "Copiar",
     "copySuccess": "Copiado al portapapeles",
     "copyError": "No se pudo copiar al portapapeles",
@@ -1456,7 +1457,19 @@
     "hideQueryResults": "Ocultar los resultados de la consulta",
     "vrlExtractionTooltip": "Para usar los campos VRL extraídos en el gráfico, escriba una función VRL y haga clic en el botón Aplicar. Los campos se extraerán, lo que le permitirá usarlos para crear el gráfico.",
     "errorFetchingFunctions": "Error al recuperar las funciones",
-    "functionAppliedSuccess": "La función {name} se aplicó correctamente."
+    "functionAppliedSuccess": "La función {name} se aplicó correctamente.",
+    "panelTimeSettings": "Configuración de tiempo del panel",
+    "panelTimeEnabled": "Permitir tiempo a nivel de panel",
+    "useGlobalTime": "Usa la hora global",
+    "useIndividualTime": "Usa el tiempo individual",
+    "panelTimeGlobalHint": "El panel realizará un seguimiento del tiempo global del panel de control. Los cambios en la hora global actualizarán este panel.",
+    "panelTimeIndividualHint": "El panel utilizará su propio intervalo de tiempo. Configure la hora con el selector de fechas que aparece a continuación. Los cambios de hora globales no afectarán a este panel.",
+    "panelTimeRange": "Rango de tiempo del panel",
+    "panelTimeRangeTooltip": "Este intervalo de tiempo solo se aplica a este panel. Otros paneles utilizarán sus propias horas configuradas o la hora global del panel de control.",
+    "panelTimeSettingsTooltip": "Configure la forma en que este panel determina su intervalo de tiempo. Puede usar el intervalo de tiempo del panel de control o establecer uno personalizado para este panel.",
+    "panelTimeMode": "Fuente de rango de tiempo (al cargar el tablero)",
+    "useDefaultTimeTooltip": "Cuando esté activado, este panel utilizará la duración predeterminada configurada como intervalo de tiempo al cargar el panel, en lugar del tiempo global del panel.",
+    "defaultDuration": "Duración predeterminada"
   },
   "panel": {
     "header": "Panel",

@@ -113,6 +113,7 @@
     "getStarted": "Comece",
     "reset": "Redefinir",
     "retry": "Tente novamente",
+    "set": "+ Conjunto",
     "copy": "Copiar",
     "copySuccess": "Copiado para a prancheta",
     "copyError": "Falha ao copiar para a área de transferência",
@@ -1456,7 +1457,19 @@
     "hideQueryResults": "Ocultar resultados da consulta",
     "vrlExtractionTooltip": "Para usar campos VRL extraídos no gráfico, escreva uma função VRL e clique no botão Aplicar. Os campos serão extraídos, permitindo que você os use para criar o gráfico.",
     "errorFetchingFunctions": "Erro ao buscar funções",
-    "functionAppliedSuccess": "função {name} aplicada com sucesso."
+    "functionAppliedSuccess": "função {name} aplicada com sucesso.",
+    "panelTimeSettings": "Configurações de tempo do painel",
+    "panelTimeEnabled": "Permitir tempo no nível do painel",
+    "useGlobalTime": "Use a hora global",
+    "useIndividualTime": "Use o tempo individual",
+    "panelTimeGlobalHint": "O painel rastreará a hora global do painel. Alterações na hora global atualizarão esse painel.",
+    "panelTimeIndividualHint": "O painel usará seu próprio intervalo de tempo. Defina a hora usando o seletor de data abaixo. As mudanças globais de horário não afetarão esse painel.",
+    "panelTimeRange": "Intervalo de tempo do painel",
+    "panelTimeRangeTooltip": "Esse intervalo de tempo se aplica somente a esse painel. Outros painéis usarão seus próprios horários configurados ou o horário global do painel.",
+    "panelTimeSettingsTooltip": "Configure como esse painel determina seu intervalo de tempo. Você pode usar o intervalo de tempo do painel ou definir um personalizado para esse painel.",
+    "panelTimeMode": "Fonte do intervalo de tempo (no carregamento do painel)",
+    "useDefaultTimeTooltip": "Quando ativado, esse painel usará a duração padrão configurada como seu intervalo de tempo no carregamento do painel, em vez do tempo global do painel.",
+    "defaultDuration": "Duração padrão"
   },
   "panel": {
     "header": "Painel",
