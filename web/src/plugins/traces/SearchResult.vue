@@ -57,139 +57,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'tw:h-[calc(100%-3.25rem)]!'
       "
     >
-      <!-- ════════════════════ Loading State ════════════════════ -->
-      <div
-        class="full-height flex justify-center items-center tw:pt-[4rem]"
-        v-if="searchObj.loading == true"
-      >
-        <div class="q-pb-lg">
-          <q-spinner-hourglass
-            color="primary"
-            size="40px"
-            style="margin: 0 auto; display: block"
-          />
-          <span class="text-center">
-            Hold on tight, we're fetching your traces.
-          </span>
-        </div>
-      </div>
-
-      <!-- ════════════════════ Empty State ════════════════════ -->
-      <div
-        v-else-if="noResults"
-        class="text-center tw:mx-[10%] tw:my-[40px] tw:text-[20px]"
-      >
-        <q-icon name="info" color="primary" size="md" /> No traces found. Please
-        adjust the filters and try again.
-      </div>
-
-      <!-- ════════════════════ Traces List Section ════════════════════ -->
-      <div
-        v-else
-        v-show="hasResults"
-        data-test="traces-table-wrapper"
-        class="traces-section column tw:h-full"
-      >
-        <!-- Section header: title + count badge -->
-        <div
-          data-test="traces-section-header"
-          class="traces-section-header row items-center q-px-sm q-py-xs tw:bg-[var(--o2-section-header-bg)]!"
-          v-show="
+      <TracesSearchResultList
+        :hits="hits"
+        :loading="searchObj.loading"
+        :search-performed="searchPerformed"
+        :show-header="
+          !!(
             searchObj.data.stream.selectedStream.value &&
             !searchObj.data.errorMsg?.trim()?.length &&
             searchObj.searchApplied
-          "
-        >
-          <span
-            data-test="traces-section-title"
-            class="tw:text-[0.75rem] tw:font-bold tw:tracking-[0.0625rem]! tw:text-[var(--o2-text-1)]! tw:mr-[0.85rem]"
-          >
-            TRACES
-          </span>
-          <q-badge
-            data-test="traces-count-badge"
-            rounded
-            :label="`${hits.length} Traces Found`"
-            class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
-          />
-        </div>
-
-        <!-- Table scroll area -->
-        <div
-          data-test="traces-search-result-list"
-          class="traces-table-scroll-area tw:w-full"
-        >
-          <TracesTable
-            :columns="tracesColumns"
-            :rows="hits"
-            :row-class="traceRowClass"
-            @row-click="expandRowDetail"
-            @load-more="loadMore"
-          >
-            <template #cell-timestamp="{ item }">
-              <TraceTimestampCell :item="item" />
-            </template>
-
-            <template #cell-service_operation="{ item }">
-              <TraceServiceCell :item="item" />
-            </template>
-
-            <template #cell-duration="{ item }">
-              <span class="text-caption" data-test="trace-row-duration">
-                {{ formatTimeWithSuffix(item.duration) || "0us" }}
-              </span>
-            </template>
-
-            <template #cell-spans="{ item }">
-              <q-badge
-                data-test="trace-row-spans-badge"
-                :label="item.spans"
-                class="tw:bg-[var(--o2-tag-grey-2)]! tw:text-[var(--o2-text-1)]! tw:px-[0.5rem]! tw:py-[0.325rem]!"
-              />
-            </template>
-
-            <template #cell-status="{ item }">
-              <TraceStatusCell :item="item" />
-            </template>
-
-            <template #cell-input_tokens="{ item }">
-              <span class="text-caption" data-test="trace-row-input-tokens">
-                {{
-                  isLLMTrace(item)
-                    ? formatTokens(extractLLMData(item)?.usage?.input ?? 0)
-                    : "-"
-                }}
-              </span>
-            </template>
-
-            <template #cell-output_tokens="{ item }">
-              <span class="text-caption" data-test="trace-row-output-tokens">
-                {{
-                  isLLMTrace(item)
-                    ? formatTokens(extractLLMData(item)?.usage?.output ?? 0)
-                    : "-"
-                }}
-              </span>
-            </template>
-
-            <template #cell-cost="{ item }">
-              <span class="text-caption" data-test="trace-row-cost">
-                {{
-                  isLLMTrace(item)
-                    ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}`
-                    : "-"
-                }}
-              </span>
-            </template>
-
-            <template #cell-service_latency="{ item }">
-              <TraceLatencyCell :item="item" />
-            </template>
-
-            <template #empty />
-          </TracesTable>
-        </div>
-      </div>
+          )
+        "
+        @row-click="expandRowDetail"
+        @load-more="loadMore"
+      />
     </div>
   </div>
 </template>
@@ -200,32 +81,14 @@ import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
-import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
-import { getImageURL } from "../../utils/zincutils";
-import TracesTable from "@/components/traces/TracesTable.vue";
-import { useTracesTableColumns } from "./composables/useTracesTableColumns";
-import TraceTimestampCell from "./components/TraceTimestampCell.vue";
-import TraceServiceCell from "./components/TraceServiceCell.vue";
-import TraceLatencyCell from "./components/TraceLatencyCell.vue";
-import TraceStatusCell from "./components/TraceStatusCell.vue";
 import { useRouter } from "vue-router";
-import {
-  isLLMTrace,
-  extractLLMData,
-  formatCost,
-  formatTokens,
-} from "../../utils/llmUtils";
-import { formatTimeWithSuffix } from "../../utils/zincutils";
+import TracesSearchResultList from "./components/TracesSearchResultList.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
-    TracesTable,
-    TraceTimestampCell,
-    TraceServiceCell,
-    TraceLatencyCell,
-    TraceStatusCell,
+    TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
     ),
@@ -265,9 +128,6 @@ export default defineComponent({
     const router = useRouter();
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();
-    const totalHeight = ref(0);
-
-    const searchTableRef: any = ref(null);
     const metricsDashboardRef: any = ref(null);
 
     const expandRowDetail = (props: any) => {
@@ -283,22 +143,6 @@ export default defineComponent({
       });
 
       emit("get:traceDetails", props);
-    };
-
-    const getRowIndex = (next: boolean, _prev: boolean, oldIndex: number) => {
-      if (next) {
-        return oldIndex + 1;
-      } else {
-        return oldIndex - 1;
-      }
-    };
-
-    const addSearchTerm = (term: string) => {
-      searchObj.data.stream.addToFilter = term;
-    };
-
-    const removeSearchTerm = (term: string) => {
-      emit("remove:searchTerm", term);
     };
 
     const onMetricsTimeRangeSelected = (range: {
@@ -319,38 +163,16 @@ export default defineComponent({
       metricsDashboardRef?.value?.loadDashboard();
     };
 
-    const hasLlmTraces = computed(() =>
-      (searchObj.data.queryResults?.hits ?? []).some((hit: any) =>
-        isLLMTrace(hit),
-      ),
-    );
-
-    const tracesColumns = useTracesTableColumns(hasLlmTraces);
-
-    const traceRowClass = (row: any) =>
-      (row.errors ?? 0) > 0 ? "oz-table__row--error" : "";
-
     // -----------------------------------------------------------------------
     // Infinite scroll
     // -----------------------------------------------------------------------
     const hits = computed<any[]>(() => searchObj.data.queryResults?.hits ?? []);
 
-    const noResults = computed(
-      () =>
-        Object.prototype.hasOwnProperty.call(
-          searchObj.data.queryResults,
-          "total",
-        ) &&
-        hits.value.length === 0 &&
-        !searchObj.loading,
-    );
-
-    const hasResults = computed(
-      () =>
-        Object.prototype.hasOwnProperty.call(
-          searchObj.data.queryResults,
-          "total",
-        ) && hits.value.length > 0,
+    const searchPerformed = computed(() =>
+      Object.prototype.hasOwnProperty.call(
+        searchObj.data.queryResults,
+        "total",
+      ),
     );
 
     function loadMore() {
@@ -373,32 +195,14 @@ export default defineComponent({
       store,
       searchObj,
       updatedLocalLogFilterField,
-      byString,
-      searchTableRef,
       metricsDashboardRef,
-      addSearchTerm,
-      removeSearchTerm,
       expandRowDetail,
-      totalHeight,
-      getImageURL,
-      getRowIndex,
       onMetricsTimeRangeSelected,
       onMetricsFiltersUpdated,
       getDashboardData,
-      hasLlmTraces,
-      tracesColumns,
-      traceRowClass,
-      // Infinite scroll
       hits,
-      noResults,
-      hasResults,
+      searchPerformed,
       loadMore,
-      // Cell utilities exposed for slot templates
-      formatTimeWithSuffix,
-      isLLMTrace,
-      extractLLMData,
-      formatTokens,
-      formatCost,
     };
   },
 });
