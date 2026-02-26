@@ -112,26 +112,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="`${hits.length} Traces Found`"
             class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
           />
-          <q-badge
-            v-if="visibleCount < hits.length"
-            data-test="traces-visible-count-badge"
-            rounded
-            :label="`Showing ${visibleCount} of ${hits.length}`"
-            class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]!"
-          />
         </div>
 
         <!-- Table scroll area -->
         <div
           data-test="traces-search-result-list"
           class="traces-table-scroll-area tw:w-full"
-          @scroll.passive="onScrollAreaScroll"
         >
           <TracesTable
             :columns="tracesColumns"
-            :rows="visibleHits"
+            :rows="hits"
             :row-class="traceRowClass"
             @row-click="expandRowDetail"
+            @load-more="loadMore"
           >
             <template #cell-timestamp="{ item }">
               <TraceTimestampCell :item="item" />
@@ -202,13 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  computed,
-  defineAsyncComponent,
-  defineComponent,
-  ref,
-  watch,
-} from "vue";
+import { computed, defineAsyncComponent, defineComponent, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -346,9 +333,6 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     // Infinite scroll
     // -----------------------------------------------------------------------
-    const PAGE_SIZE = 50;
-    const visibleCount = ref(PAGE_SIZE);
-
     const hits = computed<any[]>(() => searchObj.data.queryResults?.hits ?? []);
 
     const noResults = computed(
@@ -369,32 +353,20 @@ export default defineComponent({
         ) && hits.value.length > 0,
     );
 
-    const visibleHits = computed(() => hits.value.slice(0, visibleCount.value));
-
     function loadMore() {
-      if (visibleCount.value < hits.value.length) {
-        visibleCount.value = Math.min(
-          visibleCount.value + PAGE_SIZE,
-          hits.value.length,
-        );
+      if (
+        searchObj.loading == false &&
+        searchObj.data.resultGrid.currentPage <=
+          searchObj.data.queryResults.from /
+            searchObj.meta.resultGrid.rowsPerPage &&
+        searchObj.data.queryResults.hits.length >
+          searchObj.meta.resultGrid.rowsPerPage *
+            searchObj.data.resultGrid.currentPage
+      ) {
+        searchObj.data.resultGrid.currentPage += 1;
+        emit("update:scroll");
       }
     }
-
-    function onScrollAreaScroll(e: Event) {
-      const el = e.target as HTMLElement;
-      console.log(el.scrollTop + el.clientHeight, el.scrollHeight - 200);
-      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) {
-        loadMore();
-      }
-    }
-
-    // Reset visible window whenever a new search starts
-    watch(
-      () => searchObj.loading,
-      (isLoading) => {
-        if (isLoading) visibleCount.value = PAGE_SIZE;
-      },
-    );
 
     return {
       t,
@@ -420,9 +392,7 @@ export default defineComponent({
       hits,
       noResults,
       hasResults,
-      visibleCount,
-      visibleHits,
-      onScrollAreaScroll,
+      loadMore,
       // Cell utilities exposed for slot templates
       formatTimeWithSuffix,
       isLLMTrace,

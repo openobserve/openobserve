@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  TracesTable — Generic TanStack Table wrapper for OpenObserve
+  TracesTable — Generic TanStack Table + TanStack Virtual wrapper
 
   Column sizing contract (via ColumnDef.meta):
     meta.grow     — flex: 1 1 0 (fills remaining space).
@@ -33,7 +33,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     #cell-{columnId}      — scoped slot for a specific column cell.
                             Slot props: { item: T, cell: Cell<T, unknown> }
                             Falls back to FlexRender if the slot is not provided.
+
+  Events:
+    row-click   — emitted when the user clicks a row
+    load-more   — emitted when the user scrolls within 300px of the bottom
+                  (use this to trigger server-side fetching of more pages)
 -->
+<template>
+  <div ref="scrollerRef" class="oz-table" @scroll.passive="handleScroll">
+    <!-- ── Sticky header ─────────────────────────────────────────────────── -->
+    <div
+      class="oz-table__head tw:bg-[var(--o2-card-bg)]! row no-wrap items-center q-px-sm tw:border-[var(--o2-border-color)]!"
+    >
+      <div
+        v-for="header in table.getHeaderGroups()[0].headers"
+        :key="header.id"
+        class="oz-table__th text-caption text-weight-bold"
+        :class="getAlignClass(header.column)"
+        :style="getColumnStyle(header.column)"
+      >
+        <FlexRender
+          :render="header.column.columnDef.header"
+          :props="header.getContext()"
+        />
+      </div>
+    </div>
+
+    <!-- ── Virtual rows ───────────────────────────────────────────────────── -->
+    <template v-if="!loading && allRows.length">
+      <div
+        :style="{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          position: 'relative',
+          width: '100%',
+        }"
+      >
+        <div
+          v-for="virtualRow in rowVirtualizer.getVirtualItems()"
+          :key="virtualRow.key"
+          class="oz-table__row tw:bg-[var(--o2-card-bg)]! row no-wrap items-center q-px-sm cursor-pointer tw:border-b tw:border-[var(--o2-border-2)]!"
+          :class="rowClass?.(allRows[virtualRow.index].original)"
+          :style="{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: `${virtualRow.size}px`,
+            transform: `translateY(${virtualRow.start}px)`,
+          }"
+          @click="$emit('row-click', allRows[virtualRow.index].original)"
+        >
+          <div
+            v-for="cell in allRows[virtualRow.index].getVisibleCells()"
+            :key="cell.id"
+            class="oz-table__td"
+            :class="getAlignClass(cell.column)"
+            :style="getColumnStyle(cell.column)"
+          >
+            <slot
+              :name="`cell-${cell.column.id}`"
+              :item="allRows[virtualRow.index].original"
+              :cell="cell"
+            >
+              <FlexRender
+                :render="cell.column.columnDef.cell"
+                :props="cell.getContext()"
+              />
+            </slot>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ── Loading ───────────────────────────────────────────────────────── -->
+    <slot v-else-if="loading" name="loading" />
+
+    <!-- ── Empty ─────────────────────────────────────────────────────────── -->
+    <slot v-else name="empty" />
+  </div>
+</template>
 
 <!-- Module augmentation must live in a non-setup script block -->
 <script lang="ts">
@@ -51,7 +129,8 @@ declare module "@tanstack/vue-table" {
 export default {};
 </script>
 
-<script setup lang="ts" generic="T extends Record<string, any>">
+<script setup lang="ts">
+import { ref, computed } from "vue";
 import {
   useVueTable,
   getCoreRowModel,
@@ -59,6 +138,7 @@ import {
   type ColumnDef,
   type Column,
 } from "@tanstack/vue-table";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Props & emits
@@ -84,6 +164,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   "row-click": [row: T];
+  /** Fired when the user scrolls within 300px of the bottom. */
+  "load-more": [];
 }>();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,13 +173,39 @@ const emit = defineEmits<{
 // ─────────────────────────────────────────────────────────────────────────────
 const table = useVueTable({
   get data() {
-    return props.rows;
+    return props.rows.slice();
   },
   get columns() {
     return props.columns;
   },
   getCoreRowModel: getCoreRowModel(),
 });
+
+const allRows = computed(() => table.getRowModel().rows);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Virtual scroll
+// ─────────────────────────────────────────────────────────────────────────────
+const ROW_HEIGHT = 52; // matches the fixed row height in CSS
+
+const scrollerRef = ref<HTMLElement | null>(null);
+
+const rowVirtualizer = useVirtualizer(
+  computed(() => ({
+    count: allRows.value.length,
+    getScrollElement: () => scrollerRef.value,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  })),
+);
+
+function handleScroll() {
+  const el = scrollerRef.value;
+  if (!el) return;
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 300) {
+    emit("load-more");
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column sizing helpers
@@ -122,68 +230,13 @@ function getAlignClass(column: Column<T, unknown>): string {
 }
 </script>
 
-<template>
-  <div class="oz-table">
-    <!-- ── Sticky header ─────────────────────────────────────────────────── -->
-    <div
-      class="oz-table__head tw:bg-[var(--o2-card-bg)]! row no-wrap items-center q-px-sm tw:border-[var(--o2-border-color)]!"
-    >
-      <div
-        v-for="header in table.getHeaderGroups()[0].headers"
-        :key="header.id"
-        class="oz-table__th text-caption text-weight-bold"
-        :class="getAlignClass(header.column)"
-        :style="getColumnStyle(header.column)"
-      >
-        <FlexRender
-          :render="header.column.columnDef.header"
-          :props="header.getContext()"
-        />
-      </div>
-    </div>
-
-    <!-- ── Rows ──────────────────────────────────────────────────────────── -->
-    <template v-if="!loading && table.getRowModel().rows.length">
-      <div
-        v-for="row in table.getRowModel().rows"
-        :key="row.id"
-        class="oz-table__row tw:bg-[var(--o2-card-bg)]! row no-wrap items-center q-px-sm cursor-pointer tw:border-b tw:border-[var(--o2-border-2)]!"
-        :class="rowClass?.(row.original)"
-        @click="$emit('row-click', row.original)"
-      >
-        <div
-          v-for="cell in row.getVisibleCells()"
-          :key="cell.id"
-          class="oz-table__td"
-          :class="getAlignClass(cell.column)"
-          :style="getColumnStyle(cell.column)"
-        >
-          <slot
-            :name="`cell-${cell.column.id}`"
-            :item="row.original"
-            :cell="cell"
-          >
-            <FlexRender
-              :render="cell.column.columnDef.cell"
-              :props="cell.getContext()"
-            />
-          </slot>
-        </div>
-      </div>
-    </template>
-
-    <!-- ── Loading ───────────────────────────────────────────────────────── -->
-    <slot v-else-if="loading" name="loading" />
-
-    <!-- ── Empty ─────────────────────────────────────────────────────────── -->
-    <slot v-else name="empty" />
-  </div>
-</template>
-
 <style lang="scss" scoped>
 .oz-table {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: auto;
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
@@ -195,7 +248,7 @@ function getAlignClass(column: Column<T, unknown>): string {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   letter-spacing: 2px;
   color: var(--o2-text-3);
-  background: inherit;
+  flex-shrink: 0;
 }
 
 .oz-table__th {
@@ -207,7 +260,7 @@ function getAlignClass(column: Column<T, unknown>): string {
 
 /* ── Rows ────────────────────────────────────────────────────────────────── */
 .oz-table__row {
-  min-height: 52px;
+  height: 52px; /* fixed — must match ROW_HEIGHT in script */
   transition: background 0.15s ease;
 
   &:hover {
