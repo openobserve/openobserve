@@ -284,6 +284,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                         </q-item-section>
                       </q-item>
+                      <!-- Cross-link options -->
+                      <template v-if="getCrossLinksForField(props.row.field).length > 0">
+                        <q-separator class="q-my-xs" />
+                        <q-item
+                          v-for="crossLink in getCrossLinksForField(props.row.field)"
+                          :key="crossLink.name"
+                          clickable
+                          v-close-popup
+                          @click.stop="openCrossLink(crossLink.resolvedUrl)"
+                        >
+                          <q-item-section>
+                            <q-item-label>
+                              <q-btn
+                                icon="open_in_new"
+                                size="6px"
+                                round
+                                class="q-mr-sm pointer"
+                              />{{ crossLink.name }}
+                            </q-item-label>
+                          </q-item-section>
+                        </q-item>
+                      </template>
                     </q-list>
                   </q-btn-dropdown>
                   <pre
@@ -746,6 +768,77 @@ export default defineComponent({
       emit("add:table", value);
     };
 
+    // Cross-linking: get all matching cross-links for a field
+    const getCrossLinksForField = (fieldName: string): Array<{ name: string; resolvedUrl: string }> => {
+      if (!store.state.zoConfig?.enable_cross_linking) return [];
+
+      const crossLinks = searchObj.data.crossLinks;
+      if (!crossLinks) return [];
+
+      const { stream_links = [], org_links = [] } = crossLinks;
+
+      const aliasToOriginal: Record<string, string> = {};
+      for (const link of [...stream_links, ...org_links]) {
+        for (const f of link.fields || []) {
+          if (f.alias) aliasToOriginal[f.alias] = f.name;
+        }
+      }
+
+      const originalFieldName = aliasToOriginal[fieldName] || fieldName;
+
+      const streamCoveredFields = new Set<string>();
+      for (const link of stream_links) {
+        for (const f of link.fields || []) {
+          if (f.alias) streamCoveredFields.add(f.name);
+        }
+      }
+
+      const results: Array<{ name: string; resolvedUrl: string }> = [];
+
+      for (const link of stream_links) {
+        if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+          const resolved = resolveCrossLinkUrl(link.url, rowData.value, link.fields);
+          if (resolved) results.push({ name: link.name, resolvedUrl: resolved });
+        }
+      }
+
+      if (!streamCoveredFields.has(originalFieldName)) {
+        for (const link of org_links) {
+          if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+            const resolved = resolveCrossLinkUrl(link.url, rowData.value, link.fields);
+            if (resolved) results.push({ name: link.name, resolvedUrl: resolved });
+          }
+        }
+      }
+
+      return results;
+    };
+
+    const resolveCrossLinkUrl = (
+      urlTemplate: string,
+      record: Record<string, any>,
+      fields: any[],
+    ): string | null => {
+      const aliasMap: Record<string, string> = {};
+      for (const f of fields || []) {
+        aliasMap[f.name] = f.alias || f.name;
+      }
+      const resolved = urlTemplate.replace(
+        /\{(\w+)\}/g,
+        (match: string, name: string) => {
+          const alias = aliasMap[name] || name;
+          const val = record[alias] ?? record[name];
+          if (val === undefined || val === null) return match;
+          return encodeURIComponent(String(val));
+        },
+      );
+      return resolved.includes("{") ? null : resolved;
+    };
+
+    const openCrossLink = (url: string) => {
+      window.open(url, "_blank");
+    };
+
     const viewTrace = () => {
       emit("view-trace");
     };
@@ -803,6 +896,8 @@ export default defineComponent({
       toggleWrapLogDetails,
       copyContentToClipboard,
       addFieldToTable,
+      getCrossLinksForField,
+      openCrossLink,
       searchObj,
       multiStreamFields,
       viewTrace,

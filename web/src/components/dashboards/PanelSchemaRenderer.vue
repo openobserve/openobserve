@@ -1045,7 +1045,7 @@ export default defineComponent({
     watch(
       () => metadata.value?.queries?.[0]?.query || panelSchema.value?.queries?.[0]?.query,
       async (newQuery: string) => {
-        if (!store.state.zoConfig?.enable_cross_linking || !newQuery) {
+        if (!store.state.zoConfig?.enable_cross_linking || !newQuery || panelSchema.value?.queryType === "promql") {
           crossLinksData.value = { stream_links: [], org_links: [] };
           return;
         }
@@ -1792,7 +1792,11 @@ export default defineComponent({
         name: link.name,
         type: "byUrl",
         targetBlank: true,
-        data: { url: crossLinkToDrilldownUrl(link.url, link.fields) },
+        data: {
+          url: crossLinkToDrilldownUrl(link.url, link.fields),
+          _rawUrl: link.url,
+          _fields: link.fields,
+        },
         _isCrossLink: true,
       }));
 
@@ -1808,7 +1812,11 @@ export default defineComponent({
           name: link.name,
           type: "byUrl",
           targetBlank: true,
-          data: { url: crossLinkToDrilldownUrl(link.url, link.fields) },
+          data: {
+            url: crossLinkToDrilldownUrl(link.url, link.fields),
+            _rawUrl: link.url,
+            _fields: link.fields,
+          },
           _isCrossLink: true,
         });
       }
@@ -1824,11 +1832,9 @@ export default defineComponent({
       const drilldownItem = drilldownArray.value[index];
       if (drilldownItem?._isCrossLink) {
         try {
-          // Cross-link items already have the URL with ${row.field["alias"]} placeholders
-          // Use the existing replacePlaceholders logic with drilldownVariables
-          const drilldownVariables: any = {};
-          // Build variables from click params
           if (panelSchema.value?.type === "table" && drilldownParams[1]?.[0]) {
+            // Table: use existing replacePlaceholders approach (row data directly available)
+            const drilldownVariables: any = {};
             const fields: any = {};
             const panelFields: any = [
               ...(panelSchema.value.queries?.[0]?.fields?.x || []),
@@ -1840,19 +1846,104 @@ export default defineComponent({
               fields[field.alias] = drilldownParams[1][0][field.alias];
             });
             drilldownVariables.row = { field: fields };
+            const resolvedUrl = replacePlaceholders(
+              drilldownItem.data.url,
+              drilldownVariables,
+            );
+            window.open(resolvedUrl, "_blank");
           } else {
-            drilldownVariables.series = {
-              __name: drilldownParams[0]?.seriesName,
-              __value: Array.isArray(drilldownParams[0]?.value)
-                ? drilldownParams[0]?.value[drilldownParams[0]?.value?.length - 1]
-                : drilldownParams[0]?.value,
-            };
+            // Non-table: resolve URL directly from raw data + chart click values
+            const rawUrl = drilldownItem.data._rawUrl;
+            const linkFields = drilldownItem.data._fields || [];
+            const chartType = panelSchema.value?.type;
+            const isPieOrDonut = ["pie", "donut"].includes(chartType);
+
+            // Build a record of field values from the chart click
+            const record: Record<string, any> = {};
+
+            // Determine x-axis value based on chart type
+            const dataIndex = drilldownParams[0]?.dataIndex;
+            let xAxisValue: any;
+            if (isPieOrDonut) {
+              // Pie/donut: slice name IS the x-field value
+              xAxisValue = drilldownParams[0]?.name;
+            } else if (chartType === "heatmap") {
+              // Heatmap: value is [x, y, val]
+              xAxisValue = drilldownParams[0]?.value?.[0];
+            } else {
+              // Line/bar/area/scatter etc: x value from xAxis data
+              const xAxisData = panelData.value?.options?.xAxis?.[0]?.data;
+              xAxisValue = xAxisData?.[dataIndex];
+            }
+
+            // Series name: pie/donut use params.name, others use params.seriesName
+            const seriesName = isPieOrDonut
+              ? drilldownParams[0]?.name
+              : drilldownParams[0]?.seriesName;
+
+            const xFields = panelSchema.value?.queries?.[0]?.fields?.x || [];
+            const yFields = panelSchema.value?.queries?.[0]?.fields?.y || [];
+            const breakdownFields = panelSchema.value?.queries?.[0]?.fields?.breakdown || [];
+
+            // Try to find the matching row in raw query results
+            const queryResult = data.value?.[0]?.result;
+            if (queryResult?.length > 0) {
+              for (const row of queryResult) {
+                let matches = true;
+                if (xFields.length > 0 && xAxisValue !== undefined) {
+                  if (String(row[xFields[0].alias]) !== String(xAxisValue)) {
+                    matches = false;
+                  }
+                }
+                if (matches && breakdownFields.length > 0 && seriesName && !isPieOrDonut) {
+                  if (String(row[breakdownFields[0].alias]) !== String(seriesName)) {
+                    matches = false;
+                  }
+                }
+                if (matches) {
+                  Object.assign(record, row);
+                  break;
+                }
+              }
+            }
+
+            // Fallback: populate from chart click values for any missing fields
+            const yValue = isPieOrDonut
+              ? drilldownParams[0]?.value
+              : Array.isArray(drilldownParams[0]?.value)
+                ? drilldownParams[0]?.value?.[drilldownParams[0]?.value?.length - 1]
+                : drilldownParams[0]?.value;
+
+            xFields.forEach((f: any) => {
+              if (record[f.alias] === undefined) record[f.alias] = xAxisValue;
+              if (record[f.label] === undefined) record[f.label] = xAxisValue;
+            });
+            yFields.forEach((f: any) => {
+              if (record[f.alias] === undefined) record[f.alias] = yValue;
+              if (record[f.label] === undefined) record[f.label] = yValue;
+            });
+            breakdownFields.forEach((f: any) => {
+              if (record[f.alias] === undefined) record[f.alias] = seriesName;
+              if (record[f.label] === undefined) record[f.label] = seriesName;
+            });
+
+            // Resolve {field_name} in URL using alias mapping from result_schema
+            const aliasMap: Record<string, string> = {};
+            for (const f of linkFields) {
+              aliasMap[f.name] = f.alias || f.name;
+            }
+
+            const resolvedUrl = rawUrl.replace(
+              /\{(\w+)\}/g,
+              (_match: string, fieldName: string) => {
+                const alias = aliasMap[fieldName] || fieldName;
+                const val = record[alias] ?? record[fieldName];
+                if (val === undefined || val === null) return _match;
+                return encodeURIComponent(String(val));
+              },
+            );
+            window.open(resolvedUrl, "_blank");
           }
-          const resolvedUrl = replacePlaceholders(
-            drilldownItem.data.url,
-            drilldownVariables,
-          );
-          window.open(resolvedUrl, "_blank");
         } catch (error) {
           console.error("Failed to open cross-link:", error);
         }

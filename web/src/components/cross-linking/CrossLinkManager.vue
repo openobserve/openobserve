@@ -52,10 +52,9 @@
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
                 dense
-                size="xs"
-                class="tw:max-w-[150px]"
+                class="tw:max-w-[200px]"
               >
-                <span class="tw:truncate" :title="field.name">{{ field.name }}</span>
+                <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
               </q-chip>
             </div>
           </div>

@@ -223,6 +223,28 @@ size="lg" color="primary" />
                 >
               </q-item-section>
             </q-item>
+            <!-- Cross-link options -->
+            <template v-if="getCrossLinksForField(key).length > 0">
+              <q-separator class="q-my-xs" />
+              <q-item
+                v-for="crossLink in getCrossLinksForField(key)"
+                :key="crossLink.name"
+                clickable
+                v-close-popup
+                @click.stop="openCrossLink(crossLink.resolvedUrl)"
+              >
+                <q-item-section>
+                  <q-item-label>
+                    <q-btn
+                      icon="open_in_new"
+                      size="6px"
+                      round
+                      class="q-mr-sm pointer"
+                    />{{ crossLink.name }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
             <q-item
               v-if="
                 config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
@@ -294,9 +316,6 @@ size="lg" color="primary" />
           :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
           <span class="log-key">"{{ key }}"</span><span class="log-separator">: </span><span
-            :class="{ 'cross-link-value': getCrossLinkUrl(key) }"
-            :title="getCrossLinkUrl(key) ? 'Click to open cross-link' : ''"
-            @click="getCrossLinkUrl(key) && onCrossLinkClick(key)"
           ><ChunkedContent
             v-if="getContentSize(value[key]) > 50000"
             :data="value[key]"
@@ -541,75 +560,98 @@ export default {
     };
     const { searchObj, searchAggData } = searchState();
 
-    // Cross-linking: get URL for a field value if a cross-link matches
-    const getCrossLinkUrl = (fieldName: string): string | null => {
-      if (!store.state.zoConfig?.enable_cross_linking) return null;
+    // Cross-linking: get all matching cross-links for a field using result_schema data
+    const getCrossLinksForField = (fieldName: string): Array<{ name: string; resolvedUrl: string }> => {
+      if (!store.state.zoConfig?.enable_cross_linking) return [];
 
-      const orgLinks: any[] =
-        store.state.organizationData?.organizationSettings?.cross_links || [];
+      const crossLinks = searchObj.data.crossLinks;
+      if (!crossLinks) return [];
 
-      const streamType =
-        searchObj.data.stream.streamType || "logs";
-      const sName =
-        props.streamName || searchObj.data.stream.selectedStream?.[0] || "";
-      const streamIndex =
-        store.state.streams?.streamsIndexMapping?.[streamType]?.[sName];
-      const streamData =
-        streamIndex !== undefined
-          ? store.state.streams?.[streamType]?.list?.[streamIndex]
-          : null;
-      const streamLinks: any[] = streamData?.settings?.cross_links || [];
+      const { stream_links = [], org_links = [] } = crossLinks;
 
-      // Field-level priority: check stream first, then org
-      const streamMatch = streamLinks.find((link: any) =>
-        link.fields?.some((f: any) => f.name === fieldName),
-      );
-      if (streamMatch) {
-        return resolveUrl(streamMatch.url, props.value);
-      }
-
-      // Check if field is covered by any stream link (for org exclusion)
-      const streamCoveredFields = new Set<string>();
-      for (const link of streamLinks) {
+      // Build alias→original map
+      const aliasToOriginal: Record<string, string> = {};
+      for (const link of [...stream_links, ...org_links]) {
         for (const f of link.fields || []) {
-          streamCoveredFields.add(f.name);
+          if (f.alias) aliasToOriginal[f.alias] = f.name;
         }
       }
 
-      // Only use org link if field is NOT covered by stream
-      if (!streamCoveredFields.has(fieldName)) {
-        const orgMatch = orgLinks.find((link: any) =>
-          link.fields?.some((f: any) => f.name === fieldName),
-        );
-        if (orgMatch) {
-          return resolveUrl(orgMatch.url, props.value);
+      const originalFieldName = aliasToOriginal[fieldName] || fieldName;
+
+      const streamCoveredFields = new Set<string>();
+      for (const link of stream_links) {
+        for (const f of link.fields || []) {
+          if (f.alias) streamCoveredFields.add(f.name);
         }
       }
 
-      return null;
+      const results: Array<{ name: string; resolvedUrl: string }> = [];
+
+      for (const link of stream_links) {
+        if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+          const resolved = resolveCrossLinkUrl(link.url, props.value, link.fields);
+          if (resolved) results.push({ name: link.name, resolvedUrl: resolved });
+        }
+      }
+
+      if (!streamCoveredFields.has(originalFieldName)) {
+        for (const link of org_links) {
+          if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+            const resolved = resolveCrossLinkUrl(link.url, props.value, link.fields);
+            if (resolved) results.push({ name: link.name, resolvedUrl: resolved });
+          }
+        }
+      }
+
+      return results;
     };
 
-    const resolveUrl = (
+    const resolveCrossLinkUrl = (
       urlTemplate: string,
       record: Record<string, any>,
+      fields: any[],
     ): string | null => {
+      const aliasMap: Record<string, string> = {};
+      for (const f of fields || []) {
+        aliasMap[f.name] = f.alias || f.name;
+      }
       const resolved = urlTemplate.replace(
         /\{(\w+)\}/g,
         (match: string, name: string) => {
-          const val = record[name];
+          const alias = aliasMap[name] || name;
+          const val = record[alias] ?? record[name];
           if (val === undefined || val === null) return match;
           return encodeURIComponent(String(val));
         },
       );
-      if (resolved.includes("{")) return null;
-      return resolved;
+      return resolved.includes("{") ? null : resolved;
     };
 
-    const onCrossLinkClick = (fieldName: string) => {
-      const url = getCrossLinkUrl(fieldName);
-      if (url) {
-        window.open(url, "_blank");
+    // Dropdown state for multi-link fields
+    const crossLinkDropdownVisible = ref(false);
+    const crossLinkDropdownX = ref(0);
+    const crossLinkDropdownY = ref(0);
+    const crossLinkDropdownItems = ref<Array<{ name: string; resolvedUrl: string }>>([]);
+
+    const onCrossLinkClick = (event: MouseEvent, fieldName: string) => {
+      const links = getCrossLinksForField(fieldName);
+      if (links.length === 0) return;
+
+      if (links.length === 1) {
+        window.open(links[0].resolvedUrl, "_blank");
+        return;
       }
+
+      crossLinkDropdownItems.value = links;
+      crossLinkDropdownX.value = event.clientX;
+      crossLinkDropdownY.value = event.clientY;
+      crossLinkDropdownVisible.value = true;
+    };
+
+    const openCrossLink = (url: string) => {
+      window.open(url, "_blank");
+      crossLinkDropdownVisible.value = false;
     };
     let multiStreamFields: any = ref([]);
 
@@ -1024,8 +1066,8 @@ export default {
       regexPatternType,
       confirmRegexPatternType,
       getContentSize,
-      getCrossLinkUrl,
-      onCrossLinkClick,
+      getCrossLinksForField,
+      openCrossLink,
     };
   },
 };
@@ -1034,14 +1076,5 @@ export default {
 <style lang="scss" scoped>
 @import "@/styles/logs/json-preview.scss";
 
-.cross-link-value {
-  cursor: pointer;
-  text-decoration: underline dotted;
-  text-decoration-color: var(--o2-theme-color);
-  text-underline-offset: 2px;
-
-  &:hover {
-    background: var(--o2-hover-gray);
-  }
-}
+// No custom cross-link CSS needed — cross-links render as q-items inside existing q-btn-dropdown
 </style>
