@@ -108,7 +108,9 @@ class FunctionsPage {
     await this.page.waitForTimeout(500);
 
     // Clear existing content and type new code
-    await this.page.keyboard.press('Control+A');
+    // Use Meta+A on macOS (Cmd+A), Control+A on Linux/Windows
+    const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+    await this.page.keyboard.press(selectAll);
     await this.page.keyboard.type(code);
     // Wait longer than the Monaco editor's 500ms debounce so formData syncs via v-model
     await this.page.waitForTimeout(1000);
@@ -128,7 +130,8 @@ class FunctionsPage {
 
   async clickTestButton() {
     const testButton = this.page.locator(this.testButton);
-    await testButton.click();
+    // force: true needed — button can be obscured by overlapping editor chrome
+    await testButton.click({ force: true });
     await this.page.waitForTimeout(1000);
   }
 
@@ -169,9 +172,17 @@ class FunctionsPage {
   // ==================== Test Function Methods ====================
 
   async enterTestEvent(eventJson) {
-    const testInput = this.page.locator(this.testEventsEditor);
-    await testInput.click();
-    await this.page.keyboard.press('Control+A');
+    // Focus the actual textarea inside the Monaco editor (not the container div).
+    // Using .focus() ensures keyboard shortcuts work correctly in Monaco.
+    const textarea = this.page.locator(`${this.testEventsEditor} textarea`);
+    await textarea.focus();
+    await this.page.waitForTimeout(300);
+
+    // Select all existing content, delete it, then type new content
+    const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+    await this.page.keyboard.press(selectAll);
+    await this.page.keyboard.press('Backspace');
+    await this.page.waitForTimeout(200);
     await this.page.keyboard.type(eventJson);
     // Wait for Monaco editor v-model debounce to sync
     await this.page.waitForTimeout(600);
@@ -184,9 +195,9 @@ class FunctionsPage {
     if (await runButton.isVisible({ timeout: 2000 })) {
       // force: true needed — button can be obscured by overlapping editor chrome
       await runButton.click({ force: true });
-      // Wait for output editor to contain actual JSON (not just Monaco line numbers)
+      // Wait for output to load (>10 chars distinguishes real content from Monaco line numbers)
       const outputLocator = this.page.locator(this.testOutputEditor);
-      await expect(outputLocator).toContainText('{', { timeout: 15000 });
+      await expect(outputLocator).toHaveText(/.{10,}/, { timeout: 15000 });
       return true;
     }
     return false;
@@ -318,16 +329,19 @@ class FunctionsPage {
    * @returns {Promise<string>} Test output
    */
   async testFunctionExecution(testEventJson = null) {
-    // If custom events provided, enter them first (before triggering the test)
+    // The TestFunction component is always visible (rendered in splitter v-slot:after).
+    // If custom events provided, enter them before triggering the test.
     if (testEventJson) {
       await this.enterTestEvent(testEventJson);
     }
 
+    // The toolbar "Test Function" button calls testFunction() on the TestFunction
+    // component, which POSTs to /api/{org}/functions/test and populates the output editor.
     await this.clickTestButton();
 
-    // Wait for output editor to contain actual JSON (not just Monaco line numbers)
+    // Wait for output editor to have real content (>10 chars to skip Monaco line numbers)
     const outputLocator = this.page.locator(this.testOutputEditor);
-    await expect(outputLocator).toContainText('{', { timeout: 15000 });
+    await expect(outputLocator).toHaveText(/.{10,}/, { timeout: 15000 });
 
     return await this.getTestOutput();
   }

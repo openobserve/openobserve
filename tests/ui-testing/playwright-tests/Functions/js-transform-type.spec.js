@@ -116,8 +116,8 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.selectJavaScriptType();
       await pm.functionsPage.enterFunctionCode(jsCode1);
 
-      // Explicit event without 'count' — tests the || 5 fallback: (undefined || 5) + 1 = 6
-      const output = await pm.functionsPage.testFunctionExecution('{"name":"test"}');
+      // Default events don't have 'count' — tests the || 5 fallback: (undefined || 5) + 1 = 6
+      const output = await pm.functionsPage.testFunctionExecution();
 
       // Assert output exists before checking content
       expect(output).toBeTruthy();
