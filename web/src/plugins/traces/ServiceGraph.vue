@@ -607,20 +607,6 @@ export default defineComponent({
             }))
           : [];
 
-        // Corner time labels
-        const first = points[0];
-        const ageMs = first ? Date.now() - Math.round(first.timestamp / 1000) : 0;
-        const ageH = ageMs / 3_600_000;
-        const startLabel =
-          ageH >= 23.5 ? '24h ago'
-          : ageH >= 1  ? `${Math.round(ageH)}h ago`
-          : `${Math.round(ageMs / 60_000)}m ago`;
-        const cornerColor = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.52)';
-        const cornerLabels = [
-          { type: 'text', left: GRID.left, bottom: 3, style: { text: startLabel, fill: cornerColor, fontSize: 9, fontFamily: sf } },
-          { type: 'text', right: GRID.right, bottom: 3, style: { text: 'now →', fill: cornerColor, fontSize: 9, fontFamily: sf } },
-        ];
-
         const makeSeries = (name: string, color: string, getter: (p: any) => number) => ({
           name, type: 'line', smooth: 0.5,
           data: points.map((p: any, i: number) => ({
@@ -633,6 +619,50 @@ export default defineComponent({
           areaStyle: { color: hexArea(color, 0.15), origin: 'auto' },
           label: { show: false },
         });
+
+        // Calculate time range based on actual data span
+        let xAxisMin: number | undefined = undefined;
+        let xAxisMax: number | undefined = undefined;
+        let displaySpanMs = 0;
+
+        if (points.length > 0) {
+          // Timestamps are in microseconds, convert to milliseconds
+          const firstPointTime = Math.round(points[0].timestamp / 1000);
+          const lastPointTime = Math.round(points[last].timestamp / 1000);
+          const actualSpanMs = lastPointTime - firstPointTime;
+
+          // Calculate ceiling - round up to next hour
+          const spanHours = actualSpanMs / (60 * 60 * 1000);
+          const ceilingHours = Math.ceil(spanHours);
+          const ceilingSpanMs = ceilingHours * 60 * 60 * 1000;
+
+          // Set x-axis: end at latest point, start at (latest - ceiling span)
+          xAxisMax = lastPointTime;
+          xAxisMin = lastPointTime - ceilingSpanMs;
+          displaySpanMs = ceilingSpanMs;
+        }
+
+        // Corner time labels - based on ceiling span
+        let startLabel = '';
+        if (displaySpanMs > 0) {
+          const spanHours = displaySpanMs / (60 * 60 * 1000);
+          const spanDays = displaySpanMs / (24 * 60 * 60 * 1000);
+
+          if (spanDays >= 1) {
+            startLabel = `${Math.round(spanDays)}d ago`;
+          } else if (spanHours >= 1) {
+            startLabel = `${Math.round(spanHours)}h ago`;
+          } else {
+            const spanMinutes = displaySpanMs / (60 * 1000);
+            startLabel = `${Math.round(spanMinutes)}m ago`;
+          }
+        }
+        const cornerColor = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.52)';
+        const endLabel = 'latest →';
+        const cornerLabels = [
+          { type: 'text', left: GRID.left, bottom: 3, style: { text: startLabel, fill: cornerColor, fontSize: 9, fontFamily: sf } },
+          { type: 'text', right: GRID.right, bottom: 3, style: { text: endLabel, fill: cornerColor, fontSize: 9, fontFamily: sf } },
+        ];
 
         return {
           backgroundColor: 'transparent',
@@ -661,6 +691,8 @@ export default defineComponent({
           },
           xAxis: {
             type: 'time',
+            min: xAxisMin,
+            max: xAxisMax,
             axisLine: { show: false }, axisTick: { show: false },
             splitLine: { show: false }, axisLabel: { show: false },
           },
