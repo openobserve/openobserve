@@ -94,8 +94,8 @@ pub async fn get_enrichment_table_data(
         query.histogram_interval,
         false, // overwrite_cache
     );
-     // set local mode to true for enrichment table
-     request.set_local_mode(Some(true));
+    // set local mode to true for enrichment table
+    request.set_local_mode(Some(true));
 
     log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
 
