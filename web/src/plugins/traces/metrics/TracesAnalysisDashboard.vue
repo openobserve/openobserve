@@ -51,7 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Baseline Chip -->
             <div
-              class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem] tw:bg-[var(--o2-tag-grey-1)]! tw:text-[var(--o2-text-4)] tw:border-1! tw:border-[var(--o2-border-color)]!"
+              class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+              :style="{ '--chip-color': chipColors.baseline }"
             >
               <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
                 >Baseline:</span
@@ -75,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="hasSelectedTimeRange"
               class="time-range-chip selected-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+              :style="{ '--chip-color': chipColors.selected }"
             >
               <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
                 >Selected:</span
@@ -360,7 +362,10 @@ import {
   useLatencyInsightsAnalysis,
   type LatencyInsightsConfig,
 } from "@/composables/useLatencyInsightsAnalysis";
-import { useLatencyInsightsDashboard } from "@/composables/useLatencyInsightsDashboard";
+import {
+  useLatencyInsightsDashboard,
+  COMPARISON_COLORS,
+} from "@/composables/useLatencyInsightsDashboard";
 import {
   selectDimensionsFromData,
   selectTraceDimensions,
@@ -421,6 +426,11 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 const store = useStore();
 const { t } = useI18n();
+const chipColors = computed(() =>
+  store.state.theme === "dark"
+    ? COMPARISON_COLORS.dark
+    : COMPARISON_COLORS.light,
+);
 const { loading, error, analyzeAllDimensions } = useLatencyInsightsAnalysis();
 const { generateDashboard } = useLatencyInsightsDashboard();
 
@@ -792,7 +802,11 @@ const loadAnalysis = async () => {
     }));
 
     // Generate dashboard JSON with UNION queries
-    const dashboard = generateDashboard(mockAnalyses, config);
+    const dashboard = generateDashboard(
+      mockAnalyses,
+      config,
+      store.state.theme,
+    );
 
     dashboardData.value = dashboard;
     dashboardRenderKey.value++; // Increment to force re-render on full reload
@@ -1010,7 +1024,8 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
     }));
 
     // Generate new panels using the same logic as generateDashboard
-    const newPanels = generateDashboard(mockAnalyses, config).tabs[0].panels;
+    const newPanels = generateDashboard(mockAnalyses, config, store.state.theme)
+      .tabs[0].panels;
 
     // Update layout positions for new panels to appear after existing ones
     const timestamp = Date.now();
@@ -1183,11 +1198,11 @@ watch(
     line-height: 1.2;
     transition: all 0.2s ease;
 
+    &.baseline-chip,
     &.selected-chip {
-      // Orange background matching selected in charts
-      background: rgba(59, 130, 246, 0.25);
-      color: rgb(19, 54, 110) !important;
-      border: 1px solid rgba(59, 130, 246, 0.5);
+      background: color-mix(in srgb, var(--chip-color) 20%, transparent);
+      border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
+      color: color-mix(in srgb, var(--chip-color) 80%, #000) !important;
       font-weight: 500;
     }
   }
@@ -1266,13 +1281,11 @@ body.body--dark {
     }
   }
 
-  // Time range chips dark mode - matching chart colors
+  // Time range chips: dark mode text adjustment
   .time-range-chip {
+    &.baseline-chip,
     &.selected-chip {
-      // Orange background for selected
-      background: rgba(59, 130, 246, 0.25);
-      color: rgb(156, 191, 248) !important;
-      border: 1px solid rgba(59, 130, 246, 0.5);
+      color: color-mix(in srgb, var(--chip-color) 80%, #fff) !important;
     }
   }
 }

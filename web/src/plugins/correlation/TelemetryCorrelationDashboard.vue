@@ -1390,7 +1390,11 @@ const loadDashboard = async () => {
       // selectedMetricStreams.value.forEach(s => {
       //   console.log(`  ${s.stream_name}:`, s.filters);
       // });
-      const dashboard = generateDashboard(selectedMetricStreams.value, config);
+      const dashboard = generateDashboard(
+        selectedMetricStreams.value,
+        config,
+        store.state.theme,
+      );
       dashboardData.value = dashboard;
       dashboardRenderKey.value++;
     } else {
@@ -1479,7 +1483,11 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
         metricSchemas: newSchemas,
       };
 
-      const newDashboard = generateDashboard(streamsNeedingGeneration, config);
+      const newDashboard = generateDashboard(
+        streamsNeedingGeneration,
+        config,
+        store.state.theme,
+      );
       newPanels = newDashboard.tabs[0].panels;
     }
 
