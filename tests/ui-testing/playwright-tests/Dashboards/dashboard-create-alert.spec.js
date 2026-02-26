@@ -138,7 +138,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       const dashboardStreamPromise = page.waitForResponse(
         (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
         { timeout: 30000 }
-      ).catch(() => {});
+      );
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
       await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
@@ -163,13 +163,13 @@ test.describe("Dashboard Create Alert testcases", () => {
       await expect(belowOption).toBeVisible({ timeout: 5000 });
       await expect(belowOption).toContainText("Create Alert with threshold below");
 
-      // Click "above threshold" option
-      await pm.dashboardPanelEdit.selectAlertAboveThreshold();
-
-      // Verify navigation to alert creation page with panel data
-      await page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
-        timeout: 15000,
-      });
+      // Click "above threshold" option and wait for navigation simultaneously
+      await Promise.all([
+        page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
+          timeout: 15000,
+        }),
+        pm.dashboardPanelEdit.selectAlertAboveThreshold(),
+      ]);
 
       const currentUrl = page.url();
       expect(currentUrl).toContain("fromPanel=true");
@@ -233,7 +233,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       const dashboardStreamPromise = page.waitForResponse(
         (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
         { timeout: 30000 }
-      ).catch(() => {});
+      );
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
       await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
@@ -244,13 +244,13 @@ test.describe("Dashboard Create Alert testcases", () => {
       // Verify context menu appears
       await pm.dashboardPanelEdit.expectAlertContextMenuVisible();
 
-      // Click "below threshold" option
-      await pm.dashboardPanelEdit.selectAlertBelowThreshold();
-
-      // Verify navigation to alert creation page
-      await page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
-        timeout: 15000,
-      });
+      // Click "below threshold" option and wait for navigation simultaneously
+      await Promise.all([
+        page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
+          timeout: 15000,
+        }),
+        pm.dashboardPanelEdit.selectAlertBelowThreshold(),
+      ]);
 
       const currentUrl = page.url();
       expect(currentUrl).toContain("fromPanel=true");
@@ -309,7 +309,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       const dashboardStreamPromise = page.waitForResponse(
         (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
         { timeout: 30000 }
-      ).catch(() => {});
+      );
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
       await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
@@ -435,11 +435,13 @@ test.describe("Dashboard Create Alert testcases", () => {
       await thresholdOperator.click();
       await page.getByText(">=", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
       await page.getByText(">=", { exact: true }).click();
+      // Close the operator dropdown overlay so it doesn't block the threshold input
+      await page.keyboard.press("Escape");
 
       const thresholdInput = page.locator(
         '[data-test="alert-threshold-value-input"] input'
       );
-      await thresholdInput.waitFor({ state: "visible", timeout: 5000 });
+      await thresholdInput.waitFor({ state: "visible", timeout: 10000 });
       await thresholdInput.fill("1");
 
       // Select destination

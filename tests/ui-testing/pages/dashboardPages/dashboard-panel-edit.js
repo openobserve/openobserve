@@ -208,19 +208,21 @@ export default class DashboardPanel {
   }
 
   // Select "above threshold" from alert context menu
-  // force:true is required because AlertContextMenu uses <teleport to="body">
-  // which places the menu under the app's root overlay that intercepts pointer events
+  // Uses evaluate(el.click()) because AlertContextMenu uses <teleport to="body">
+  // which places the menu under overlays that intercept CDP-dispatched pointer events.
+  // Direct DOM click() bypasses browser hit-testing and reliably triggers Vue's handler.
   async selectAlertAboveThreshold() {
     await this.alertContextMenuAbove.waitFor({ state: "visible" });
-    await this.alertContextMenuAbove.click({ force: true });
+    await this.alertContextMenuAbove.evaluate((el) => el.click());
   }
 
   // Select "below threshold" from alert context menu
-  // force:true is required because AlertContextMenu uses <teleport to="body">
-  // which places the menu under the app's root overlay that intercepts pointer events
+  // Uses evaluate(el.click()) because AlertContextMenu uses <teleport to="body">
+  // which places the menu under overlays that intercept CDP-dispatched pointer events.
+  // Direct DOM click() bypasses browser hit-testing and reliably triggers Vue's handler.
   async selectAlertBelowThreshold() {
     await this.alertContextMenuBelow.waitFor({ state: "visible" });
-    await this.alertContextMenuBelow.click({ force: true });
+    await this.alertContextMenuBelow.evaluate((el) => el.click());
   }
 
   //open Query inspector
