@@ -64,18 +64,17 @@ function buildFormatted() {
   const tz = store.state.timezone;
   const ts = (props.item.trace_start_time || 0) / 1000;
   const FMT = "YYYY-MM-DD HH:mm:ss";
-  const dateStr = _moment.tz(new Date(ts), tz).format(FMT);
+  const tsMoment = _moment.tz(new Date(ts), tz);
   const nowStr = _moment.tz(new Date(), tz).format(FMT);
-  const diffSec = qDate.getDateDiff(nowStr, dateStr, "seconds");
+  const diffSec = qDate.getDateDiff(nowStr, tsMoment.format(FMT), "seconds");
 
+  const d = tsMoment.toDate();
   let day = "";
   if (diffSec < 86400) day = "Today";
   else if (diffSec < 86400 * 2) day = "Yesterday";
-  else {
-    const d = new Date(dateStr);
-    day = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-  }
-  formatted.value = { day, time: formatTimeTo12Hour(new Date(dateStr)) };
+  else day = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+
+  formatted.value = { day, time: formatTimeTo12Hour(d) };
 }
 
 watch(() => props.item?.trace_start_time, buildFormatted);
