@@ -1768,7 +1768,7 @@ export default defineComponent({
       for (const f of fields) {
         aliasMap[f.name] = f.alias || f.name;
       }
-      return url.replace(/\{(\w+)\}/g, (_match: string, fieldName: string) => {
+      return url.replace(/\$?\{(\w+)\}/g, (_match: string, fieldName: string) => {
         const resolved = aliasMap[fieldName] || fieldName;
         return '${row.field["' + resolved + '"]}';
       });
@@ -1934,7 +1934,7 @@ export default defineComponent({
             }
 
             const resolvedUrl = rawUrl.replace(
-              /\{(\w+)\}/g,
+              /\$?\{(\w+)\}/g,
               (_match: string, fieldName: string) => {
                 const alias = aliasMap[fieldName] || fieldName;
                 const val = record[alias] ?? record[fieldName];

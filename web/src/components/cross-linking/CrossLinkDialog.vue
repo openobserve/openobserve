@@ -15,7 +15,7 @@
             <q-input
               v-model="form.name"
               dense
-              placeholder="e.g., View Trace in Jaeger"
+              placeholder="e.g., View Trace Details"
               :rules="[(val: string) => !!val || 'Name is required']"
               borderless
               hide-bottom-space
@@ -29,14 +29,14 @@
             <q-input
               v-model="form.url"
               dense
-              placeholder="e.g., https://example.com/trace/{trace_id}"
+              placeholder="e.g., https://example.com/trace/${trace_id}"
               :rules="[(val: string) => !!val || 'URL is required']"
               borderless
               hide-bottom-space
               data-test="cross-link-url-input"
             />
             <div class="tw:text-xs tw:mt-1" style="color: var(--o2-text-muted)">
-              Use {field_name} for dynamic field values
+              Use ${field_name} for dynamic field values
             </div>
           </div>
 

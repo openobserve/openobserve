@@ -243,6 +243,7 @@ export const DEFAULT_LOGS_CONFIG = {
     isOperationCancelled: false,
     searchRetriesCount: {} as { [key: string]: number },
     actionId: null,
+    crossLinks: { stream_links: [], org_links: [] },
   },
 } as const;
 

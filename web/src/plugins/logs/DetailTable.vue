@@ -824,7 +824,7 @@ export default defineComponent({
         aliasMap[f.name] = f.alias || f.name;
       }
       const resolved = urlTemplate.replace(
-        /\{(\w+)\}/g,
+        /\$?\{(\w+)\}/g,
         (match: string, name: string) => {
           const alias = aliasMap[name] || name;
           const val = record[alias] ?? record[name];

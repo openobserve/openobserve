@@ -46,7 +46,7 @@ export const useSearchBar = () => {
 
   const { fnParsedSQL, extractTimestamps } = logsUtils();
 
-  const { getDataThroughStream } = useSearchStream();
+  const { getDataThroughStream, buildSearch } = useSearchStream();
 
   const { getAllFunctions } = useFunctions();
   const { getAllActions } = useActions();
@@ -442,38 +442,43 @@ export const useSearchBar = () => {
       // }
 
       // Fire result_schema with cross_linking=true in parallel (for cross-linking feature)
-      if (store.state.zoConfig?.enable_cross_linking && searchObj.data.query) {
-        searchService
-          .result_schema(
-            {
-              org_identifier: store.state.selectedOrganization.identifier,
-              query: {
+      // Use buildSearch(true) to get the actual query (works for both sqlMode and non-sqlMode)
+      if (store.state.zoConfig?.enable_cross_linking) {
+        const searchPayload = buildSearch(true);
+        const crossLinkQuery = searchPayload?.query?.sql;
+        if (crossLinkQuery) {
+          searchService
+            .result_schema(
+              {
+                org_identifier: store.state.selectedOrganization.identifier,
                 query: {
-                  sql: searchObj.data.query,
-                  query_fn: null,
-                  size: -1,
-                  streaming_output: false,
-                  streaming_id: null,
+                  query: {
+                    sql: crossLinkQuery,
+                    query_fn: null,
+                    size: -1,
+                    streaming_output: false,
+                    streaming_id: null,
+                  },
                 },
+                page_type: searchObj.data.stream.streamType || "logs",
+                is_streaming: false,
+                cross_linking: true,
               },
-              page_type: searchObj.data.stream.streamType || "logs",
-              is_streaming: false,
-              cross_linking: true,
-            },
-            "ui",
-          )
-          .then((response: any) => {
-            searchObj.data.crossLinks = response.data?.cross_links || {
-              stream_links: [],
-              org_links: [],
-            };
-          })
-          .catch(() => {
-            searchObj.data.crossLinks = {
-              stream_links: [],
-              org_links: [],
-            };
-          });
+              "ui",
+            )
+            .then((response: any) => {
+              searchObj.data.crossLinks = response.data?.cross_links || {
+                stream_links: [],
+                org_links: [],
+              };
+            })
+            .catch(() => {
+              searchObj.data.crossLinks = {
+                stream_links: [],
+                org_links: [],
+              };
+            });
+        }
       }
 
       // Use the appropriate method to fetch data
