@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  OzTable — Generic TanStack Table wrapper for OpenObserve
+  TracesTable — Generic TanStack Table wrapper for OpenObserve
 
   Column sizing contract (via ColumnDef.meta):
     meta.grow     — flex: 1 1 0 (fills remaining space).
@@ -122,7 +122,9 @@ function getAlignClass(column: Column<T, unknown>): string {
 <template>
   <div class="oz-table">
     <!-- ── Sticky header ─────────────────────────────────────────────────── -->
-    <div class="oz-table__head row no-wrap items-center q-px-sm">
+    <div
+      class="oz-table__head row no-wrap items-center q-px-sm tw:border-[var(--o2-border-color)]!"
+    >
       <div
         v-for="header in table.getHeaderGroups()[0].headers"
         :key="header.id"
@@ -142,7 +144,7 @@ function getAlignClass(column: Column<T, unknown>): string {
       <div
         v-for="row in table.getRowModel().rows"
         :key="row.id"
-        class="oz-table__row row no-wrap items-center q-px-sm cursor-pointer tw:bg-white!"
+        class="oz-table__row row no-wrap items-center q-px-sm cursor-pointer"
         :class="rowClass?.(row.original)"
         @click="$emit('row-click', row.original)"
       >

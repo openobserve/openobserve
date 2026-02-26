@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="indexListRef"
                 :field-list="searchObj.data.stream.selectedStreamFields"
                 data-test="traces-search-index-list"
-                class="card-container tw:bg-white!"
+                class="card-container"
                 :key="searchObj.data.stream.streamLists"
                 @update:changeStream="onChangeStream"
               />

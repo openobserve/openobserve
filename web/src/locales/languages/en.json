@@ -133,6 +133,7 @@
     "selectIndex": "Select Stream First",
     "typeSearch": "Type your search query here.",
     "searchField": "Search for a field",
+    "searchDimension": "Search Dimensions",
     "maxRecords": "Max records to return",
     "searchResult": "Search Results",
     "resultsFound": "Results found",
