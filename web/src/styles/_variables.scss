@@ -451,6 +451,8 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --o2-card-bg: rgba(255, 255, 255, 0.8);
 
+  --o2-card-bg-solid: rgba(255, 255, 255);
+
   --o2-header-menu-bg: rgba(255, 255, 255, 0.5);
 
   --o2-border-color: rgba(0, 0, 0, 0.12);
@@ -618,6 +620,9 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-dark-theme-color) 30%, rgb(100, 100, 100));
 
   --o2-card-bg: #1f2223;
+
+  --o2-card-bg-solid: #1f2223;
+
 
   --o2-header-menu-bg: color-mix(in srgb, #19191e 90%, white);
 

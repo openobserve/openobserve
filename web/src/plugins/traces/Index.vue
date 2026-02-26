@@ -108,7 +108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
               <div
                 v-if="
-                  searchObj.data.errorMsg !== '' && searchObj.loading == false
+                  searchObj.data.errorMsg !== '' &&
+                  parseInt(searchObj.data.errorCode) !== 0 &&
+                  searchObj.loading == false
                 "
                 class="card-container tw:h-full"
               >
@@ -153,6 +155,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
+                v-else-if="
+                  searchObj.data.errorMsg !== '' &&
+                  parseInt(searchObj.data.errorCode) == 0 &&
+                  !searchObj.loading
+                "
+                data-test="traces-search-result-not-found-text"
+                class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
+              >
+                <q-icon name="info" color="primary" size="md" />
+                {{ searchObj.data.errorMsg }}
+              </div>
+              <div
                 v-else-if="!isStreamSelected"
                 class="card-container tw:h-full"
               >
@@ -165,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                data-test="logs-search-result-not-found-text"
+                data-test="traces-search-result-not-found-text"
                 v-else-if="
                   isStreamSelected &&
                   !searchObj.searchApplied &&
