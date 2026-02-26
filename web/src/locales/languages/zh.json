@@ -2548,7 +2548,17 @@
     "fetchingMoreTraces": "正在获取更多痕迹...",
     "showErrorOnly": "仅显示错误",
     "openInTraces": "在追踪中打开",
-    "errorRetrievingTraces": "检索跟踪时出错。"
+    "errorRetrievingTraces": "检索跟踪时出错。",
+    "fetchingTraces": "等得紧，我们正在搜寻你的踪迹。",
+    "noTracesFoundAdjust": "未发现任何痕迹。请调整过滤器并重试。",
+    "tracesTitle": "痕迹",
+    "tracesFound": "发现了痕迹",
+    "error": "错误",
+    "errors": "错误",
+    "success": "成功",
+    "today": "今天",
+    "yesterday": "昨天",
+    "spanColorPalettePreview": "Span 调色板预览"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",

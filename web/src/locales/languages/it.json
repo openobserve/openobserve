@@ -2546,7 +2546,17 @@
     "fetchingMoreTraces": "Recuperando altre tracce...",
     "showErrorOnly": "Mostra solo errori",
     "openInTraces": "Apri in Traces",
-    "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce."
+    "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce.",
+    "fetchingTraces": "Resisti, stiamo cercando le tue tracce.",
+    "noTracesFoundAdjust": "Nessuna traccia trovata. Modifica i filtri e riprova.",
+    "tracesTitle": "TRACCE",
+    "tracesFound": "Tracce trovate",
+    "error": "ERRORE",
+    "errors": "ERRORI",
+    "success": "SUCCESSO",
+    "today": "Oggi",
+    "yesterday": "Ieri",
+    "spanColorPalettePreview": "Anteprima della palette di colori Span"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

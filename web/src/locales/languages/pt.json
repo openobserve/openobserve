@@ -2548,7 +2548,17 @@
     "fetchingMoreTraces": "Buscando mais rastros...",
     "showErrorOnly": "Mostrar somente erro",
     "openInTraces": "Abrir no Traces",
-    "errorRetrievingTraces": "Ocorreu um erro ao recuperar os traços."
+    "errorRetrievingTraces": "Ocorreu um erro ao recuperar os traços.",
+    "fetchingTraces": "Aguente firme, estamos buscando seus rastros.",
+    "noTracesFoundAdjust": "Nenhum vestígio encontrado. Ajuste os filtros e tente novamente.",
+    "tracesTitle": "TRAÇOS",
+    "tracesFound": "Traços encontrados",
+    "error": "ERRO",
+    "errors": "ERROS",
+    "success": "SUCESSO",
+    "today": "Hoje",
+    "yesterday": "Ontem",
+    "spanColorPalettePreview": "Pré-visualização da paleta de cores Span"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",

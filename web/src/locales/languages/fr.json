@@ -2548,7 +2548,17 @@
     "fetchingMoreTraces": "À la recherche de nouvelles traces...",
     "showErrorOnly": "Afficher uniquement l'erreur",
     "openInTraces": "Ouvrir dans Traces",
-    "errorRetrievingTraces": "Une erreur s'est produite lors de la récupération des traces."
+    "errorRetrievingTraces": "Une erreur s'est produite lors de la récupération des traces.",
+    "fetchingTraces": "Tiens bon, on va chercher tes traces.",
+    "noTracesFoundAdjust": "Aucune trace n'a été trouvée. Veuillez ajuster les filtres et réessayer.",
+    "tracesTitle": "TRACES",
+    "tracesFound": "Traces trouvées",
+    "error": "ERREUR",
+    "errors": "ERREURS",
+    "success": "SUCCÈS",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier",
+    "spanColorPalettePreview": "Aperçu de la palette de couleurs Span"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
