@@ -61,6 +61,7 @@
             </div>
             <div class="tw:flex tw:gap-2 tw:items-center">
               <q-select
+                ref="fieldSelectRef"
                 v-if="availableFields.length > 0"
                 v-model="newFieldName"
                 :options="filteredFieldOptions"
@@ -73,7 +74,7 @@
                 @update:model-value="onFieldSelected"
                 @keyup.enter="addField"
                 dense
-                outlined
+                borderless
                 class="tw:flex-1"
                 placeholder="Type to search or enter custom field"
                 hide-bottom-space
@@ -106,7 +107,7 @@
                 color="primary"
                 size="md"
                 @click="addField"
-                :disable="!newFieldName"
+                :disable="!newFieldName && !fieldInputValue"
                 data-test="cross-link-add-field-btn"
               />
             </div>
@@ -177,6 +178,7 @@ export default defineComponent({
 
     const isEditing = computed(() => !!props.link?.name);
     const newFieldName = ref("");
+    const fieldSelectRef = ref<any>(null);
     const filteredFieldOptions = ref<string[]>([]);
 
     function filterFieldOptions(val: string, update: Function) {
@@ -201,6 +203,15 @@ export default defineComponent({
       fieldInputValue.value = val;
     }
 
+    function clearFieldInput() {
+      newFieldName.value = "";
+      fieldInputValue.value = "";
+      // Clear q-select's internal input text (use-input + fill-input caches it)
+      if (fieldSelectRef.value?.updateInputValue) {
+        fieldSelectRef.value.updateInputValue("", true);
+      }
+    }
+
     function onFieldSelected(val: string) {
       // When user selects from dropdown, auto-add immediately
       if (val) {
@@ -208,8 +219,7 @@ export default defineComponent({
         if (name && !form.value.fields.some((f) => f.name === name)) {
           form.value.fields.push({ name });
         }
-        newFieldName.value = "";
-        fieldInputValue.value = "";
+        clearFieldInput();
       }
     }
 
@@ -219,8 +229,7 @@ export default defineComponent({
       if (name && !form.value.fields.some((f) => f.name === name)) {
         form.value.fields.push({ name });
       }
-      newFieldName.value = "";
-      fieldInputValue.value = "";
+      clearFieldInput();
     }
 
     // Reset form when dialog opens
@@ -262,6 +271,8 @@ export default defineComponent({
       isEditing,
       form,
       newFieldName,
+      fieldInputValue,
+      fieldSelectRef,
       filteredFieldOptions,
       filterFieldOptions,
       onFieldInputValue,
