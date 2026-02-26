@@ -182,12 +182,10 @@ class FunctionsPage {
     const runButton = testSection.getByRole('button', { name: /run|execute|test/i });
 
     if (await runButton.isVisible({ timeout: 2000 })) {
-      await runButton.waitFor({ state: 'visible', timeout: 5000 });
-      // Register response listener before clicking to avoid race condition
-      await Promise.all([
-        this.page.waitForResponse(resp => resp.url().includes('/functions/test'), { timeout: 15000 }),
-        runButton.click(),
-      ]);
+      await runButton.click();
+      // Wait for the output editor to render the API response
+      const outputLocator = this.page.locator(this.testOutputEditor);
+      await expect(outputLocator).not.toHaveText('', { timeout: 15000 });
       return true;
     }
     return false;
@@ -324,16 +322,11 @@ class FunctionsPage {
       await this.enterTestEvent(testEventJson);
     }
 
-    // Register response listener before clicking to avoid race condition
-    const responsePromise = this.page.waitForResponse(
-      resp => resp.url().includes('/functions/test'), { timeout: 15000 }
-    );
     await this.clickTestButton();
-    await responsePromise;
 
     // Wait for the output editor to render the API response (non-empty content)
     const outputLocator = this.page.locator(this.testOutputEditor);
-    await expect(outputLocator).not.toHaveText('', { timeout: 10000 });
+    await expect(outputLocator).not.toHaveText('', { timeout: 15000 });
 
     return await this.getTestOutput();
   }
