@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-table-wrapper"
         class="traces-section column tw:h-full"
       >
-        <!-- Section header: title + count badge (left) | pagination controls (right) -->
+        <!-- Section header: title + count badge -->
         <div
           data-test="traces-section-header"
           class="traces-section-header row items-center q-px-sm q-py-xs tw:bg-[var(--o2-section-header-bg)]!"
@@ -100,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.searchApplied
           "
         >
-          <!-- Left: label + count -->
           <span
             data-test="traces-section-title"
             class="tw:text-[0.75rem] tw:font-bold tw:tracking-[0.0625rem]! tw:text-[var(--o2-text-1)]! tw:mr-[0.85rem]"
@@ -113,50 +112,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="`${hits.length} Traces Found`"
             class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
           />
-
-          <q-space />
-
-          <!-- Right: rows-per-page + range info + page buttons -->
-          <div class="pagination-block tw:flex tw:items-center">
-            <q-select
-              v-model="rowsPerPage"
-              :options="rowsPerPageOptions"
-              dense
-              borderless
-              data-test="traces-rows-per-page"
-              class="tw:m-0! select-pagination tw:mr-[0.325rem]!"
-              @update:model-value="onRowsPerPageChange"
-            />
-            <q-pagination
-              v-model="pageInput"
-              :max="totalPages"
-              :max-pages="5"
-              :input="false"
-              :boundary-numbers="false"
-              direction-links
-              size="sm"
-              color="primary"
-              active-design="unelevated"
-              data-test="traces-pagination"
-              icon-first="skip_previous"
-              icon-last="skip_next"
-              icon-prev="fast_rewind"
-              icon-next="fast_forward"
-              rowsPerPageLabel="Rows per page"
-              @update:model-value="onPageChange"
-              class="paginator-section tw:mt-0!"
-            />
-          </div>
+          <q-badge
+            v-if="visibleCount < hits.length"
+            data-test="traces-visible-count-badge"
+            rounded
+            :label="`Showing ${visibleCount} of ${hits.length}`"
+            class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]!"
+          />
         </div>
 
         <!-- Table scroll area -->
         <div
           data-test="traces-search-result-list"
           class="traces-table-scroll-area tw:w-full"
+          @scroll.passive="onScrollAreaScroll"
         >
           <TracesTable
             :columns="tracesColumns"
-            :rows="pagedHits"
+            :rows="visibleHits"
             :row-class="traceRowClass"
             @row-click="expandRowDetail"
           >
@@ -371,13 +344,10 @@ export default defineComponent({
       (row.errors ?? 0) > 0 ? "oz-table__row--error" : "";
 
     // -----------------------------------------------------------------------
-    // Pagination
+    // Infinite scroll
     // -----------------------------------------------------------------------
-    const rowsPerPageOptions = [10, 25, 50, 100];
-    const rowsPerPage = ref<number>(
-      searchObj.meta.resultGrid.rowsPerPage || 25,
-    );
-    const pageInput = ref(1);
+    const PAGE_SIZE = 50;
+    const visibleCount = ref(PAGE_SIZE);
 
     const hits = computed<any[]>(() => searchObj.data.queryResults?.hits ?? []);
 
@@ -399,30 +369,30 @@ export default defineComponent({
         ) && hits.value.length > 0,
     );
 
-    const totalPages = computed(() =>
-      Math.max(1, Math.ceil(hits.value.length / rowsPerPage.value)),
-    );
+    const visibleHits = computed(() => hits.value.slice(0, visibleCount.value));
 
-    const pagedHits = computed(() => {
-      const rpp = rowsPerPage.value;
-      const page = pageInput.value;
-      return hits.value.slice((page - 1) * rpp, page * rpp);
-    });
+    function loadMore() {
+      if (visibleCount.value < hits.value.length) {
+        visibleCount.value = Math.min(
+          visibleCount.value + PAGE_SIZE,
+          hits.value.length,
+        );
+      }
+    }
 
-    const onPageChange = (page: number) => {
-      pageInput.value = page;
-    };
+    function onScrollAreaScroll(e: Event) {
+      const el = e.target as HTMLElement;
+      console.log(el.scrollTop + el.clientHeight, el.scrollHeight - 200);
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) {
+        loadMore();
+      }
+    }
 
-    const onRowsPerPageChange = (rpp: number) => {
-      searchObj.meta.resultGrid.rowsPerPage = rpp;
-      pageInput.value = 1;
-    };
-
-    // Reset to first page whenever a new search kicks off
+    // Reset visible window whenever a new search starts
     watch(
       () => searchObj.loading,
       (isLoading) => {
-        if (isLoading) pageInput.value = 1;
+        if (isLoading) visibleCount.value = PAGE_SIZE;
       },
     );
 
@@ -446,17 +416,13 @@ export default defineComponent({
       hasLlmTraces,
       tracesColumns,
       traceRowClass,
-      // Pagination
-      rowsPerPageOptions,
-      rowsPerPage,
-      pageInput,
+      // Infinite scroll
       hits,
       noResults,
       hasResults,
-      totalPages,
-      pagedHits,
-      onPageChange,
-      onRowsPerPageChange,
+      visibleCount,
+      visibleHits,
+      onScrollAreaScroll,
       // Cell utilities exposed for slot templates
       formatTimeWithSuffix,
       isLLMTrace,
@@ -469,8 +435,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-@import "@/styles/pagination.scss";
-
 /* ── Traces list section ─────────────────────────────────────────────────── */
 .traces-section {
   flex: 1;

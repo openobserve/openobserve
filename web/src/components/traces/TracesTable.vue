@@ -126,7 +126,7 @@ function getAlignClass(column: Column<T, unknown>): string {
   <div class="oz-table">
     <!-- ── Sticky header ─────────────────────────────────────────────────── -->
     <div
-      class="oz-table__head row no-wrap items-center q-px-sm tw:border-[var(--o2-border-color)]!"
+      class="oz-table__head tw:bg-[var(--o2-card-bg)]! row no-wrap items-center q-px-sm tw:border-[var(--o2-border-color)]!"
     >
       <div
         v-for="header in table.getHeaderGroups()[0].headers"
@@ -147,7 +147,7 @@ function getAlignClass(column: Column<T, unknown>): string {
       <div
         v-for="row in table.getRowModel().rows"
         :key="row.id"
-        class="oz-table__row row no-wrap items-center q-px-sm cursor-pointer"
+        class="oz-table__row tw:bg-[var(--o2-card-bg)]! row no-wrap items-center q-px-sm cursor-pointer tw:border-b tw:border-[var(--o2-border-2)]!"
         :class="rowClass?.(row.original)"
         @click="$emit('row-click', row.original)"
       >
@@ -208,7 +208,6 @@ function getAlignClass(column: Column<T, unknown>): string {
 /* ── Rows ────────────────────────────────────────────────────────────────── */
 .oz-table__row {
   min-height: 52px;
-  border-bottom: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.06));
   transition: background 0.15s ease;
 
   &:hover {
