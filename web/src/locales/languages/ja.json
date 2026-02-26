@@ -1468,7 +1468,6 @@
     "columnsDefaultOrder": "列はデフォルトの順序で表示されます",
     "moveUp": "上へ移動",
     "moveDown": "下に移動",
-<<<<<<< feat-NLP-mode
     "toggleFunctionEditor": "関数エディターの切り替え",
     "useSavedFunction": "保存済み関数を使う",
     "showQueryResults": "クエリ結果を表示",
@@ -1476,9 +1475,7 @@
     "vrlExtractionTooltip": "抽出された VRL フィールドをチャートで使用するには、VRL 関数を記述して [適用] ボタンをクリックします。フィールドが抽出され、そのフィールドを使用してチャートを作成できます。",
     "errorFetchingFunctions": "関数を取得中にエラーが発生しました",
     "functionAppliedSuccess": "{name} 関数が正常に適用されました。",
-=======
     "connectNullValuesTooltip": "欠損値のデータポイントを線で結びます。",
->>>>>>> main
     "panelTimeSettings": "パネルタイム設定",
     "panelTimeEnabled": "パネルレベルの時間を許可",
     "useGlobalTime": "グローバルタイムを使う",
