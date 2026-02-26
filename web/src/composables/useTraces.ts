@@ -92,6 +92,7 @@ const defaultObject = {
     parsedQuery: {},
     errorMsg: "",
     errorCode: 0,
+    errorDetail: "",
     additionalErrorMsg: "",
     stream: {
       streamLists: [],
@@ -164,6 +165,7 @@ const useTraces = () => {
   const resetSearchObj = () => {
     // delete searchObj.data;
     searchObj.data.errorMsg = "";
+    searchObj.data.errorDetail = "";
     searchObj.data.stream.streamLists = [];
     searchObj.data.stream.selectedStream = { label: "", value: "" };
     searchObj.data.stream.selectedStreamFields = [];

@@ -2700,7 +2700,8 @@
     "collapseFields": "Collapse Fields",
     "openFields": "Open Fields",
     "timeRangeUpdated": "The selected time range did not include this trace. The time range has been updated to match the trace's timestamp.",
-    "fetchingMoreTraces": "Fetching more traces..."
+    "fetchingMoreTraces": "Fetching more traces...",
+    "errorRetrievingTraces": "Error occurred while retrieving traces."
   },
   "actions": {
     "testAction": "Test action",
@@ -2924,6 +2925,7 @@
     "dimensionBasedCorrelation": "Dimension-based Correlation",
     "tracesFromService": "Traces from service: {service}",
     "noTracesFound": "No Traces Found",
+    "errorRetrievingTraces": "Error occurred while retrieving traces.",
     "noTracesDescription": "No traces found for this correlation in the selected time range.",
     "viewInTraces": "View in Traces",
     "filters": "Filters",
