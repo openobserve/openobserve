@@ -2568,7 +2568,8 @@
     "timeRangeUpdated": "選択した時間範囲にはこのトレースが含まれていません。時間範囲はトレースのタイムスタンプと一致するように更新されました。",
     "fetchingMoreTraces": "さらにトレースを取得中...",
     "showErrorOnly": "エラーのみ表示",
-    "openInTraces": "トレースで開く"
+    "openInTraces": "トレースで開く",
+    "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -2945,7 +2946,8 @@
     "tracesErrorDetails": "トレースデータの取得中にエラーが発生しました。もう一度試してください。",
     "metricsError": "メトリクスを読み込めません",
     "metricsErrorDetails": "メトリックスデータの取得中にエラーが発生しました。もう一度試してください。",
-    "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。"
+    "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。",
+    "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",

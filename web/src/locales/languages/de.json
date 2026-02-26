@@ -2547,7 +2547,8 @@
     "timeRangeUpdated": "Der gewählte Zeitraum enthielt diese Spur nicht. Der Zeitbereich wurde aktualisiert, sodass er dem Zeitstempel der Spur entspricht.",
     "fetchingMoreTraces": "Weitere Spuren werden abgerufen...",
     "showErrorOnly": "Nur Fehler anzeigen",
-    "openInTraces": "In Traces öffnen"
+    "openInTraces": "In Traces öffnen",
+    "errorRetrievingTraces": "Beim Abrufen der Spuren ist ein Fehler aufgetreten."
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -2945,7 +2946,8 @@
     "tracesErrorDetails": "Beim Abrufen der Trace-Daten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
     "metricsError": "Metriken können nicht geladen werden",
     "metricsErrorDetails": "Beim Abrufen der Metrikdaten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
-    "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden."
+    "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden.",
+    "errorRetrievingTraces": "Beim Abrufen der Spuren ist ein Fehler aufgetreten."
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

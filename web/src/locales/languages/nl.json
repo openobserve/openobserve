@@ -2547,7 +2547,8 @@
     "timeRangeUpdated": "Dit spoor is niet opgenomen in het geselecteerde tijdbereik. Het tijdbereik is bijgewerkt zodat het overeenkomt met de tijdstempel van de trace.",
     "fetchingMoreTraces": "Nog meer sporen ophalen...",
     "showErrorOnly": "Alleen fout weergeven",
-    "openInTraces": "Openen in Traces"
+    "openInTraces": "Openen in Traces",
+    "errorRetrievingTraces": "Er is een fout opgetreden bij het ophalen van sporen."
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -2945,7 +2946,8 @@
     "tracesErrorDetails": "Er is een fout opgetreden tijdens het ophalen van traceergegevens. Probeer het nog eens.",
     "metricsError": "Kan statistieken niet laden",
     "metricsErrorDetails": "Er is een fout opgetreden tijdens het ophalen van metrische gegevens. Probeer het nog eens.",
-    "noMetricsDescription": "Er zijn geen statistieken gevonden voor deze correlatie in het geselecteerde tijdbereik."
+    "noMetricsDescription": "Er zijn geen statistieken gevonden voor deze correlatie in het geselecteerde tijdbereik.",
+    "errorRetrievingTraces": "Er is een fout opgetreden bij het ophalen van sporen."
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",
