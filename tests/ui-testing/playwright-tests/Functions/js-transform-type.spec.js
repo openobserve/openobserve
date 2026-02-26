@@ -144,7 +144,6 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       testLogger.info(`Error test output: ${errorOutput}`);
 
       const hasError = errorOutput.toLowerCase().includes('error') ||
-                      errorOutput.toLowerCase().includes('undefined') ||
                       errorOutput.toLowerCase().includes('failed');
 
       expect(hasError).toBe(true);
