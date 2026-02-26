@@ -500,25 +500,29 @@ test.describe("Dashboard Create Alert testcases", () => {
       await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
+      // Verify alert appears in list and delete it
       const alertSearchInput = page.locator(
         '[data-test="alert-list-search-input"]'
       );
-      if (
-        await alertSearchInput.isVisible({ timeout: 5000 }).catch(() => false)
-      ) {
-        await alertSearchInput.fill(alertName.toLowerCase());
-        await page.waitForTimeout(2000);
-        // Use text content match since alert names may be truncated in table cells
-        await expect(
-          page.locator("table tbody tr").first()
-        ).toBeVisible({ timeout: 10000 });
-        const firstRowText = await page.locator("table tbody tr").first().textContent();
-        expect(firstRowText).toContain("Alert_from_");
-        testLogger.info("Alert found in alerts list", { alertName });
-      }
+      await alertSearchInput.waitFor({ state: "visible", timeout: 10000 });
+      await alertSearchInput.fill(alertName.toLowerCase());
+      await page.waitForTimeout(2000);
 
-      // Cleanup: Delete the alert
-      await pm.alertsPage.searchAndDeleteAlert(alertName);
+      // Verify alert row is visible
+      const firstRow = page.locator("table tbody tr").first();
+      await expect(firstRow).toBeVisible({ timeout: 10000 });
+      const firstRowText = await firstRow.textContent();
+      expect(firstRowText).toContain("Alert_from_");
+      testLogger.info("Alert found in alerts list", { alertName });
+
+      // Cleanup: Delete the alert via kebab menu on the first row
+      const kebabButton = firstRow.locator('[data-test*="-more-options"]').first();
+      await kebabButton.waitFor({ state: "visible", timeout: 5000 });
+      await kebabButton.click();
+      await page.getByText("Delete", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
+      await page.getByText("Delete", { exact: true }).click();
+      await page.locator('[data-test="confirm-button"]').click();
+      await expect(page.getByText("Alert deleted")).toBeVisible({ timeout: 10000 });
       testLogger.info("Alert deleted", { alertName });
 
       // Cleanup: Delete the dashboard
