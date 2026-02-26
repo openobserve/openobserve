@@ -182,19 +182,12 @@ class FunctionsPage {
     const runButton = testSection.getByRole('button', { name: /run|execute|test/i });
 
     if (await runButton.isVisible({ timeout: 2000 })) {
-      // Wait for button to be enabled (it may be disabled initially)
       await runButton.waitFor({ state: 'visible', timeout: 5000 });
-      // Try to click with force if needed (button validation may be preventing click)
-      try {
-        await runButton.click({ timeout: 5000 });
-      } catch (e) {
-        // If regular click fails due to disabled state, force click
-        await runButton.click({ force: true });
-      }
-      await this.page.waitForResponse(
-        resp => resp.url().includes('/functions/test'),
-        { timeout: 15000 }
-      );
+      // Register response listener before clicking to avoid race condition
+      await Promise.all([
+        this.page.waitForResponse(resp => resp.url().includes('/functions/test'), { timeout: 15000 }),
+        runButton.click({ timeout: 5000 }).catch(() => runButton.click({ force: true })),
+      ]);
       return true;
     }
     return false;
