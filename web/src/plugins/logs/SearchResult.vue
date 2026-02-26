@@ -88,9 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             dense
             color="primary"
-            icon="analytics"
+            icon="timeline"
             :label="t('volumeInsights.insightsButtonLabel')"
-            class="q-ml-md"
+            class="tw:ml-[0.5rem]! analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
             size="sm"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
