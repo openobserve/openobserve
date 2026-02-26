@@ -173,6 +173,8 @@ class FunctionsPage {
     await testInput.click();
     await this.page.keyboard.press('Control+A');
     await this.page.keyboard.type(eventJson);
+    // Wait for Monaco editor v-model debounce to sync
+    await this.page.waitForTimeout(600);
   }
 
   async clickRunTestButton() {
@@ -327,8 +329,6 @@ class FunctionsPage {
     // If custom events provided, enter them first (before triggering the test)
     if (testEventJson) {
       await this.enterTestEvent(testEventJson);
-      // Wait for the events editor debounce to sync
-      await this.page.waitForTimeout(1000);
     }
 
     // Click the "Test Function" button and wait for the API response
