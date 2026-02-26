@@ -2548,7 +2548,17 @@
     "fetchingMoreTraces": "Daha fazla iz getiriyor...",
     "showErrorOnly": "Yalnızca Hatayı Göster",
     "openInTraces": "Traces'te aç",
-    "errorRetrievingTraces": "İzler alınırken hata oluştu."
+    "errorRetrievingTraces": "İzler alınırken hata oluştu.",
+    "fetchingTraces": "Sıkı tutun, izlerini getiriyoruz.",
+    "noTracesFoundAdjust": "Hiçbir iz bulunamadı. Lütfen filtreleri ayarlayın ve tekrar deneyin.",
+    "tracesTitle": "İZLERİ",
+    "tracesFound": "İzler Bulundu",
+    "error": "HATA",
+    "errors": "HATALAR",
+    "success": "BAŞARI",
+    "today": "Bugün",
+    "yesterday": "Dün",
+    "spanColorPalettePreview": "Span Renk Paleti Önizlemesi"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

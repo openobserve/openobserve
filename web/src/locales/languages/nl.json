@@ -2548,7 +2548,17 @@
     "fetchingMoreTraces": "Nog meer sporen ophalen...",
     "showErrorOnly": "Alleen fout weergeven",
     "openInTraces": "Openen in Traces",
-    "errorRetrievingTraces": "Er is een fout opgetreden bij het ophalen van sporen."
+    "errorRetrievingTraces": "Er is een fout opgetreden bij het ophalen van sporen.",
+    "fetchingTraces": "Hou je vast, we halen je sporen op.",
+    "noTracesFoundAdjust": "Geen sporen gevonden. Pas de filters aan en probeer het opnieuw.",
+    "tracesTitle": "SPOREN",
+    "tracesFound": "Sporen gevonden",
+    "error": "FOUT",
+    "errors": "FOUTEN",
+    "success": "SUCCES",
+    "today": "Vandaag",
+    "yesterday": "Gisteren",
+    "spanColorPalettePreview": "Voorbeeld van het kleurenpalet van Span"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

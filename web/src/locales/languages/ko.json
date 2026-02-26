@@ -2548,7 +2548,17 @@
     "fetchingMoreTraces": "더 많은 트레이스를 가져오는 중...",
     "showErrorOnly": "오류만 보기",
     "openInTraces": "오픈 인 트레이스",
-    "errorRetrievingTraces": "추적을 가져오는 동안 오류가 발생했습니다."
+    "errorRetrievingTraces": "추적을 가져오는 동안 오류가 발생했습니다.",
+    "fetchingTraces": "잠깐만요, 우리가 당신의 흔적을 찾고 있어요.",
+    "noTracesFoundAdjust": "흔적을 찾을 수 없습니다.필터를 조정하고 다시 시도하세요.",
+    "tracesTitle": "추적",
+    "tracesFound": "흔적 발견",
+    "error": "오류",
+    "errors": "오류",
+    "success": "성공",
+    "today": "오늘",
+    "yesterday": "어제",
+    "spanColorPalettePreview": "스팬 컬러 팔레트 미리보기"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",

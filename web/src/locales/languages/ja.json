@@ -2569,7 +2569,17 @@
     "fetchingMoreTraces": "さらにトレースを取得中...",
     "showErrorOnly": "エラーのみ表示",
     "openInTraces": "トレースで開く",
-    "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。"
+    "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。",
+    "fetchingTraces": "しっかりつかまって足跡を掴んでる",
+    "noTracesFoundAdjust": "トレースが見つかりません。フィルターを調整して、もう一度試してください。",
+    "tracesTitle": "トレース",
+    "tracesFound": "トレースが見つかりました",
+    "error": "エラー",
+    "errors": "エラー",
+    "success": "成功",
+    "today": "今日",
+    "yesterday": "昨日",
+    "spanColorPalettePreview": "Span カラーパレットのプレビュー"
   },
   "actions": {
     "testAction": "アクションをテスト",
