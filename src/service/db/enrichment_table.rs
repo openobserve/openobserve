@@ -86,7 +86,7 @@ pub async fn get_enrichment_table_data(
 
     let search_query: proto::cluster_rpc::SearchQuery = query.clone().into();
     let trace_id = ider::generate_trace_id();
-    let request = config::datafusion::request::Request::new(
+    let mut request = config::datafusion::request::Request::new(
         trace_id.clone(),
         org_id.to_string(),
         StreamType::EnrichmentTables,
@@ -97,6 +97,8 @@ pub async fn get_enrichment_table_data(
         query.histogram_interval,
         false, // overwrite_cache
     );
+    // set local mode to true for enrichment table
+    request.set_local_mode(Some(true));
 
     log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
 
