@@ -186,7 +186,7 @@ class FunctionsPage {
       // Register response listener before clicking to avoid race condition
       await Promise.all([
         this.page.waitForResponse(resp => resp.url().includes('/functions/test'), { timeout: 15000 }),
-        runButton.click({ timeout: 5000 }).catch(() => runButton.click({ force: true })),
+        runButton.click(),
       ]);
       return true;
     }
@@ -331,14 +331,8 @@ class FunctionsPage {
     ]);
 
     // Wait for the output editor to render the API response (non-empty content)
-    await this.page.waitForFunction(
-      selector => {
-        const el = document.querySelector(selector);
-        return el && el.textContent.trim().length > 0;
-      },
-      this.testOutputEditor,
-      { timeout: 10000 }
-    );
+    const outputLocator = this.page.locator(this.testOutputEditor);
+    await expect(outputLocator).not.toHaveText('', { timeout: 10000 });
 
     return await this.getTestOutput();
   }
