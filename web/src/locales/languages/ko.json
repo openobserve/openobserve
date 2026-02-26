@@ -351,7 +351,8 @@
     "openFields": "오픈 필드",
     "askAIFunctionPlaceholder": "AI에게 당신의 기능을 도와달라고 요청하세요...",
     "enterFunctionPrompt": "함수 생성 프롬프트 입력",
-    "recordsPerPage": "페이지당 레코드 수"
+    "recordsPerPage": "페이지당 레코드 수",
+    "searchDimension": "치수 검색"
   },
   "menu": {
     "home": "홈",

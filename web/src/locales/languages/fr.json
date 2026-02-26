@@ -351,7 +351,8 @@
     "openFields": "Champs ouverts",
     "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
     "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
-    "recordsPerPage": "Enregistrements par page"
+    "recordsPerPage": "Enregistrements par page",
+    "searchDimension": "Dimensions de recherche"
   },
   "menu": {
     "home": "Accueil",

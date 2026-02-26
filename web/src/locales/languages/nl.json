@@ -351,7 +351,8 @@
     "openFields": "Open velden",
     "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
     "enterFunctionPrompt": "Voer een prompt in om een functie te genereren",
-    "recordsPerPage": "Records per pagina"
+    "recordsPerPage": "Records per pagina",
+    "searchDimension": "Afmetingen zoeken"
   },
   "menu": {
     "home": "Home",
