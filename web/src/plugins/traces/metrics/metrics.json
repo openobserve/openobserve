@@ -61,13 +61,14 @@
             "table_transpose": false,
             "table_dynamic_columns": false,
             "color": {
-              "mode": "fixed",
-              "fixedColor": [
-                "#79abfc"
-              ],
-              "seriesBy": "last",
-              "colorBySeries": []
-            },
+              "mode": "palette-classic-by-series",
+              "colorBySeries": [
+                  { "value": "p50 (Median)", "color": "#4caf50" },
+                  { "value": "p70", "color": "#cddc39" },
+                  { "value": "p95", "color": "#ff9800" },
+                  { "value": "p99", "color": "#f44336" }
+                ]            
+              },
             "trellis": {
               "layout": null,
               "num_of_columns": 1,
@@ -78,7 +79,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp) AS time_bucket, max(duration) AS max_trace_duration, approx_distinct(trace_id) AS max_rate, approx_distinct(trace_id) filter (where span_status = 'ERROR') AS error_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "query": "SELECT histogram(_timestamp) AS x_axis, approx_percentile_cont(duration, 0.50) AS p50, approx_percentile_cont(duration, 0.50) AS p75, approx_percentile_cont(duration, 0.95) AS p95, approx_percentile_cont(duration, 0.99) AS p99 FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY x_axis ORDER BY x_axis ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -87,8 +88,8 @@
                 "x": [
                   {
                     "label": "",
-                    "alias": "time_bucket",
-                    "column": "time_bucket",
+                    "alias": "x_axis",
+                    "column": "x_axis",
                     "color": null,
                     "isDerived": true,
                     "havingConditions": [],
@@ -97,10 +98,37 @@
                 ],
                 "y": [
                   {
-                    "label": "",
-                    "alias": "max_trace_duration",
-                    "column": "max_trace_duration",
-                    "color": "#5960b2",
+                    "label": "p50 (Median)",
+                    "alias": "p50",
+                    "column": "p50",
+                    "color": "#4caf50",
+                    "isDerived": true,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true
+                  },
+                                    {
+                    "label": "p75",
+                    "alias": "p75",
+                    "column": "p75",
+                    "color": "#cddc39",
+                    "isDerived": true,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true
+                  },
+                  {
+                    "label": "p95",
+                    "alias": "p95",
+                    "column": "p95",
+                    "color": "#ff9800",
+                    "isDerived": true,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true
+                  },
+                  {
+                    "label": "p99",
+                    "alias": "p99",
+                    "column": "p99",
+                    "color": "#f44336",
                     "isDerived": true,
                     "havingConditions": [],
                     "treatAsNonTimestamp": true
