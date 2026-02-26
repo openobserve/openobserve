@@ -1980,8 +1980,9 @@ pub async fn result_schema(
             .map(|v| v == "true")
             .unwrap_or(false)
     {
-        use crate::service::db::organization::get_org_setting;
         use std::collections::HashSet as StdHashSet;
+
+        use crate::service::db::organization::get_org_setting;
 
         let field_alias_map = &res_schema.field_alias_map;
 
