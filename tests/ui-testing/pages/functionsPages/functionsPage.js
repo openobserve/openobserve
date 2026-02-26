@@ -182,10 +182,11 @@ class FunctionsPage {
     const runButton = testSection.getByRole('button', { name: /run|execute|test/i });
 
     if (await runButton.isVisible({ timeout: 2000 })) {
-      await runButton.click();
-      // Wait for the output editor to render the API response
+      // force: true needed — button can be obscured by overlapping editor chrome
+      await runButton.click({ force: true });
+      // Wait for output editor to contain actual JSON (not just Monaco line numbers)
       const outputLocator = this.page.locator(this.testOutputEditor);
-      await expect(outputLocator).not.toHaveText('', { timeout: 15000 });
+      await expect(outputLocator).toContainText('{', { timeout: 15000 });
       return true;
     }
     return false;
@@ -324,9 +325,9 @@ class FunctionsPage {
 
     await this.clickTestButton();
 
-    // Wait for the output editor to render the API response (non-empty content)
+    // Wait for output editor to contain actual JSON (not just Monaco line numbers)
     const outputLocator = this.page.locator(this.testOutputEditor);
-    await expect(outputLocator).not.toHaveText('', { timeout: 15000 });
+    await expect(outputLocator).toContainText('{', { timeout: 15000 });
 
     return await this.getTestOutput();
   }
