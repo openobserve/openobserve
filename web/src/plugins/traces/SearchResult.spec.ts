@@ -223,15 +223,50 @@ describe("SearchResult", () => {
     });
   });
 
-  describe("Virtual scroll functionality", () => {
-    it("should not trigger scroll update when loading", () => {
-      // Temporarily set loading to true
+  describe("loadMore / infinite scroll", () => {
+    beforeEach(() => {
+      // Reset page and total to known state before each test
+      mockSearchObj.data.resultGrid.currentPage = 1;
+      mockSearchObj.data.queryResults.total = 2;
+      mockSearchObj.meta.resultGrid.rowsPerPage = 1; // page 1 * 1 < 2 → should fire
+      mockSearchObj.loading = false;
+    });
+
+    afterEach(() => {
+      // Restore defaults used by other tests
+      mockSearchObj.data.resultGrid.currentPage = 1;
+      mockSearchObj.data.queryResults.total = 2;
+      mockSearchObj.meta.resultGrid.rowsPerPage = 10;
+      mockSearchObj.loading = false;
+    });
+
+    it("should emit update:scroll and increment page when more records exist", async () => {
+      // currentPage(1) * rowsPerPage(1) = 1 < total(2) → fires
+      const list = wrapper.findComponent({ name: "TracesSearchResultList" });
+      await list.vm.$emit("load-more");
+
+      expect(wrapper.emitted("update:scroll")).toBeTruthy();
+      expect(mockSearchObj.data.resultGrid.currentPage).toBe(2);
+    });
+
+    it("should not emit update:scroll when all records are already loaded", async () => {
+      mockSearchObj.meta.resultGrid.rowsPerPage = 10;
+      // currentPage(1) * rowsPerPage(10) = 10 >= total(2) → does not fire
+
+      const list = wrapper.findComponent({ name: "TracesSearchResultList" });
+      await list.vm.$emit("load-more");
+
+      expect(wrapper.emitted("update:scroll")).toBeFalsy();
+    });
+
+    it("should not emit update:scroll when loading is true", async () => {
       mockSearchObj.loading = true;
 
-      // The component should show loading spinner instead
-      expect(mockSearchObj.loading).toBe(true);
+      const list = wrapper.findComponent({ name: "TracesSearchResultList" });
+      await list.vm.$emit("load-more");
 
-      // Reset loading state
+      expect(wrapper.emitted("update:scroll")).toBeFalsy();
+
       mockSearchObj.loading = false;
     });
   });
