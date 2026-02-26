@@ -178,12 +178,9 @@ export default defineComponent({
     function loadMore() {
       if (
         searchObj.loading == false &&
-        searchObj.data.resultGrid.currentPage <=
-          searchObj.data.queryResults.from /
-            searchObj.meta.resultGrid.rowsPerPage &&
-        searchObj.data.queryResults.hits.length >
-          searchObj.meta.resultGrid.rowsPerPage *
-            searchObj.data.resultGrid.currentPage
+        searchObj.data.resultGrid.currentPage *
+          searchObj.meta.resultGrid.rowsPerPage <
+          searchObj.data.queryResults.total
       ) {
         searchObj.data.resultGrid.currentPage += 1;
         emit("update:scroll");

@@ -129,7 +129,7 @@ declare module "@tanstack/vue-table" {
 export default {};
 </script>
 
-<script setup lang="ts">
+<script setup lang="ts" generic="T = Record<string, any>">
 import { ref, computed } from "vue";
 import {
   useVueTable,
@@ -139,6 +139,7 @@ import {
   type Column,
 } from "@tanstack/vue-table";
 import { useVirtualizer } from "@tanstack/vue-virtual";
+import { debounce } from "quasar";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Props & emits
@@ -199,13 +200,13 @@ const rowVirtualizer = useVirtualizer(
   })),
 );
 
-function handleScroll() {
+const handleScroll = debounce(function () {
   const el = scrollerRef.value;
   if (!el) return;
   if (el.scrollTop + el.clientHeight >= el.scrollHeight - 300) {
     emit("load-more");
   }
-}
+}, 300);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column sizing helpers
