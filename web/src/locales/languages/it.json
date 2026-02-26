@@ -351,7 +351,8 @@
     "openFields": "Campi aperti",
     "askAIFunctionPlaceholder": "Chiedi all'IA di aiutarti con la tua funzione...",
     "enterFunctionPrompt": "Inserisci un prompt per generare la funzione",
-    "recordsPerPage": "Record per pagina"
+    "recordsPerPage": "Record per pagina",
+    "searchDimension": "Dimensioni di ricerca"
   },
   "menu": {
     "home": "Home",

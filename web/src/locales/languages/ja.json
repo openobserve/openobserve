@@ -351,7 +351,8 @@
     "openFields": "オープンフィールド",
     "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
     "enterFunctionPrompt": "関数を生成するプロンプトを入力してください",
-    "recordsPerPage": "1 ページあたりのレコード数"
+    "recordsPerPage": "1 ページあたりのレコード数",
+    "searchDimension": "ディメンション検索"
   },
   "menu": {
     "home": "ホーム",
