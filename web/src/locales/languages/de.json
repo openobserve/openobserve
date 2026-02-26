@@ -113,6 +113,7 @@
     "getStarted": "Fangen Sie an",
     "reset": "Zurücksetzen",
     "retry": "Erneut versuchen",
+    "set": "+ Satz",
     "copy": "Kopieren",
     "copySuccess": "In die Zwischenablage kopiert",
     "copyError": "Fehler beim Kopieren in die Zwischenablage"
@@ -1415,7 +1416,20 @@
     "noColumnsOrdered": "Keine Spalten angeordnet",
     "columnsDefaultOrder": "Die Spalten werden in ihrer Standardreihenfolge angezeigt",
     "moveUp": "Steigen Sie auf",
-    "moveDown": "Gehe nach unten"
+    "moveDown": "Gehe nach unten",
+    "connectNullValuesTooltip": "Verbinde Datenpunkte über fehlende Werte mit einer Linie.",
+    "panelTimeSettings": "Zeiteinstellungen für das Panel",
+    "panelTimeEnabled": "Zeit auf Panelebene zulassen",
+    "useGlobalTime": "Globale Zeit verwenden",
+    "useIndividualTime": "Nutze individuelle Zeit",
+    "panelTimeGlobalHint": "Das Panel verfolgt die globale Dashboard-Zeit. Durch Änderungen der globalen Uhrzeit wird dieses Panel aktualisiert.",
+    "panelTimeIndividualHint": "Das Panel verwendet seinen eigenen Zeitbereich. Stellen Sie die Uhrzeit mit der Datumsauswahl unten ein. Globale Zeitänderungen wirken sich nicht auf dieses Panel aus.",
+    "panelTimeRange": "Zeitbereich des Panels",
+    "panelTimeRangeTooltip": "Dieser Zeitbereich gilt nur für dieses Panel. Andere Panels verwenden ihre eigenen konfigurierten Zeiten oder die globale Dashboard-Uhrzeit.",
+    "panelTimeSettingsTooltip": "Konfigurieren Sie, wie dieses Panel seinen Zeitbereich bestimmt. Sie können den Zeitraum des Dashboards verwenden oder einen benutzerdefinierten Zeitraum für diesen Bereich festlegen.",
+    "panelTimeMode": "Quelle für den Zeitbereich (beim Laden des Dashboards)",
+    "useDefaultTimeTooltip": "Wenn diese Option aktiviert ist, verwendet dieses Panel die konfigurierte Standarddauer als Zeitraum beim Laden des Dashboards und nicht die globale Dashboard-Zeit.",
+    "defaultDuration": "Standarddauer"
   },
   "panel": {
     "header": "Panel",

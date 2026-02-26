@@ -525,8 +525,11 @@ export default defineComponent({
 
           const hits = response.content.results.hits;
 
+          // Resolve field name for searching in response
+          const resolvedFieldName = resolveVariableValue(variableObject.query_data.field);
+
           const fieldHit = hits.find(
-            (field: any) => field.field === variableObject.query_data.field,
+            (field: any) => field.field === resolvedFieldName,
           );
 
           variableLog(
@@ -742,6 +745,41 @@ export default defineComponent({
         reset: handleSearchReset,
       });
     };
+    // Helper function to resolve variable references in a string
+    const resolveVariableValue = (value: string): string => {
+      if (!value || typeof value !== 'string') return value ?? "";
+
+      // Replace all variable references ($variableName) with their resolved values
+      // Using replace callback avoids regex exec loop risks and handles
+      // special replacement patterns ($1, $&, etc.) safely
+      const resolvedValue = value.replace(
+        /\$([a-zA-Z0-9_-]+)/g,
+        (fullMatch, varName) => {
+          // Find the variable in variablesData.values
+          const referencedVar = variablesData.values.find(
+            (v: any) => v.name === varName,
+          );
+
+          if (referencedVar) {
+            let varValue = referencedVar.value;
+
+            // Handle array values (multi-select)
+            // Stream and field must be single tokens, use first element only
+            if (Array.isArray(varValue)) {
+              varValue = String(varValue[0] ?? '');
+            }
+
+            return varValue ?? '';
+          }
+
+          // Keep original reference if variable not found
+          return fullMatch;
+        },
+      );
+
+      return resolvedValue;
+    };
+
     const fetchFieldValuesWithWebsocket = (
       variableObject: any,
       queryContext: string,
@@ -770,13 +808,17 @@ export default defineComponent({
       // Reset first response flag when starting a new fetch
       variableFirstResponseProcessed.value[variableObject.name] = false;
 
+      // Resolve variable references in stream and field
+      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
+      const resolvedField = resolveVariableValue(variableObject.query_data.field);
+
       const payload = {
-        fields: [variableObject.query_data.field],
+        fields: [resolvedField],
         size: variableObject.query_data.max_record_size || 10,
         no_count: true,
         start_time: startTime,
         end_time: endTime,
-        stream_name: variableObject.query_data.stream,
+        stream_name: resolvedStream,
         stream_type: variableObject.query_data.stream_type || "logs",
         use_cache: (window as any).use_cache ?? true,
         sql: queryContext || "",
@@ -792,7 +834,6 @@ export default defineComponent({
       };
       try {
         // Log the payload and trace id for debugging
-
         // Start new streaming connection
         initializeStreamingConnection(wsPayload, variableObject);
         addTraceId(variableObject.name, wsPayload.traceId);
@@ -2011,12 +2052,16 @@ export default defineComponent({
       const timestamp_column =
         store.state.zoConfig.timestamp_column || "_timestamp";
 
+      // Resolve variable references in stream and field names for SQL query
+      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
+      const resolvedField = resolveVariableValue(variableObject.query_data.field);
+
       let dummyQuery: string;
 
       if (searchText) {
-        dummyQuery = `SELECT ${timestamp_column} FROM "${variableObject.query_data.stream}" WHERE str_match(${variableObject.query_data.field}, '${escapeSingleQuotes(searchText.trim())}')`;
+        dummyQuery = `SELECT ${timestamp_column} FROM "${resolvedStream}" WHERE str_match(${resolvedField}, '${escapeSingleQuotes(searchText.trim())}')`;
       } else {
-        dummyQuery = `SELECT ${timestamp_column} FROM "${variableObject.query_data.stream}"`;
+        dummyQuery = `SELECT ${timestamp_column} FROM "${resolvedStream}"`;
       }
 
       // Construct the filter from the query data
@@ -2102,16 +2147,20 @@ export default defineComponent({
       variableObject: any,
       queryContext: string,
     ) => {
+      // Resolve variable references in stream and field names
+      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
+      const resolvedField = resolveVariableValue(variableObject.query_data.field);
+
       const payload = {
         org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
-        stream_name: variableObject.query_data.stream, // Name of the stream
+        stream_name: resolvedStream, // Resolved stream name
         start_time: new Date(
           props.selectedTimeDate?.start_time?.toISOString(),
         ).getTime(), // Start time in milliseconds
         end_time: new Date(
           props.selectedTimeDate?.end_time?.toISOString(),
         ).getTime(), // End time in milliseconds
-        fields: [variableObject.query_data.field], // Fields to fetch
+        fields: [resolvedField], // Resolved field name
         size: variableObject.query_data.max_record_size || 10, // Maximum number of records
         type: variableObject.query_data.stream_type, // Type of the stream
         query_context: queryContext, // Encoded query context
