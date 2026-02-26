@@ -16,7 +16,10 @@
 use config::{get_config, meta::stream::StreamType};
 #[cfg(feature = "enterprise")]
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
-use utoipa::{Modify, OpenApi, openapi::security::{Http, HttpAuthScheme, SecurityScheme}};
+use utoipa::{
+    Modify, OpenApi,
+    openapi::security::{Http, HttpAuthScheme, SecurityScheme},
+};
 
 use crate::{common::meta, handler::http::request};
 
