@@ -173,7 +173,6 @@ class FunctionsPage {
     await testInput.click();
     await this.page.keyboard.press('Control+A');
     await this.page.keyboard.type(eventJson);
-    await this.page.waitForTimeout(500);
   }
 
   async clickRunTestButton() {
@@ -193,7 +192,7 @@ class FunctionsPage {
       await this.page.waitForResponse(
         resp => resp.url().includes('/functions/test'),
         { timeout: 15000 }
-      ).catch(() => {});
+      );
       return true;
     }
     return false;
