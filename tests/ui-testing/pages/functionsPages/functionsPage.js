@@ -330,13 +330,20 @@ class FunctionsPage {
     }
 
     // Click the "Test Function" button and wait for the API response
-    const [response] = await Promise.all([
+    await Promise.all([
       this.page.waitForResponse(resp => resp.url().includes('/functions/test'), { timeout: 15000 }),
       this.clickTestButton(),
     ]);
 
-    // Brief wait for the output editor to render the response
-    await this.page.waitForTimeout(500);
+    // Wait for the output editor to render the API response (non-empty content)
+    await this.page.waitForFunction(
+      selector => {
+        const el = document.querySelector(selector);
+        return el && el.textContent.trim().length > 0;
+      },
+      this.testOutputEditor,
+      { timeout: 10000 }
+    );
 
     return await this.getTestOutput();
   }
