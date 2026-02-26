@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :baseFilter="filter"
       :streamFields="streamFields"
       :analysisType="defaultAnalysisTab"
-      :availableAnalysisTypes="['volume', 'latency', 'error']"
+      :availableAnalysisTypes="['volume', 'error', 'duration']"
       @close="showAnalysisDashboard = false"
     />
   </div>
@@ -179,7 +179,7 @@ const showAnalysisDashboard = ref(false);
 const analysisDurationFilter = ref({ start: 0, end: 0 });
 const analysisRateFilter = ref({ start: 0, end: 0 });
 const analysisErrorFilter = ref({ start: 0, end: 0 });
-const defaultAnalysisTab = ref<"latency" | "volume" | "error">("volume");
+const defaultAnalysisTab = ref<"duration" | "volume" | "error">("volume");
 // Store the original time range before selection for baseline comparison
 const originalTimeRangeBeforeSelection = ref<TimeRange | null>(null);
 
@@ -649,7 +649,7 @@ const openUnifiedAnalysisDashboard = () => {
         durationEnd = filter.end;
         durationTimeStart = filter.timeStart;
         durationTimeEnd = filter.timeEnd;
-        latestFilterType = "latency";
+        latestFilterType = "duration";
       } else if (filter.panelTitle === "Rate") {
         rateStart = filter.start;
         rateEnd = filter.end;

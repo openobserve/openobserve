@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="tw:text-[var(--o2-text-4)]! tw:text-lg tw:font-semibold tw:whitespace-nowrap"
           >
-            <template v-if="props.analysisType === 'latency'">{{
+            <template v-if="props.analysisType === 'duration'">{{
               t("latencyInsights.title")
             }}</template>
             <template v-else-if="props.analysisType === 'volume'">{{
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="tw:flex tw:items-center tw:gap-3">
-          <!-- Refresh button (shown when percentile changes on latency tab) -->
+          <!-- Refresh button (shown when percentile changes on duration tab) -->
           <q-btn
             v-if="showRefreshButton"
             dense
@@ -403,14 +403,14 @@ interface Props {
   streamName: string;
   streamType?: string; // logs or traces
   baseFilter?: string;
-  analysisType?: "latency" | "volume" | "error"; // Initial/default analysis type
-  availableAnalysisTypes?: Array<"latency" | "volume" | "error">; // Which tabs to show
+  analysisType?: "duration" | "volume" | "error"; // Initial/default analysis type
+  availableAnalysisTypes?: Array<"duration" | "volume" | "error">; // Which tabs to show
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  analysisType: "latency",
+  analysisType: "duration",
   availableAnalysisTypes: () => ["volume"], // Default to just volume
 });
 
@@ -443,7 +443,7 @@ const lastSplitterPosition = ref(25); // Remember last position before collapse
 // Percentile change tracking - use variables manager's hasUncommittedChanges
 // This matches the pattern used in ViewDashboard
 const showRefreshButton = computed(() => {
-  if (activeAnalysisType.value !== "latency") {
+  if (activeAnalysisType.value !== "duration") {
     return false;
   }
 
@@ -469,7 +469,7 @@ const isCustomSQLMode = computed(() => {
 });
 
 // Active tab management
-const activeAnalysisType = ref<"latency" | "volume" | "error">(
+const activeAnalysisType = ref<"duration" | "volume" | "error">(
   props.analysisType,
 );
 
@@ -483,9 +483,9 @@ const availableTabs = computed(() => {
           label: t("volumeInsights.tabLabel"),
           icon: "trending_up",
         };
-      case "latency":
+      case "duration":
         return {
-          name: "latency",
+          name: "duration",
           label: t("latencyInsights.tabLabel"),
           icon: "schedule",
         };
@@ -696,7 +696,7 @@ const hasSelectedTimeRange = computed(() => {
 // Additional filter metadata (duration, rate, or error count)
 const filterMetadata = computed(() => {
   if (
-    props.analysisType === "latency" &&
+    props.analysisType === "duration" &&
     props.durationFilter &&
     !props.durationFilter.timeStart
   ) {
@@ -721,7 +721,7 @@ const loadAnalysis = async () => {
   try {
     // Determine which filter to use based on active analysis type
     let filterConfig;
-    if (activeAnalysisType.value === "latency") {
+    if (activeAnalysisType.value === "duration") {
       filterConfig = {
         durationFilter: props.durationFilter,
         rateFilter: undefined,
@@ -811,7 +811,7 @@ const onVariablesManagerReady = (manager: any) => {
 
   // Load analysis immediately when manager is ready to populate dashboard
   // This ensures the dashboard shows data on initial load instead of remaining blank
-  if (activeAnalysisType.value === "latency" && !dashboardData.value) {
+  if (activeAnalysisType.value === "duration" && !dashboardData.value) {
     loadAnalysis();
   }
 };
@@ -947,7 +947,7 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
 
     // Build config (reuse logic from loadAnalysis)
     let filterConfig: any = {};
-    if (activeAnalysisType.value === "latency") {
+    if (activeAnalysisType.value === "duration") {
       filterConfig = {
         durationFilter: props.durationFilter,
         rateFilter: undefined,

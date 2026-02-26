@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="traces-table-header-latency"
       class="header-cell col-latency text-caption text-weight-bold"
     >
-      SERVICE LATENCY
+      SERVICE DURATION
     </div>
   </div>
 </template>
