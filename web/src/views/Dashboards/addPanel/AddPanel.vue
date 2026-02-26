@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disable="disable"
             class="tw:h-[36px]"
             @hide="setTimeForVariables"
+            data-test="dashboard-global-date-time-picker"
           />
           <q-btn
             outline
@@ -283,6 +284,7 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import {
   createDashboardsContextProvider,
   contextRegistry,
@@ -768,6 +770,47 @@ export default defineComponent({
         // take route time related query params
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
+
+      // v4.0: In edit mode, if panel has panel-specific time, pre-populate
+      // the date picker so the user sees the same time context as view mode
+      // Priority: URL panel params > saved panel_time_range > global (already set above)
+      if (editMode.value) {
+        const panelId = route.query.panelId as string;
+
+        // Priority 1: URL panel-specific params (user changed time in view mode)
+        const ptPeriod = route.query[`pt-period.${panelId}`];
+        const ptFrom = route.query[`pt-from.${panelId}`];
+        const ptTo = route.query[`pt-to.${panelId}`];
+
+        if (ptPeriod) {
+          selectedDate.value = {
+            valueType: "relative",
+            relativeTimePeriod: ptPeriod as string,
+          };
+        } else if (ptFrom && ptTo) {
+          selectedDate.value = {
+            valueType: "absolute",
+            startTime: parseInt(ptFrom as string),
+            endTime: parseInt(ptTo as string),
+          };
+        } else if (dashboardPanelData.data.config?.panel_time_range) {
+          // Priority 2: Panel's saved config time
+          const panelTimeRange = dashboardPanelData.data.config.panel_time_range;
+          if (panelTimeRange.type === 'relative' && panelTimeRange.relativeTimePeriod) {
+            selectedDate.value = {
+              valueType: "relative",
+              relativeTimePeriod: panelTimeRange.relativeTimePeriod,
+            };
+          } else if (panelTimeRange.type === 'absolute' && panelTimeRange.startTime && panelTimeRange.endTime) {
+            selectedDate.value = {
+              valueType: "absolute",
+              startTime: panelTimeRange.startTime,
+              endTime: panelTimeRange.endTime,
+            };
+          }
+        }
+        // Priority 3: global time (already set above, no action needed)
+      }
     };
 
     const isInitialDashboardPanelData = () => {
@@ -871,6 +914,50 @@ export default defineComponent({
     watch(selectedDate, () => {
       updateDateTime(selectedDate.value);
     });
+    // Watch for panel-level time configuration changes and update URL
+    watch(
+      () => dashboardPanelData.data.config?.panel_time_range,
+      (newPanelTime) => {
+        // Get panel ID (only in edit mode)
+        const panelId = route.query.panelId as string;
+        if (!panelId) {
+          // In create mode, don't update URL with panel time params yet
+          // Panel time will be saved with the panel config
+          return;
+        }
+
+        if (!newPanelTime) {
+          // Panel time removed - clear panel time params from URL
+          const query = { ...route.query };
+          delete query[`pt-period.${panelId}`];
+          delete query[`pt-from.${panelId}`];
+          delete query[`pt-to.${panelId}`];
+          router.replace({ query });
+          return;
+        }
+
+        // Update URL with panel time parameters
+        const query = { ...route.query };
+
+        if (newPanelTime.type === 'relative' && newPanelTime.relativeTimePeriod) {
+          // Relative time: pt-period.{panelId}={relativeTimePeriod}
+          query[`pt-period.${panelId}`] = newPanelTime.relativeTimePeriod;
+          // Remove absolute time params if they exist
+          delete query[`pt-from.${panelId}`];
+          delete query[`pt-to.${panelId}`];
+        } else if (newPanelTime.type === 'absolute' && newPanelTime.startTime && newPanelTime.endTime) {
+          // Absolute time: pt-from.{panelId}={startTime}&pt-to.{panelId}={endTime}
+          query[`pt-from.${panelId}`] = newPanelTime.startTime.toString();
+          query[`pt-to.${panelId}`] = newPanelTime.endTime.toString();
+          // Remove relative time param if it exists
+          delete query[`pt-period.${panelId}`];
+        }
+
+        router.replace({ query });
+      },
+      { deep: true }
+    );
+
 
     // resize the chart when config panel is opened and closed
     watch(
@@ -947,16 +1034,30 @@ export default defineComponent({
 
     const updateDateTime = (value: object) => {
       if (selectedDate.value && dateTimePickerRef?.value) {
-        const date = dateTimePickerRef.value?.getConsumableDateTime();
+        // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
+        // In add/edit panel mode, when time changes, this panel should always refresh
+        panelIdToBeRefreshed.value = null;
 
-        dashboardPanelData.meta.dateTime = {
+        // v4.0: In add/edit panel mode, ALWAYS use global date time picker for chart rendering
+        // Config date time (panel_time_range) is ONLY saved for view mode default
+        // Never use panel_time_range for chart rendering in edit mode
+        const date = dateTimePickerRef.value?.getConsumableDateTime();
+        const effectiveTime = {
           start_time: new Date(date.startTime),
           end_time: new Date(date.endTime),
         };
 
+        // Set the effective time for chart rendering
+        dashboardPanelData.meta.dateTime = effectiveTime;
+
+        // CRITICAL: Update chartData to trigger PanelSchemaRenderer to re-render
+        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        panelEditorRef.value?.initChartData(dashboardPanelData.data);
+
+        // Variables also use the global time in add/edit mode
         dateTimeForVariables.value = {
-          start_time: new Date(selectedDate.value.startTime),
-          end_time: new Date(selectedDate.value.endTime),
+          start_time: effectiveTime.start_time,
+          end_time: effectiveTime.end_time,
         };
         router.replace({
           query: {

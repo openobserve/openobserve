@@ -16,6 +16,7 @@ import DashboardImport from "./dashboardPages/dashboard-import.js";
 import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
 import DateTimeHelper from "./dashboardPages/dashboard-time";
+import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
@@ -92,6 +93,7 @@ class PageManager {
     this.dashboardShareExport = new DashboardShareExportPage(page);
     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
     this.dateTimeHelper = new DateTimeHelper(page);
+    this.dashboardPanelTime = new DashboardPanelTime(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
 
