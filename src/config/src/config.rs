@@ -1916,7 +1916,7 @@ pub struct Nats {
     pub replicas: usize,
     #[env_config(
         name = "ZO_NATS_HISTORY",
-        default = 3,
+        default = 1,
         help = "in the context of KV to configure how many historical entries to keep for a given bucket.
         Can not be modified after bucket is initialized.
         To update this, delete and recreate the bucket."
@@ -1940,6 +1940,8 @@ pub struct Nats {
     pub queue_max_age: u64,
     #[env_config(name = "ZO_NATS_EVENT_MAX_AGE", default = 3600)] // seconds
     pub event_max_age: u64,
+    #[env_config(name = "ZO_NATS_LOCK_MAX_AGE", default = 7200)] // seconds
+    pub lock_max_age: u64,
     #[env_config(
         name = "ZO_NATS_QUEUE_MAX_SIZE",
         help = "The maximum size of the queue in MB, default is 2048MB",

@@ -115,7 +115,8 @@
     "copySuccess": "クリップボードにコピー",
     "copyError": "クリップボードへのコピーに失敗しました",
     "reset": "リセット",
-    "retry": "リトライ"
+    "retry": "リトライ",
+    "set": "+ セット"
   },
   "search": {
     "metrics": "メトリクス",
@@ -1432,7 +1433,20 @@
     "noColumnsOrdered": "列は順序付けられていません",
     "columnsDefaultOrder": "列はデフォルトの順序で表示されます",
     "moveUp": "上へ移動",
-    "moveDown": "下に移動"
+    "moveDown": "下に移動",
+    "connectNullValuesTooltip": "欠損値のデータポイントを線で結びます。",
+    "panelTimeSettings": "パネルタイム設定",
+    "panelTimeEnabled": "パネルレベルの時間を許可",
+    "useGlobalTime": "グローバルタイムを使う",
+    "useIndividualTime": "個別の時間を使う",
+    "panelTimeGlobalHint": "パネルはグローバルダッシュボード時間を追跡します。グローバルタイムが変更されると、このパネルも更新されます。",
+    "panelTimeIndividualHint": "パネルは独自の時間範囲を使用します。以下の日付ピッカーを使用して時間を設定します。グローバル時間を変更しても、このパネルには影響しません。",
+    "panelTimeRange": "パネル時間範囲",
+    "panelTimeRangeTooltip": "この時間範囲はこのパネルにのみ適用されます。他のパネルは、独自に設定された時間またはグローバルダッシュボード時間を使用します。",
+    "panelTimeSettingsTooltip": "このパネルが時間範囲を決定する方法を設定します。このパネルには、ダッシュボードの時間範囲を使用することも、カスタムの時間範囲を設定することもできます。",
+    "panelTimeMode": "時間範囲ソース (ダッシュボードロード時)",
+    "useDefaultTimeTooltip": "有効にすると、このパネルは、ダッシュボードのグローバル時間ではなく、設定されたデフォルトの期間をダッシュボードロード時の時間範囲として使用します。",
+    "defaultDuration": "デフォルト期間"
   },
   "panel": {
     "header": "パネル",

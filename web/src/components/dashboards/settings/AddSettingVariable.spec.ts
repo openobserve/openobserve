@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { Quasar } from "quasar";
-import { nextTick } from "vue";
+import { nextTick, ref } from "vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
 
 // Mock external dependencies
@@ -90,10 +90,10 @@ vi.mock("@/composables/useStreams", () => ({
 
 const mockUseSelectAutoComplete = {
   filterFn: vi.fn(),
-  filteredOptions: [
+  filteredOptions: ref([
     { name: "stream1", type: "logs" },
     { name: "stream2", type: "logs" }
-  ]
+  ])
 };
 
 vi.mock("../../../composables/useSelectAutocomplete", () => ({
@@ -139,6 +139,15 @@ vi.mock("../../../utils/dashboard/variables/variablesDependencyUtils", () => ({
   isGraphHasCycle: vi.fn().mockReturnValue(null)
 }));
 
+// Mock scope utils
+vi.mock("@/utils/dashboard/variables/variablesScopeUtils", () => ({
+  getScopeType: vi.fn((v: any) => {
+    if (v.panels && v.panels.length > 0) return "panels";
+    if (v.tabs && v.tabs.length > 0) return "tabs";
+    return "global";
+  })
+}));
+
 // Mock child components
 vi.mock("./common/DashboardHeader.vue", () => ({
   default: {
@@ -152,9 +161,9 @@ vi.mock("./common/DashboardHeader.vue", () => ({
 vi.mock("../addPanel/CommonAutoComplete.vue", () => ({
   default: {
     name: "CommonAutoComplete",
-    template: '<div data-test="common-autocomplete-mock"></div>',
+    template: '<div class="common-autocomplete-mock" v-bind="$attrs"></div>',
     props: ["modelValue", "items", "searchRegex", "rules", "debounce", "placeholder"],
-    emits: ["update:modelValue"]
+    emits: ["update:modelValue", "select"],
   }
 }));
 
@@ -169,15 +178,18 @@ describe("AddSettingVariable", () => {
     ]
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    
+
     wrapper = mount(AddSettingVariable, {
       global: {
         plugins: [Quasar],
       },
       props: defaultProps
     });
+
+    // Wait for async onMounted to complete (it awaits getDashboard)
+    await flushPromises();
   });
 
   afterEach(() => {
@@ -652,10 +664,107 @@ describe("AddSettingVariable", () => {
 
     it("should handle max record size validation", async () => {
       wrapper.vm.variableData.query_data.max_record_size = "";
-      
+
       await nextTick();
-      
+
       expect(wrapper.vm.variableData.query_data.max_record_size).toBe(null);
+    });
+  });
+
+  describe("Variable Reference Support in Stream/Field Selection", () => {
+    beforeEach(async () => {
+      wrapper.vm.variableData.type = "query_values";
+      await nextTick();
+    });
+
+    it("should have mergedStreamsFilteredOptions computed property", () => {
+      expect(wrapper.vm.mergedStreamsFilteredOptions).toBeDefined();
+      expect(Array.isArray(wrapper.vm.mergedStreamsFilteredOptions)).toBe(true);
+    });
+
+    it("should have mergedFieldsFilteredOptions computed property", () => {
+      expect(wrapper.vm.mergedFieldsFilteredOptions).toBeDefined();
+      expect(Array.isArray(wrapper.vm.mergedFieldsFilteredOptions)).toBe(true);
+    });
+
+    it("should have dashboardVariablesFilterItems that produces $ prefixed options", () => {
+      // dashboardVariablesFilterItems should produce items like {label: "var1", value: "$var1"}
+      const filterItems = wrapper.vm.dashboardVariablesFilterItems;
+      expect(Array.isArray(filterItems)).toBe(true);
+      // Variable options should have $ prefix in their value
+      filterItems.forEach((item: any) => {
+        expect(item.value).toMatch(/^\$/);
+      });
+    });
+
+    it("should expose mergedStreamsFilterFn and mergedFieldsFilterFn for autocomplete", () => {
+      expect(wrapper.vm.mergedStreamsFilterFn).toBeDefined();
+      expect(wrapper.vm.mergedFieldsFilterFn).toBeDefined();
+    });
+
+    it("should skip schema fetch when stream is a variable reference", async () => {
+      // Set stream to a variable reference
+      wrapper.vm.variableData.query_data.stream = "$var1";
+      wrapper.vm.variableData.query_data.field = "existing_field";
+
+      await wrapper.vm.streamUpdated();
+
+      // Should NOT call getStream since it's a variable reference
+      expect(mockStreams.getStream).not.toHaveBeenCalled();
+    });
+
+    it("should not reset field value when stream is a variable reference", async () => {
+      wrapper.vm.variableData.query_data.stream = "$var1";
+      wrapper.vm.variableData.query_data.field = "existing_field";
+
+      await wrapper.vm.streamUpdated();
+
+      // Field should be preserved since it was already set
+      expect(wrapper.vm.variableData.query_data.field).toBe("existing_field");
+    });
+
+    it("should clear currentFieldsList when stream is a variable reference", async () => {
+      // Set some initial fields
+      wrapper.vm.data.currentFieldsList = [
+        { name: "field1", type: "string" },
+      ];
+
+      wrapper.vm.variableData.query_data.stream = "$var1";
+
+      await wrapper.vm.streamUpdated();
+
+      expect(wrapper.vm.data.currentFieldsList).toEqual([]);
+    });
+
+    it("should fetch schema normally when stream has no variable reference", async () => {
+      wrapper.vm.variableData.query_data.stream_type = "logs";
+      wrapper.vm.variableData.query_data.stream = "regular-stream";
+
+      await wrapper.vm.streamUpdated();
+
+      // Should call getStream for non-variable streams
+      expect(mockStreams.getStream).toHaveBeenCalledWith("regular-stream", "logs", true);
+    });
+
+    it("should set empty field when stream is non-variable and updated", async () => {
+      wrapper.vm.variableData.query_data.stream_type = "logs";
+      wrapper.vm.variableData.query_data.stream = "regular-stream";
+      wrapper.vm.variableData.query_data.field = "old_field";
+
+      await wrapper.vm.streamUpdated();
+
+      // Field should be reset for non-variable streams
+      expect(wrapper.vm.variableData.query_data.field).toBe("");
+    });
+
+    it("should render stream select with CommonAutoComplete", () => {
+      const streamSelect = wrapper.find('[data-test="dashboard-variable-stream-select"]');
+      expect(streamSelect.exists()).toBe(true);
+    });
+
+    it("should render field select with CommonAutoComplete", () => {
+      const fieldSelect = wrapper.find('[data-test="dashboard-variable-field-select"]');
+      expect(fieldSelect.exists()).toBe(true);
     });
   });
 });
