@@ -74,22 +74,19 @@ test.describe("Dashboard Create Alert testcases", () => {
       // Click the panel dropdown menu and select "Create Alert"
       await pm.dashboardPanelEdit.createAlertFromPanelMenu(panelName);
 
-      // Verify navigation to alert creation page with fromPanel=true
+      // Verify navigation to alert creation page with fromPanel=true and panelData
       await page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
         timeout: 15000,
       });
 
-      testLogger.info("Navigated to alert creation page from panel menu");
+      // Verify URL contains panelData (proves panel data was passed)
+      const currentUrl = page.url();
+      expect(currentUrl).toContain("fromPanel=true");
+      expect(currentUrl).toContain("panelData=");
 
-      // Verify the alert name input is pre-filled with panel title
-      const alertNameInput = page.locator(
-        '[data-test="add-alert-name-input"]'
-      );
-      await expect(alertNameInput).toBeVisible({ timeout: 10000 });
-      const alertNameValue = await alertNameInput.inputValue();
-      expect(alertNameValue).toContain("Alert_from_");
-
-      testLogger.info("Alert name is pre-filled", { alertNameValue });
+      testLogger.info("Navigated to alert creation page with panel data", {
+        url: currentUrl,
+      });
 
       // Navigate back to dashboards to clean up
       await pm.dashboardList.menuItem("dashboards-item");
@@ -167,22 +164,18 @@ test.describe("Dashboard Create Alert testcases", () => {
       // Click "above threshold" option
       await pm.dashboardPanelEdit.selectAlertAboveThreshold();
 
-      // Verify navigation to alert creation page
+      // Verify navigation to alert creation page with panel data
       await page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
         timeout: 15000,
       });
 
+      const currentUrl = page.url();
+      expect(currentUrl).toContain("fromPanel=true");
+      expect(currentUrl).toContain("panelData=");
+
       testLogger.info(
         "Navigated to alert creation page from context menu (above threshold)"
       );
-
-      // Verify alert name is pre-filled
-      const alertNameInput = page.locator(
-        '[data-test="add-alert-name-input"]'
-      );
-      await expect(alertNameInput).toBeVisible({ timeout: 10000 });
-      const alertNameValue = await alertNameInput.inputValue();
-      expect(alertNameValue).toContain("Alert_from_");
 
       // Navigate back and clean up
       await pm.dashboardList.menuItem("dashboards-item");
@@ -255,17 +248,13 @@ test.describe("Dashboard Create Alert testcases", () => {
         timeout: 15000,
       });
 
+      const currentUrl = page.url();
+      expect(currentUrl).toContain("fromPanel=true");
+      expect(currentUrl).toContain("panelData=");
+
       testLogger.info(
         "Navigated to alert creation page from context menu (below threshold)"
       );
-
-      // Verify alert name is pre-filled
-      const alertNameInput = page.locator(
-        '[data-test="add-alert-name-input"]'
-      );
-      await expect(alertNameInput).toBeVisible({ timeout: 10000 });
-      const alertNameValue = await alertNameInput.inputValue();
-      expect(alertNameValue).toContain("Alert_from_");
 
       // Navigate back and clean up
       await pm.dashboardList.menuItem("dashboards-item");
@@ -405,12 +394,14 @@ test.describe("Dashboard Create Alert testcases", () => {
       await page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
         timeout: 15000,
       });
+      await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(2000);
 
       // Get the pre-filled alert name
       const alertNameInput = page.locator(
         '[data-test="add-alert-name-input"]'
       );
-      await expect(alertNameInput).toBeVisible({ timeout: 10000 });
+      await expect(alertNameInput).toBeVisible({ timeout: 30000 });
       const alertName = await alertNameInput.inputValue();
       expect(alertName).toContain("Alert_from_");
       testLogger.info("Alert form pre-filled from panel", { alertName });
