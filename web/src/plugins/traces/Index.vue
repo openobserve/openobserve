@@ -112,23 +112,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 class="card-container tw:h-full"
               >
-                <h5 class="text-center">
+                <div class="text-center tw:pt-[2rem]">
+                  <!-- Actual error case -->
                   <div
-                    data-test="logs-search-result-not-found-text"
-                    v-if="
-                      searchObj.data.stream.streamLists.length &&
-                      searchObj.data.errorCode == 0
-                    "
+                    data-test="traces-search-error-message"
+                    class="tw:text-[1.3rem] q-pt-lg"
                   >
-                    {{ t("traces.noTracesFound") }}
+                    {{ t("traces.errorRetrievingTraces") }}
+                    <q-btn
+                      v-if="searchObj.data.errorDetail"
+                      @click="toggleErrorDetails"
+                      size="sm"
+                      class="o2-secondary-button q-ml-sm"
+                      data-test="traces-search-error-details-btn"
+                      >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                    >
                   </div>
-                  <SanitizedHtmlRenderer
-                    data-test="logs-search-error-message"
-                    :htmlContent="`${searchObj.data.errorMsg}
-                  ${searchObj.data.errorDetail ? `<h6 style='font-size: 14px; margin: 0;'>${searchObj.data.errorDetail}</h6>` : ''}`"
-                  />
+                  <!-- FTS not configured -->
                   <div
-                    data-test="logs-search-error-20003"
+                    data-test="traces-search-error-20003"
                     v-if="parseInt(searchObj.data.errorCode) == 20003"
                   >
                     <q-btn
@@ -145,11 +147,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                     {{ t("traces.configureFullTextSearch") }}
                   </div>
-                  <br />
                   <q-item-label>{{
                     searchObj.data.additionalErrorMsg
                   }}</q-item-label>
-                </h5>
+                </div>
               </div>
               <div
                 v-else-if="!isStreamSelected"
@@ -187,6 +188,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @shareLink="copyTracesUrl"
                   @metrics:filters-updated="onMetricsFiltersUpdated"
                 />
+              </div>
+              <!-- Collapsible error detail — shown below results when toggled -->
+              <div class="text-center">
+                <h5 class="tw:my-none">
+                  <span v-if="disableMoreErrorDetails">
+                    <SanitizedHtmlRenderer
+                      data-test="traces-search-detail-error-message"
+                      :htmlContent="searchObj?.data?.errorMsg"
+                    />
+                    <div
+                      v-if="searchObj?.data?.errorDetail"
+                      class="error-display__message"
+                    >
+                      {{ searchObj.data.errorDetail }}
+                    </div>
+                  </span>
+                </h5>
               </div>
             </div>
           </template>
@@ -282,6 +300,10 @@ const searchBarRef = ref(null);
 let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
+const disableMoreErrorDetails = ref(false);
+const toggleErrorDetails = () => {
+  disableMoreErrorDetails.value = !disableMoreErrorDetails.value;
+};
 const indexListRef = ref(null);
 const showColorPreview = ref(false);
 const { getStreams, getStream } = useStreams();
@@ -805,28 +827,19 @@ async function getQueryData() {
           if (dismiss) dismiss();
 
           const errData = err?.content || err;
-          if (errData?.message) {
-            searchObj.data.errorMsg = errData.message;
-          } else if (err?.message) {
-            searchObj.data.errorMsg = err.message;
-          } else {
-            searchObj.data.errorMsg = "Search request failed";
+          const { message, trace_id, code, error_detail } = errData ?? {};
+
+          let errorMsg = message || err?.message || "Search request failed";
+          if (code) {
+            searchObj.data.errorCode = code;
+            const customMessage = logsErrorMessage(code);
+            if (customMessage) errorMsg = t(customMessage);
           }
-          if (errData?.code) {
-            searchObj.data.errorCode = errData.code;
-            const customMessage = logsErrorMessage(errData.code);
-            if (customMessage !== "") {
-              searchObj.data.errorMsg = t(customMessage);
-            }
+          if (trace_id) {
+            errorMsg += ` <br><span class='text-subtitle1'>TraceID: ${trace_id}</span>`;
           }
-          if (errData?.code && errData?.message) {
-            searchObj.data.errorMsg = errData.message;
-            searchObj.data.errorCode = errData.code;
-          }
-          if (errData?.code && errData?.error_detail) {
-            searchObj.data.errorDetail = errData.error_detail;
-            searchObj.data.errorCode = errData.code;
-          }
+          searchObj.data.errorMsg = errorMsg;
+          searchObj.data.errorDetail = error_detail || "";
           currentSearchTraceId = null;
         },
         complete: (_payload: any) => {
@@ -843,7 +856,8 @@ async function getQueryData() {
   } catch (e: any) {
     console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
-    showErrorNotification("Search request failed");
+    searchObj.data.errorMsg = e?.message || "Search request failed";
+    searchObj.data.errorDetail = "";
   }
 }
 
