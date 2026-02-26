@@ -1417,6 +1417,7 @@
     "columnsDefaultOrder": "Sütunlar varsayılan sıralarında görüntülenecektir",
     "moveUp": "Yukarı hareket et",
     "moveDown": "Aşağı hareket et",
+    "connectNullValuesTooltip": "Veri noktalarını eksik değerler arasında bir çizgi ile bağlayın.",
     "panelTimeSettings": "Panel Zaman Ayarları",
     "panelTimeEnabled": "Panel seviyesi süresine izin ver",
     "useGlobalTime": "Küresel zamanı kullan",

@@ -1417,6 +1417,7 @@
     "columnsDefaultOrder": "열은 기본 순서로 표시됩니다.",
     "moveUp": "위로 이동",
     "moveDown": "아래로 이동",
+    "connectNullValuesTooltip": "결측값의 데이터 포인트를 선으로 연결합니다.",
     "panelTimeSettings": "패널 시간 설정",
     "panelTimeEnabled": "패널 레벨 시간 허용",
     "useGlobalTime": "글로벌 타임 사용",

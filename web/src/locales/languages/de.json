@@ -1417,6 +1417,7 @@
     "columnsDefaultOrder": "Die Spalten werden in ihrer Standardreihenfolge angezeigt",
     "moveUp": "Steigen Sie auf",
     "moveDown": "Gehe nach unten",
+    "connectNullValuesTooltip": "Verbinde Datenpunkte über fehlende Werte mit einer Linie.",
     "panelTimeSettings": "Zeiteinstellungen für das Panel",
     "panelTimeEnabled": "Zeit auf Panelebene zulassen",
     "useGlobalTime": "Globale Zeit verwenden",

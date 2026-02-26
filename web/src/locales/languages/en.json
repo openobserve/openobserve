@@ -1496,6 +1496,7 @@
     "addOthersSeries": "Add 'others' series",
     "addOthersSeriesTooltip": "Include an 'others' series for values outside the top results when using breakdown fields.",
     "connectNullValues": "Connect null values",
+    "connectNullValuesTooltip": "Connect data points across missing values with a line.",
     "noValueReplacement": "No Value Replacement",
     "noValueReplacementTooltip": "What to display when a value is missing for time series",
     "gaugeMinValue": "Gauge Min Value",

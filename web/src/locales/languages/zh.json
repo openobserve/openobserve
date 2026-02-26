@@ -1417,6 +1417,7 @@
     "columnsDefaultOrder": "列将按其默认顺序显示",
     "moveUp": "向上移动",
     "moveDown": "向下移动",
+    "connectNullValuesTooltip": "用一条线将缺失值上的数据点连接起来。",
     "panelTimeSettings": "小组讨论时间设置",
     "panelTimeEnabled": "允许面板关卡时间",
     "useGlobalTime": "使用全球时间",

@@ -1417,6 +1417,7 @@
     "columnsDefaultOrder": "As colunas serão exibidas em sua ordem padrão",
     "moveUp": "Mova-se para cima",
     "moveDown": "Mover para baixo",
+    "connectNullValuesTooltip": "Conecte pontos de dados entre valores ausentes com uma linha.",
     "panelTimeSettings": "Configurações de tempo do painel",
     "panelTimeEnabled": "Permitir tempo no nível do painel",
     "useGlobalTime": "Use a hora global",
