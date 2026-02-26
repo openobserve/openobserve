@@ -1161,8 +1161,14 @@ watch(
     }
   }
 
-  :deep(.trace-analysis-dashboards :first-child) {
-    padding: 0rem !important;
+  .trace-analysis-dashboards {
+    :deep(.render-dashboard-charts-container) {
+      padding: 0rem !important;
+    }
+
+    :deep(.global-variables-selector) {
+      margin-top: 0rem !important;
+    }
   }
 
   .trace-analysis-dashboards {
