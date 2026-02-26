@@ -1,5 +1,7 @@
 //dashboard panel edit page
 // Methods: Duplicate panel, Edit panel, Delete panel, Download json, Download csv, Move to another tab, Fullscreen panel, Refresh panel, Edit layout, Go to logs, Create alert from panel
+import { expect } from '@playwright/test';
+
 export default class DashboardPanel {
   constructor(page) {
     this.page = page;
@@ -173,40 +175,52 @@ export default class DashboardPanel {
     await this.createAlertFromPanel.click();
   }
 
-  // Right-click on chart to open alert context menu
-  async rightClickChartForAlert() {
+  // Right-click on chart center to open alert context menu
+  // Retries because ECharts needs time after data load to register contextmenu handlers
+  async rightClickChartForAlert(maxRetries = 3) {
     const chartCanvas = this.chartRendererCanvas.first();
     await chartCanvas.waitFor({ state: "visible", timeout: 15000 });
-    // Click center of the chart canvas with right-click
-    await chartCanvas.click({ button: "right", position: { x: 200, y: 100 } });
+    const box = await chartCanvas.boundingBox();
+    const position = box
+      ? { x: Math.floor(box.width / 2), y: Math.floor(box.height / 2) }
+      : { x: 200, y: 100 };
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      await chartCanvas.click({ button: "right", position });
+      const menuVisible = await this.alertContextMenu
+        .waitFor({ state: "visible", timeout: 3000 })
+        .then(() => true)
+        .catch(() => false);
+      if (menuVisible) return;
+    }
+    // Final attempt without catching - let it throw if still not visible
+    await chartCanvas.click({ button: "right", position });
   }
 
   // Verify alert context menu is visible
   async expectAlertContextMenuVisible() {
-    const { expect } = require('@playwright/test');
     await expect(this.alertContextMenu).toBeVisible({ timeout: 10000 });
   }
 
   // Verify alert context menu is hidden
   async expectAlertContextMenuHidden() {
-    const { expect } = require('@playwright/test');
     await expect(this.alertContextMenu).not.toBeVisible({ timeout: 5000 });
   }
 
   // Select "above threshold" from alert context menu
-  // Uses dispatchEvent because the teleported context menu is covered by the app overlay
-  // which intercepts pointer events - dispatchEvent fires directly on the DOM node
+  // force:true is required because AlertContextMenu uses <teleport to="body">
+  // which places the menu under the app's root overlay that intercepts pointer events
   async selectAlertAboveThreshold() {
     await this.alertContextMenuAbove.waitFor({ state: "visible" });
-    await this.alertContextMenuAbove.dispatchEvent("click");
+    await this.alertContextMenuAbove.click({ force: true });
   }
 
   // Select "below threshold" from alert context menu
-  // Uses dispatchEvent because the teleported context menu is covered by the app overlay
-  // which intercepts pointer events - dispatchEvent fires directly on the DOM node
+  // force:true is required because AlertContextMenu uses <teleport to="body">
+  // which places the menu under the app's root overlay that intercepts pointer events
   async selectAlertBelowThreshold() {
     await this.alertContextMenuBelow.waitFor({ state: "visible" });
-    await this.alertContextMenuBelow.dispatchEvent("click");
+    await this.alertContextMenuBelow.click({ force: true });
   }
 
   //open Query inspector

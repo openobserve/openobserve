@@ -2,11 +2,11 @@
 // PR #9682: fix: allow to create alert from anywhere from dashboard chart
 // Tests for creating alerts from dashboard panel menu and chart context menu
 
-const {
+import {
   test,
   expect,
   navigateToBase,
-} = require("../utils/enhanced-baseFixtures.js");
+} from "../utils/enhanced-baseFixtures.js";
 import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
 import {
@@ -14,7 +14,7 @@ import {
   deleteDashboard,
 } from "./utils/dashCreation.js";
 import { waitForStreamComplete } from "../utils/streaming-helpers.js";
-const testLogger = require("../utils/test-logger.js");
+import testLogger from "../utils/test-logger.js";
 
 const randomDashboardName =
   "Dashboard_Alert_" + Math.random().toString(36).slice(2, 11);
@@ -134,12 +134,14 @@ test.describe("Dashboard Create Alert testcases", () => {
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Save the panel to get back to dashboard view
+      // Save the panel and wait for dashboard to reload chart data
+      const dashboardStreamPromise = page.waitForResponse(
+        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
+        { timeout: 30000 }
+      ).catch(() => {});
       await pm.dashboardPanelActions.savePanel();
-
-      // Wait for the dashboard view to stabilize with chart rendered
-      await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
-      await page.waitForTimeout(2000);
+      await dashboardStreamPromise;
+      await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
 
       // Right-click on the chart renderer to trigger alert context menu
       await pm.dashboardPanelEdit.rightClickChartForAlert();
@@ -232,7 +234,7 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       // Wait for dashboard view to stabilize
       await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
-      await page.waitForTimeout(2000);
+      await page.locator('[data-test="chart-renderer"]').first().waitFor({ state: "visible", timeout: 10000 });
 
       // Right-click on the chart renderer
       await pm.dashboardPanelEdit.rightClickChartForAlert();
@@ -301,10 +303,14 @@ test.describe("Dashboard Create Alert testcases", () => {
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Save the panel
+      // Save the panel and wait for dashboard to reload chart data
+      const dashboardStreamPromise = page.waitForResponse(
+        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
+        { timeout: 30000 }
+      ).catch(() => {});
       await pm.dashboardPanelActions.savePanel();
-      await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
-      await page.waitForTimeout(2000);
+      await dashboardStreamPromise;
+      await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
 
       // Right-click on the chart renderer
       await pm.dashboardPanelEdit.rightClickChartForAlert();
@@ -394,8 +400,6 @@ test.describe("Dashboard Create Alert testcases", () => {
       await page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
         timeout: 15000,
       });
-      await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
-      await page.waitForTimeout(2000);
 
       // Get the pre-filled alert name
       const alertNameInput = page.locator(
@@ -407,74 +411,56 @@ test.describe("Dashboard Create Alert testcases", () => {
       testLogger.info("Alert form pre-filled from panel", { alertName });
 
       // Step 4: Complete the alert wizard (scheduled alert from panel data)
+      const continueBtn = page.getByRole("button", { name: "Continue" });
+
       // Step 1 (Setup) - pre-filled → Continue
-      await page.getByRole("button", { name: "Continue" }).click();
+      await continueBtn.click();
       await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(1000);
 
       // Step 2 (SQL/Conditions) - pre-filled → Continue
-      await page.getByRole("button", { name: "Continue" }).click();
+      await continueBtn.click();
       await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(1000);
 
       // Step 3 (Compare with Past) → Skip, Continue
-      await page.getByRole("button", { name: "Continue" }).click();
+      await continueBtn.click();
       await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(1000);
 
       // Step 4 (Settings) → Set threshold and select destination
+      // data-test selectors added in AlertSettings.vue; fallback for pre-build compat
       const thresholdOperator = page
-        .locator(".step-alert-conditions .q-select")
-        .first();
-      await thresholdOperator.waitFor({ state: "visible", timeout: 5000 });
-      await thresholdOperator.click();
-      await page.waitForTimeout(500);
+        .locator('[data-test="alert-threshold-operator-select"]')
+        .or(page.locator(".step-alert-conditions .q-select").first());
+      await thresholdOperator.first().waitFor({ state: "visible", timeout: 10000 });
+      await thresholdOperator.first().click();
+      await page.getByText(">=", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
       await page.getByText(">=", { exact: true }).click();
 
       const thresholdInput = page
-        .locator(".step-alert-conditions input[type='number']")
-        .first();
-      await thresholdInput.waitFor({ state: "visible", timeout: 5000 });
-      await thresholdInput.fill("1");
+        .locator('[data-test="alert-threshold-value-input"] input')
+        .or(page.locator(".step-alert-conditions input[type='number']").first());
+      await thresholdInput.first().waitFor({ state: "visible", timeout: 5000 });
+      await thresholdInput.first().fill("1");
 
       // Select destination
-      const destinationRow = page
-        .locator(".alert-settings-row")
-        .filter({ hasText: /Destination/ });
-      const destinationDropdown = destinationRow
-        .locator(".q-select")
-        .first();
-      await destinationDropdown.waitFor({ state: "visible", timeout: 5000 });
-      await destinationDropdown.click();
-      await page.waitForTimeout(1000);
+      const destinationDropdown = page
+        .locator('[data-test="alert-destinations-select"]')
+        .or(page.locator(".destinations-select-field").first());
+      await destinationDropdown.first().waitFor({ state: "visible", timeout: 5000 });
+      await destinationDropdown.first().click();
 
-      const visibleMenu = page.locator(".q-menu:visible");
-      await expect(
-        visibleMenu.locator(".q-item").first()
-      ).toBeVisible({ timeout: 5000 });
-
-      const destOption = visibleMenu
-        .locator(".q-item")
-        .filter({ hasText: destinationName })
-        .first();
-      if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await destOption.click();
-      } else {
-        await visibleMenu.locator(".q-item").first().click();
-        testLogger.warn("Selected first available destination (fallback)");
-      }
-      await page.waitForTimeout(500);
+      // Quasar q-select renders items as q-item in a popup menu
+      const destOption = page.locator(".q-item").filter({ hasText: destinationName }).first();
+      await expect(destOption).toBeVisible({ timeout: 5000 });
+      await destOption.click();
       await page.keyboard.press("Escape");
 
       // Step 5 (Dedup) → Skip, Continue
-      await page.getByRole("button", { name: "Continue" }).click();
+      await continueBtn.click();
       await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(500);
 
       // Step 6 (Advanced) → Skip, Continue
-      await page.getByRole("button", { name: "Continue" }).click();
+      await continueBtn.click();
       await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(500);
 
       // Submit the alert
       await page.locator('[data-test="add-alert-submit-btn"]').click();
@@ -488,16 +474,12 @@ test.describe("Dashboard Create Alert testcases", () => {
       });
 
       // Verify alert appears in the alerts list
-      await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(2000);
-
-      // Verify alert appears in list and delete it
       const alertSearchInput = page.locator(
         '[data-test="alert-list-search-input"]'
       );
-      await alertSearchInput.waitFor({ state: "visible", timeout: 10000 });
+      await alertSearchInput.waitFor({ state: "visible", timeout: 15000 });
       await alertSearchInput.fill(alertName.toLowerCase());
-      await page.waitForTimeout(2000);
+      await page.locator("table tbody tr").first().waitFor({ state: "visible", timeout: 10000 });
 
       // Verify alert row is visible
       const firstRow = page.locator("table tbody tr").first();
