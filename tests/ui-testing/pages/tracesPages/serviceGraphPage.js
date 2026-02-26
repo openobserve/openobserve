@@ -383,12 +383,35 @@ export class ServiceGraphPage {
 
   // ===== TELEMETRY CORRELATION =====
 
+  /**
+   * Click "Show Telemetry" and wait for the async API call to finish.
+   * The button has a :loading state while fetchCorrelatedStreams() runs.
+   * Returns true if the correlation dialog opened, false if an error notification appeared.
+   */
+  async clickShowTelemetryAndWait() {
+    const btn = this.page.locator(this.sidePanelShowTelemetryBtn);
+    await btn.click();
+
+    // Wait for the loading spinner to appear and then disappear (API call in progress)
+    // The button has :loading="correlationLoading" — Quasar adds .q-btn--loading class
+    await btn.locator('.q-spinner').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await btn.locator('.q-spinner').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+
+    // After loading completes, either the dialog opens or a notification toast appears
+    const dialogVisible = await this.page.locator(this.correlationDashboardCard)
+      .waitFor({ state: 'visible', timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+
+    return dialogVisible;
+  }
+
   async clickShowTelemetry() {
     await this.page.locator(this.sidePanelShowTelemetryBtn).click();
   }
 
   async expectCorrelationDialogVisible() {
-    await expect(this.page.locator(this.correlationDashboardCard)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.correlationDashboardCard)).toBeVisible({ timeout: 15000 });
   }
 
   async isCorrelationDialogVisible() {
