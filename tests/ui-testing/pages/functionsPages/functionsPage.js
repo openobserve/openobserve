@@ -324,11 +324,12 @@ class FunctionsPage {
       await this.enterTestEvent(testEventJson);
     }
 
-    // Click the "Test Function" button and wait for the API response
-    await Promise.all([
-      this.page.waitForResponse(resp => resp.url().includes('/functions/test'), { timeout: 15000 }),
-      this.clickTestButton(),
-    ]);
+    // Register response listener before clicking to avoid race condition
+    const responsePromise = this.page.waitForResponse(
+      resp => resp.url().includes('/functions/test'), { timeout: 15000 }
+    );
+    await this.clickTestButton();
+    await responsePromise;
 
     // Wait for the output editor to render the API response (non-empty content)
     const outputLocator = this.page.locator(this.testOutputEditor);

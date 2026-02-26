@@ -143,6 +143,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       expect(errorOutput).toBeTruthy();
       testLogger.info(`Error test output: ${errorOutput}`);
 
+      // `row.field = undefinedVar` throws ReferenceError — message always contains 'error'
       const hasError = errorOutput.toLowerCase().includes('error') ||
                       errorOutput.toLowerCase().includes('failed');
 
