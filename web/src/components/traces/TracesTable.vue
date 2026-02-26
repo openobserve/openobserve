@@ -28,8 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     Use 'oz-table__row--error' to render the red left-border error variant.
 
   Slots:
-    #loading  — shown while loading=true
-    #empty    — shown when rows is empty and loading=false
+    #loading              — shown while loading=true
+    #empty                — shown when rows is empty and loading=false
+    #cell-{columnId}      — scoped slot for a specific column cell.
+                            Slot props: { item: T, cell: Cell<T, unknown> }
+                            Falls back to FlexRender if the slot is not provided.
 -->
 
 <!-- Module augmentation must live in a non-setup script block -->
@@ -155,10 +158,16 @@ function getAlignClass(column: Column<T, unknown>): string {
           :class="getAlignClass(cell.column)"
           :style="getColumnStyle(cell.column)"
         >
-          <FlexRender
-            :render="cell.column.columnDef.cell"
-            :props="cell.getContext()"
-          />
+          <slot
+            :name="`cell-${cell.column.id}`"
+            :item="row.original"
+            :cell="cell"
+          >
+            <FlexRender
+              :render="cell.column.columnDef.cell"
+              :props="cell.getContext()"
+            />
+          </slot>
         </div>
       </div>
     </template>
@@ -203,7 +212,11 @@ function getAlignClass(column: Column<T, unknown>): string {
   transition: background 0.15s ease;
 
   &:hover {
-    background: var(--o2-table-header-bg);
+    background: color-mix(
+      in srgb,
+      var(--o2-theme-color) 15%,
+      rgb(255, 255, 255)
+    );
   }
 
   /**
@@ -219,5 +232,17 @@ function getAlignClass(column: Column<T, unknown>): string {
 .oz-table__td {
   padding: 8px;
   overflow: hidden;
+}
+
+body.body--dark {
+  .oz-table__row {
+    &:hover {
+      background: color-mix(
+        in srgb,
+        var(--o2-theme-color) 15%,
+        rgb(37, 37, 37)
+      );
+    }
+  }
 }
 </style>

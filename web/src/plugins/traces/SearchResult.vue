@@ -160,6 +160,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :row-class="traceRowClass"
             @row-click="expandRowDetail"
           >
+            <template #cell-timestamp="{ item }">
+              <TraceTimestampCell :item="item" />
+            </template>
+
+            <template #cell-service_operation="{ item }">
+              <TraceServiceCell :item="item" />
+            </template>
+
+            <template #cell-duration="{ item }">
+              <span class="text-caption" data-test="trace-row-duration">
+                {{ formatTimeWithSuffix(item.duration) || "0us" }}
+              </span>
+            </template>
+
+            <template #cell-spans="{ item }">
+              <q-badge
+                data-test="trace-row-spans-badge"
+                :label="item.spans"
+                class="tw:bg-[var(--o2-tag-grey-2)]! tw:text-[var(--o2-text-1)]! tw:px-[0.5rem]! tw:py-[0.325rem]!"
+              />
+            </template>
+
+            <template #cell-status="{ item }">
+              <TraceStatusCell :item="item" />
+            </template>
+
+            <template #cell-input_tokens="{ item }">
+              <span class="text-caption" data-test="trace-row-input-tokens">
+                {{
+                  isLLMTrace(item)
+                    ? formatTokens(extractLLMData(item)?.usage?.input ?? 0)
+                    : "-"
+                }}
+              </span>
+            </template>
+
+            <template #cell-output_tokens="{ item }">
+              <span class="text-caption" data-test="trace-row-output-tokens">
+                {{
+                  isLLMTrace(item)
+                    ? formatTokens(extractLLMData(item)?.usage?.output ?? 0)
+                    : "-"
+                }}
+              </span>
+            </template>
+
+            <template #cell-cost="{ item }">
+              <span class="text-caption" data-test="trace-row-cost">
+                {{
+                  isLLMTrace(item)
+                    ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}`
+                    : "-"
+                }}
+              </span>
+            </template>
+
+            <template #cell-service_latency="{ item }">
+              <TraceLatencyCell :item="item" />
+            </template>
+
             <template #empty />
           </TracesTable>
         </div>
@@ -185,13 +245,27 @@ import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import TracesTable from "@/components/traces/TracesTable.vue";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
+import TraceTimestampCell from "./components/TraceTimestampCell.vue";
+import TraceServiceCell from "./components/TraceServiceCell.vue";
+import TraceLatencyCell from "./components/TraceLatencyCell.vue";
+import TraceStatusCell from "./components/TraceStatusCell.vue";
 import { useRouter } from "vue-router";
-import { isLLMTrace } from "../../utils/llmUtils";
+import {
+  isLLMTrace,
+  extractLLMData,
+  formatCost,
+  formatTokens,
+} from "../../utils/llmUtils";
+import { formatTimeWithSuffix } from "../../utils/zincutils";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     TracesTable,
+    TraceTimestampCell,
+    TraceServiceCell,
+    TraceLatencyCell,
+    TraceStatusCell,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
     ),
@@ -383,6 +457,12 @@ export default defineComponent({
       pagedHits,
       onPageChange,
       onRowsPerPageChange,
+      // Cell utilities exposed for slot templates
+      formatTimeWithSuffix,
+      isLLMTrace,
+      extractLLMData,
+      formatTokens,
+      formatCost,
     };
   },
 });
