@@ -39,20 +39,6 @@ import { date as qDate } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-function formatTimeTo12Hour(date: Date): string {
-  let hr = date.getHours();
-  const m = String(date.getMinutes()).padStart(2, "0");
-  const s = String(date.getSeconds()).padStart(2, "0");
-  const ampm = hr >= 12 ? "PM" : "AM";
-  hr = hr % 12 || 12;
-  return `${String(hr).padStart(2, "0")}:${m}:${s} ${ampm}`;
-}
-
 const props = defineProps<{
   item: Record<string, any>;
 }>();
@@ -70,13 +56,12 @@ function buildFormatted() {
   const nowStr = _moment.tz(new Date(), tz).format(FMT);
   const diffSec = qDate.getDateDiff(nowStr, tsMoment.format(FMT), "seconds");
 
-  const d = tsMoment.toDate();
   let day = "";
   if (diffSec < 86400) day = t('traces.today');
   else if (diffSec < 86400 * 2) day = t('traces.yesterday');
-  else day = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  else day = tsMoment.format("D MMM");
 
-  formatted.value = { day, time: formatTimeTo12Hour(d) };
+  formatted.value = { day, time: tsMoment.format("hh:mm:ss A") };
 }
 
 watch(() => props.item?.trace_start_time, buildFormatted);

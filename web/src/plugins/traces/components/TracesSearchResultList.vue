@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-badge
           data-test="traces-count-badge"
           rounded
-          :label="`${hits.length} ${t('traces.tracesFound')}`"
+          :label="`${props.total != null ? props.total : hits.length} ${t('traces.tracesFound')}`"
           class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
         />
       </div>
@@ -171,6 +171,8 @@ interface Props {
   searchPerformed?: boolean;
   /** Show the "TRACES X Traces Found" section header. Default: true */
   showHeader?: boolean;
+  /** Server-side total record count. When provided, the badge shows this instead of hits.length. */
+  total?: number;
 }
 
 const { t } = useI18n();
@@ -178,6 +180,7 @@ const { t } = useI18n();
 const props = withDefaults(defineProps<Props>(), {
   searchPerformed: true,
   showHeader: true,
+  total: undefined,
 });
 
 const emit = defineEmits<{
