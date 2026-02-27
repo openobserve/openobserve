@@ -1,21 +1,22 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
 const dotenv = require('dotenv');
+const testLogger = require('./playwright-tests/utils/test-logger.js');
 
 // Load environment variables from .env file
 const envResult = dotenv.config();
 if (envResult.error) {
-  console.warn('⚠️  No .env file found, using system environment variables');
+  testLogger.warn('No .env file found, using system environment variables');
 } else {
-  console.log('✅ Environment variables loaded from .env file');
+  testLogger.info('Environment variables loaded from .env file');
 }
 
 // Check alpha1-specific environment variables
 if (!process.env.ZO_BASE_URL) {
-  console.warn('⚠️  ZO_BASE_URL not set. Must be provided for alpha1 cloud tests.');
+  testLogger.warn('ZO_BASE_URL not set. Must be provided for alpha1 cloud tests.');
 }
 if (!process.env.ALPHA1_USER_EMAIL || !process.env.ALPHA1_USER_PASSWORD) {
-  console.warn('⚠️  ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set for Dex email login');
+  testLogger.warn('ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set for Dex email login');
 }
 
 /**
