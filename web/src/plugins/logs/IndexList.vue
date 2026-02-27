@@ -162,7 +162,6 @@ import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
 import {
   b64EncodeUnicode,
-  b64DecodeUnicode,
   getImageURL,
   convertTimeFromMicroToMilli,
   formatLargeNumber,
@@ -874,36 +873,18 @@ export default defineComponent({
       searchObj.data.stream.addToFilter = combined;
     };
 
-    /**
-     * Injects `str_match_ignore_case(field, 'term')` into a base64-encoded SQL
-     * query, appending it to an existing WHERE clause or creating a new one.
-     */
-    const addStrMatchToSQL = (
-      encodedSQL: string,
-      fieldName: string,
-      searchTerm: string,
-    ): string => {
-      const sql = b64DecodeUnicode(encodedSQL);
-      if (!sql) return encodedSQL;
-
-      // Single-quote escape to prevent injection in the SQL string literal.
-      const escapedTerm = searchTerm.replace(/'/g, "''");
-      const condition = `str_match_ignore_case(${fieldName}, '${escapedTerm}')`;
-      const modifiedSQL = /\bWHERE\b/i.test(sql)
-        ? `${sql} AND ${condition}`
-        : `${sql} WHERE ${condition}`;
-
-      return b64EncodeUnicode(modifiedSQL) || encodedSQL;
-    };
-
     const loadMoreFieldValues = (fieldName: string) => {
       const payloads = lastFieldFetchPayloads.value[fieldName];
       if (!payloads?.length) return;
 
-      const size = store.state.zoConfig?.query_values_default_num || 10;
+      const pageSize = store.state.zoConfig?.query_values_default_num || 10;
       const currentFrom = fieldValuesPage.value[fieldName] || 0;
-      const nextFrom = currentFrom + size;
+      const nextFrom = currentFrom + pageSize;
       fieldValuesPage.value[fieldName] = nextFrom;
+
+      // Backend expects: SQL LIMIT = size, DataFusion SKIP = from.
+      // Rows returned = size - from = pageSize, so size must equal from + pageSize.
+      const totalSize = nextFrom + pageSize;
 
       // Show loading without wiping existing values while the next page arrives.
       if (fieldValues.value[fieldName]) {
@@ -912,7 +893,7 @@ export default defineComponent({
       }
 
       for (const payload of payloads) {
-        fetchValuesWithWebsocket({ ...payload, from: nextFrom, size });
+        fetchValuesWithWebsocket({ ...payload, from: nextFrom, size: totalSize });
       }
     };
 
@@ -949,13 +930,10 @@ export default defineComponent({
       resetFieldValues(fieldName, true);
 
       for (const payload of payloads) {
-        const modifiedPayload = searchTerm
-          ? {
-              ...payload,
-              sql: addStrMatchToSQL(payload.sql, fieldName, searchTerm),
-            }
-          : payload;
-        fetchValuesWithWebsocket(modifiedPayload);
+        fetchValuesWithWebsocket({
+          ...payload,
+          keyword: searchTerm || undefined,
+        });
       }
     };
 
@@ -1344,10 +1322,9 @@ export default defineComponent({
       const fieldName = payload?.queryReq?.fields[0];
       const streamName = payload?.queryReq?.stream_name;
       const isAppend = (payload?.queryReq?.from ?? 0) > 0;
-      const pageSize =
-        payload?.queryReq?.size ||
-        store.state.zoConfig?.query_values_default_num ||
-        10;
+      // Per-page count is always query_values_default_num regardless of the
+      // total `size` sent (which equals from + pageSize for paginated requests).
+      const pageSize = store.state.zoConfig?.query_values_default_num || 10;
 
       try {
         // We don't need to handle search_response_metadata
