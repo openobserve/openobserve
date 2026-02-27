@@ -180,6 +180,24 @@ pub fn set_permission<P: AsRef<std::path::Path>>(
     std::fs::create_dir_all(path.as_ref())
 }
 
+/// Returns the total size (in bytes) of all files under `dir`, recursively.
+/// Returns 0 if the directory does not exist or cannot be read.
+pub fn get_dir_size(dir: &str) -> usize {
+    let mut total: usize = 0;
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            total += get_dir_size(path.to_str().unwrap_or(""));
+        } else if let Ok(meta) = entry.metadata() {
+            total += meta.len() as usize;
+        }
+    }
+    total
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
