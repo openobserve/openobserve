@@ -12,7 +12,7 @@ try {
 
 // Check alpha1-specific environment variables
 if (!process.env.ZO_BASE_URL) {
-  console.warn('⚠️  ZO_BASE_URL not set. Defaulting to https://alpha1.dev.zinclabs.dev');
+  console.warn('⚠️  ZO_BASE_URL not set. Must be provided for alpha1 cloud tests.');
 }
 if (!process.env.ALPHA1_USER_EMAIL || !process.env.ALPHA1_USER_PASSWORD) {
   console.warn('⚠️  ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set for Dex email login');
@@ -47,7 +47,7 @@ module.exports = defineConfig({
       ],
 
   use: {
-    baseURL: process.env["ZO_BASE_URL"] || "https://alpha1.dev.zinclabs.dev",
+    baseURL: process.env["ZO_BASE_URL"],
     trace: 'on-first-retry',
     navigationTimeout: process.env.CI ? 90000 : 30000,
     actionTimeout: process.env.CI ? 45000 : 15000,

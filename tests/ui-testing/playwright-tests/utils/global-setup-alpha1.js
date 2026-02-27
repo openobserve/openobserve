@@ -31,7 +31,10 @@ async function globalSetup() {
   });
 
   try {
-    const baseUrl = process.env.ZO_BASE_URL || 'https://alpha1.dev.zinclabs.dev';
+    const baseUrl = process.env.ZO_BASE_URL;
+    if (!baseUrl) {
+      throw new Error('ZO_BASE_URL must be set');
+    }
     const userEmail = process.env.ALPHA1_USER_EMAIL;
     const userPassword = process.env.ALPHA1_USER_PASSWORD;
 
@@ -75,7 +78,7 @@ async function globalSetup() {
 
     // Step 4: Submit and wait for redirect back to alpha1
     const submitButton = page.locator(
-      'button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In"), button:has-text("Log In")'
+      'button:has-text("Login"), button:has-text("Sign In"), button:has-text("Log In"), button[type="submit"], input[type="submit"]'
     );
 
     await submitButton.first().click();
@@ -130,7 +133,7 @@ async function globalSetup() {
       await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
     }
 
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch((e) => console.warn('[alpha1] networkidle timeout:', e.message));
 
     // Step 7: Verify login success
     console.log(`[alpha1] Verifying login at: ${page.url()}`);
