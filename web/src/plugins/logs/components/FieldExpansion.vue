@@ -129,109 +129,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Loading state (only shown when there are no interim cached results) -->
-          <div
-            v-show="fieldValues?.isLoading && !displayValues.length"
-            class="q-pl-md q-py-xs"
-            style="height: 3.75rem"
-          >
-            <q-inner-loading
-              size="xs"
-              :showing="fieldValues?.isLoading && !displayValues.length"
-              label="Fetching values..."
-              label-style="font-size: 1.1em"
-            />
-          </div>
+          <!-- Scrollable values area -->
+          <div class="values-scroll-container">
+            <!-- Loading state (only shown when there are no interim cached results) -->
+            <div
+              v-show="fieldValues?.isLoading && !displayValues.length"
+              class="q-pl-md q-py-xs"
+              style="height: 3.75rem"
+            >
+              <q-inner-loading
+                size="xs"
+                :showing="fieldValues?.isLoading && !displayValues.length"
+                label="Fetching values..."
+                label-style="font-size: 1.1em"
+              />
+            </div>
 
-          <!-- No values found -->
-          <div
-            v-show="!displayValues.length && !fieldValues?.isLoading"
-            class="q-pl-md q-py-xs text-subtitle2"
-          >
-            {{ fieldValues?.errMsg || "No values found" }}
-          </div>
+            <!-- No values found -->
+            <div
+              v-show="!displayValues.length && !fieldValues?.isLoading"
+              class="q-pl-md q-py-xs text-subtitle2"
+            >
+              {{ fieldValues?.errMsg || "No values found" }}
+            </div>
 
-          <!-- Field values list -->
-          <div v-for="value in displayValues" :key="value.key">
-            <q-list dense>
-              <q-item
-                tag="label"
-                class="q-pr-none"
-                :data-test="`logs-search-subfield-add-${field.name}-${value.key}`"
-              >
-                <!-- Checkbox for multi-select -->
-                <q-checkbox
-                  v-if="selectedStreamsCount == field.streams.length"
-                  v-model="selectedValues"
-                  :val="value.key"
-                  size="xs"
-                  dense
-                  class="q-mr-xs"
-                  @click.stop
-                />
-
-                <div
-                  class="flex row wrap justify-between"
-                  :style="
-                    selectedStreamsCount == field.streams.length
-                      ? 'width: calc(100% - 4.25rem)'
-                      : 'width: 100%'
-                  "
+            <!-- Field values list -->
+            <div v-for="value in displayValues" :key="value.key">
+              <q-list dense>
+                <q-item
+                  tag="label"
+                  class="q-pr-none"
+                  :data-test="`logs-search-subfield-add-${field.name}-${value.key}`"
                 >
+                  <!-- Checkbox for multi-select -->
+                  <q-checkbox
+                    v-if="selectedStreamsCount == field.streams.length"
+                    v-model="selectedValues"
+                    :val="value.key"
+                    size="xs"
+                    dense
+                    class="q-mr-xs"
+                    @click.stop
+                  />
+
                   <div
-                    :title="value.key"
-                    class="ellipsis q-pr-xs"
-                    style="width: calc(100% - 3.125rem)"
-                  >
-                    {{ value.key }}
-                  </div>
-                  <div
-                    :title="value.count.toString()"
-                    class="ellipsis text-right q-pr-sm"
-                    style="display: contents"
+                    class="flex row wrap justify-between"
                     :style="
                       selectedStreamsCount == field.streams.length
-                        ? 'width: 3.125rem'
-                        : ''
+                        ? 'width: calc(100% - 4.25rem)'
+                        : 'width: 100%'
                     "
                   >
-                    {{ formatLargeNumber(value.count) }}
+                    <div
+                      :title="value.key"
+                      class="ellipsis q-pr-xs"
+                      style="width: calc(100% - 3.125rem)"
+                    >
+                      {{ value.key }}
+                    </div>
+                    <div
+                      :title="value.count.toString()"
+                      class="ellipsis text-right q-pr-sm"
+                      style="display: contents"
+                      :style="
+                        selectedStreamsCount == field.streams.length
+                          ? 'width: 3.125rem'
+                          : ''
+                      "
+                    >
+                      {{ formatLargeNumber(value.count) }}
+                    </div>
                   </div>
-                </div>
 
-                <!-- Include/Exclude buttons -->
-                <div
-                  v-if="selectedStreamsCount == field.streams.length"
-                  class="flex row tw:ml-[0.125rem]"
-                  :class="theme === 'dark' ? 'text-white' : 'text-black'"
-                >
-                  <q-btn
-                    class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
-                    size="0.25rem"
-                    @click.stop="handleAddSearchTerm(field.name, value.key, 'include')"
-                    title="Include Term"
-                    round
-                    :data-test="`log-search-subfield-list-equal-${field.name}-field-btn`"
+                  <!-- Include/Exclude buttons -->
+                  <div
+                    v-if="selectedStreamsCount == field.streams.length"
+                    class="flex row tw:ml-[0.125rem]"
+                    :class="theme === 'dark' ? 'text-white' : 'text-black'"
                   >
-                    <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
-                      <EqualIcon></EqualIcon>
-                    </q-icon>
-                  </q-btn>
-                  <q-btn
-                    class="o2-custom-button-hover tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                    size="0.25rem"
-                    @click.stop="handleAddSearchTerm(field.name, value.key, 'exclude')"
-                    title="Exclude Term"
-                    round
-                    :data-test="`log-search-subfield-list-not-equal-${field.name}-field-btn`"
-                  >
-                    <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
-                      <NotEqualIcon></NotEqualIcon>
-                    </q-icon>
-                  </q-btn>
-                </div>
-              </q-item>
-            </q-list>
+                    <q-btn
+                      class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                      size="0.25rem"
+                      @click.stop="
+                        handleAddSearchTerm(field.name, value.key, 'include')
+                      "
+                      title="Include Term"
+                      round
+                      :data-test="`log-search-subfield-list-equal-${field.name}-field-btn`"
+                    >
+                      <q-icon
+                        class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!"
+                      >
+                        <EqualIcon></EqualIcon>
+                      </q-icon>
+                    </q-btn>
+                    <q-btn
+                      class="o2-custom-button-hover tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
+                      size="0.25rem"
+                      @click.stop="
+                        handleAddSearchTerm(field.name, value.key, 'exclude')
+                      "
+                      title="Exclude Term"
+                      round
+                      :data-test="`log-search-subfield-list-not-equal-${field.name}-field-btn`"
+                    >
+                      <q-icon
+                        class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!"
+                      >
+                        <NotEqualIcon></NotEqualIcon>
+                      </q-icon>
+                    </q-btn>
+                  </div>
+                </q-item>
+              </q-list>
+            </div>
           </div>
 
           <!-- View more values -->
@@ -440,7 +451,6 @@ const handleApplyMultiSelect = (action: string) => {
   right: 0;
   top: 0;
   bottom: 0;
-  display: none;
   align-items: center;
   padding: 0 0.25rem;
   background: var(--q-dark);
@@ -538,6 +548,11 @@ const handleApplyMultiSelect = (action: string) => {
       filter: brightness(1.12);
     }
   }
+}
+
+.values-scroll-container {
+  max-height: 15rem;
+  overflow-y: auto;
 }
 
 .view-more-container {
