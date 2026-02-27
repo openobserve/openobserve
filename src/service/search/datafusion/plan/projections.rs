@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use config::{
     datafusion::request::Request,
@@ -61,6 +61,10 @@ pub struct ResultSchemaExtractor {
     temp_having: Option<HavingNode>,
     /// internal field, store projections for alias resolution in HAVING
     temp_projections: Vec<Expr>,
+    /// Mapping from original field name to alias (for cross-linking).
+    /// e.g., "namespace_name" -> "x_axis_1" when query has `namespace_name AS x_axis_1`
+    /// For unaliased fields: "trace_id" -> "trace_id"
+    pub field_alias_map: HashMap<String, String>,
 }
 
 impl ResultSchemaExtractor {
@@ -76,6 +80,7 @@ impl ResultSchemaExtractor {
             last_node_was_aggregate: false,
             temp_having: None,
             temp_projections: Vec::new(),
+            field_alias_map: HashMap::new(),
         }
     }
 }
@@ -432,6 +437,54 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                     }
                 }
                 self.projections = temp;
+
+                // Build field_alias_map from projection expressions.
+                // This maps original field name -> final output alias for cross-linking.
+                // For CTEs/subqueries the visitor fires once per Projection layer (bottom-up),
+                // so we thread the accumulated map forward transitively:
+                //   inner layer:  unique_id -> t_id
+                //   outer layer sees Column(t_id) -> naively t_id -> t_id
+                //   transitive:   unique_id -> t_id  (preserved)
+                // For simple single-projection queries self.field_alias_map is empty on first
+                // visit, so we skip the transitive step entirely (fast path).
+                let mut layer_map = HashMap::new();
+                for expr in &proj.expr {
+                    match expr {
+                        Expr::Alias(alias) => {
+                            let original = get_col_name(&alias.expr.clone().unalias_nested().data);
+                            layer_map.insert(original, alias.name.clone());
+                        }
+                        Expr::Column(col) => {
+                            layer_map.insert(col.name.clone(), col.name.clone());
+                        }
+                        _ => {
+                            let name = get_col_name(expr);
+                            layer_map.insert(name.clone(), name);
+                        }
+                    }
+                }
+
+                self.field_alias_map = if self.field_alias_map.is_empty() {
+                    // Fast path: no inner layers seen yet, use layer_map directly.
+                    layer_map
+                } else {
+                    // Slow path: thread accumulated inner-layer mappings through this layer.
+                    // For each (orig -> intermediate) known from inner layers:
+                    //   - if this layer outputs `intermediate`, follow it to the final alias
+                    //   - if this layer doesn't mention `intermediate`, the column was projected
+                    //     away and should be dropped
+                    let mut resolved = HashMap::with_capacity(self.field_alias_map.len());
+                    for (orig, intermediate) in &self.field_alias_map {
+                        if let Some(final_alias) = layer_map.get(intermediate) {
+                            resolved.insert(orig.clone(), final_alias.clone());
+                        }
+                    }
+                    // Also include columns first introduced at this layer (no inner history).
+                    for (k, v) in layer_map {
+                        resolved.entry(k).or_insert(v);
+                    }
+                    resolved
+                };
             }
             LogicalPlan::Aggregate(aggr) => {
                 // Mark that we just saw an aggregate node
@@ -811,6 +864,72 @@ mod tests {
         assert_eq!(
             extractor.projections,
             vec!["x_axis_1", "x_axis_2", "y_axis_1"]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_field_alias_map_cte() {
+        // Single-level CTE: field renamed inside CTE, re-selected by alias outside.
+        // field_alias_map must trace unique_id -> t_id through the CTE layer.
+        let sql = r#"WITH base AS (
+            SELECT k8s_namespace_name AS t_id FROM "default"
+        )
+        SELECT t_id FROM base"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.projections, vec!["_timestamp", "t_id"]);
+        assert_eq!(
+            extractor.field_alias_map.get("k8s_namespace_name"),
+            Some(&"t_id".to_string()),
+            "original field must map to its final output alias through CTE"
+        );
+        assert_eq!(
+            extractor.field_alias_map.get("t_id"),
+            Some(&"t_id".to_string()),
+            "alias itself must also be present as identity mapping"
+        );
+
+        // Two-level CTE rename chain: orig -> mid -> final
+        let sql = r#"WITH a AS (
+            SELECT k8s_namespace_name AS mid FROM "default"
+        ),
+        b AS (
+            SELECT mid AS final_id FROM a
+        )
+        SELECT final_id FROM b"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.projections, vec!["_timestamp", "final_id"]);
+        assert_eq!(
+            extractor.field_alias_map.get("k8s_namespace_name"),
+            Some(&"final_id".to_string()),
+            "original field must be transitively resolved through two CTE layers"
+        );
+
+        // Column projected away in outer CTE should not appear in field_alias_map.
+        let sql = r#"WITH base AS (
+            SELECT k8s_namespace_name AS ns, k8s_node_name AS node FROM "default"
+        )
+        SELECT ns FROM base"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert!(
+            !extractor.field_alias_map.contains_key("k8s_node_name"),
+            "projected-away column must not appear in field_alias_map"
+        );
+        assert_eq!(
+            extractor.field_alias_map.get("k8s_namespace_name"),
+            Some(&"ns".to_string()),
+        );
+
+        // Simple query (no CTE): fast path, field_alias_map built directly.
+        let sql = r#"SELECT k8s_namespace_name AS ns FROM "default""#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(
+            extractor.field_alias_map.get("k8s_namespace_name"),
+            Some(&"ns".to_string()),
+            "simple alias must work on fast path"
         );
     }
 

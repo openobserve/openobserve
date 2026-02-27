@@ -245,40 +245,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
       </div>
       <div
-        style="
-          border: 1px solid gray;
-          border-radius: 4px;
-          padding: 3px;
-          position: absolute;
-          top: 0px;
-          left: 0px;
-          display: none;
-          text-wrap: nowrap;
-          z-index: 9999999;
-        "
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        class="crosslink-drilldown-menu"
+        :class="{ 'crosslink-drilldown-menu--dark': store.state.theme === 'dark' }"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
       >
-        <div
+        <template
           v-for="(drilldown, index) in drilldownArray"
           :key="JSON.stringify(drilldown)"
-          class="drilldown-item q-px-sm q-py-xs"
-          style="
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            position: relative;
-          "
         >
+          <q-separator
+            v-if="drilldown._isCrossLink && index > 0 && !drilldownArray[index - 1]._isCrossLink"
+          />
           <div
+            class="crosslink-drilldown-menu-item"
             @click="openDrilldown(index)"
-            style="cursor: pointer; display: flex; align-items: center"
           >
-            <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
+            <q-icon size="xs" class="q-mr-sm" :name="drilldown._isCrossLink ? 'open_in_new' : 'link'" />
             <span>{{ drilldown.name }}</span>
           </div>
-        </div>
+        </template>
       </div>
       <div
         style="
@@ -369,6 +355,7 @@ import {
 } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
+import searchService from "@/services/search";
 import { exportFile } from "quasar";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { throttle } from "lodash-es";
@@ -592,6 +579,9 @@ export default defineComponent({
     const drilldownArray: any = ref([]);
     const selectedAnnotationData: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
+
+    // Cross-linking: store cross-links from result_schema response
+    const crossLinksData: any = ref({ stream_links: [], org_links: [] });
     const annotationPopupRef: any = ref(null);
 
     const limitNumberOfSeriesWarningMessage: any = ref("");
@@ -1052,6 +1042,49 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Cross-linking: fetch cross-links when the executed query (with variables resolved) changes
+    watch(
+      () => metadata.value?.queries?.[0]?.query || panelSchema.value?.queries?.[0]?.query,
+      async (newQuery: string) => {
+        if (!store.state.zoConfig?.enable_cross_linking || !newQuery || panelSchema.value?.queryType === "promql") {
+          crossLinksData.value = { stream_links: [], org_links: [] };
+          return;
+        }
+        try {
+          const response = await searchService.result_schema(
+            {
+              org_identifier: store.state.selectedOrganization.identifier,
+              query: {
+                query: {
+                  sql: store.state.zoConfig.sql_base64_enabled
+                    ? b64EncodeUnicode(newQuery)
+                    : newQuery,
+                  query_fn: null,
+                  size: -1,
+                  streaming_output: false,
+                  streaming_id: null,
+                },
+                ...(store.state.zoConfig.sql_base64_enabled
+                  ? { encoding: "base64" }
+                  : {}),
+              },
+              page_type: "dashboards",
+              is_streaming: false,
+              cross_linking: true,
+            },
+            "dashboards",
+          );
+          crossLinksData.value = response.data?.cross_links || {
+            stream_links: [],
+            org_links: [],
+          };
+        } catch {
+          crossLinksData.value = { stream_links: [], org_links: [] };
+        }
+      },
+      { immediate: true },
+    );
+
     watch(
       [
         data,
@@ -1431,10 +1464,15 @@ export default defineComponent({
         }
       }
 
-      // Store click parameters for drilldown
-      if (hasDrilldown) {
+      // Store click parameters for drilldown (including cross-links)
+      const crossLinkItems = getCrossLinkDrilldownItems();
+      const shouldShowDrilldown = hasDrilldown || crossLinkItems.length > 0;
+
+
+      if (shouldShowDrilldown) {
         drilldownParams = [params, args];
-        drilldownArray.value = panelSchema.value.config.drilldown ?? [];
+        const panelDrilldowns = panelSchema.value.config.drilldown ?? [];
+        drilldownArray.value = [...panelDrilldowns, ...crossLinkItems];
       }
 
       // Calculate offset values based on chart type
@@ -1449,7 +1487,7 @@ export default defineComponent({
       }
 
       // Handle popup displays with priority
-      if (hasDrilldown) {
+      if (shouldShowDrilldown) {
         // Show drilldown popup first
         drilldownPopUpRef.value.style.display = "block";
         await nextTick();
@@ -1487,7 +1525,7 @@ export default defineComponent({
 
       // Hide popups if no content to display
       if (
-        !hasDrilldown &&
+        !shouldShowDrilldown &&
         (!hasAnnotation || !params?.data?.annotationDetails?.text)
       ) {
         hidePopupsAndOverlays();
@@ -1722,9 +1760,186 @@ export default defineComponent({
 
       return logsUrl;
     };
+    // Cross-linking: convert URL using field→alias mapping
+    const crossLinkToDrilldownUrl = (
+      url: string,
+      fields: Array<{ name: string; alias?: string }>,
+    ): string => {
+      const aliasMap: Record<string, string> = {};
+      for (const f of fields) {
+        aliasMap[f.name] = f.alias || f.name;
+      }
+      return url.replace(/\$?\{(\w+)\}/g, (_match: string, fieldName: string) => {
+        const resolved = aliasMap[fieldName] || fieldName;
+        return '${row.field["' + resolved + '"]}';
+      });
+    };
+
+    // Cross-linking: merge stream + org links with field-level replacement
+    const getCrossLinkDrilldownItems = (): any[] => {
+      const { stream_links = [], org_links = [] } =
+        crossLinksData.value || {};
+
+      // Collect all fields covered by stream links
+      const streamCoveredFields = new Set<string>();
+      for (const link of stream_links) {
+        for (const f of link.fields) {
+          if (f.alias) streamCoveredFields.add(f.name);
+        }
+      }
+
+      // Start with all stream links
+      const result: any[] = stream_links.map((link: any) => ({
+        name: link.name,
+        type: "byUrl",
+        targetBlank: true,
+        data: {
+          url: crossLinkToDrilldownUrl(link.url, link.fields),
+          _rawUrl: link.url,
+          _fields: link.fields,
+        },
+        _isCrossLink: true,
+      }));
+
+      // Add org links only if they have at least one matched field NOT covered by stream
+      for (const link of org_links) {
+        const matchedFields = link.fields.filter((f: any) => f.alias);
+        const hasUncovered = matchedFields.some(
+          (f: any) => !streamCoveredFields.has(f.name),
+        );
+        if (matchedFields.length > 0 && !hasUncovered) continue;
+
+        result.push({
+          name: link.name,
+          type: "byUrl",
+          targetBlank: true,
+          data: {
+            url: crossLinkToDrilldownUrl(link.url, link.fields),
+            _rawUrl: link.url,
+            _fields: link.fields,
+          },
+          _isCrossLink: true,
+        });
+      }
+
+      return result;
+    };
+
     const openDrilldown = async (index: any) => {
       // hide the drilldown pop up
       hidePopupsAndOverlays();
+
+      // Handle cross-link items (they exist in drilldownArray but not in panelSchema.config.drilldown)
+      const drilldownItem = drilldownArray.value[index];
+      if (drilldownItem?._isCrossLink) {
+        try {
+          const rawUrl = drilldownItem.data._rawUrl;
+          const linkFields = drilldownItem.data._fields || [];
+
+          // Find the first matching field from cross-link's fields array that has a value
+          let fieldName = "";
+          let fieldValue: any = "";
+
+          if (panelSchema.value?.type === "table" && drilldownParams[1]?.[0]) {
+            // Table: row data is directly available
+            const rowData = drilldownParams[1][0];
+            const panelFields: any = [
+              ...(panelSchema.value.queries?.[0]?.fields?.x || []),
+              ...(panelSchema.value.queries?.[0]?.fields?.y || []),
+              ...(panelSchema.value.queries?.[0]?.fields?.z || []),
+            ];
+            for (const lf of linkFields) {
+              const alias = lf.alias || lf.name;
+              const pf = panelFields.find((f: any) => f.alias === alias || f.label === lf.name);
+              const val = rowData[alias] ?? rowData[lf.name];
+              if (val !== undefined && val !== null) {
+                fieldName = lf.name;
+                fieldValue = val;
+                break;
+              }
+            }
+          } else {
+            // Non-table: find value from raw query data or chart click
+            const chartType = panelSchema.value?.type;
+            const isPieOrDonut = ["pie", "donut"].includes(chartType);
+            const dataIndex = drilldownParams[0]?.dataIndex;
+            const xAxisData = panelData.value?.options?.xAxis?.[0]?.data;
+
+            // Build a record from raw data
+            const record: Record<string, any> = {};
+            const queryResult = data.value?.[0]?.result;
+            const xFields = panelSchema.value?.queries?.[0]?.fields?.x || [];
+            const breakdownFields = panelSchema.value?.queries?.[0]?.fields?.breakdown || [];
+
+            let xAxisValue: any;
+            if (isPieOrDonut) {
+              xAxisValue = drilldownParams[0]?.name;
+            } else if (chartType === "heatmap") {
+              xAxisValue = drilldownParams[0]?.value?.[0];
+            } else {
+              xAxisValue = xAxisData?.[dataIndex];
+            }
+            const seriesName = isPieOrDonut
+              ? drilldownParams[0]?.name
+              : drilldownParams[0]?.seriesName;
+
+            if (queryResult?.length > 0) {
+              for (const row of queryResult) {
+                let matches = true;
+                if (xFields.length > 0 && xAxisValue !== undefined) {
+                  if (String(row[xFields[0].alias]) !== String(xAxisValue)) matches = false;
+                }
+                if (matches && breakdownFields.length > 0 && seriesName && !isPieOrDonut) {
+                  if (String(row[breakdownFields[0].alias]) !== String(seriesName)) matches = false;
+                }
+                if (matches) {
+                  Object.assign(record, row);
+                  break;
+                }
+              }
+            }
+
+            // Find first matching field with a value
+            for (const lf of linkFields) {
+              const alias = lf.alias || lf.name;
+              const val = record[alias] ?? record[lf.name];
+              if (val !== undefined && val !== null) {
+                fieldName = lf.name;
+                fieldValue = val;
+                break;
+              }
+            }
+          }
+
+          // Get time range
+          const startTime = selectedTimeObj?.value?.start_time
+            ? new Date(selectedTimeObj.value.start_time.toISOString()).getTime()
+            : 0;
+          const endTime = selectedTimeObj?.value?.end_time
+            ? new Date(selectedTimeObj.value.end_time.toISOString()).getTime()
+            : 0;
+
+          // Get query
+          const currentQuery =
+            metadata?.value?.queries?.[0]?.query ??
+            panelSchema?.value?.queries?.[0]?.query ??
+            "";
+
+          // Resolve the 6 fixed variables
+          const resolvedUrl = rawUrl
+            .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
+            .replace(/\$\{field\.__value\}/g, encodeURIComponent(String(fieldValue)))
+            .replace(/\$\{start_time\}/g, String(startTime))
+            .replace(/\$\{end_time\}/g, String(endTime))
+            .replace(/\$\{query\}/g, encodeURIComponent(currentQuery))
+            .replace(/\$\{query_encoded\}/g, b64EncodeUnicode(currentQuery));
+
+          window.open(resolvedUrl, "_blank");
+        } catch (error) {
+          console.error("Failed to open cross-link:", error);
+        }
+        return;
+      }
 
       // if panelSchema exists
       if (panelSchema.value) {
@@ -2472,6 +2687,62 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+// Cross-link drilldown popup — matches AlertContextMenu.vue exactly
+.crosslink-drilldown-menu {
+  position: absolute;
+  z-index: 9999999;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  padding: 4px 0;
+  display: none;
+  white-space: nowrap;
+  top: 0;
+  left: 0;
+}
+
+.crosslink-drilldown-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 14px;
+  color: #333;
+
+  &:hover {
+    background-color: #f5f5f5;
+  }
+
+  &:active {
+    background-color: #e0e0e0;
+  }
+
+  span {
+    user-select: none;
+  }
+}
+
+.crosslink-drilldown-menu--dark {
+  background: #2c2c2c;
+  border-color: #404040;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item {
+  color: #e0e0e0;
+}
+
+.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:hover {
+  background-color: #383838;
+}
+
+.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:active {
+  background-color: #444444;
+}
+
 .drilldown-item:hover {
   background-color: rgba(202, 201, 201, 0.908);
 }

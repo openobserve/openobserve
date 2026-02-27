@@ -74,6 +74,8 @@ interface SearchObjectData {
   resultGrid: ResultGrid;
   searchAround: SearchAroundData;
   highlightQuery: string;
+  crossLinks: { stream_links: any[]; org_links: any[] };
+  crossLinkQuery: string;
 }
 
 interface SearchObject {

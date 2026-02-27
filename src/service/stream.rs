@@ -853,6 +853,33 @@ pub async fn update_stream_settings(
             .retain(|field| !new_settings.partition_keys.remove.contains(field));
     }
 
+    // Handle cross_links updates
+    if !new_settings.cross_links.add.is_empty() || !new_settings.cross_links.remove.is_empty() {
+        // Remove links by name
+        for link_to_remove in &new_settings.cross_links.remove {
+            settings
+                .cross_links
+                .retain(|l| l.name != link_to_remove.name);
+        }
+
+        // Validate and add new links
+        for link_to_add in new_settings.cross_links.add {
+            if link_to_add.name.is_empty() || link_to_add.url.is_empty() {
+                return Ok(MetaHttpResponse::bad_request(
+                    "Cross-link name and URL are required",
+                ));
+            }
+            if link_to_add.name.len() > 256 {
+                return Ok(MetaHttpResponse::bad_request(
+                    "Cross-link name must be 256 characters or less",
+                ));
+            }
+            settings.cross_links.push(link_to_add);
+        }
+
+        // Enforce max limit
+    }
+
     #[cfg(feature = "vectorscan")]
     {
         if let Err(e) = process_association_changes(

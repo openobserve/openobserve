@@ -1309,6 +1309,12 @@ pub struct Common {
         help = "enable ingestion error logs reporting"
     )]
     pub ingestion_log_enabled: bool,
+    #[env_config(
+        name = "ZO_ENABLE_CROSS_LINKING",
+        default = false,
+        help = "Enable cross-linking feature for drill-down links on log/trace records"
+    )]
+    pub enable_cross_linking: bool,
 }
 
 impl Common {

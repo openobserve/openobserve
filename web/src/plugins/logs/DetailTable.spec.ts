@@ -799,4 +799,177 @@ describe("DetailTable Component", () => {
     ];
     expect(componentOptions.emits).toEqual(expectedEmits);
   });
+
+  // Test 61-70: Cross-Linking Functionality
+  describe("Cross-Linking Functionality", () => {
+    const mockCrossLinks = {
+      stream_links: [
+        {
+          name: "View Trace",
+          url: "https://traces.example.com/${field.__value}",
+          fields: [{ name: "trace_id", alias: "kubernetes_container_name" }],
+        },
+      ],
+      org_links: [
+        {
+          name: "View Dashboard",
+          url: "https://dashboard.example.com/${field.__value}",
+          fields: [{ name: "host", alias: "kubernetes_container_hash" }],
+        },
+      ],
+    };
+
+    it("should return empty array when enable_cross_linking is false", () => {
+      store.state.zoConfig.enable_cross_linking = false;
+      const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
+      expect(result).toEqual([]);
+    });
+
+    it("should return empty array when crossLinks data is undefined", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = undefined;
+      const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
+      expect(result).toEqual([]);
+    });
+
+    it("should return empty array when crossLinks data is null", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = null;
+      const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
+      expect(result).toEqual([]);
+    });
+
+    it("should return matching stream links with resolved URLs", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = mockCrossLinks;
+      wrapper.vm.rowData = {
+        kubernetes_container_name: "my-trace-123",
+        kubernetes_container_hash: "host-abc",
+      };
+
+      const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("View Trace");
+      expect(result[0].resolvedUrl).toBe(
+        "https://traces.example.com/my-trace-123",
+      );
+    });
+
+    it("should fall back to org links when stream does not cover the field", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = mockCrossLinks;
+      wrapper.vm.rowData = {
+        kubernetes_container_name: "my-trace-123",
+        kubernetes_container_hash: "host-abc",
+      };
+
+      const result = wrapper.vm.getCrossLinksForField("kubernetes_container_hash");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("View Dashboard");
+      expect(result[0].resolvedUrl).toBe(
+        "https://dashboard.example.com/host-abc",
+      );
+    });
+
+    it("should prioritize stream links over org links for same field", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      const crossLinksWithOverlap = {
+        stream_links: [
+          {
+            name: "Stream Link",
+            url: "https://stream.example.com/${field.__value}",
+            fields: [{ name: "trace_id", alias: "kubernetes_container_name" }],
+          },
+        ],
+        org_links: [
+          {
+            name: "Org Link",
+            url: "https://org.example.com/${field.__value}",
+            fields: [{ name: "trace_id", alias: "kubernetes_container_name" }],
+          },
+        ],
+      };
+      wrapper.vm.searchObj.data.crossLinks = crossLinksWithOverlap;
+      wrapper.vm.rowData = { kubernetes_container_name: "val123" };
+
+      const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("Stream Link");
+    });
+
+    it("should return empty when no fields have matching alias", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = {
+        stream_links: [
+          {
+            name: "No Match",
+            url: "https://example.com/${field.__value}",
+            fields: [{ name: "foo", alias: "bar" }],
+          },
+        ],
+        org_links: [],
+      };
+      wrapper.vm.rowData = { something_else: "value" };
+
+      const result = wrapper.vm.getCrossLinksForField("something_else");
+      expect(result).toEqual([]);
+    });
+
+    it("should resolve all 6 fixed variables in URL template", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = {
+        stream_links: [
+          {
+            name: "Full Template",
+            url: "https://example.com/${field.__name}/${field.__value}?from=${start_time}&to=${end_time}",
+            fields: [
+              { name: "trace_id", alias: "kubernetes_container_name" },
+            ],
+          },
+        ],
+        org_links: [],
+      };
+      wrapper.vm.rowData = { kubernetes_container_name: "val123" };
+
+      const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
+      expect(result).toHaveLength(1);
+      // field.__name = originalFieldName = "trace_id", field.__value = "val123"
+      expect(result[0].resolvedUrl).toContain("trace_id");
+      expect(result[0].resolvedUrl).toContain("val123");
+    });
+
+    it("should call window.open when openCrossLink is called", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      wrapper.vm.openCrossLink("https://example.com/trace/123");
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/trace/123",
+        "_blank",
+      );
+      openSpy.mockRestore();
+    });
+
+    it("should encode URI components in resolved URLs", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = {
+        stream_links: [
+          {
+            name: "Encoded",
+            url: "https://example.com/search?q=${field.__value}",
+            fields: [{ name: "trace_id", alias: "kubernetes_container_name" }],
+          },
+        ],
+        org_links: [],
+      };
+      wrapper.vm.rowData = {
+        kubernetes_container_name: "hello world&foo=bar",
+      };
+
+      const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
+      expect(result).toHaveLength(1);
+      expect(result[0].resolvedUrl).toBe(
+        "https://example.com/search?q=hello%20world%26foo%3Dbar",
+      );
+    });
+  });
 });

@@ -145,6 +145,24 @@ pub async fn create(
         data.usage_stream_enabled = usage_stream_enabled;
     }
 
+    if let Some(cross_links) = settings.cross_links {
+        for link in &cross_links {
+            if link.name.is_empty() {
+                return MetaHttpResponse::bad_request("Cross-link name is required");
+            }
+            if link.name.len() > 256 {
+                return MetaHttpResponse::bad_request(
+                    "Cross-link name must be 256 characters or less",
+                );
+            }
+            if link.url.is_empty() {
+                return MetaHttpResponse::bad_request("Cross-link URL is required");
+            }
+        }
+        field_found = true;
+        data.cross_links = cross_links;
+    }
+
     if !field_found {
         return MetaHttpResponse::bad_request("No valid field found");
     }

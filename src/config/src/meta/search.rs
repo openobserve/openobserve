@@ -1386,6 +1386,14 @@ pub struct ResultSchemaResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub having: Option<HavingNode>,
     pub timeseries_field: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cross_links: Option<CrossLinksResponse>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct CrossLinksResponse {
+    pub stream_links: Vec<super::stream::CrossLink>,
+    pub org_links: Vec<super::stream::CrossLink>,
 }
 
 const AGGREGATION_CACHE_INTERVALS: [(Option<Duration>, Interval); 6] = [

@@ -430,6 +430,7 @@ describe("OrganizationSettings", () => {
           trace_id_field_name: "custom_trace_id",
           span_id_field_name: "custom_span_id",
           toggle_ingestion_logs: true,
+          cross_links: [],
         }
       );
     });
@@ -447,6 +448,7 @@ describe("OrganizationSettings", () => {
         trace_id_field_name: "new_trace",
         span_id_field_name: "new_span",
         toggle_ingestion_logs: false,
+        cross_links: [],
       });
     });
 
@@ -736,14 +738,16 @@ describe("OrganizationSettings", () => {
           trace_id_field_name: "integration_trace_id",
           span_id_field_name: "integration_span_id",
           toggle_ingestion_logs: true,
+          cross_links: [],
         }
       );
-      
+
       expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizationSettings", {
         ...mockStore.state.organizationData.organizationSettings,
         trace_id_field_name: "integration_trace_id",
         span_id_field_name: "integration_span_id",
         toggle_ingestion_logs: true,
+        cross_links: [],
       });
       
       expect(mockNotify).toHaveBeenCalledWith({

@@ -931,6 +931,7 @@ export default defineComponent({
           light_mode_theme_color: orgSettings?.data?.data?.light_mode_theme_color,
           dark_mode_theme_color: orgSettings?.data?.data?.dark_mode_theme_color,
           claim_parser_function: orgSettings?.data?.data?.claim_parser_function ?? defaultSettings.claim_parser_function,
+          cross_links: orgSettings?.data?.data?.cross_links ?? [],
         });
 
         if (
