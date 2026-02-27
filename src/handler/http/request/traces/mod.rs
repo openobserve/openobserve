@@ -337,7 +337,8 @@ pub async fn get_latest_traces(
     // search
     let query_sql = if is_llm_stream {
         format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
             sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
             sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
@@ -348,7 +349,10 @@ pub async fn get_latest_traces(
         )
     } else {
         format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM \"{stream_name}\""
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp,
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration \
+            FROM \"{stream_name}\""
         )
     };
     let sql_order_expr = match sort_by.as_str() {
@@ -934,7 +938,8 @@ async fn process_latest_traces_stream(
     // Build the aggregation SQL (Query 1) — identical to get_latest_traces
     let query_sql_base = if is_llm_stream {
         format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
             sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
             sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
@@ -945,7 +950,10 @@ async fn process_latest_traces_stream(
         )
     } else {
         format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM \"{stream_name}\""
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration \
+            FROM \"{stream_name}\""
         )
     };
     let query_sql = if filter.is_empty() {
