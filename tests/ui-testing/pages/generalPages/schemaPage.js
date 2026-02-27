@@ -38,7 +38,7 @@ class SchemaPage {
             saveStreamBtn: '[data-test="save-stream-btn"]',
             menuHomeItem: '[data-test="menu-link-\\/-item"]',
             menuLogsItem: '[data-test="menu-link-\\/logs-item"]',
-            fnEditor: '#fnEditor',
+            fnEditor: '[data-test="logs-vrl-function-editor"]',
             logSearchIndexSelectStream: '[data-test="log-search-index-list-select-stream"]',
             logStreamRefreshStatsBtn: '[data-test="log-stream-refresh-stats-btn"]',
             deleteButton: 'Delete',
@@ -284,7 +284,7 @@ class SchemaPage {
 
         // Try clicking the monaco editor, with toggle fallback if click fails
         try {
-            await this.page.locator(this.schemaLocators.fnEditor).locator('.monaco-editor').click({ timeout: 3000 });
+            await this.page.locator(this.schemaLocators.fnEditor).first().locator('.monaco-editor').last().click({ timeout: 3000 });
         } catch (error) {
             testLogger.warn('Failed to click monaco editor, trying toggle button');
 
@@ -293,7 +293,7 @@ class SchemaPage {
             await this.page.waitForTimeout(1000);
 
             // Retry clicking monaco editor
-            await this.page.locator(this.schemaLocators.fnEditor).locator('.monaco-editor').click();
+            await this.page.locator(this.schemaLocators.fnEditor).first().locator('.monaco-editor').last().click();
         }
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).click();
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).fill(fromStream);

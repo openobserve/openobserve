@@ -98,9 +98,12 @@ export class AlertsPage {
             rowTemplateTextarea: '[data-test="add-alert-row-input-textarea"]',
 
             // Query Editor Dialog selectors
-            sqlEditorDialog: '[data-test="scheduled-alert-sql-editor"]',
-            promqlEditorDialog: '[data-test="scheduled-alert-promql-editor"]',
-            vrlFunctionEditorDialog: '[data-test="scheduled-alert-vrl-function-editor"]',
+            // The alerts dialog has TWO editors: SQL/PromQL (top) and VRL (bottom)
+            // The SQL editor has editor-id="alert-editor-sql" (when SQL tab is active)
+            // Use ID selector to target specifically the SQL editor, not the VRL editor
+            sqlEditorDialog: '#alert-editor-sql',
+            promqlEditorDialog: '#alert-editor-promql',
+            vrlFunctionEditorDialog: '#alert-editor-vrl',
             runQueryButton: '[data-test="alert-run-query-btn"]',
             generateQueryButton: '[data-test="alert-generate-query-btn"]',
 
