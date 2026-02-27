@@ -76,7 +76,7 @@
 
     <!-- Cross-Linking Configuration -->
     <template v-if="store.state.zoConfig?.enable_cross_linking">
-      <q-separator class="tw:my-4" />
+      <q-separator class="q-mt-lg q-mb-md" />
       <CrossLinkManager
         v-model="crossLinks"
         title="Cross-Linking Configuration"

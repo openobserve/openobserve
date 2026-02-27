@@ -1,10 +1,10 @@
 <template>
   <div class="cross-link-manager">
     <!-- Header -->
-    <div class="tw:flex tw:justify-between tw:items-center tw:mb-3">
+    <div class="tw:flex tw:justify-between tw:items-center q-mb-md">
       <div>
-        <div class="tw:font-semibold tw:text-sm">{{ title }}</div>
-        <div v-if="subtitle" class="tw:text-xs" style="color: var(--o2-text-muted)">
+        <div class="text-body1 text-bold">{{ title }}</div>
+        <div v-if="subtitle" class="text-caption" style="color: var(--o2-text-muted)">
           {{ subtitle }}
         </div>
       </div>
@@ -27,13 +27,13 @@
       <div
         v-for="(link, idx) in links"
         :key="link.name"
-        class="cross-link-item el-border tw:rounded-md tw:mb-2 tw:p-3"
+        class="cross-link-item el-border tw:rounded-md q-mb-xs q-pa-sm"
         :data-test="`cross-link-item-${idx}`"
       >
         <div class="tw:flex tw:justify-between tw:items-start">
           <div class="tw:flex-1 tw:min-w-0">
             <!-- Name -->
-            <div class="tw:font-semibold tw:text-sm tw:truncate" :title="link.name" style="color: var(--o2-text-primary)">
+            <div class="text-subtitle2 text-bold tw:truncate" :title="link.name" style="color: var(--o2-text-primary)">
               {{ link.name }}
               <q-badge
                 v-if="link._source"
@@ -43,18 +43,18 @@
               />
             </div>
             <!-- URL -->
-            <div class="tw:text-xs tw:truncate tw:mt-1" :title="link.url" style="color: var(--o2-text-muted)">
+            <div class="text-caption tw:truncate q-mt-xs" :title="link.url" style="color: var(--o2-text-muted)">
               {{ link.url }}
             </div>
             <!-- Fields -->
-            <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-2">
+            <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 q-mt-xs">
               <q-chip
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
                 dense
                 class="tw:max-w-[200px]"
               >
-                <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
+                <span class="tw:truncate text-caption" :title="field.name">{{ field.name }}</span>
               </q-chip>
             </div>
           </div>
@@ -87,7 +87,7 @@
     <!-- Empty State -->
     <div
       v-else
-      class="tw:text-center tw:py-6 tw:text-sm"
+      class="tw:text-center q-py-lg text-body2"
       style="color: var(--o2-text-muted)"
       data-test="cross-link-empty"
     >
