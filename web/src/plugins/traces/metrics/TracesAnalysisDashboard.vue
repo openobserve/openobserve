@@ -26,62 +26,110 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-card class="analysis-dashboard-card">
       <!-- Header -->
-      <q-card-section class="analysis-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4">
-        <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
-          <q-icon name="dashboard" size="md" color="primary" />
-          <span class="tw:text-lg tw:font-semibold tw:whitespace-nowrap">
-            <template v-if="props.analysisType === 'latency'">{{ t('latencyInsights.title') }}</template>
-            <template v-else-if="props.analysisType === 'volume'">{{ t('volumeInsights.title') }}</template>
-            <template v-else-if="props.analysisType === 'error'">{{ t('errorInsights.title') }}</template>
+      <q-card-section
+        class="analysis-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-[0.675rem]"
+      >
+        <div class="tw:flex tw:items-center tw:gap-1 tw:flex-wrap">
+          <q-icon name="timeline" size="1.5rem" color="primary" />
+          <span
+            class="tw:text-[var(--o2-text-4)]! tw:text-lg tw:font-semibold tw:whitespace-nowrap"
+          >
+            <template v-if="props.analysisType === 'duration'">{{
+              t("latencyInsights.title")
+            }}</template>
+            <template v-else-if="props.analysisType === 'volume'">{{
+              t("volumeInsights.title")
+            }}</template>
+            <template v-else-if="props.analysisType === 'error'">{{
+              t("errorInsights.title")
+            }}</template>
           </span>
 
           <!-- Time Range Display: Inline chips -->
-          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+          <div
+            class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:ml-[1rem]"
+          >
             <!-- Baseline Chip -->
-            <div class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-0.5 tw:rounded">
-              <span class="tw:font-semibold tw:text-[0.6rem] tw:uppercase tw:tracking-wide tw:opacity-70">Baseline</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).start }}</span>
+            <div
+              class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+              :style="{ '--chip-color': chipColors.baseline }"
+            >
+              <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
+                >Baseline:</span
+              >
+              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+                formatSmartTimestamp(
+                  baselineTimeRange.startTime,
+                  baselineTimeRange.endTime,
+                ).start
+              }}</span>
               <span class="tw:opacity-60 tw:text-[0.65rem]">→</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).end }}</span>
+              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+                formatSmartTimestamp(
+                  baselineTimeRange.startTime,
+                  baselineTimeRange.endTime,
+                ).end
+              }}</span>
             </div>
 
             <!-- Selected Chip -->
-            <div v-if="hasSelectedTimeRange" class="time-range-chip selected-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-0.5 tw:rounded">
-              <span class="tw:font-semibold tw:text-[0.6rem] tw:uppercase tw:tracking-wide">Selected</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(selectedTimeRangeDisplay.startTime, selectedTimeRangeDisplay.endTime).start }}</span>
+            <div
+              v-if="hasSelectedTimeRange"
+              class="time-range-chip selected-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+              :style="{ '--chip-color': chipColors.selected }"
+            >
+              <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
+                >Selected:</span
+              >
+              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+                formatSmartTimestamp(
+                  selectedTimeRangeDisplay.startTime,
+                  selectedTimeRangeDisplay.endTime,
+                ).start
+              }}</span>
               <span class="tw:opacity-70 tw:text-[0.65rem]">→</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{ formatSmartTimestamp(selectedTimeRangeDisplay.startTime, selectedTimeRangeDisplay.endTime).end }}</span>
+              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+                formatSmartTimestamp(
+                  selectedTimeRangeDisplay.startTime,
+                  selectedTimeRangeDisplay.endTime,
+                ).end
+              }}</span>
             </div>
 
             <!-- Additional filter info -->
-            <span v-if="filterMetadata" class="tw:opacity-60 tw:text-[0.65rem] tw:ml-1">
+            <span
+              v-if="filterMetadata"
+              class="tw:opacity-60 tw:text-[0.65rem] tw:ml-1"
+            >
               {{ filterMetadata }}
             </span>
           </div>
         </div>
 
         <div class="tw:flex tw:items-center tw:gap-3">
-          <!-- Refresh button (shown when percentile changes on latency tab) -->
+          <!-- Refresh button (shown when percentile changes on duration tab) -->
           <q-btn
             v-if="showRefreshButton"
             dense
             no-caps
             color="primary"
             icon="refresh"
-            :label="t('panel.refresh')"
             @click="refreshAfterPercentileChange"
             data-test="percentile-refresh-button"
+            class="tw:px-[0.5rem]!"
           >
-            <q-tooltip>{{ t('latencyInsights.refreshTooltip') }}</q-tooltip>
+            <q-tooltip>{{ t("latencyInsights.refreshTooltip") }}</q-tooltip>
           </q-btn>
 
           <q-btn
             flat
             round
             dense
-            icon="cancel"
+            size="sm"
+            :icon="outlinedClose"
             @click="isOpen = false"
             data-test="analysis-dashboard-close"
+            class="traces-analysis-close-btn"
           />
         </div>
       </q-card-section>
@@ -92,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="activeAnalysisType"
         dense
         inline-label
-        class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+        class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-1)]! insights-dashboard-tabs"
         active-color="primary"
         indicator-color="primary"
         align="left"
@@ -117,46 +165,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- LEFT: Dimension Selector Sidebar -->
           <template #before>
-            <div class="relative-position tw:h-full ">
+            <div class="relative-position tw:h-full">
               <div
                 v-if="showDimensionSelector"
                 class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
                 data-test="dimension-selector-sidebar"
               >
                 <!-- Sidebar Header -->
-                <div class="tw:p-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                  <div class="tw:text-base tw:font-semibold tw:mb-3">
-                    {{ t('latencyInsights.selectDimensions') }}
-                  </div>
-
+                <div
+                  class="tw:p-[0.625rem] tw:border-solid tw:border-[var(--o2-border-color)]"
+                >
                   <!-- Search Input -->
                   <q-input
                     v-model="dimensionSearchText"
                     dense
                     borderless
-                    :placeholder="t('search.searchField')"
+                    :placeholder="t('search.searchDimension')"
                     clearable
                     class="tw:w-full"
                     data-test="dimension-search-input"
                   >
                     <template #prepend>
-                      <q-icon name="search" />
+                      <q-icon
+                        name="search"
+                        class="tw:text-[1.2rem]! tw:text-[var(--o2-text-3)]"
+                      />
                     </template>
                   </q-input>
                 </div>
 
                 <!-- Dimension List -->
-                <div class="dimension-list-container tw:flex-1 tw:overflow-y-auto">
+                <div
+                  class="dimension-list-container tw:flex-1 tw:overflow-y-auto tw:px-[0.325rem]"
+                >
                   <q-list v-if="filteredDimensions.length > 0">
                     <q-item
                       v-for="dimension in filteredDimensions"
                       :key="dimension.value"
                       dense
-                      class="dimension-list-item"
+                      class="dimension-list-item tw:border-none!"
                     >
                       <q-item-section side>
                         <q-checkbox
-                          :model-value="selectedDimensions.includes(dimension.value)"
+                          :model-value="
+                            selectedDimensions.includes(dimension.value)
+                          "
                           @update:model-value="toggleDimension(dimension.value)"
                           color="primary"
                           size="xs"
@@ -165,7 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </q-item-section>
                       <q-item-section>
-                        <q-item-label class="dimension-label tw:truncate tw:cursor-pointer">
+                        <q-item-label
+                          class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!"
+                        >
                           {{ dimension.label }}
                           <q-tooltip
                             anchor="top middle"
@@ -183,13 +238,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- No results message -->
                   <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
-                    {{ t('search.noResult') }}
+                    {{ t("search.noResult") }}
                   </div>
                 </div>
 
                 <!-- Selected Count Footer -->
-                <div class="tw:p-3 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] o2-table-footer-title">
-                  {{ selectedDimensions.length }} {{ t('latencyInsights.dimensionsSelected') }}
+                <div
+                  class="tw:p-3 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] o2-table-footer-title tw:text-[var(--o2-text-4)]!"
+                >
+                  {{ selectedDimensions.length }}
+                  {{ t("latencyInsights.dimensionsSelected") }}
                 </div>
               </div>
             </div>
@@ -200,8 +258,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               data-test="dimension-selector-collapse-btn"
               :icon="showDimensionSelector ? 'chevron_left' : 'chevron_right'"
-              :title="showDimensionSelector ? 'Collapse Dimensions' : 'Expand Dimensions'"
-              :class="showDimensionSelector ? 'logs-splitter-icon-expand' : 'logs-splitter-icon-collapse'"
+              :title="
+                showDimensionSelector
+                  ? 'Collapse Dimensions'
+                  : 'Expand Dimensions'
+              "
+              :class="
+                showDimensionSelector
+                  ? 'splitter-icon-expand'
+                  : 'splitter-icon-collapse'
+              "
               color="primary"
               size="sm"
               dense
@@ -213,16 +279,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- RIGHT: Dashboard Charts -->
           <template #after>
             <div class="tw:h-full">
-              <div class="tw:h-full tw:w-full relative-position tw:overflow-auto">
+              <div
+                class="tw:h-full tw:w-full relative-position tw:overflow-auto"
+              >
                 <!-- Loading State -->
                 <div
                   v-if="loading"
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                 >
-                  <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
-                  <div class="tw:text-base">{{ t('latencyInsights.analyzingDimensions') }}</div>
+                  <q-spinner-hourglass
+                    color="primary"
+                    size="3.75rem"
+                    class="tw:mb-4"
+                  />
+                  <div class="tw:text-base">
+                    {{ t("latencyInsights.analyzingDimensions") }}
+                  </div>
                   <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
-                    {{ t('latencyInsights.computingDistributions', { count: selectedDimensions.length }) }}
+                    {{
+                      t("latencyInsights.computingDistributions", {
+                        count: selectedDimensions.length,
+                      })
+                    }}
                   </div>
                 </div>
 
@@ -231,8 +309,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else-if="error"
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                 >
-                  <q-icon name="error_outline" size="3.75rem" color="negative" class="tw:mb-4" />
-                  <div class="tw:text-base tw:mb-2">{{ t('latencyInsights.failedToLoad') }}</div>
+                  <q-icon
+                    name="error_outline"
+                    size="3.75rem"
+                    color="negative"
+                    class="tw:mb-4"
+                  />
+                  <div class="tw:text-base tw:mb-2">
+                    {{ t("latencyInsights.failedToLoad") }}
+                  </div>
                   <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
                   <q-btn
                     outline
@@ -256,6 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
                   @variablesManagerReady="onVariablesManagerReady"
                   @onDeletePanel="handlePanelDelete"
+                  class="tw:p-[0.4rem] trace-analysis-dashboards"
                 />
               </div>
             </div>
@@ -267,13 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import {
-  ref,
-  computed,
-  watch,
-  defineAsyncComponent,
-  nextTick,
-} from "vue";
+import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
@@ -282,11 +362,18 @@ import {
   useLatencyInsightsAnalysis,
   type LatencyInsightsConfig,
 } from "@/composables/useLatencyInsightsAnalysis";
-import { useLatencyInsightsDashboard } from "@/composables/useLatencyInsightsDashboard";
-import { selectDimensionsFromData, selectTraceDimensions } from "@/composables/useDimensionSelector";
+import {
+  useLatencyInsightsDashboard,
+  COMPARISON_COLORS,
+} from "@/composables/useLatencyInsightsDashboard";
+import {
+  selectDimensionsFromData,
+  selectTraceDimensions,
+} from "@/composables/useDimensionSelector";
+import { outlinedClose } from "@quasar/extras/material-icons-outlined";
 
 const RenderDashboardCharts = defineAsyncComponent(
-  () => import("@/views/Dashboards/RenderDashboardCharts.vue")
+  () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
 interface DurationFilter {
@@ -321,14 +408,14 @@ interface Props {
   streamName: string;
   streamType?: string; // logs or traces
   baseFilter?: string;
-  analysisType?: "latency" | "volume" | "error"; // Initial/default analysis type
-  availableAnalysisTypes?: Array<"latency" | "volume" | "error">; // Which tabs to show
+  analysisType?: "duration" | "volume" | "error"; // Initial/default analysis type
+  availableAnalysisTypes?: Array<"duration" | "volume" | "error">; // Which tabs to show
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  analysisType: "latency",
+  analysisType: "duration",
   availableAnalysisTypes: () => ["volume"], // Default to just volume
 });
 
@@ -339,6 +426,11 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 const store = useStore();
 const { t } = useI18n();
+const chipColors = computed(() =>
+  store.state.theme === "dark"
+    ? COMPARISON_COLORS.dark
+    : COMPARISON_COLORS.light,
+);
 const { loading, error, analyzeAllDimensions } = useLatencyInsightsAnalysis();
 const { generateDashboard } = useLatencyInsightsDashboard();
 
@@ -351,7 +443,7 @@ const dashboardData = ref<any>(null);
 const dashboardChartsRef = ref<any>(null);
 const showDimensionSelector = ref(true); // Changed to true - now controls sidebar visibility
 const dashboardRenderKey = ref(0); // Only increment on full reload to avoid re-rendering on panel append
-const dimensionSearchText = ref('');
+const dimensionSearchText = ref("");
 
 // Splitter configuration for dimension selector sidebar (using percentage)
 const splitterModel = ref(25); // 25% width for dimension selector (default)
@@ -361,7 +453,7 @@ const lastSplitterPosition = ref(25); // Remember last position before collapse
 // Percentile change tracking - use variables manager's hasUncommittedChanges
 // This matches the pattern used in ViewDashboard
 const showRefreshButton = computed(() => {
-  if (activeAnalysisType.value !== 'latency') {
+  if (activeAnalysisType.value !== "duration") {
     return false;
   }
 
@@ -370,9 +462,11 @@ const showRefreshButton = computed(() => {
   // Use optional chaining for safer property access
   if (manager?.hasUncommittedChanges !== undefined) {
     // Access the value if it's a ref, otherwise use directly
-    const hasChanges = typeof manager.hasUncommittedChanges === 'object' && 'value' in manager.hasUncommittedChanges
-      ? manager.hasUncommittedChanges.value
-      : manager.hasUncommittedChanges;
+    const hasChanges =
+      typeof manager.hasUncommittedChanges === "object" &&
+      "value" in manager.hasUncommittedChanges
+        ? manager.hasUncommittedChanges.value
+        : manager.hasUncommittedChanges;
     return hasChanges;
   }
 
@@ -381,22 +475,36 @@ const showRefreshButton = computed(() => {
 
 // Detect custom SQL mode
 const isCustomSQLMode = computed(() => {
-  return props.baseFilter?.trim().toUpperCase().startsWith('SELECT') || false;
+  return props.baseFilter?.trim().toUpperCase().startsWith("SELECT") || false;
 });
 
 // Active tab management
-const activeAnalysisType = ref<"latency" | "volume" | "error">(props.analysisType);
+const activeAnalysisType = ref<"duration" | "volume" | "error">(
+  props.analysisType,
+);
 
 // Tab configuration
 const availableTabs = computed(() => {
-  return props.availableAnalysisTypes.map(type => {
+  return props.availableAnalysisTypes.map((type) => {
     switch (type) {
-      case 'volume':
-        return { name: 'volume', label: t('volumeInsights.tabLabel'), icon: 'trending_up' };
-      case 'latency':
-        return { name: 'latency', label: t('latencyInsights.tabLabel'), icon: 'schedule' };
-      case 'error':
-        return { name: 'error', label: t('errorInsights.tabLabel'), icon: 'error_outline' };
+      case "volume":
+        return {
+          name: "volume",
+          label: t("volumeInsights.tabLabel"),
+          icon: "trending_up",
+        };
+      case "duration":
+        return {
+          name: "duration",
+          label: t("latencyInsights.tabLabel"),
+          icon: "schedule",
+        };
+      case "error":
+        return {
+          name: "error",
+          label: t("errorInsights.tabLabel"),
+          icon: "error_outline",
+        };
     }
   });
 });
@@ -420,7 +528,11 @@ const getInitialDimensions = () => {
   }));
 
   // For LOGS: Use sample-based analysis if we have log data
-  if (streamType === "logs" && props.logSamples && props.logSamples.length >= 10) {
+  if (
+    streamType === "logs" &&
+    props.logSamples &&
+    props.logSamples.length >= 10
+  ) {
     return selectDimensionsFromData(props.logSamples, schemaFields, 6);
   }
 
@@ -453,8 +565,8 @@ const filteredDimensions = computed(() => {
   // Filter by search text if provided
   if (dimensionSearchText.value?.trim()) {
     const searchLower = dimensionSearchText.value.toLowerCase();
-    dimensions = dimensions.filter(dim =>
-      dim.label.toLowerCase().includes(searchLower)
+    dimensions = dimensions.filter((dim) =>
+      dim.label.toLowerCase().includes(searchLower),
     );
   }
 
@@ -494,7 +606,9 @@ const toggleDimension = (dimensionValue: string) => {
       return;
     }
     // Remove dimension - create new array to trigger reactivity
-    selectedDimensions.value = selectedDimensions.value.filter(d => d !== dimensionValue);
+    selectedDimensions.value = selectedDimensions.value.filter(
+      (d) => d !== dimensionValue,
+    );
   } else {
     // Add dimension - create new array to trigger reactivity
     selectedDimensions.value = [...selectedDimensions.value, dimensionValue];
@@ -503,7 +617,9 @@ const toggleDimension = (dimensionValue: string) => {
 
 // Get dimension label from value
 const getDimensionLabel = (dimensionValue: string): string => {
-  const dimension = availableDimensions.value.find(d => d.value === dimensionValue);
+  const dimension = availableDimensions.value.find(
+    (d) => d.value === dimensionValue,
+  );
   return dimension?.label || dimensionValue;
 };
 
@@ -512,7 +628,9 @@ const handlePanelDelete = (panelId: string) => {
   if (!dashboardData.value?.tabs?.[0]?.panels) return;
 
   // Find the panel by ID
-  const panel = dashboardData.value.tabs[0].panels.find((p: any) => p.id === panelId);
+  const panel = dashboardData.value.tabs[0].panels.find(
+    (p: any) => p.id === panelId,
+  );
 
   if (panel?.title) {
     // Panel title is the dimension name - remove it from selectedDimensions
@@ -532,13 +650,14 @@ const toggleDimensionSelector = () => {
   } else {
     // Expanding: restore previous position, but use 25% if it was too small (< 10) or not set
     const savedPosition = lastSplitterPosition.value;
-    splitterModel.value = (savedPosition && savedPosition >= 10) ? savedPosition : 25;
+    splitterModel.value =
+      savedPosition && savedPosition >= 10 ? savedPosition : 25;
     showDimensionSelector.value = true;
   }
 
   // Redraw charts after sidebar collapse/expand
   nextTick(() => {
-    window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new Event("resize"));
   });
 };
 
@@ -549,7 +668,7 @@ const onSplitterUpdate = () => {
     lastSplitterPosition.value = splitterModel.value;
   }
 
-  window.dispatchEvent(new Event('resize'));
+  window.dispatchEvent(new Event("resize"));
 };
 
 const baselineTimeRange = computed(() => {
@@ -563,17 +682,17 @@ const selectedTimeRangeDisplay = computed(() => {
   if (props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
     return {
       startTime: props.rateFilter.timeStart,
-      endTime: props.rateFilter.timeEnd
+      endTime: props.rateFilter.timeEnd,
     };
   } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
     return {
       startTime: props.durationFilter.timeStart,
-      endTime: props.durationFilter.timeEnd
+      endTime: props.durationFilter.timeEnd,
     };
   } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
     return {
       startTime: props.errorFilter.timeStart,
-      endTime: props.errorFilter.timeEnd
+      endTime: props.errorFilter.timeEnd,
     };
   }
   return null;
@@ -586,12 +705,24 @@ const hasSelectedTimeRange = computed(() => {
 
 // Additional filter metadata (duration, rate, or error count)
 const filterMetadata = computed(() => {
-  if (props.analysisType === 'latency' && props.durationFilter && !props.durationFilter.timeStart) {
-    return `${t('latencyInsights.durationLabel')} ${formatTimeWithSuffix(props.durationFilter.start)} - ${formatTimeWithSuffix(props.durationFilter.end)}`;
-  } else if (props.analysisType === 'volume' && props.rateFilter && !props.rateFilter.timeStart) {
-    return `${t('volumeInsights.rateLabel')} ${props.rateFilter.start} - ${props.rateFilter.end} traces/interval`;
-  } else if (props.analysisType === 'error' && props.errorFilter && !props.errorFilter.timeStart) {
-    return `${t('errorInsights.errorsGreaterThan')} ${props.errorFilter.start}`;
+  if (
+    props.analysisType === "duration" &&
+    props.durationFilter &&
+    !props.durationFilter.timeStart
+  ) {
+    return `${t("latencyInsights.durationLabel")} ${formatTimeWithSuffix(props.durationFilter.start)} - ${formatTimeWithSuffix(props.durationFilter.end)}`;
+  } else if (
+    props.analysisType === "volume" &&
+    props.rateFilter &&
+    !props.rateFilter.timeStart
+  ) {
+    return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} traces/interval`;
+  } else if (
+    props.analysisType === "error" &&
+    props.errorFilter &&
+    !props.errorFilter.timeStart
+  ) {
+    return `${t("errorInsights.errorsGreaterThan")} ${props.errorFilter.start}`;
   }
   return null;
 });
@@ -600,12 +731,24 @@ const loadAnalysis = async () => {
   try {
     // Determine which filter to use based on active analysis type
     let filterConfig;
-    if (activeAnalysisType.value === 'latency') {
-      filterConfig = { durationFilter: props.durationFilter, rateFilter: undefined, errorFilter: undefined };
-    } else if (activeAnalysisType.value === 'volume') {
-      filterConfig = { durationFilter: undefined, rateFilter: props.rateFilter, errorFilter: undefined };
-    } else if (activeAnalysisType.value === 'error') {
-      filterConfig = { durationFilter: undefined, rateFilter: undefined, errorFilter: props.errorFilter };
+    if (activeAnalysisType.value === "duration") {
+      filterConfig = {
+        durationFilter: props.durationFilter,
+        rateFilter: undefined,
+        errorFilter: undefined,
+      };
+    } else if (activeAnalysisType.value === "volume") {
+      filterConfig = {
+        durationFilter: undefined,
+        rateFilter: props.rateFilter,
+        errorFilter: undefined,
+      };
+    } else if (activeAnalysisType.value === "error") {
+      filterConfig = {
+        durationFilter: undefined,
+        rateFilter: undefined,
+        errorFilter: props.errorFilter,
+      };
     }
 
     // For volume/error analysis with filter, use the actual selected time range from the brush
@@ -617,17 +760,20 @@ const loadAnalysis = async () => {
     if (props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.rateFilter.timeStart,
-        endTime: props.rateFilter.timeEnd
+        endTime: props.rateFilter.timeEnd,
       };
-    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
+    } else if (
+      props.durationFilter?.timeStart &&
+      props.durationFilter?.timeEnd
+    ) {
       selectedTimeRange = {
         startTime: props.durationFilter.timeStart,
-        endTime: props.durationFilter.timeEnd
+        endTime: props.durationFilter.timeEnd,
       };
     } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.errorFilter.timeStart,
-        endTime: props.errorFilter.timeEnd
+        endTime: props.errorFilter.timeEnd,
       };
     }
 
@@ -656,7 +802,11 @@ const loadAnalysis = async () => {
     }));
 
     // Generate dashboard JSON with UNION queries
-    const dashboard = generateDashboard(mockAnalyses, config);
+    const dashboard = generateDashboard(
+      mockAnalyses,
+      config,
+      store.state.theme,
+    );
 
     dashboardData.value = dashboard;
     dashboardRenderKey.value++; // Increment to force re-render on full reload
@@ -665,7 +815,7 @@ const loadAnalysis = async () => {
     // The handleVariablesDataChange event will update them if needed
   } catch (err: any) {
     console.error("Error loading analysis:", err);
-    showErrorNotification(err.message || t('latencyInsights.failedToLoad'));
+    showErrorNotification(err.message || t("latencyInsights.failedToLoad"));
   }
 };
 
@@ -675,7 +825,7 @@ const onVariablesManagerReady = (manager: any) => {
 
   // Load analysis immediately when manager is ready to populate dashboard
   // This ensures the dashboard shows data on initial load instead of remaining blank
-  if (activeAnalysisType.value === 'latency' && !dashboardData.value) {
+  if (activeAnalysisType.value === "duration" && !dashboardData.value) {
     loadAnalysis();
   }
 };
@@ -686,7 +836,9 @@ const getCurrentPercentile = (): string => {
   if (manager && manager.committedVariablesData) {
     // committedVariablesData has structure: { global: [], tabs: {}, panels: {} }
     // Percentile is likely a global variable
-    const percentileVar = manager.committedVariablesData.global?.find((v: any) => v.name === 'percentile');
+    const percentileVar = manager.committedVariablesData.global?.find(
+      (v: any) => v.name === "percentile",
+    );
     if (percentileVar && percentileVar.value !== undefined) {
       return percentileVar.value;
     }
@@ -740,7 +892,10 @@ const formatCompactTimestamp = (microseconds: number) => {
 };
 
 // Smart timestamp formatter - shows date only once if same day
-const formatSmartTimestamp = (startMicroseconds: number, endMicroseconds: number) => {
+const formatSmartTimestamp = (
+  startMicroseconds: number,
+  endMicroseconds: number,
+) => {
   const startDate = new Date(startMicroseconds / 1000);
   const endDate = new Date(endMicroseconds / 1000);
 
@@ -763,13 +918,13 @@ const formatSmartTimestamp = (startMicroseconds: number, endMicroseconds: number
     // Same day: show "MM/DD HH:MM:SS" for start, only "HH:MM:SS" for end
     return {
       start: `${formatDate(startDate)} ${formatTime(startDate)}`,
-      end: formatTime(endDate)
+      end: formatTime(endDate),
     };
   } else {
     // Different days: show both full timestamps
     return {
       start: `${formatDate(startDate)} ${formatTime(startDate)}`,
-      end: `${formatDate(endDate)} ${formatTime(endDate)}`
+      end: `${formatDate(endDate)} ${formatTime(endDate)}`,
     };
   }
 };
@@ -789,7 +944,7 @@ watch(
       loadAnalysis();
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 // Add new dimension panels without re-rendering existing ones
@@ -804,24 +959,47 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
     const currentPanels = dashboardData.value.tabs[0].panels;
     const existingCount = currentPanels.length;
 
-
     // Build config (reuse logic from loadAnalysis)
     let filterConfig: any = {};
-    if (activeAnalysisType.value === 'latency') {
-      filterConfig = { durationFilter: props.durationFilter, rateFilter: undefined, errorFilter: undefined };
-    } else if (activeAnalysisType.value === 'volume') {
-      filterConfig = { durationFilter: undefined, rateFilter: props.rateFilter, errorFilter: undefined };
-    } else if (activeAnalysisType.value === 'error') {
-      filterConfig = { durationFilter: undefined, rateFilter: undefined, errorFilter: props.errorFilter };
+    if (activeAnalysisType.value === "duration") {
+      filterConfig = {
+        durationFilter: props.durationFilter,
+        rateFilter: undefined,
+        errorFilter: undefined,
+      };
+    } else if (activeAnalysisType.value === "volume") {
+      filterConfig = {
+        durationFilter: undefined,
+        rateFilter: props.rateFilter,
+        errorFilter: undefined,
+      };
+    } else if (activeAnalysisType.value === "error") {
+      filterConfig = {
+        durationFilter: undefined,
+        rateFilter: undefined,
+        errorFilter: props.errorFilter,
+      };
     }
 
     let selectedTimeRange = props.timeRange;
     if (props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
-      selectedTimeRange = { startTime: props.rateFilter.timeStart, endTime: props.rateFilter.timeEnd };
-    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
-      selectedTimeRange = { startTime: props.durationFilter.timeStart, endTime: props.durationFilter.timeEnd };
+      selectedTimeRange = {
+        startTime: props.rateFilter.timeStart,
+        endTime: props.rateFilter.timeEnd,
+      };
+    } else if (
+      props.durationFilter?.timeStart &&
+      props.durationFilter?.timeEnd
+    ) {
+      selectedTimeRange = {
+        startTime: props.durationFilter.timeStart,
+        endTime: props.durationFilter.timeEnd,
+      };
     } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
-      selectedTimeRange = { startTime: props.errorFilter.timeStart, endTime: props.errorFilter.timeEnd };
+      selectedTimeRange = {
+        startTime: props.errorFilter.timeStart,
+        endTime: props.errorFilter.timeEnd,
+      };
     }
 
     const config: LatencyInsightsConfig = {
@@ -846,7 +1024,8 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
     }));
 
     // Generate new panels using the same logic as generateDashboard
-    const newPanels = generateDashboard(mockAnalyses, config).tabs[0].panels;
+    const newPanels = generateDashboard(mockAnalyses, config, store.state.theme)
+      .tabs[0].panels;
 
     // Update layout positions for new panels to appear after existing ones
     const timestamp = Date.now();
@@ -864,7 +1043,6 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
       // Also update the panel ID to match
       panel.id = `${panel.id}_${timestamp}`;
     });
-
 
     // Create a new dashboard object to ensure Vue detects the change
     // We need to increment the render key to force grid re-layout, but this will cause re-queries
@@ -890,9 +1068,8 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
     if (dashboardChartsRef.value?.refreshGridStack) {
       await dashboardChartsRef.value.refreshGridStack();
     }
-
   } catch (err: any) {
-    console.error('Error adding dimension panels:', err);
+    console.error("Error adding dimension panels:", err);
     loadAnalysis();
   }
 };
@@ -901,23 +1078,26 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
 watch(
   selectedDimensions,
   (newDimensions, oldDimensions) => {
-
     // Skip if this is the initial load (already handled by isOpen watcher)
     if (!oldDimensions || oldDimensions.length === 0) {
       return;
     }
 
     // Check if dimensions actually changed
-    const changed = newDimensions.length !== oldDimensions.length ||
+    const changed =
+      newDimensions.length !== oldDimensions.length ||
       newDimensions.some((d, i) => d !== oldDimensions[i]);
 
     if (!changed) {
       return;
     }
 
-    const addedDimensions = newDimensions.filter(d => !oldDimensions.includes(d));
-    const removedDimensions = oldDimensions.filter(d => !newDimensions.includes(d));
-
+    const addedDimensions = newDimensions.filter(
+      (d) => !oldDimensions.includes(d),
+    );
+    const removedDimensions = oldDimensions.filter(
+      (d) => !newDimensions.includes(d),
+    );
 
     if (isOpen.value && newDimensions.length > 0) {
       if (removedDimensions.length > 0) {
@@ -930,33 +1110,37 @@ watch(
         // If only added, append new panels without regenerating existing ones
         addDimensionPanels(addedDimensions);
       }
-    } 
+    }
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Reload when active analysis type (tab) changes
 watch(
   () => activeAnalysisType.value,
   (newTab, oldTab) => {
-
     if (isOpen.value && !loading.value) {
       loadAnalysis();
-    } 
-  }
+    }
+  },
 );
 
 // Watch for changes in props
 watch(
-  () => [props.durationFilter, props.rateFilter, props.timeRange, props.streamName, props.analysisType],
+  () => [
+    props.durationFilter,
+    props.rateFilter,
+    props.timeRange,
+    props.streamName,
+    props.analysisType,
+  ],
   () => {
     if (isOpen.value) {
       loadAnalysis();
     }
   },
-  { deep: true }
+  { deep: true },
 );
-
 </script>
 
 <style lang="scss" scoped>
@@ -972,24 +1156,53 @@ watch(
     margin: 8px 0px;
   }
 
+  .traces-analysis-close-btn {
+    :deep(.q-icon) {
+      font-size: 1.2rem;
+      color: var(--o2-text-1);
+    }
+  }
+
+  .insights-dashboard-tabs {
+    :deep(.q-tabs__content .q-icon) {
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+    }
+
+    :deep(.q-tab__label) {
+      font-weight: bold;
+      padding-left: 0.13rem;
+    }
+  }
+
+  .trace-analysis-dashboards {
+    :deep(.render-dashboard-charts-container) {
+      padding: 0rem !important;
+    }
+
+    :deep(.global-variables-selector) {
+      margin-top: 0rem !important;
+    }
+  }
+
+  .trace-analysis-dashboards {
+    :deep(.panelHeader) {
+      padding-left: 0.325rem !important;
+    }
+  }
+
   // Time range chips styling - matching chart colors
   .time-range-chip {
     font-size: 0.7rem;
     line-height: 1.2;
     transition: all 0.2s ease;
 
-    &.baseline-chip {
-      // Red background matching baseline in charts
-      background: rgba(239, 68, 68, 0.12);
-      color: rgba(0, 0, 0, 0.85);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-    }
-
+    &.baseline-chip,
     &.selected-chip {
-      // Orange background matching selected in charts
-      background: rgba(251, 146, 60, 0.15);
-      color: rgba(0, 0, 0, 0.85);
-      border: 1px solid rgba(251, 146, 60, 0.4);
+      background: color-mix(in srgb, var(--chip-color) 20%, transparent);
+      border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
+      color: color-mix(in srgb, var(--chip-color) 80%, #000) !important;
       font-weight: 500;
     }
   }
@@ -1000,7 +1213,7 @@ watch(
     min-height: 0;
     background: #f5f5f5 !important;
   }
-  .q-card__section--vert{
+  .q-card__section--vert {
     padding: 8px !important;
   }
 }
@@ -1015,8 +1228,7 @@ watch(
   // max-height removed - now handled by flex container
 
   .dimension-list-item {
-    padding: 0.5rem 1rem;
-    border-bottom: 0.0625rem solid var(--q-border-color, #e0e0e0);
+    border-bottom: none;
 
     &:hover {
       background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
@@ -1042,8 +1254,6 @@ watch(
   top: 26px !important;
   left: 15px !important;
 }
-
-
 
 // Dark mode support
 body.body--dark {
@@ -1071,20 +1281,11 @@ body.body--dark {
     }
   }
 
-  // Time range chips dark mode - matching chart colors
+  // Time range chips: dark mode text adjustment
   .time-range-chip {
-    &.baseline-chip {
-      // Red background for baseline
-      background: rgba(239, 68, 68, 0.2);
-      color: rgba(255, 255, 255, 0.9);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-    }
-
+    &.baseline-chip,
     &.selected-chip {
-      // Orange background for selected
-      background: rgba(251, 146, 60, 0.25);
-      color: rgba(255, 255, 255, 0.9);
-      border: 1px solid rgba(251, 146, 60, 0.5);
+      color: color-mix(in srgb, var(--chip-color) 80%, #fff) !important;
     }
   }
 }

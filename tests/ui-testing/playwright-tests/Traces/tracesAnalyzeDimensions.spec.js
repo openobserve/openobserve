@@ -128,7 +128,7 @@ test.describe("Traces Analyze Dimensions testcases", () => {
 
     // Click Latency tab — verify active and check charts
     await pm.tracesPage.clickLatencyTab();
-    const latencyActive = await pm.tracesPage.isTabActive('Latency');
+    const latencyActive = await pm.tracesPage.isTabActive('Duration');
     expect(latencyActive).toBeTruthy();
     const latencyCharts = await pm.tracesPage.hasAnalysisDashboardCharts();
     testLogger.info(`Latency tab active, charts: ${latencyCharts}`);

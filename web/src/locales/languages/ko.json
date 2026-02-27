@@ -351,7 +351,8 @@
     "openFields": "오픈 필드",
     "askAIFunctionPlaceholder": "AI에게 당신의 기능을 도와달라고 요청하세요...",
     "enterFunctionPrompt": "함수 생성 프롬프트 입력",
-    "recordsPerPage": "페이지당 레코드 수"
+    "recordsPerPage": "페이지당 레코드 수",
+    "searchDimension": "치수 검색"
   },
   "menu": {
     "home": "홈",
@@ -2546,7 +2547,18 @@
     "timeRangeUpdated": "선택한 시간 범위에는 이 추적이 포함되지 않았습니다.트레이스의 타임스탬프와 일치하도록 시간 범위가 업데이트되었습니다.",
     "fetchingMoreTraces": "더 많은 트레이스를 가져오는 중...",
     "showErrorOnly": "오류만 보기",
-    "openInTraces": "오픈 인 트레이스"
+    "openInTraces": "오픈 인 트레이스",
+    "errorRetrievingTraces": "추적을 가져오는 동안 오류가 발생했습니다.",
+    "fetchingTraces": "잠깐만요, 우리가 당신의 흔적을 찾고 있어요.",
+    "noTracesFoundAdjust": "흔적을 찾을 수 없습니다.필터를 조정하고 다시 시도하세요.",
+    "tracesTitle": "추적",
+    "tracesFound": "흔적 발견",
+    "error": "오류",
+    "errors": "오류",
+    "success": "성공",
+    "today": "오늘",
+    "yesterday": "어제",
+    "spanColorPalettePreview": "스팬 컬러 팔레트 미리보기"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -2944,7 +2956,8 @@
     "tracesErrorDetails": "추적 데이터를 가져오는 동안 오류가 발생했습니다.다시 시도해 주세요.",
     "metricsError": "지표를 로드할 수 없음",
     "metricsErrorDetails": "지표 데이터를 가져오는 동안 오류가 발생했습니다.다시 시도해 주세요.",
-    "noMetricsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 메트릭을 찾을 수 없습니다."
+    "noMetricsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 메트릭을 찾을 수 없습니다.",
+    "errorRetrievingTraces": "추적을 가져오는 동안 오류가 발생했습니다."
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",

@@ -451,9 +451,12 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --o2-card-bg: rgba(255, 255, 255, 0.8);
 
+  --o2-card-bg-solid: rgba(255, 255, 255);
+
   --o2-header-menu-bg: rgba(255, 255, 255, 0.5);
 
   --o2-border-color: rgba(0, 0, 0, 0.12);
+  --o2-border-2: rgba(0, 0, 0, 0.08);
   --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
 
   --o2-menu-gradient-start: rgba(89, 175, 199, 0.3);
@@ -490,6 +493,17 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-input-label-text-color: #636464;
 
   --tw-border-style: #e5e7eb;
+
+  --o2-section-header-bg: color-mix(in srgb, var(--o2-theme-color) 3%, rgb(247, 247, 247));
+
+  --o2-text-3: #94A3B8;
+  --o2-text-1: #64748B;
+  --o2-text-2: #475569;
+  --o2-text-4: #334155;
+
+  --o2-tag-grey-1: #E2E8F0;
+  --o2-tag-grey-2: #eaebec;
+
 
   // Span Colors for Traces (Light Mode)
   --o2-span-1: #{$o2-span-1};
@@ -607,10 +621,14 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --o2-card-bg: #1f2223;
 
+  --o2-card-bg-solid: #1f2223;
+
+
   --o2-header-menu-bg: color-mix(in srgb, #19191e 90%, white);
 
 
   --o2-border-color: rgba(255, 255, 255, 0.40);
+  --o2-border-2: rgba(255, 255, 255, 0.12);
   --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
 
   --o2-menu-gradient-start: rgba(89, 155, 174, 0.3);
@@ -620,7 +638,7 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
 
-    --o2-table-actions-bg: #1f2223;
+  --o2-table-actions-bg: #1f2223;
 
 
   --o2-tab-bg: color-mix(in srgb, white 20%, var(--o2-theme-color));
@@ -629,7 +647,7 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #112027);
   --o2-actions-column-shawdow: rgba(125, 125, 125, 0.694);
 
-    --q-primary: var(--o2-dark-theme-color);
+  --q-primary: var(--o2-dark-theme-color);
 
   // JSON Syntax Highlighting
   --o2-json-key: #{$json-key-dark};
@@ -702,6 +720,20 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-trace-text-secondary: #{$o2-dark-gray-1000};
   --o2-trace-hover: #{$o2-dark-gray-300};
   --o2-trace-selected: #{$o2-dark-blue-300};
+
+
+  --o2-section-header-bg: #28292a;
+  
+
+  --o2-text-3: #94A3B8;
+  --o2-text-1: #94A3B8;
+  --o2-text-2: #a5b2c5;
+  --o2-text-4: #bacce6;
+
+  --o2-tag-grey-1: #565b60;
+  --o2-tag-grey-2: #313234;
+
+  
 }
 
 // ============================================
