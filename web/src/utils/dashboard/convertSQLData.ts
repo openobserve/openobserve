@@ -25,18 +25,24 @@ import { toZonedTime } from "date-fns-tz";
 import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
 import { format } from "date-fns";
 import {
+  formatUnitValue,
+  getUnitValue,
+} from "./convertDataIntoUnitValue";
+import {
+  applySeriesColorMappings,
+  getContrastColor,
+} from "./chartColorUtils";
+import {
   calculateOptimalFontSize,
   calculateWidthText,
-  formatDate,
-  formatUnitValue,
-  getContrastColor,
-  applySeriesColorMappings,
-  getUnitValue,
-  isTimeSeries,
-  isTimeStamp,
   calculateDynamicNameGap,
   calculateRotatedLabelBottomSpace,
-} from "./convertDataIntoUnitValue";
+} from "./chartDimensionUtils";
+import {
+  formatDate,
+  isTimeSeries,
+  isTimeStamp,
+} from "./dateTimeUtils";
 import {
   calculateGridPositions,
   getTrellisGrid,

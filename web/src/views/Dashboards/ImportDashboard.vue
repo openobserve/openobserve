@@ -328,7 +328,7 @@ import { useRouter, useRoute } from "vue-router";
 import dashboardService from "../../services/dashboards.js";
 import axios from "axios";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
-import { validateDashboardJson } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";

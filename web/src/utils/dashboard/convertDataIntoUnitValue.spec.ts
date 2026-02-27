@@ -17,20 +17,28 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   getUnitValue,
   formatUnitValue,
+} from "@/utils/dashboard/convertDataIntoUnitValue";
+import {
   isTimeSeries,
   isTimeStamp,
   formatDate,
+  convertOffsetToSeconds,
+  getUTCTimestampFromZonedTimestamp,
+} from "@/utils/dashboard/dateTimeUtils";
+import {
   getContrastColor,
+  applySeriesColorMappings,
+} from "@/utils/dashboard/chartColorUtils";
+import {
   calculateOptimalFontSize,
   calculateWidthText,
-  applySeriesColorMappings,
-  convertOffsetToSeconds,
+} from "@/utils/dashboard/chartDimensionUtils";
+import {
   findFirstValidMappedValue,
   validatePanel,
   validateDashboardJson,
   validateSQLPanelFields,
-  getUTCTimestampFromZonedTimestamp
-} from "@/utils/dashboard/convertDataIntoUnitValue";
+} from "@/utils/dashboard/panelValidation";
 
 // Mock vuex store for logsUtils
 const mockVuexStore = {

@@ -15,7 +15,7 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { convertTableData } from "@/utils/dashboard/convertTableData";
-import { isTimeSeries, isTimeStamp } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { isTimeSeries, isTimeStamp } from "@/utils/dashboard/dateTimeUtils";
 
 // Mock external dependencies
 vi.mock("date-fns-tz", () => ({
@@ -23,6 +23,11 @@ vi.mock("date-fns-tz", () => ({
 }));
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
+  formatUnitValue: vi.fn((unitValue) => unitValue?.value || "0"),
+  getUnitValue: vi.fn((value, unit, customUnit, decimals) => ({ value: value?.toString() || "0", unit: unit || "" })),
+}));
+
+vi.mock("@/utils/dashboard/panelValidation", () => ({
   findFirstValidMappedValue: vi.fn((value, mappings, type) => {
     if (mappings && mappings.length > 0) {
       const mapping = mappings.find((m: any) => m.from === value);
@@ -30,9 +35,10 @@ vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
     }
     return null;
   }),
+}));
+
+vi.mock("@/utils/dashboard/dateTimeUtils", () => ({
   formatDate: vi.fn((date) => "2024-01-01 12:00:00"),
-  formatUnitValue: vi.fn((unitValue) => unitValue?.value || "0"),
-  getUnitValue: vi.fn((value, unit, customUnit, decimals) => ({ value: value?.toString() || "0", unit: unit || "" })),
   isTimeSeries: vi.fn(() => false),
   isTimeStamp: vi.fn(() => false),
 }));

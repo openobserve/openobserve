@@ -36,15 +36,8 @@ vi.mock("date-fns", () => ({
 }));
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
-  calculateOptimalFontSize: vi.fn(() => 12),
-  calculateWidthText: vi.fn(() => 100),
-  formatDate: vi.fn(() => "2024-01-01"),
   formatUnitValue: vi.fn(() => ({ value: "100", unit: "" })),
-  getContrastColor: vi.fn(() => "#000000"),
-  applySeriesColorMappings: vi.fn((series) => series),
   getUnitValue: vi.fn(() => ({ value: "100", unit: "" })),
-  isTimeSeries: vi.fn(() => false),
-  isTimeStamp: vi.fn(() => false),
   calculateBottomLegendHeight: vi.fn((legendCount, chartWidth, series, maxHeight, legendConfig, gridConfig, chartHeight) => {
     if (legendConfig && gridConfig && chartHeight) {
       legendConfig.top = chartHeight - 90;
@@ -61,8 +54,24 @@ vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
     gridSpace: { left: 60, right: 160, top: 60, bottom: 90 }
   })),
   calculatePieChartRadius: vi.fn(() => 150),
+}));
+
+vi.mock("@/utils/dashboard/chartDimensionUtils", () => ({
+  calculateOptimalFontSize: vi.fn(() => 12),
+  calculateWidthText: vi.fn(() => 100),
   calculateDynamicNameGap: vi.fn(() => 25),
   calculateRotatedLabelBottomSpace: vi.fn(() => 0),
+}));
+
+vi.mock("@/utils/dashboard/chartColorUtils", () => ({
+  getContrastColor: vi.fn(() => "#000000"),
+  applySeriesColorMappings: vi.fn((series) => series),
+}));
+
+vi.mock("@/utils/dashboard/dateTimeUtils", () => ({
+  formatDate: vi.fn(() => "2024-01-01"),
+  isTimeSeries: vi.fn(() => false),
+  isTimeStamp: vi.fn(() => false),
 }));
 
 vi.mock("@/utils/dashboard/calculateGridForSubPlot", () => ({
