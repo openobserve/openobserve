@@ -136,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (fieldName, searchTerm) =>
                     $emit('search-field-values', fieldName, searchTerm)
                 "
+                @load-more-values="(fieldName) => $emit('load-more-values', fieldName)"
               />
             </template>
           </FieldRow>
@@ -246,6 +247,7 @@ defineEmits<{
     action: string,
   ];
   "search-field-values": [fieldName: string, searchTerm: string];
+  "load-more-values": [fieldName: string];
   "before-show": [event: any, field: any];
   "before-hide": [field: any];
   "toggle-group": [group: string];

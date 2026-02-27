@@ -233,6 +233,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </div>
 
+          <!-- View more values -->
+          <div
+            v-if="fieldValues?.hasMore && !fieldValues?.isLoading"
+            class="view-more-container q-px-sm q-pt-xs"
+          >
+            <q-btn
+              flat
+              no-caps
+              dense
+              size="0.2rem"
+              padding="0.1rem 0.3rem"
+              class="view-more-btn full-width"
+              @click="$emit('load-more-values', field.name)"
+              :data-test="`log-search-subfield-load-more-${field.name}`"
+            >
+              View more values
+            </q-btn>
+          </div>
+
           <!-- Multi-select action bar -->
           <div
             v-if="selectedValues.length > 0 && selectedStreamsCount == field.streams.length"
@@ -310,6 +329,7 @@ interface Props {
     isLoading: boolean;
     values: { key: string; count: number }[];
     errMsg?: string;
+    hasMore?: boolean;
   };
   selectedFields: string[];
   selectedStreamsCount: number;
@@ -331,6 +351,7 @@ const emit = defineEmits<{
     action: string,
   ];
   "search-field-values": [fieldName: string, searchTerm: string];
+  "load-more-values": [fieldName: string];
   "before-show": [event: any, field: any];
   "before-hide": [field: any];
 }>();
@@ -510,6 +531,24 @@ const handleApplyMultiSelect = (action: string) => {
     &:hover {
       filter: brightness(1.12);
     }
+  }
+}
+
+.view-more-container {
+  border-top: 1px solid var(--o2-border-color);
+}
+
+.view-more-btn {
+  color: var(--q-primary) !important;
+  font-size: 0.625rem !important;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  width: 100%;
+  border-radius: 0 0 0.25rem 0.25rem !important;
+  transition: opacity 0.15s;
+
+  &:hover {
+    opacity: 0.8;
   }
 }
 </style>
