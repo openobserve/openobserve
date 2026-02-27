@@ -465,6 +465,7 @@ pub async fn search_http2_stream(
             .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
     }
 
+    #[cfg(feature = "enterprise")]
     // Check permissions for each stream
     let permission_resource_type =
         if req.search_type == Some(config::meta::search::SearchEventType::Insights) {
