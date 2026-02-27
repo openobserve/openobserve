@@ -786,17 +786,36 @@ export default defineComponent({
           }]
         } : undefined;
 
-        // Generate sample dates for current month
-        const now = new Date();
-        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        // Get ingestion history from store
+        const ingestionHistory = store.state.zoConfig?.ingestion_history || [];
+
         const dates = [];
         const values = [];
 
-        // Create sample data for visualization
-        for (let i = 1; i <= daysInMonth; i++) {
-          dates.push(`${i}`);
-          // Random values for demonstration
-          values.push(Math.random() * (ingestionLimit || 100) * 0.8);
+        // Use actual ingestion history data
+        // Data format: [{ ts: "2026-02-27T00:00:00", value: 202.90125079791258 }]
+        // Values are in MB, convert to GB
+        if (ingestionHistory.length > 0) {
+          // Sort by timestamp to ensure chronological order
+          const sortedHistory = [...ingestionHistory].sort((a, b) =>
+            new Date(a.ts).getTime() - new Date(b.ts).getTime()
+          );
+
+          sortedHistory.forEach((item: any) => {
+            const date = new Date(item.ts);
+            const day = date.getDate();
+            dates.push(`${day}`);
+            // Convert MB to GB (divide by 1024)
+            values.push(item.value / 1024);
+          });
+        } else {
+          // Fallback: if no data available, show empty chart
+          const now = new Date();
+          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          for (let i = 1; i <= daysInMonth; i++) {
+            dates.push(`${i}`);
+            values.push(0);
+          }
         }
 
         // Simple echarts configuration for bar chart
@@ -826,7 +845,7 @@ export default defineComponent({
                 show: true,
                 color: 'rgba(255, 255, 255, 0.8)',
                 fontSize: 10,
-                interval: Math.floor(daysInMonth / 6) // Show ~6 labels
+                interval: Math.floor(dates.length / 6) // Show ~6 labels based on actual data length
               }
             },
             yAxis: {
@@ -878,14 +897,26 @@ export default defineComponent({
                 fontSize: 12
               },
               formatter: (params: any) => {
-                const date = params[0].name;
+                const dayNum = params[0].name;
                 const value = params[0].value;
                 const formattedValue = value >= 1000
                   ? (value / 1000).toFixed(2) + ' TB'
                   : value.toFixed(2) + ' GB';
 
-                const monthName = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleString('default', { month: 'short' });
-                return `${monthName} ${date}<br/>Usage: ${formattedValue}`;
+                // Get the actual date from ingestion history for this day
+                const ingestionHistory = store.state.zoConfig?.ingestion_history || [];
+                const matchingEntry = ingestionHistory.find((item: any) => {
+                  const date = new Date(item.ts);
+                  return date.getDate() === parseInt(dayNum);
+                });
+
+                if (matchingEntry) {
+                  const fullDate = new Date(matchingEntry.ts);
+                  const monthName = fullDate.toLocaleString('default', { month: 'short' });
+                  return `${monthName} ${dayNum}<br/>Usage: ${formattedValue}`;
+                }
+
+                return `Day ${dayNum}<br/>Usage: ${formattedValue}`;
               }
             },
             animation: true
