@@ -16,7 +16,10 @@
 use config::{get_config, meta::stream::StreamType};
 #[cfg(feature = "enterprise")]
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
-use utoipa::{Modify, OpenApi, openapi::security::SecurityScheme};
+use utoipa::{
+    Modify, OpenApi,
+    openapi::security::{Http, HttpAuthScheme, SecurityScheme},
+};
 
 use crate::{common::meta, handler::http::request};
 
@@ -458,6 +461,10 @@ impl Modify for SecurityAddon {
             SecurityScheme::ApiKey(utoipa::openapi::security::ApiKey::Header(
                 utoipa::openapi::security::ApiKeyValue::new("Authorization"),
             )),
+        );
+        components.add_security_scheme(
+            "BasicAuth",
+            SecurityScheme::Http(Http::new(HttpAuthScheme::Basic)),
         );
     }
 }

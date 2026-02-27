@@ -103,14 +103,18 @@ class FunctionsPage {
   }
 
   async enterFunctionCode(code) {
-    const editor = this.page.locator(this.functionEditor);
-    await editor.click();
-    await this.page.waitForTimeout(500);
+    // Focus the actual textarea inside the Monaco editor (not the container div).
+    // On headless Linux, clicking the wrapper div doesn't transfer focus to Monaco's
+    // internal textarea, so keyboard.type() sends keystrokes to nothing.
+    const textarea = this.page.locator(`${this.functionEditor} textarea`);
+    await textarea.focus();
+    await this.page.waitForTimeout(300);
 
     // Clear existing content and type new code
-    // Use Meta+A on macOS (Cmd+A), Control+A on Linux/Windows
     const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
     await this.page.keyboard.press(selectAll);
+    await this.page.keyboard.press('Backspace');
+    await this.page.waitForTimeout(200);
     await this.page.keyboard.type(code);
     // Wait longer than the Monaco editor's 500ms debounce so formData syncs via v-model
     await this.page.waitForTimeout(1000);
