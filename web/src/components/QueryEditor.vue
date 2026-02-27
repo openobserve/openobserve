@@ -11,7 +11,7 @@
       class="ai-input-bar tw:p-2 tw:flex-shrink-0 tw:z-10"
     >
       <!-- Show streaming status with spinner + stop button -->
-      <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2">
+      <div v-if="isGenerating" :class="aiBarStreamingClass">
         <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
         <q-spinner-dots color="primary" size="1.2em" />
         <span class="tw:text-sm tw:flex-1">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
@@ -35,7 +35,7 @@
           dense
           borderless
           :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
-          class="ai-input-field tw:flex-1"
+          :class="aiInputFieldClass"
           :data-test="`${dataTestPrefix}-ai-input-field`"
           @keydown.enter="handleAIInputEnter"
         >
@@ -232,6 +232,20 @@ const nlpIcon = computed(() => {
   return store.state.theme === 'dark'
     ? getImageURL('images/common/ai_icon_dark.svg')
     : getImageURL('images/common/ai_icon.svg');
+});
+
+// Computed: AI input field class based on theme
+const aiInputFieldClass = computed(() => {
+  return store.state.theme === 'dark'
+    ? 'ai-input-field ai-input-field--dark tw:flex-1'
+    : 'ai-input-field tw:flex-1';
+});
+
+// Computed: AI streaming bar class based on theme
+const aiBarStreamingClass = computed(() => {
+  return store.state.theme === 'dark'
+    ? 'ai-bar-streaming ai-bar-streaming--dark tw:flex tw:items-center tw:gap-2'
+    : 'ai-bar-streaming tw:flex tw:items-center tw:gap-2';
 });
 
 // Computed: Is in AI mode?
@@ -649,16 +663,29 @@ defineExpose({
   color: #666;
 }
 
-/* Dark mode styling */
-.q-dark .ai-input-field :deep(.q-field__control) {
-  background: var(--q-dark);
+/* Dark mode styling - using store.state.theme */
+.ai-input-field--dark :deep(.q-field__control) {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.q-dark .ai-bar-streaming {
-  background: var(--q-dark);
+.ai-input-field--dark :deep(.q-field__native),
+.ai-input-field--dark :deep(input) {
+  color: #fff !important;
 }
 
-.q-dark .ai-bar-streaming span {
+.ai-input-field--dark :deep(.q-field__native::placeholder),
+.ai-input-field--dark :deep(input::placeholder) {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Dark mode streaming bar - using store.state.theme */
+.ai-bar-streaming--dark {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.ai-bar-streaming--dark span {
   color: #ccc;
 }
 </style>
