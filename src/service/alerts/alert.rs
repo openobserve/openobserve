@@ -1667,29 +1667,37 @@ async fn process_dest_template(
             .replace("{alert_promql_value}", &contidion.value.to_string());
     }
 
-    // Check if {rows} is being used in a JSON context
+    // Check if {rows} or {rows:N} is being used in a JSON context (quoted value position)
     let is_json_rows_context = check_json_context(&resp, "rows");
 
     if is_json_rows_context {
-        // If the row template type is json, then all row_tpl_val elements are JSON values, inject
-        // as JSON array Otherwise, the row_tpl_val is a normal string, so inject as a
-        // single string joined with \n
-        let mut all_json = true;
-
-        for v in rows_tpl_val.iter() {
-            if let Value::String(_) = v {
-                all_json = false;
-                break;
-            }
-        }
+        // Check if all row_tpl_val elements are actual JSON values (not string fallbacks)
+        let all_json = rows_tpl_val.iter().all(|v| !v.is_string());
 
         if all_json {
-            // Create JSON array representation with actual JSON objects
-            let json_array = Value::Array(rows_tpl_val.to_vec());
-            let json_str = serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
-            resp = resp.replace("\"{rows}\"", &json_str);
+            // Determine the row limit from {rows:N} pattern, if present
+            let row_limit = extract_rows_limit(&resp);
+            let limited_rows = if let Some(n) = row_limit {
+                &rows_tpl_val[..n.min(rows_tpl_val.len())]
+            } else {
+                rows_tpl_val
+            };
+
+            // Create JSON array from the row template values as-is (each row produces
+            // one JSON value — object or array — and {rows} is the array of those values)
+            let json_array = Value::Array(limited_rows.to_vec());
+            let json_str =
+                serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
+
+            // Replace either "{rows}" or "{rows:N}" pattern
+            if let Some(n) = row_limit {
+                let pattern = format!("\"{{rows:{n}}}\"");
+                resp = resp.replace(&pattern, &json_str);
+            } else {
+                resp = resp.replace("\"{rows}\"", &json_str);
+            }
         } else {
-            // Fallback to string behavior
+            // Fallback to string behavior for non-JSON row values
             process_variable_replace(
                 &mut resp,
                 "rows",
@@ -1698,7 +1706,7 @@ async fn process_dest_template(
             );
         }
     } else {
-        // Normal string replacement
+        // Normal string replacement (non-JSON context)
         process_variable_replace(
             &mut resp,
             "rows",
@@ -1723,16 +1731,39 @@ async fn process_dest_template(
 }
 
 /// Checks if a variable is being used in a JSON context (i.e., as a direct value in JSON)
-/// For example, {"key": "{var}"} returns true, but {"key": "text {var} text"} returns false
+/// For example, {"key": "{var}"} returns true, but {"key": "text {var} text"} returns false.
+/// Also detects "{var:N}" patterns (e.g., "{rows:3}").
 fn check_json_context(tpl: &str, var_name: &str) -> bool {
+    // Check for "{var}" pattern
     let pattern_with_quotes = format!("\"{{{var_name}}}\"");
+    if is_json_value_position(tpl, &pattern_with_quotes) {
+        return true;
+    }
 
-    if let Some(pos) = tpl.find(&pattern_with_quotes) {
+    // Check for "{var:N}" pattern (e.g., "{rows:3}")
+    let prefix = format!("\"{{{var_name}:");
+    if let Some(start) = tpl.find(&prefix) {
+        let after_prefix = start + prefix.len();
+        if let Some(end) = tpl[after_prefix..].find("}\"") {
+            let num_str = &tpl[after_prefix..after_prefix + end];
+            if num_str.parse::<usize>().is_ok() {
+                let full_pattern = &tpl[start..after_prefix + end + 2]; // includes closing }"
+                if is_json_value_position(tpl, full_pattern) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Checks if a pattern appears in a JSON value position (after `:` and before `,` or `}`)
+fn is_json_value_position(tpl: &str, pattern: &str) -> bool {
+    if let Some(pos) = tpl.find(pattern) {
         let before = &tpl[..pos];
-        let after = &tpl[pos + pattern_with_quotes.len()..];
+        let after = &tpl[pos + pattern.len()..];
 
-        // Pattern should be: "key": "{var_name}" followed by , or }
-        // Check for colon before (with optional whitespace)
         let before_trimmed = before.trim_end();
         let after_trimmed = after.trim_start();
 
@@ -1743,6 +1774,20 @@ fn check_json_context(tpl: &str, var_name: &str) -> bool {
         }
     }
     false
+}
+
+/// Extracts the row limit N from a "{rows:N}" pattern in the template string.
+/// Returns None if only "{rows}" is present (no limit).
+fn extract_rows_limit(tpl: &str) -> Option<usize> {
+    let prefix = "\"{rows:";
+    if let Some(start) = tpl.find(prefix) {
+        let after_prefix = start + prefix.len();
+        if let Some(end) = tpl[after_prefix..].find("}\"") {
+            let num_str = &tpl[after_prefix..after_prefix + end];
+            return num_str.parse::<usize>().ok();
+        }
+    }
+    None
 }
 
 fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue, is_email: bool) {
@@ -2842,5 +2887,187 @@ mod tests {
             r#""data": "{rows}", "msg": "test\"quote""#,
             "rows"
         ));
+    }
+
+    #[test]
+    fn test_check_json_context_with_limit() {
+        // "{rows:1}" in JSON value position
+        assert!(check_json_context(r#""fields": "{rows:1}"}"#, "rows"));
+
+        // "{rows:10}" with larger number
+        assert!(check_json_context(r#""data": "{rows:10}","#, "rows"));
+
+        // "{rows:3}" nested in object
+        assert!(check_json_context(
+            r#"{"embeds": [{"fields": "{rows:3}"}]}"#,
+            "rows"
+        ));
+
+        // "{rows:N}" not in value position — should be false
+        assert!(!check_json_context(r#""{rows:2}": "value""#, "rows"));
+
+        // "{rows:N}" with text around it — should be false
+        assert!(!check_json_context(r#""data": "prefix {rows:1}""#, "rows"));
+    }
+
+    #[test]
+    fn test_extract_rows_limit() {
+        // Simple "{rows:1}"
+        assert_eq!(extract_rows_limit(r#""fields": "{rows:1}""#), Some(1));
+
+        // Larger limit
+        assert_eq!(extract_rows_limit(r#""data": "{rows:25}""#), Some(25));
+
+        // No limit — just "{rows}"
+        assert_eq!(extract_rows_limit(r#""data": "{rows}""#), None);
+
+        // No rows pattern at all
+        assert_eq!(extract_rows_limit(r#""data": "something""#), None);
+    }
+
+    #[tokio::test]
+    async fn test_process_dest_template_json_rows_single_objects() {
+        // JSON row template producing single objects: "{rows}" → [obj1, obj2]
+        let dest_tpl = r#"{"alert": "{alert_name}", "data": "{rows}"}"#;
+        let rows_tpl_val = vec![
+            json!({"user": "Alice", "score": 95}),
+            json!({"user": "Bob", "score": 80}),
+        ];
+        let mut row1 = Map::new();
+        row1.insert("user".to_string(), json!("Alice"));
+        row1.insert("score".to_string(), json!(95));
+        let mut row2 = Map::new();
+        row2.insert("user".to_string(), json!("Bob"));
+        row2.insert("score".to_string(), json!(80));
+        let rows = vec![row1, row2];
+
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+        };
+
+        let result =
+            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
+                .await;
+
+        // The result should be valid JSON with rows as a JSON array of objects
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        let data = &parsed["data"];
+        assert!(data.is_array());
+        let arr = data.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0]["user"], "Alice");
+        assert_eq!(arr[1]["user"], "Bob");
+    }
+
+    #[tokio::test]
+    async fn test_process_dest_template_json_rows_with_limit() {
+        // "{rows:1}" should limit to 1 row
+        let dest_tpl = r#"{"data": "{rows:1}"}"#;
+        let rows_tpl_val = vec![
+            json!({"user": "Alice"}),
+            json!({"user": "Bob"}),
+            json!({"user": "Charlie"}),
+        ];
+        let mut row1 = Map::new();
+        row1.insert("user".to_string(), json!("Alice"));
+        let mut row2 = Map::new();
+        row2.insert("user".to_string(), json!("Bob"));
+        let mut row3 = Map::new();
+        row3.insert("user".to_string(), json!("Charlie"));
+        let rows = vec![row1, row2, row3];
+
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+        };
+
+        let result =
+            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
+                .await;
+
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        let data = &parsed["data"];
+        assert!(data.is_array());
+        let arr = data.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["user"], "Alice");
+    }
+
+    #[tokio::test]
+    async fn test_process_dest_template_json_rows_array_row_template() {
+        // Row template produces an array of objects per row — result is array of arrays
+        let dest_tpl = r#"{"embeds": [{"fields": "{rows}"}]}"#;
+        let rows_tpl_val = vec![json!([
+            {"name": "URL", "value": "/api/test"},
+            {"name": "Method", "value": "GET"}
+        ])];
+        let mut row1 = Map::new();
+        row1.insert("url".to_string(), json!("/api/test"));
+        row1.insert("method".to_string(), json!("GET"));
+        let rows = vec![row1];
+
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+        };
+
+        let result =
+            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
+                .await;
+
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        let fields = &parsed["embeds"][0]["fields"];
+        assert!(fields.is_array());
+        // Single row producing an array → result is [[obj, obj]]
+        let outer = fields.as_array().unwrap();
+        assert_eq!(outer.len(), 1);
+        assert!(outer[0].is_array());
+        let inner = outer[0].as_array().unwrap();
+        assert_eq!(inner.len(), 2);
+        assert_eq!(inner[0]["name"], "URL");
+        assert_eq!(inner[1]["name"], "Method");
+    }
+
+    #[tokio::test]
+    async fn test_process_dest_template_string_rows_unchanged() {
+        // String row template values (Value::String) should use the old string replacement path
+        let dest_tpl = r#"{"data": "{rows}"}"#;
+        let rows_tpl_val = vec![
+            Value::String("Alert 1: user Alice".to_string()),
+            Value::String("Alert 2: user Bob".to_string()),
+        ];
+        let mut row1 = Map::new();
+        row1.insert("user".to_string(), json!("Alice"));
+        let mut row2 = Map::new();
+        row2.insert("user".to_string(), json!("Bob"));
+        let rows = vec![row1, row2];
+
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+        };
+
+        let result =
+            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
+                .await;
+
+        // String values should be joined with \n (non-email), not injected as JSON array
+        assert!(result.contains("Alert 1: user Alice"));
+        assert!(result.contains("Alert 2: user Bob"));
+        // Should NOT be a JSON array
+        assert!(!result.contains("[\"Alert 1"));
     }
 }
