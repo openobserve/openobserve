@@ -12,9 +12,6 @@ const { test } = require("@playwright/test");
 const testLogger = require("../utils/test-logger.js");
 const { CloudLoginPage } = require("../../pages/cloudPages/cloudLoginPage.js");
 
-const ALPHA1_BASE_URL =
-  process.env.ZO_BASE_URL || "https://alpha1.dev.zinclabs.dev";
-
 test.describe("Alpha1 Cloud Login & Sanity", () => {
   let cloudLoginPage;
 
@@ -28,7 +25,7 @@ test.describe("Alpha1 Cloud Login & Sanity", () => {
     { tag: ["@cloudLogin", "@smoke", "@P0", "@cloud", "@all"] },
     async () => {
       testLogger.step("Navigate to alpha1 home page");
-      await cloudLoginPage.gotoHomePage(ALPHA1_BASE_URL);
+      await cloudLoginPage.gotoHomePage();
 
       testLogger.step("Verify URL contains /web/");
       await cloudLoginPage.expectOnWebPage();
@@ -45,7 +42,7 @@ test.describe("Alpha1 Cloud Login & Sanity", () => {
     { tag: ["@cloudLogin", "@smoke", "@P1", "@cloud", "@all"] },
     async () => {
       testLogger.step("Navigate to logs page");
-      await cloudLoginPage.gotoLogsPage(ALPHA1_BASE_URL);
+      await cloudLoginPage.gotoLogsPage();
 
       testLogger.step("Verify URL contains /logs");
       await cloudLoginPage.expectOnLogsPage();
@@ -59,7 +56,7 @@ test.describe("Alpha1 Cloud Login & Sanity", () => {
     { tag: ["@cloudLogin", "@smoke", "@P0", "@cloud", "@all"] },
     async () => {
       testLogger.step("Navigate to alpha1 home page");
-      await cloudLoginPage.gotoHomePage(ALPHA1_BASE_URL);
+      await cloudLoginPage.gotoHomePage();
 
       testLogger.step("Verify on web page");
       await cloudLoginPage.expectOnWebPage();

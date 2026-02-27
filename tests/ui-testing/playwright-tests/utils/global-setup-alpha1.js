@@ -17,6 +17,12 @@ async function globalSetup() {
   }
   const authFile = path.join(authDir, 'user.json');
 
+  // Debug screenshots go to test-results directory
+  const debugDir = path.join(__dirname, '..', '..', 'test-results');
+  if (!fs.existsSync(debugDir)) {
+    fs.mkdirSync(debugDir, { recursive: true });
+  }
+
   const browser = await chromium.launch();
   const context = await browser.newContext({
     viewport: { width: 1500, height: 1024 },
@@ -32,7 +38,6 @@ async function globalSetup() {
 
   try {
     const baseUrl = process.env.ZO_BASE_URL || 'https://alpha1.dev.zinclabs.dev';
-    const orgId = process.env.ORGNAME || '3ACrlU3WeEzp7J07Ie50n5dNTrY';
     const userEmail = process.env.ALPHA1_USER_EMAIL;
     const userPassword = process.env.ALPHA1_USER_PASSWORD;
 
@@ -41,7 +46,6 @@ async function globalSetup() {
     }
 
     // Step 1: Navigate to alpha1 — this redirects to Dex login page
-    // Don't pass org_identifier on initial login - let the app redirect to default org first
     const loginUrl = `${baseUrl}/web/`;
     console.log(`[alpha1] Navigating to ${loginUrl}`);
     await page.goto(loginUrl);
@@ -56,7 +60,6 @@ async function globalSetup() {
     console.log('[alpha1] Clicking "Continue with Email"...');
     await continueWithEmail.click();
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(1000);
 
     console.log(`[alpha1] On Dex local login page: ${page.url()}`);
 
@@ -77,24 +80,23 @@ async function globalSetup() {
     await passwordField.first().fill(userPassword);
     console.log('[alpha1] Password entered');
 
-    // Step 4: Submit and wait for navigation
+    // Step 4: Submit and wait for redirect back to alpha1
     const submitButton = page.locator(
       'button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In"), button:has-text("Log In")'
     );
 
-    // Use Promise.all to click and wait for navigation together
-    await Promise.all([
-      page.waitForNavigation({ timeout: 15000 }),
-      submitButton.first().click(),
-    ]);
+    await submitButton.first().click();
+    await page.waitForURL(
+      url => url.toString().includes(baseUrl),
+      { timeout: 15000 }
+    );
     console.log(`[alpha1] After submit navigation: ${page.url()}`);
 
     // Step 5: Check if we're on a Dex approval page
-    // Dex may show an "Approve" or "Grant Access" page after authentication
     const currentUrl = page.url();
     if (currentUrl.includes('dex/approval') || currentUrl.includes('dex/auth')) {
       console.log('[alpha1] On Dex approval/auth page, looking for grant button...');
-      await page.screenshot({ path: path.join(__dirname, 'debug-dex-approval.png') });
+      await page.screenshot({ path: path.join(debugDir, 'debug-dex-approval.png') });
 
       const grantButton = page.locator(
         'button[type="submit"], button:has-text("Grant Access"), button:has-text("Approve"), ' +
@@ -104,10 +106,11 @@ async function globalSetup() {
       try {
         await grantButton.first().waitFor({ state: 'visible', timeout: 5000 });
         console.log('[alpha1] Found grant/approve button, clicking...');
-        await Promise.all([
-          page.waitForNavigation({ timeout: 15000 }),
-          grantButton.first().click(),
-        ]);
+        await grantButton.first().click();
+        await page.waitForURL(
+          url => !url.toString().includes('dex'),
+          { timeout: 15000 }
+        );
         console.log(`[alpha1] After grant approval: ${page.url()}`);
       } catch {
         console.log('[alpha1] No grant button found, continuing...');
@@ -115,14 +118,13 @@ async function globalSetup() {
     }
 
     // Step 6: Wait for the app to fully load
-    // After Dex completes, we should end up at alpha1
     await page.waitForTimeout(3000);
     console.log(`[alpha1] After settling: ${page.url()}`);
 
     // If still on Dex, wait longer for the redirect
     if (page.url().includes('dex')) {
       console.log('[alpha1] Still on Dex, waiting for redirect...');
-      await page.screenshot({ path: path.join(__dirname, 'debug-still-on-dex.png') });
+      await page.screenshot({ path: path.join(debugDir, 'debug-still-on-dex.png') });
       await page.waitForURL(
         url => !url.toString().includes('dex'),
         { timeout: 30000 }
@@ -142,7 +144,7 @@ async function globalSetup() {
 
     // Step 7: Verify login success
     console.log(`[alpha1] Verifying login at: ${page.url()}`);
-    await page.screenshot({ path: path.join(__dirname, 'debug-alpha1-after-login.png') });
+    await page.screenshot({ path: path.join(debugDir, 'debug-alpha1-after-login.png') });
 
     const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
     await menuItem.waitFor({ state: 'visible', timeout: 15000 });
@@ -153,7 +155,7 @@ async function globalSetup() {
     console.log(`[alpha1] Auth state saved to ${authFile}`);
 
   } catch (error) {
-    const screenshotPath = path.join(__dirname, 'debug-alpha1-login.png');
+    const screenshotPath = path.join(debugDir, 'debug-alpha1-login.png');
     await page.screenshot({ path: screenshotPath }).catch(() => {});
     console.error(`[alpha1] Login failed. Screenshot: ${screenshotPath}`);
     console.error(`[alpha1] Current URL: ${page.url()}`);

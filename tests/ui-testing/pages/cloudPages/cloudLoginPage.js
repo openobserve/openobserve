@@ -30,13 +30,13 @@ export class CloudLoginPage {
 
     // ===== NAVIGATION METHODS =====
 
-    async gotoHomePage(baseUrl) {
-        await this.page.goto(`${baseUrl}/web/`);
+    async gotoHomePage() {
+        await this.page.goto('/web/');
         await this.page.waitForLoadState('networkidle');
     }
 
-    async gotoLogsPage(baseUrl) {
-        await this.page.goto(`${baseUrl}/web/logs`);
+    async gotoLogsPage() {
+        await this.page.goto('/web/logs');
         await this.page.waitForLoadState('domcontentloaded');
     }
 }
