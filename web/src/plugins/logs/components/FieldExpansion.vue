@@ -216,38 +216,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Multi-select action bar -->
           <div
             v-if="selectedValues.length > 0 && selectedStreamsCount == field.streams.length"
-            class="flex items-center justify-between q-pt-xs q-pb-xs q-px-sm multi-select-action-bar"
+            class="multi-select-action-bar q-px-sm q-py-xs"
           >
-            <span class="text-caption">{{ selectedValues.length }} selected</span>
-            <div class="flex items-center q-gutter-xs">
-              <q-btn
-                size="xs"
-                flat
-                dense
-                padding="0.1rem 0.3rem"
-                @click="selectedValues = []"
-                :data-test="`log-search-subfield-clear-selected-${field.name}`"
-              >Clear</q-btn>
-              <q-btn
-                size="xs"
-                dense
-                color="primary"
-                outline
-                padding="0.1rem 0.3rem"
-                @click="handleApplyMultiSelect('include')"
-                title="Include selected values with OR"
-                :data-test="`log-search-subfield-include-selected-${field.name}`"
-              >Include</q-btn>
-              <q-btn
-                size="xs"
-                dense
-                color="negative"
-                outline
-                padding="0.1rem 0.3rem"
-                @click="handleApplyMultiSelect('exclude')"
-                title="Exclude selected values"
-                :data-test="`log-search-subfield-exclude-selected-${field.name}`"
-              >Exclude</q-btn>
+            <div class="flex items-center justify-between">
+              <span class="multi-select-count">
+                {{ selectedValues.length }} selected
+              </span>
+              <div class="flex items-center" style="gap: 0.2rem">
+                <q-btn
+                  flat
+                  round
+                  dense
+                  size="0.2rem"
+                  padding="0.1rem"
+                  class="multi-select-clear-btn"
+                  :class="theme === 'dark' ? 'text-white' : 'text-dark'"
+                  title="Clear selection"
+                  @click="selectedValues = []"
+                  :data-test="`log-search-subfield-clear-selected-${field.name}`"
+                >
+                  <q-icon name="close" size="0.6rem" />
+                </q-btn>
+                <q-btn
+                  unelevated
+                  no-caps
+                  dense
+                  size="0.2rem"
+                  padding="0.1rem 0.3rem"
+                  class="multi-select-include-btn"
+                  @click="handleApplyMultiSelect('include')"
+                  title="Include selected values (OR)"
+                  :data-test="`log-search-subfield-include-selected-${field.name}`"
+                >
+                  Include
+                </q-btn>
+                <q-btn
+                  unelevated
+                  no-caps
+                  dense
+                  size="0.2rem"
+                  padding="0.1rem 0.3rem"
+                  class="multi-select-exclude-btn"
+                  @click="handleApplyMultiSelect('exclude')"
+                  title="Exclude selected values"
+                  :data-test="`log-search-subfield-exclude-selected-${field.name}`"
+                >
+                  Exclude
+                </q-btn>
+              </div>
             </div>
           </div>
         </div>
@@ -349,6 +365,51 @@ const handleApplyMultiSelect = (action: string) => {
 
 .multi-select-action-bar {
   border-top: 1px solid var(--o2-border-color);
-  font-size: 0.75rem;
+  background: var(--o2-hover-accent, rgba(0, 0, 0, 0.02));
+  border-radius: 0 0 0.25rem 0.25rem;
+
+  .multi-select-count {
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: var(--q-primary);
+    display: flex;
+    align-items: center;
+  }
+
+  .multi-select-clear-btn {
+    transition: opacity 0.15s;
+
+    &:hover {
+      opacity: 0.7;
+    }
+  }
+
+  .multi-select-include-btn {
+    background: var(--q-primary) !important;
+    color: #fff !important;
+    border-radius: 0.25rem !important;
+    font-size: 0.625rem !important;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: filter 0.15s;
+
+    &:hover {
+      filter: brightness(1.12);
+    }
+  }
+
+  .multi-select-exclude-btn {
+    background: var(--q-negative) !important;
+    color: #fff !important;
+    border-radius: 0.25rem !important;
+    font-size: 0.625rem !important;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: filter 0.15s;
+
+    &:hover {
+      filter: brightness(1.12);
+    }
+  }
 }
 </style>
