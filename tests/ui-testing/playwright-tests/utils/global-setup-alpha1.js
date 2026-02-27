@@ -78,7 +78,7 @@ async function globalSetup() {
 
     // Step 4: Submit and wait for redirect back to alpha1
     const submitButton = page.locator(
-      'button:has-text("Login"), button:has-text("Sign In"), button:has-text("Log In"), button[type="submit"], input[type="submit"]'
+      'button:has-text("Login"), button:has-text("Sign In"), button:has-text("Log In")'
     );
 
     await submitButton.first().click();
