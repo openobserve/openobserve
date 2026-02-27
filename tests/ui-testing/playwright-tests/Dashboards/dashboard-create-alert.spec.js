@@ -435,13 +435,14 @@ test.describe("Dashboard Create Alert testcases", () => {
       await thresholdOperator.click();
       await page.getByText(">=", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
       await page.getByText(">=", { exact: true }).click();
-      // Close the operator dropdown overlay so it doesn't block the threshold input
-      await page.keyboard.press("Escape");
 
+      // Quasar q-input may place data-test on the native <input> or on its root div,
+      // so match both: 'input[data-test]' (on input) and '[data-test] input' (input inside parent)
       const thresholdInput = page.locator(
-        '[data-test="alert-threshold-value-input"] input'
+        'input[data-test="alert-threshold-value-input"], [data-test="alert-threshold-value-input"] input'
       );
       await thresholdInput.waitFor({ state: "visible", timeout: 10000 });
+      await thresholdInput.clear();
       await thresholdInput.fill("1");
 
       // Select destination
