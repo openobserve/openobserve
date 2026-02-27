@@ -1,0 +1,170 @@
+const { chromium } = require('@playwright/test');
+const path = require('path');
+const fs = require('fs');
+
+/**
+ * Global setup for Alpha1 cloud tests
+ * Handles Dex "Continue with Email" login flow:
+ *   alpha1.dev.zinclabs.dev → dex-alpha1.dev.zinclabs.dev → email/password → approval → redirect back
+ */
+async function globalSetup() {
+  console.log('[alpha1] Starting global setup - Dex email login');
+
+  // Create auth storage directory
+  const authDir = path.join(__dirname, 'auth');
+  if (!fs.existsSync(authDir)) {
+    fs.mkdirSync(authDir, { recursive: true });
+  }
+  const authFile = path.join(authDir, 'user.json');
+
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    viewport: { width: 1500, height: 1024 },
+  });
+  const page = await context.newPage();
+
+  // Log all navigations for debugging
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) {
+      console.log(`[alpha1] [nav] ${frame.url()}`);
+    }
+  });
+
+  try {
+    const baseUrl = process.env.ZO_BASE_URL || 'https://alpha1.dev.zinclabs.dev';
+    const orgId = process.env.ORGNAME || '3ACrlU3WeEzp7J07Ie50n5dNTrY';
+    const userEmail = process.env.ALPHA1_USER_EMAIL;
+    const userPassword = process.env.ALPHA1_USER_PASSWORD;
+
+    if (!userEmail || !userPassword) {
+      throw new Error('ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set');
+    }
+
+    // Step 1: Navigate to alpha1 — this redirects to Dex login page
+    // Don't pass org_identifier on initial login - let the app redirect to default org first
+    const loginUrl = `${baseUrl}/web/`;
+    console.log(`[alpha1] Navigating to ${loginUrl}`);
+    await page.goto(loginUrl);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000);
+
+    console.log(`[alpha1] Current URL: ${page.url()}`);
+
+    // Step 2: Click "Continue with Email" on the Dex page
+    const continueWithEmail = page.getByText('Continue with Email');
+    await continueWithEmail.waitFor({ state: 'visible', timeout: 10000 });
+    console.log('[alpha1] Clicking "Continue with Email"...');
+    await continueWithEmail.click();
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(1000);
+
+    console.log(`[alpha1] On Dex local login page: ${page.url()}`);
+
+    // Step 3: Fill in the Dex local login form
+    const emailField = page.locator(
+      'input[name="login"], input[name="email"], input[name="username"], ' +
+      'input[type="email"], input[type="text"][id="login"]'
+    );
+    const passwordField = page.locator(
+      'input[name="password"], input[type="password"]'
+    );
+
+    await emailField.first().waitFor({ state: 'visible', timeout: 10000 });
+    await emailField.first().fill(userEmail);
+    console.log('[alpha1] Email entered');
+
+    await passwordField.first().waitFor({ state: 'visible', timeout: 5000 });
+    await passwordField.first().fill(userPassword);
+    console.log('[alpha1] Password entered');
+
+    // Step 4: Submit and wait for navigation
+    const submitButton = page.locator(
+      'button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In"), button:has-text("Log In")'
+    );
+
+    // Use Promise.all to click and wait for navigation together
+    await Promise.all([
+      page.waitForNavigation({ timeout: 15000 }),
+      submitButton.first().click(),
+    ]);
+    console.log(`[alpha1] After submit navigation: ${page.url()}`);
+
+    // Step 5: Check if we're on a Dex approval page
+    // Dex may show an "Approve" or "Grant Access" page after authentication
+    const currentUrl = page.url();
+    if (currentUrl.includes('dex/approval') || currentUrl.includes('dex/auth')) {
+      console.log('[alpha1] On Dex approval/auth page, looking for grant button...');
+      await page.screenshot({ path: path.join(__dirname, 'debug-dex-approval.png') });
+
+      const grantButton = page.locator(
+        'button[type="submit"], button:has-text("Grant Access"), button:has-text("Approve"), ' +
+        'input[type="submit"][value="Approve"], button[value="approve"]'
+      );
+
+      try {
+        await grantButton.first().waitFor({ state: 'visible', timeout: 5000 });
+        console.log('[alpha1] Found grant/approve button, clicking...');
+        await Promise.all([
+          page.waitForNavigation({ timeout: 15000 }),
+          grantButton.first().click(),
+        ]);
+        console.log(`[alpha1] After grant approval: ${page.url()}`);
+      } catch {
+        console.log('[alpha1] No grant button found, continuing...');
+      }
+    }
+
+    // Step 6: Wait for the app to fully load
+    // After Dex completes, we should end up at alpha1
+    await page.waitForTimeout(3000);
+    console.log(`[alpha1] After settling: ${page.url()}`);
+
+    // If still on Dex, wait longer for the redirect
+    if (page.url().includes('dex')) {
+      console.log('[alpha1] Still on Dex, waiting for redirect...');
+      await page.screenshot({ path: path.join(__dirname, 'debug-still-on-dex.png') });
+      await page.waitForURL(
+        url => !url.toString().includes('dex'),
+        { timeout: 30000 }
+      );
+    }
+
+    // If stuck on callback URL (/web/cb#id_token=...), the auth cookies are set
+    // but the client-side router may not complete the redirect.
+    // Navigate directly to /web/ — the auth state is already persisted.
+    if (page.url().includes('/cb#') || page.url().includes('/cb?')) {
+      console.log('[alpha1] On callback URL — auth cookies set, navigating to /web/...');
+      await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
+    }
+
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Step 7: Verify login success
+    console.log(`[alpha1] Verifying login at: ${page.url()}`);
+    await page.screenshot({ path: path.join(__dirname, 'debug-alpha1-after-login.png') });
+
+    const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
+    await menuItem.waitFor({ state: 'visible', timeout: 15000 });
+    console.log('[alpha1] Login successful — main menu visible');
+
+    // Save authentication state for tests to reuse
+    await context.storageState({ path: authFile });
+    console.log(`[alpha1] Auth state saved to ${authFile}`);
+
+  } catch (error) {
+    const screenshotPath = path.join(__dirname, 'debug-alpha1-login.png');
+    await page.screenshot({ path: screenshotPath }).catch(() => {});
+    console.error(`[alpha1] Login failed. Screenshot: ${screenshotPath}`);
+    console.error(`[alpha1] Current URL: ${page.url()}`);
+    console.error(`[alpha1] Error: ${error.message}`);
+    throw error;
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+
+  console.log('[alpha1] Global setup completed successfully');
+}
+
+module.exports = globalSetup;
