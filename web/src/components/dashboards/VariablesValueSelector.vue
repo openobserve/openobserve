@@ -238,6 +238,31 @@ export default defineComponent({
       values: [],
     });
 
+    // Cached lookup map for resolveVariableValue — rebuilt only when the reactive
+    // sources (global/tab/current-scope variable values) actually change.
+    // Avoids iterating all variable arrays on every stream/field resolution call.
+    const resolvedVarLookup = computed((): Record<string, any> => {
+      const lookup: Record<string, any> = {};
+      if (useManager && manager) {
+        (manager.variablesData.global || []).forEach((v: any) => {
+          lookup[v.name] = v.value;
+        });
+        if (props.tabId && manager.variablesData.tabs?.[props.tabId]) {
+          manager.variablesData.tabs[props.tabId].forEach((v: any) => {
+            lookup[v.name] = v.value;
+          });
+        }
+        variablesData.values.forEach((v: any) => {
+          lookup[v.name] = v.value;
+        });
+      } else {
+        variablesData.values.forEach((v: any) => {
+          lookup[v.name] = v.value;
+        });
+      }
+      return lookup;
+    });
+
 // ================== FOR DEBUGGING PURPOSES ONLY ==================
     // watch for changes in variablesData.values
     let previousValues: any[] = [];
@@ -745,43 +770,17 @@ export default defineComponent({
         reset: handleSearchReset,
       });
     };
-    // Helper function to resolve variable references in a string
+    // Helper function to resolve variable references in a string.
+    // Uses the cached resolvedVarLookup computed (scope precedence: global → tab → current).
     const resolveVariableValue = (value: string): string => {
       if (!value || typeof value !== 'string') return value ?? "";
 
-      // Build a merged lookup map with scope precedence: global → tab → current scope
-      // This allows tab/panel-level variables to reference global (or tab) variables
-      // in their stream/field, which is critical for cross-scope variable substitution.
-      // Filter substitution works via processVariableContent which already handles
-      // all scopes; this function is specifically for stream/field resolution.
-      const varLookup: Record<string, any> = {};
+      const varLookup = resolvedVarLookup.value;
 
-      if (useManager && manager) {
-        // Global (lowest precedence) — always available as parent scope
-        (manager.variablesData.global || []).forEach((v: any) => {
-          varLookup[v.name] = v.value;
-        });
-        // Tab-level variables (if a tabId is in context)
-        if (props.tabId && manager.variablesData.tabs?.[props.tabId]) {
-          manager.variablesData.tabs[props.tabId].forEach((v: any) => {
-            varLookup[v.name] = v.value;
-          });
-        }
-        // Current scope variables (highest precedence — overrides global/tab)
-        variablesData.values.forEach((v: any) => {
-          varLookup[v.name] = v.value;
-        });
-      } else {
-        // Non-manager mode: use variablesData.values as-is
-        variablesData.values.forEach((v: any) => {
-          varLookup[v.name] = v.value;
-        });
-      }
-
-      // Replace all variable references ($variableName) with their resolved values
+      // Replace all variable references ($variableName) with their resolved values.
       // Using replace callback avoids regex exec loop risks and handles
-      // special replacement patterns ($1, $&, etc.) safely
-      const resolvedValue = value.replace(
+      // special replacement patterns ($1, $&, etc.) safely.
+      return value.replace(
         /\$([a-zA-Z0-9_-]+)/g,
         (fullMatch, varName) => {
           if (varName in varLookup) {
@@ -800,8 +799,6 @@ export default defineComponent({
           return fullMatch;
         },
       );
-
-      return resolvedValue;
     };
 
     const fetchFieldValuesWithWebsocket = (

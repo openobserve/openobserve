@@ -52,10 +52,10 @@ async function setupDashboardAndOpenVariables(page, pm, dashboardName) {
  * for the "add panel if no panel" button which is hidden when panels exist.
  */
 async function openDashboardWithPanels(page, dashboardName) {
-  const dashboardRow = page
-    .locator('//tr[.//div[@title="' + dashboardName + '"]]')
-    .nth(0);
-  await dashboardRow.locator('div[title="' + dashboardName + '"]').click();
+  // Use page.getByTitle() instead of XPath string concatenation — Playwright
+  // handles all escaping internally so dashboard names with special characters
+  // (quotes, brackets, etc.) are matched safely.
+  await page.getByTitle(dashboardName, { exact: true }).first().click();
   await page
     .locator('[data-test="dashboard-panel-container"]')
     .waitFor({ state: "visible", timeout: 20000 });
