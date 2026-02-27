@@ -113,19 +113,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showValueSearch"
             class="value-search-container q-mb-xs"
           >
-            <q-input
-              v-model="valueSearchTerm"
-              dense
-              borderless
-              clearable
-              :placeholder="`Search ${field.name} values…`"
-              class="value-search-input"
-              @clear="valueSearchTerm = ''"
-            >
-              <template #prepend>
-                <q-icon name="search" size="0.875rem" />
-              </template>
-            </q-input>
+            <div class="value-search-input-wrap">
+              <q-input
+                v-model="valueSearchTerm"
+                dense
+                borderless
+                clearable
+                :placeholder="`Search ${field.name} values…`"
+                @clear="valueSearchTerm = ''"
+              >
+                <template #prepend>
+                  <q-icon name="search" size="0.875rem" />
+                </template>
+              </q-input>
+            </div>
           </div>
 
           <!-- Loading state (only shown when there are no interim cached results) -->
@@ -451,36 +452,41 @@ const handleApplyMultiSelect = (action: string) => {
 
 .value-search-container {
   border-bottom: 1px solid var(--o2-border-color);
+}
 
-  .value-search-input {
-    font-size: 0.75rem;
+.value-search-input-wrap {
+  font-size: 0.75rem;
 
-    :deep(.q-field__control) {
-      height: 1.65rem;
-      min-height: 1.65rem;
-      padding: 0 0.25rem;
-      display: flex;
-      align-items: center;
-      border: 1px solid var(--o2-border-color);
-      border-radius: 0.25rem;
-    }
+  &:deep(.q-field__control) {
+    height: 1.65rem;
+    min-height: 1.65rem;
+    padding: 0 0.25rem;
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--o2-border-color);
+    border-radius: 0.25rem;
+  }
 
-    :deep(.q-field__prepend),
-    :deep(.q-field__append) {
-      height: 1.65rem;
-      display: flex;
-      align-items: center;
-      padding-right: 0.25rem;
-    }
+  &:deep(.q-field__prepend),
+  &:deep(.q-field__append) {
+    height: 1.65rem;
+    display: flex;
+    align-items: center;
+    padding-right: 0.25rem;
+  }
 
-    :deep(.q-field__native) {
-      padding: 0;
-      line-height: 1.3;
-    }
+  &:deep(.q-field__native) {
+    padding: 0;
+    line-height: 1.3;
+    height: 1.65rem !important;
+  }
 
-    :deep(.q-field__append .q-icon) {
-      font-size: 0.875rem;
-    }
+  &:deep(.q-field__append .q-icon) {
+    font-size: 0.875rem;
+  }
+
+  .q-icon {
+    line-height: 1.3;
   }
 }
 
