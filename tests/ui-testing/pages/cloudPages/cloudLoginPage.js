@@ -31,7 +31,7 @@ class CloudLoginPage {
 
     async gotoHomePage() {
         await this.page.goto('/web/');
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('domcontentloaded');
     }
 
     async gotoLogsPage() {

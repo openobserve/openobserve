@@ -78,10 +78,9 @@ async function globalSetup() {
       'button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In"), button:has-text("Log In")'
     );
 
-    const baseOrigin = new URL(baseUrl).origin;
     await submitButton.first().click();
     await page.waitForURL(
-      url => new URL(url.toString()).origin === baseOrigin,
+      /web\/|dex\/approval/,
       { timeout: 15000 }
     );
     console.log(`[alpha1] After submit navigation: ${page.url()}`);
