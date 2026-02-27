@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div ref="timelineContainer" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-3 tw:pt-2 tw:pb-4">
-      <div class="tw:relative">
+        <div class="tw:relative">
         <!-- Vertical Timeline Line -->
         <div
           class="tw:absolute tw:left-3 tw:top-0 tw:bottom-0 tw:w-0.5"
@@ -598,9 +598,11 @@ watch(() => props.visible, async (visible) => {
 });
 
 // Watch for refresh trigger from parent component
-watch(() => props.refreshTrigger, (newVal, oldVal) => {
+watch(() => props.refreshTrigger, async (newVal, oldVal) => {
   if (newVal !== oldVal && props.visible && props.incidentId) {
-    fetchEvents();
+    await fetchEvents();
+    await nextTick();
+    scrollToBottom();
   }
 });
 
