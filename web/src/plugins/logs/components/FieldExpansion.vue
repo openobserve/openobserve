@@ -138,11 +138,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-pr-none"
                 :data-test="`logs-search-subfield-add-${field.name}-${value.key}`"
               >
+                <!-- Checkbox for multi-select -->
+                <q-checkbox
+                  v-if="selectedStreamsCount == field.streams.length"
+                  v-model="selectedValues"
+                  :val="value.key"
+                  size="xs"
+                  dense
+                  class="q-mr-xs"
+                  @click.stop
+                />
+
                 <div
                   class="flex row wrap justify-between"
                   :style="
                     selectedStreamsCount == field.streams.length
-                      ? 'width: calc(100% - 2.625rem)'
+                      ? 'width: calc(100% - 4.25rem)'
                       : 'width: 100%'
                   "
                 >
@@ -176,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                     class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
                     size="0.25rem"
-                    @click="handleAddSearchTerm(field.name, value.key, 'include')"
+                    @click.stop="handleAddSearchTerm(field.name, value.key, 'include')"
                     title="Include Term"
                     round
                     :data-test="`log-search-subfield-list-equal-${field.name}-field-btn`"
@@ -188,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                     class="o2-custom-button-hover tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
                     size="0.25rem"
-                    @click="handleAddSearchTerm(field.name, value.key, 'exclude')"
+                    @click.stop="handleAddSearchTerm(field.name, value.key, 'exclude')"
                     title="Exclude Term"
                     round
                     :data-test="`log-search-subfield-list-not-equal-${field.name}-field-btn`"
@@ -201,6 +212,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item>
             </q-list>
           </div>
+
+          <!-- Multi-select action bar -->
+          <div
+            v-if="selectedValues.length > 0 && selectedStreamsCount == field.streams.length"
+            class="flex items-center justify-between q-pt-xs q-pb-xs q-px-sm multi-select-action-bar"
+          >
+            <span class="text-caption">{{ selectedValues.length }} selected</span>
+            <div class="flex items-center q-gutter-xs">
+              <q-btn
+                size="xs"
+                flat
+                dense
+                padding="0.1rem 0.3rem"
+                @click="selectedValues = []"
+                :data-test="`log-search-subfield-clear-selected-${field.name}`"
+              >Clear</q-btn>
+              <q-btn
+                size="xs"
+                dense
+                color="primary"
+                outline
+                padding="0.1rem 0.3rem"
+                @click="handleApplyMultiSelect('include')"
+                title="Include selected values with OR"
+                :data-test="`log-search-subfield-include-selected-${field.name}`"
+              >Include</q-btn>
+              <q-btn
+                size="xs"
+                dense
+                color="negative"
+                outline
+                padding="0.1rem 0.3rem"
+                @click="handleApplyMultiSelect('exclude')"
+                title="Exclude selected values"
+                :data-test="`log-search-subfield-exclude-selected-${field.name}`"
+              >Exclude</q-btn>
+            </div>
+          </div>
         </div>
       </q-card-section>
     </q-card>
@@ -208,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import {
   outlinedAdd,
   outlinedVisibility,
@@ -238,9 +287,16 @@ const emit = defineEmits<{
   "toggle-field": [field: any];
   "toggle-interesting": [field: any, isInteresting: boolean];
   "add-search-term": [fieldName: string, value: string, action: string];
+  "add-multiple-search-terms": [
+    fieldName: string,
+    values: string[],
+    action: string,
+  ];
   "before-show": [event: any, field: any];
   "before-hide": [field: any];
 }>();
+
+const selectedValues = ref<string[]>([]);
 
 const isFieldSelected = computed(() =>
   props.selectedFields.includes(props.field.name),
@@ -251,6 +307,7 @@ const handleBeforeShow = (event: any) => {
 };
 
 const handleBeforeHide = () => {
+  selectedValues.value = [];
   emit("before-hide", props.field);
 };
 
@@ -260,6 +317,17 @@ const handleAddSearchTerm = (
   action: string,
 ) => {
   emit("add-search-term", fieldName, value, action);
+};
+
+const handleApplyMultiSelect = (action: string) => {
+  if (!selectedValues.value.length) return;
+  emit(
+    "add-multiple-search-terms",
+    props.field.name,
+    [...selectedValues.value],
+    action,
+  );
+  selectedValues.value = [];
 };
 </script>
 
@@ -277,5 +345,10 @@ const handleAddSearchTerm = (
 
 :deep(.q-expansion-item):hover .field_overlay {
   display: flex;
+}
+
+.multi-select-action-bar {
+  border-top: 1px solid var(--o2-border-color);
+  font-size: 0.75rem;
 }
 </style>

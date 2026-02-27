@@ -127,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @toggle-field="clickFieldFn"
         @toggle-interesting="addToInterestingFieldList"
         @add-search-term="addSearchTerm"
+        @add-multiple-search-terms="addMultipleSearchTerms"
         @before-show="openFilterCreator"
         @before-hide="cancelFilterCreator"
         @toggle-group="toggleFieldGroup"
@@ -821,6 +822,34 @@ export default defineComponent({
       }
     };
 
+    const addMultipleSearchTerms = (
+      field: string,
+      values: string[],
+      action: string,
+    ) => {
+      if (!values.length) return;
+
+      const expressions = values
+        .map((v) => getFilterExpressionByFieldType(field, v, action))
+        .filter(Boolean);
+
+      if (!expressions.length) {
+        $q.notify({
+          type: "negative",
+          message: "Failed to generate filter expressions",
+        });
+        return;
+      }
+
+      const joinOperator = action === "include" ? " OR " : " AND ";
+      const combined =
+        expressions.length > 1
+          ? `(${expressions.join(joinOperator)})`
+          : expressions[0];
+
+      searchObj.data.stream.addToFilter = combined;
+    };
+
     let fieldIndex: any = -1;
     const addToInterestingFieldList = (
       field: any,
@@ -1400,6 +1429,7 @@ export default defineComponent({
       filterFieldFn,
       addToFilter,
       clickFieldFn,
+      addMultipleSearchTerms,
       getImageURL,
       filterStreamFn,
       openFilterCreator,

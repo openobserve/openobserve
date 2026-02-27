@@ -123,6 +123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (fieldName, value, action) =>
                     $emit('add-search-term', fieldName, value, action)
                 "
+                @add-multiple-search-terms="
+                  (fieldName, values, action) =>
+                    $emit('add-multiple-search-terms', fieldName, values, action)
+                "
                 @before-show="
                   (event, field) => $emit('before-show', event, field)
                 "
@@ -230,6 +234,11 @@ defineEmits<{
   "toggle-field": [field: any];
   "toggle-interesting": [field: any, isInteresting: boolean];
   "add-search-term": [fieldName: string, value: string, action: string];
+  "add-multiple-search-terms": [
+    fieldName: string,
+    values: string[],
+    action: string,
+  ];
   "before-show": [event: any, field: any];
   "before-hide": [field: any];
   "toggle-group": [group: string];
