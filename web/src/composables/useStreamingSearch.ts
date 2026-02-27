@@ -225,7 +225,6 @@ const useHttpStreaming = () => {
 
     } else if (type === "values") {
       url = `/_values_stream`;
-      if (meta?.keyword) url += `?keyword=${encodeURIComponent(meta.keyword)}`;
     } else if (type === "promql") {
       // PromQL streaming endpoint
       // For instant queries, set start == end to get a single evaluation point
