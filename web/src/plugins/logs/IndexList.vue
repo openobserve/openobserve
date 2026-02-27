@@ -325,6 +325,9 @@ export default defineComponent({
     // Caches the original (no-keyword) values so clearing the search box
     // restores them instantly without a new API call.
     const cachedFieldValues = ref<Record<string, { key: string; count: number }[]>>({});
+    // Caches the per-stream values alongside cachedFieldValues so "load more"
+    // appends correctly after a search is cleared.
+    const cachedStreamFieldValues = ref<Record<string, Record<string, { values: { key: string; count: number }[] }>>>({});
     // Tracks the current `from` offset for each field's "load more" pagination.
     const fieldValuesPage = ref<Record<string, number>>({});
 
@@ -656,6 +659,7 @@ export default defineComponent({
         };
         lastFieldFetchPayloads.value[name] = [];
         delete cachedFieldValues.value[name];
+        delete cachedStreamFieldValues.value[name];
         fieldValuesPage.value[name] = 0;
         let query_context = "";
         let query = searchObj.data.query;
@@ -903,10 +907,16 @@ export default defineComponent({
 
       // Restore from cache when the search term is cleared — no API call needed.
       if (!searchTerm && cachedFieldValues.value[fieldName]) {
+        const cachedVals = cachedFieldValues.value[fieldName];
+        const pageSize = store.state.zoConfig?.query_values_default_num || 10;
+        // Restore per-stream values so "load more" appends to the right baseline.
+        streamFieldValues.value[fieldName] =
+          cachedStreamFieldValues.value[fieldName] || {};
         fieldValues.value[fieldName] = {
           isLoading: false,
-          values: [...cachedFieldValues.value[fieldName]],
+          values: [...cachedVals],
           errMsg: "",
+          hasMore: cachedVals.length >= pageSize,
         };
         return;
       }
@@ -919,6 +929,9 @@ export default defineComponent({
         const current = fieldValues.value[fieldName]?.values;
         if (current?.length) {
           cachedFieldValues.value[fieldName] = [...current];
+          cachedStreamFieldValues.value[fieldName] = JSON.parse(
+            JSON.stringify(streamFieldValues.value[fieldName] || {}),
+          );
         }
       }
 
@@ -1474,6 +1487,7 @@ export default defineComponent({
       cancelValueApi(row.name);
       delete lastFieldFetchPayloads.value[row.name];
       delete cachedFieldValues.value[row.name];
+      delete cachedStreamFieldValues.value[row.name];
       delete fieldValuesPage.value[row.name];
     };
 
