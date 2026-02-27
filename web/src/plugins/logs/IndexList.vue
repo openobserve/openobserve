@@ -821,6 +821,103 @@ export default defineComponent({
       }
     };
 
+    const addMultipleSearchTerms = (
+      field: string,
+      values: string[],
+      action: string,
+    ) => {
+      if (!values.length) return;
+
+      const expressions = values
+        .map((v) => getFilterExpressionByFieldType(field, v, action))
+        .filter(Boolean);
+
+      if (!expressions.length) {
+        $q.notify({
+          type: "negative",
+          message: "Failed to generate filter expressions",
+        });
+        return;
+      }
+
+      const joinOperator = action === "include" ? " OR " : " AND ";
+      const combined =
+        expressions.length > 1
+          ? `(${expressions.join(joinOperator)})`
+          : expressions[0];
+
+      searchObj.data.stream.addToFilter = combined;
+    };
+
+    const loadMoreFieldValues = (fieldName: string) => {
+      const payloads = lastFieldFetchPayloads.value[fieldName];
+      if (!payloads?.length) return;
+
+      const pageSize = store.state.zoConfig?.query_values_default_num || 10;
+      const currentFrom = fieldValuesPage.value[fieldName] || 0;
+      const nextFrom = currentFrom + pageSize;
+      fieldValuesPage.value[fieldName] = nextFrom;
+
+      // Show loading without wiping existing values while the next page arrives.
+      if (fieldValues.value[fieldName]) {
+        fieldValues.value[fieldName].isLoading = true;
+        fieldValues.value[fieldName].hasMore = false;
+      }
+
+      for (const payload of payloads) {
+        fetchValuesWithWebsocket({ ...payload, from: nextFrom, size: pageSize });
+      }
+    };
+
+    const searchFieldValues = (fieldName: string, searchTerm: string) => {
+      // Reset pagination whenever the search term changes.
+      fieldValuesPage.value[fieldName] = 0;
+
+      // Restore from cache when the search term is cleared — no API call needed.
+      if (!searchTerm && cachedFieldValues.value[fieldName]) {
+        const cachedVals = cachedFieldValues.value[fieldName];
+        const pageSize = store.state.zoConfig?.query_values_default_num || 10;
+        // Restore per-stream values so "load more" appends to the right baseline.
+        streamFieldValues.value[fieldName] =
+          cachedStreamFieldValues.value[fieldName] || {};
+        fieldValues.value[fieldName] = {
+          isLoading: false,
+          values: [...cachedVals],
+          errMsg: "",
+          hasMore: cachedVals.length >= pageSize,
+        };
+        return;
+      }
+
+      const payloads = lastFieldFetchPayloads.value[fieldName];
+      if (!payloads?.length) return;
+
+      // Snapshot the current values as cache before the first keyword search.
+      if (searchTerm && !cachedFieldValues.value[fieldName]) {
+        const current = fieldValues.value[fieldName]?.values;
+        if (current?.length) {
+          cachedFieldValues.value[fieldName] = [...current];
+          cachedStreamFieldValues.value[fieldName] = JSON.parse(
+            JSON.stringify(streamFieldValues.value[fieldName] || {}),
+          );
+        }
+      }
+
+      fieldValues.value[fieldName] = {
+        isLoading: true,
+        values: [],
+        errMsg: "",
+      };
+      resetFieldValues(fieldName, true);
+
+      for (const payload of payloads) {
+        fetchValuesWithWebsocket({
+          ...payload,
+          keyword: searchTerm || undefined,
+        });
+      }
+    };
+
     let fieldIndex: any = -1;
     const addToInterestingFieldList = (
       field: any,
