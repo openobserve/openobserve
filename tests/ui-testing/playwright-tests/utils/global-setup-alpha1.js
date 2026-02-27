@@ -39,7 +39,7 @@ async function globalSetup() {
     const userEmail = process.env.ALPHA1_USER_EMAIL;
     const userPassword = process.env.ALPHA1_USER_PASSWORD;
 
-    if (!userEmail || !userPassword) {
+    if (!userEmail?.trim() || !userPassword?.trim()) {
       throw new Error('ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set');
     }
 
@@ -89,7 +89,7 @@ async function globalSetup() {
     );
 
     // Check if login failed (Dex error page)
-    if (page.url().includes('error')) {
+    if (/dex\/.*error/.test(page.url())) {
       throw new Error(`Login failed — Dex returned error page: ${page.url()}`);
     }
     testLogger.info(`[alpha1] After submit navigation: ${page.url()}`);

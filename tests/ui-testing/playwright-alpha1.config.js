@@ -1,5 +1,6 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
+const path = require('path');
 const dotenv = require('dotenv');
 const testLogger = require('./playwright-tests/utils/test-logger.js');
 
@@ -70,7 +71,7 @@ module.exports = defineConfig({
         viewport: { width: 1500, height: 1024 },
         permissions: ['clipboard-read', 'clipboard-write'],
         // Reuse auth state from global setup (Dex email login)
-        storageState: './playwright-tests/utils/auth/user.json',
+        storageState: path.join(__dirname, 'playwright-tests/utils/auth/user.json'),
       },
     },
   ],
