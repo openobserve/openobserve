@@ -551,7 +551,7 @@ const handleApplyMultiSelect = (action: string) => {
 }
 
 .values-scroll-container {
-  max-height: 15rem;
+  max-height: 16rem;
   overflow-y: auto;
 }
 
