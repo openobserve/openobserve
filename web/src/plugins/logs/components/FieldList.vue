@@ -113,7 +113,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :selected-streams-count="selectedStreamsCount"
                 :theme="theme"
                 :show-quick-mode="showQuickMode"
-                :default-values-count="defaultValuesCount"
                 @add-to-filter="$emit('add-to-filter', $event)"
                 @toggle-field="$emit('toggle-field', $event)"
                 @toggle-interesting="
@@ -132,11 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (event, field) => $emit('before-show', event, field)
                 "
                 @before-hide="(field) => $emit('before-hide', field)"
-                @search-field-values="
-                  (fieldName, searchTerm) =>
-                    $emit('search-field-values', fieldName, searchTerm)
-                "
-                @load-more-values="(fieldName) => $emit('load-more-values', fieldName)"
               />
             </template>
           </FieldRow>
@@ -224,7 +218,6 @@ interface Props {
   showQuickMode: boolean;
   fieldValues: Record<string, any>;
   selectedStreamsCount: number;
-  defaultValuesCount: number;
   showUserDefinedSchemaToggle: boolean;
   useUserDefinedSchemas: string;
   userDefinedSchemaBtnGroupOption: any[];
@@ -246,8 +239,6 @@ defineEmits<{
     values: string[],
     action: string,
   ];
-  "search-field-values": [fieldName: string, searchTerm: string];
-  "load-more-values": [fieldName: string];
   "before-show": [event: any, field: any];
   "before-hide": [field: any];
   "toggle-group": [group: string];
