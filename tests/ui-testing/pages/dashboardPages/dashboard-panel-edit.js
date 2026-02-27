@@ -139,16 +139,9 @@ export default class DashboardPanel {
 
   //edit layout
   async editLayoutPanel(panelName, height) {
-    // await this.page
-    //   .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
-    //   .waitFor({ state: "visible" });
-    // await this.page
-    //   .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
-    //   .click();
-    await this.page
-      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
-      .waitFor({ state: "visible" })
-      .click();
+    const dropdownBtn = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+    await dropdownBtn.waitFor({ state: "visible" });
+    await dropdownBtn.click();
     await this.editLayout.waitFor({ state: "visible" });
     await this.editLayout.click();
     await this.panelHeight.waitFor({ state: "visible" });
@@ -208,21 +201,21 @@ export default class DashboardPanel {
   }
 
   // Select "above threshold" from alert context menu
-  // Uses evaluate(el.click()) because AlertContextMenu uses <teleport to="body">
-  // which places the menu under overlays that intercept CDP-dispatched pointer events.
-  // Direct DOM click() bypasses browser hit-testing and reliably triggers Vue's handler.
+  // dispatchEvent is used because AlertContextMenu uses <teleport to="body"> which
+  // places the menu under overlays that intercept pointer events from click({ force: true }).
+  // dispatchEvent('click') dispatches directly on the element through Playwright's locator path.
   async selectAlertAboveThreshold() {
     await this.alertContextMenuAbove.waitFor({ state: "visible" });
-    await this.alertContextMenuAbove.evaluate((el) => el.click());
+    await this.alertContextMenuAbove.dispatchEvent("click");
   }
 
   // Select "below threshold" from alert context menu
-  // Uses evaluate(el.click()) because AlertContextMenu uses <teleport to="body">
-  // which places the menu under overlays that intercept CDP-dispatched pointer events.
-  // Direct DOM click() bypasses browser hit-testing and reliably triggers Vue's handler.
+  // dispatchEvent is used because AlertContextMenu uses <teleport to="body"> which
+  // places the menu under overlays that intercept pointer events from click({ force: true }).
+  // dispatchEvent('click') dispatches directly on the element through Playwright's locator path.
   async selectAlertBelowThreshold() {
     await this.alertContextMenuBelow.waitFor({ state: "visible" });
-    await this.alertContextMenuBelow.evaluate((el) => el.click());
+    await this.alertContextMenuBelow.dispatchEvent("click");
   }
 
   //open Query inspector
@@ -240,7 +233,7 @@ export default class DashboardPanel {
     } catch (e) {
       // Menu may not have opened, retry click
       await this.page.keyboard.press('Escape');
-      await this.page.waitForTimeout(500);
+      await this.queryInspector.waitFor({ state: "hidden", timeout: 5000 });
       await dropdownBtn.click();
       await this.queryInspector.waitFor({ state: "visible", timeout: 10000 });
     }
