@@ -454,11 +454,18 @@ watch(() => props.defaultLanguage, (newLang) => {
 // Watch for query changes and update editor if needed
 watch(() => props.query, (newQuery) => {
   // Only update if editor exists and query is different
-  if (editorRef.value && editorRef.value.getValue && editorRef.value.getValue() !== newQuery) {
-    console.log('[QueryEditor] External query changed, updating editor:', newQuery);
-    if (editorRef.value.setValue) {
-      editorRef.value.setValue(newQuery);
-    }
+  if (!editorRef.value?.getValue) return;
+
+  const currentValue = editorRef.value.getValue();
+
+  // Compare trimmed values to avoid cursor jumps from whitespace differences
+  // This prevents setValue calls when user is typing trailing spaces
+  if (currentValue?.trim() === newQuery?.trim()) {
+    return;
+  }
+
+  if (editorRef.value.setValue) {
+    editorRef.value.setValue(newQuery);
   }
 });
 

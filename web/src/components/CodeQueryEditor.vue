@@ -796,8 +796,21 @@ export default defineComponent({
     watch(
       () => props.query,
       (newQuery, oldQuery) => {
-        if (props.readOnly || !editorObj?.hasWidgetFocus()) {
-          editorObj?.getModel()?.setValue(props.query);
+        if (!editorObj) return;
+
+        const currentValue = editorObj.getValue();
+        const newValue = props.query || '';
+        const hasFocus = editorObj.hasWidgetFocus();
+
+        // Only update if:
+        // 1. Editor doesn't have focus (external update), OR
+        // 2. It's readonly AND values are actually different
+        // 3. Compare trimmed values to avoid cursor jumps from trailing spaces
+        const shouldUpdate = (props.readOnly || !hasFocus)
+          && currentValue?.trim() !== newValue?.trim();
+
+        if (shouldUpdate) {
+          editorObj.getModel()?.setValue(newValue);
         }
       },
     );
