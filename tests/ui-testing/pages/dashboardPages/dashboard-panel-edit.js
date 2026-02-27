@@ -1,5 +1,7 @@
 //dashboard panel edit page
-// Methods: Duplicate panel, Edit panel, Delete panel, Download json, Download csv, Move to another tab, Fullscreen panel, Refresh panel, Edit layout, Go to logs
+// Methods: Duplicate panel, Edit panel, Delete panel, Download json, Download csv, Move to another tab, Fullscreen panel, Refresh panel, Edit layout, Go to logs, Create alert from panel
+import { expect } from '@playwright/test';
+
 export default class DashboardPanel {
   constructor(page) {
     this.page = page;
@@ -44,6 +46,17 @@ export default class DashboardPanel {
     this.queryInspector = page.locator(
       '[data-test="dashboard-query-inspector-panel"]'
     );
+
+    // VERIFIED: Create Alert from Panel Menu (PanelContainer.vue:289)
+    this.createAlertFromPanel = page.locator('[data-test="dashboard-create-alert-from-panel"]');
+
+    // VERIFIED: Alert Context Menu selectors (AlertContextMenu.vue)
+    this.alertContextMenu = page.locator('[data-test="alert-context-menu"]');
+    this.alertContextMenuAbove = page.locator('[data-test="alert-context-menu-above"]');
+    this.alertContextMenuBelow = page.locator('[data-test="alert-context-menu-below"]');
+
+    // VERIFIED: Chart renderer (ChartRenderer.vue:19)
+    this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
   }
 
   // Duplicate panel
@@ -126,16 +139,9 @@ export default class DashboardPanel {
 
   //edit layout
   async editLayoutPanel(panelName, height) {
-    // await this.page
-    //   .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
-    //   .waitFor({ state: "visible" });
-    // await this.page
-    //   .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
-    //   .click();
-    await this.page
-      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
-      .waitFor({ state: "visible" })
-      .click();
+    const dropdownBtn = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+    await dropdownBtn.waitFor({ state: "visible" });
+    await dropdownBtn.click();
     await this.editLayout.waitFor({ state: "visible" });
     await this.editLayout.click();
     await this.panelHeight.waitFor({ state: "visible" });
@@ -153,6 +159,65 @@ export default class DashboardPanel {
     await this.goToLogs.click();
   }
 
+  // Create Alert from panel dropdown menu
+  async createAlertFromPanelMenu(panelName) {
+    await this.page
+      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+      .click();
+    await this.createAlertFromPanel.waitFor({ state: "visible" });
+    await this.createAlertFromPanel.click();
+  }
+
+  // Right-click on chart center to open alert context menu
+  // Retries because ECharts needs time after data load to register contextmenu handlers
+  async rightClickChartForAlert(maxRetries = 3) {
+    const chartCanvas = this.chartRendererCanvas.first();
+    await chartCanvas.waitFor({ state: "visible", timeout: 15000 });
+    const box = await chartCanvas.boundingBox();
+    const position = box
+      ? { x: Math.floor(box.width / 2), y: Math.floor(box.height / 2) }
+      : { x: 200, y: 100 };
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      await chartCanvas.click({ button: "right", position });
+      const menuVisible = await this.alertContextMenu
+        .waitFor({ state: "visible", timeout: 3000 })
+        .then(() => true)
+        .catch(() => false);
+      if (menuVisible) return;
+    }
+    // Final attempt without catching - let it throw if still not visible
+    await chartCanvas.click({ button: "right", position });
+  }
+
+  // Verify alert context menu is visible
+  async expectAlertContextMenuVisible() {
+    await expect(this.alertContextMenu).toBeVisible({ timeout: 10000 });
+  }
+
+  // Verify alert context menu is hidden
+  async expectAlertContextMenuHidden() {
+    await expect(this.alertContextMenu).not.toBeVisible({ timeout: 5000 });
+  }
+
+  // Select "above threshold" from alert context menu
+  // dispatchEvent is used because AlertContextMenu uses <teleport to="body"> which
+  // places the menu under overlays that intercept pointer events from click({ force: true }).
+  // dispatchEvent('click') dispatches directly on the element through Playwright's locator path.
+  async selectAlertAboveThreshold() {
+    await this.alertContextMenuAbove.waitFor({ state: "visible" });
+    await this.alertContextMenuAbove.dispatchEvent("click");
+  }
+
+  // Select "below threshold" from alert context menu
+  // dispatchEvent is used because AlertContextMenu uses <teleport to="body"> which
+  // places the menu under overlays that intercept pointer events from click({ force: true }).
+  // dispatchEvent('click') dispatches directly on the element through Playwright's locator path.
+  async selectAlertBelowThreshold() {
+    await this.alertContextMenuBelow.waitFor({ state: "visible" });
+    await this.alertContextMenuBelow.dispatchEvent("click");
+  }
+
   //open Query inspector
 
   async openQueryInspector(panelName) {
@@ -168,7 +233,7 @@ export default class DashboardPanel {
     } catch (e) {
       // Menu may not have opened, retry click
       await this.page.keyboard.press('Escape');
-      await this.page.waitForTimeout(500);
+      await this.queryInspector.waitFor({ state: "hidden", timeout: 5000 });
       await dropdownBtn.click();
       await this.queryInspector.waitFor({ state: "visible", timeout: 10000 });
     }
