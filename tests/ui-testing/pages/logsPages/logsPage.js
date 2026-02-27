@@ -2901,7 +2901,7 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsText(text) {
-        return await expect(this.page.locator(this.queryEditor).locator('.monaco-editor')).toContainText(text);
+        return await expect(this.page.locator(this.queryEditor).locator('.monaco-editor').last()).toContainText(text);
     }
 
     // ===== QUERY EDITOR EXPAND/COLLAPSE METHODS =====
