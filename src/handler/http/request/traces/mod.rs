@@ -153,6 +153,8 @@ pub async fn traces_write(
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
+        ("sort_by" = Option<String>, Query, description = "sort by field: start_time, duration (default: start_time)"),
+        ("sort_order" = Option<String>, Query, description = "sort order: asc, desc (default: desc)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
@@ -320,27 +322,52 @@ pub async fn get_latest_traces(
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    let sort_by = query
+        .get("sort_by")
+        .map_or("start_time", |v| v.as_str())
+        .to_string()
+        .to_lowercase();
+    let sort_order = query
+        .get("sort_order")
+        .map_or("desc", |v| v.as_str())
+        .to_string()
+        .to_lowercase();
+    let sort_order_sql = if sort_order == "asc" { "ASC" } else { "DESC" };
 
     // search
     let query_sql = if is_llm_stream {
         format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-        sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
-        sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
-        sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
-        sum(_o2_llm_cost_details_total) as llm_cost_details_total, \
-        FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
-        FROM \"{stream_name}\""
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration, \
+            sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
+            sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
+            sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
+            sum(_o2_llm_cost_details_total) as llm_cost_details_total, \
+            FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+            FROM \"{stream_name}\""
         )
     } else {
         format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM \"{stream_name}\""
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp,
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration \
+            FROM \"{stream_name}\""
         )
     };
+    let sql_order_expr = match sort_by.as_str() {
+        "duration" => format!("zo_sql_duration {sort_order_sql}"),
+        "start_time" | "_timestamp" => format!("zo_sql_timestamp {sort_order_sql}"),
+        _ => {
+            return MetaHttpResponse::bad_request(
+                "Invalid sort_by field, only support duration and start_time",
+            );
+        }
+    };
     let query_sql = if filter.is_empty() {
-        format!("{query_sql} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
+        format!("{query_sql} GROUP BY trace_id ORDER BY {sql_order_expr}")
     } else {
-        format!("{query_sql} WHERE {filter} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
+        format!("{query_sql} WHERE {filter} GROUP BY trace_id ORDER BY {sql_order_expr}")
     };
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -430,6 +457,7 @@ pub async fn get_latest_traces(
         let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
         let trace_start_time = json::get_int_value(item.get("trace_start_time").unwrap());
         let trace_end_time = json::get_int_value(item.get("trace_end_time").unwrap());
+        let trace_duration = json::get_int_value(item.get("zo_sql_duration").unwrap());
         // trace time is nanosecond, need to compare with microsecond
         if trace_start_time / 1000 < start_time {
             start_time = trace_start_time / 1000;
@@ -443,7 +471,7 @@ pub async fn get_latest_traces(
                 trace_id,
                 start_time: trace_start_time,
                 end_time: trace_end_time,
-                duration: 0,
+                duration: trace_duration,
                 spans: [0, 0],
                 service_name: Vec::new(),
                 first_event: serde_json::Value::Null,
@@ -580,7 +608,22 @@ pub async fn get_latest_traces(
         }
     }
     let mut traces_data = traces_data.values().collect::<Vec<&TraceResponseItem>>();
-    traces_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+    match sort_by.as_str() {
+        "duration" => {
+            if sort_order == "asc" {
+                traces_data.sort_by(|a, b| a.duration.cmp(&b.duration));
+            } else {
+                traces_data.sort_by(|a, b| b.duration.cmp(&a.duration));
+            }
+        }
+        _ => {
+            if sort_order == "asc" {
+                traces_data.sort_by(|a, b| a.start_time.cmp(&b.start_time));
+            } else {
+                traces_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+            }
+        }
+    }
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -895,17 +938,22 @@ async fn process_latest_traces_stream(
     // Build the aggregation SQL (Query 1) — identical to get_latest_traces
     let query_sql_base = if is_llm_stream {
         format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-        sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
-        sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
-        sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
-        sum(_o2_llm_cost_details_total) as llm_cost_details_total, \
-        FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
-        FROM \"{stream_name}\""
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration, \
+            sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
+            sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
+            sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
+            sum(_o2_llm_cost_details_total) as llm_cost_details_total, \
+            FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+            FROM \"{stream_name}\""
         )
     } else {
         format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM \"{stream_name}\""
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration \
+            FROM \"{stream_name}\""
         )
     };
     let query_sql = if filter.is_empty() {

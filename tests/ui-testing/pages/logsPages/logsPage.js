@@ -108,7 +108,7 @@ export class LogsPage {
         this.histogramToggleDiv = '[data-test="logs-search-bar-show-histogram-toggle-btn"] div';
 
         // Additional locators
-        this.fnEditor = '#fnEditor';
+        this.fnEditor = '[data-test="logs-vrl-function-editor"]';
         this.searchListFirstTextLeft = '.search-list > :nth-child(1) > .text-left';
         this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn"]';
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
@@ -352,7 +352,7 @@ export class LogsPage {
 
         while (fnEditorExists === 0 && retries > 0) {
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            fnEditorExists = await this.page.locator('#fnEditor').count();
+            fnEditorExists = await this.page.locator('[data-test="logs-vrl-function-editor"]').count();
 
             if (fnEditorExists === 0) {
                 await this.page.waitForTimeout(2000);
@@ -370,7 +370,7 @@ export class LogsPage {
             await this.page.goto(currentUrl.toString());
             await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-            fnEditorExists = await this.page.locator('#fnEditor').count();
+            fnEditorExists = await this.page.locator('[data-test="logs-vrl-function-editor"]').count();
 
             if (fnEditorExists === 0) {
                 // Take screenshot for debugging
@@ -1727,7 +1727,7 @@ export class LogsPage {
     }
 
     async clickQueryEditorTextbox() {
-        return await this.page.locator(this.queryEditor).locator('.monaco-editor').click();
+        return await this.page.locator(this.queryEditor).getByRole('code').click();
     }
 
     async fillQueryEditor(query) {
@@ -2785,7 +2785,7 @@ export class LogsPage {
 
     async expectVrlFieldVisible() {
         // When in query editor view, check if the query editor container is visible
-        const queryEditor = this.page.locator('.query-editor-container, #fnEditor');
+        const queryEditor = this.page.locator('.query-editor-container, [data-test="logs-vrl-function-editor"]');
         const isEditorVisible = await queryEditor.first().isVisible();
 
         if (!isEditorVisible) {
@@ -2901,7 +2901,7 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsText(text) {
-        return await expect(this.page.locator(this.queryEditor).locator('.monaco-editor')).toContainText(text);
+        return await expect(this.page.locator(this.queryEditor).locator('.monaco-editor').last()).toContainText(text);
     }
 
     // ===== QUERY EDITOR EXPAND/COLLAPSE METHODS =====
@@ -3748,14 +3748,14 @@ export class LogsPage {
 
     async toggleQueryModeEditor() {
         await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
-        // Wait for the Monaco editor container to appear (Firefox needs this)
+        // Wait for the VRL function editor container to appear (Firefox needs this)
         await this.page.waitForTimeout(2000);
-        await this.page.locator('#fnEditor').waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.locator('[data-test="logs-vrl-function-editor"]').first().waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async clickMonacoEditor() {
         // Wait for Monaco editor to be fully rendered (Firefox needs longer)
-        const monacoEditor = this.page.locator('#fnEditor').locator('.monaco-editor');
+        const monacoEditor = this.page.locator('[data-test="logs-vrl-function-editor"]').first().locator('.monaco-editor').last();
         await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
         // Scroll into view for Firefox (element may be outside viewport)
         await monacoEditor.scrollIntoViewIfNeeded();
@@ -3765,8 +3765,8 @@ export class LogsPage {
 
     async fillMonacoEditor(text) {
         // Wait for Monaco editor to be visible (Firefox rendering is slower)
-        const fnEditorContainer = this.page.locator('#fnEditor');
-        const monacoEditor = fnEditorContainer.locator('.monaco-editor');
+        const fnEditorContainer = this.page.locator('[data-test="logs-vrl-function-editor"]').first();
+        const monacoEditor = fnEditorContainer.locator('.monaco-editor').last();
         await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
 
         // Use JavaScript to scroll the fnEditor into center of viewport (more reliable for Firefox)

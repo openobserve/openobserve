@@ -773,8 +773,14 @@ export default defineComponent({
     const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
     onMounted(async () => {
-      // Set up alerts context provider
-      const alertsProvider = createAlertsContextProvider(formData, store, props.isUpdated);
+      // Set up alerts context provider with stream information
+      const alertsProvider = createAlertsContextProvider(
+        formData,
+        store,
+        props.isUpdated,
+        formData.value.stream_name,
+        formData.value.stream_type
+      );
       contextRegistry.register('alerts', alertsProvider);
       contextRegistry.setActive('alerts');
 
@@ -812,6 +818,23 @@ export default defineComponent({
       // are registered in their respective component watchers (step2Ref, step4Ref)
       // with proper field refs for highlighting
     });
+
+    // Watch for stream changes and update context provider
+    watch(
+      () => [formData.value.stream_name, formData.value.stream_type],
+      ([newStreamName, newStreamType]) => {
+        console.log('[AddAlert] Stream changed, updating context provider:', { newStreamName, newStreamType });
+        const alertsProvider = createAlertsContextProvider(
+          formData,
+          store,
+          props.isUpdated,
+          newStreamName,
+          newStreamType
+        );
+        contextRegistry.register('alerts', alertsProvider);
+        // Keep alerts context active (don't need to re-set active)
+      }
+    );
 
     // Watch for step4Ref (AlertSettings) to register wizard mode field refs
     watch(step4Ref, (newVal) => {

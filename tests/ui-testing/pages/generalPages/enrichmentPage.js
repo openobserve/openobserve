@@ -26,7 +26,7 @@ class EnrichmentPage {
         this.dateTimeBtn = '[data-test="date-time-btn"]';
         
         // VRL editor locator
-        this.vrlEditor = '#fnEditor';
+        this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.refreshButton = "[data-test='logs-search-bar-refresh-btn']";
         this.showQueryToggleBtn = '[data-test="logs-search-bar-show-query-toggle-btn"] div';
         
@@ -610,7 +610,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             testLogger.debug('VRL editor visible after clicking toggle button');
         }
         
-        const vrlEditorExists = await this.page.locator('#fnEditor').count();
+        const vrlEditorExists = await this.page.locator('[data-test="logs-vrl-function-editor"]').count();
         testLogger.debug('VRL Editor count after URL logic', { vrlEditorExists });
 
         // Wait for enrichment table to be fully indexed and available for querying

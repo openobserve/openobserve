@@ -197,10 +197,9 @@ test.describe("dashboard UI testcases", () => {
     // await page.locator(".cm-line").first().click();
 
     // Focus on the first line of the editor
-    await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".monaco-editor")
+      .getByRole('code')
       .click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
