@@ -1843,7 +1843,7 @@ pub struct DiskCache {
     // Disk data cache bucket num, multiple bucket means multiple locker, default is 0
     #[env_config(name = "ZO_DISK_CACHE_BUCKET_NUM", default = 0)]
     pub bucket_num: usize,
-    // MB, default is 50% of local volume available space and maximum 100GB
+    // MB, default is 50% of local volume available space and maximum 500GB
     #[env_config(name = "ZO_DISK_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
     // MB, default is 10% of local volume available space and maximum 20GB
@@ -2970,8 +2970,8 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         let cache_current_size = get_dir_size(cache_dir);
         let effective_free = cfg.limit.disk_free + cache_current_size;
         cfg.disk_cache.max_size = effective_free / 2; // 50%
-        if cfg.disk_cache.max_size > 1024 * 1024 * 1024 * 100 {
-            cfg.disk_cache.max_size = 1024 * 1024 * 1024 * 100; // 100GB
+        if cfg.disk_cache.max_size > 1024 * 1024 * 1024 * 500 {
+            cfg.disk_cache.max_size = 1024 * 1024 * 1024 * 500; // 500GB
         }
     } else {
         cfg.disk_cache.max_size *= 1024 * 1024;
