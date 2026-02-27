@@ -886,10 +886,6 @@ export default defineComponent({
       const nextFrom = currentFrom + pageSize;
       fieldValuesPage.value[fieldName] = nextFrom;
 
-      // Backend expects: SQL LIMIT = size, DataFusion SKIP = from.
-      // Rows returned = size - from = pageSize, so size must equal from + pageSize.
-      const totalSize = nextFrom + pageSize;
-
       // Show loading without wiping existing values while the next page arrives.
       if (fieldValues.value[fieldName]) {
         fieldValues.value[fieldName].isLoading = true;
@@ -897,7 +893,7 @@ export default defineComponent({
       }
 
       for (const payload of payloads) {
-        fetchValuesWithWebsocket({ ...payload, from: nextFrom, size: totalSize });
+        fetchValuesWithWebsocket({ ...payload, from: nextFrom, size: pageSize });
       }
     };
 
