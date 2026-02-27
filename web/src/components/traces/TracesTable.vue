@@ -212,8 +212,8 @@ function getColumnStyle(column: Column<T, unknown>): Record<string, string> {
   const meta = column.columnDef.meta;
 
   if (meta?.grow) {
-    const min = meta.minWidth ?? column.columnDef.minSize ?? 100;
-    return { flex: "1 1 0", minWidth: `${min}px`, overflow: "hidden" };
+    const min = meta.width ?? column.columnDef.minSize ?? 100;
+    return { flex: "1 1 0", width: `${min}px`, overflow: "hidden" };
   }
 
   const size = column.getSize();

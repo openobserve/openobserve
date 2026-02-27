@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row items-center" data-test="trace-row-service">
+  <div class="row items-center tw:flex-nowrap!" data-test="trace-row-service">
     <!-- Service colour dot -->
     <span
       data-test="trace-row-service-dot"
@@ -27,13 +27,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Service name + operation -->
-    <div class="column tw:min-w-0">
-      <span
-        data-test="trace-row-service-name"
-        class="text-weight-bold ellipsis tw:text-[var(--o2-text-4)]! tw:text-[0.875rem]! tw:tracking-[0.03rem]!"
+    <div class="column tw:min-w-0 tw:flex-nowrap!">
+      <!-- First line: service name + badge -->
+      <div
+        class="row items-center tw:gap-[0.325rem] tw:min-w-0 tw:flex-nowrap!"
       >
-        {{ item.service_name }}
-      </span>
+        <span
+          data-test="trace-row-service-name"
+          class="text-weight-bold ellipsis tw:min-w-0 tw:text-[var(--o2-text-4)]! tw:text-[0.875rem]! tw:tracking-[0.03rem]!"
+        >
+          {{ item.service_name }}
+        </span>
+        <QBadge
+          v-if="extraServices.length > 0"
+          data-test="trace-row-extra-services"
+          :label="`+${extraServices.length}`"
+          class="tw:shrink-0 tw:bg-[var(--o2-tag-grey-2)]! tw:text-[var(--o2-text-1)]! tw:px-[0.5rem]! tw:py-[0.25rem]!"
+        >
+          <QTooltip
+            anchor="bottom middle"
+            self="top middle"
+            class="extra-services-tooltip"
+          >
+            <div
+              v-for="svc in extraServices"
+              :key="svc.name"
+              class="tw:flex tw:items-center"
+            >
+              <div
+                class="tw:h-2 tw:w-2 tw:rounded-sm tw:mr-2"
+                :style="{
+                  backgroundColor: svc.color,
+                  boxShadow: `0 0 0.5rem ${svc.color}`,
+                }"
+              />
+              <span
+                class="text-weight-bold ellipsis tw:text-[var(--o2-text-4)]! tw:text-[0.875rem]! tw:tracking-[0.03rem]!"
+              >
+                {{ svc.name }}
+              </span>
+            </div>
+          </QTooltip>
+        </QBadge>
+      </div>
+
       <span
         data-test="trace-row-operation-name"
         class="text-caption text-grey-6 ellipsis tw:text-[var(--o2-text-1)]!"
@@ -41,39 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ item.operation_name }}
       </span>
     </div>
-
-    <!-- +N more badge for multi-service traces -->
-    <QBadge
-      v-if="extraServices.length > 0"
-      data-test="trace-row-extra-services"
-      :label="`+${extraServices.length}`"
-      class="tw:bg-[var(--o2-tag-grey-2)]! tw:text-[var(--o2-text-1)]! tw:px-[0.5rem]! tw:py-[0.25rem]! tw:ml-[0.325rem]"
-    >
-      <QTooltip
-        anchor="bottom middle"
-        self="top middle"
-        class="extra-services-tooltip"
-      >
-        <div
-          v-for="svc in extraServices"
-          :key="svc.name"
-          class="tw:flex tw:items-center"
-        >
-          <div
-            class="tw:h-2 tw:w-2 tw:rounded-sm tw:mr-2"
-            :style="{
-              backgroundColor: svc.color,
-              boxShadow: `0 0 0.5rem ${svc.color}`,
-            }"
-          />
-          <span
-            class="text-weight-bold ellipsis tw:text-[var(--o2-text-4)]! tw:text-[0.875rem]! tw:tracking-[0.03rem]!"
-          >
-            {{ svc.name }}
-          </span>
-        </div>
-      </QTooltip>
-    </QBadge>
   </div>
 </template>
 
