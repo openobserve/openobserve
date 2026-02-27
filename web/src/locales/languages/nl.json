@@ -116,7 +116,9 @@
     "set": "+ Set",
     "copy": "Kopiëren",
     "copySuccess": "Gekopieerd naar klembord",
-    "copyError": "Kopiëren naar klembord is mislukt"
+    "copyError": "Kopiëren naar klembord is mislukt",
+    "goBack": "Ga terug",
+    "stopGenerating": "Stop met genereren"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -129,7 +131,7 @@
     "source": "_bron",
     "noResult": "Geen resultaat",
     "syntaxGuide": "Handleiding voor syntaxis",
-    "recordsPerPage": "Records per pagina",
+    "rowsPerPage": "Records per pagina",
     "showing": "bewijs",
     "of": "van",
     "rowDetail": "Details van de bron",
@@ -320,7 +322,37 @@
     "buildQuery": "Bouwen",
     "enableSqlModeForBuild": "Schakel de SQL-modus in en selecteer een enkele stream om de querybuilder te gebruiken",
     "applyToSearch": "Toepassen om te zoeken",
-    "complexQueryDetected": "Complexe zoekopdracht gedetecteerd. Met behulp van de aangepaste modus."
+    "complexQueryDetected": "Complexe zoekopdracht gedetecteerd. Met behulp van de aangepaste modus.",
+    "nlpModeLabel": "Modus voor natuurlijke taal",
+    "generateSQL": "SQL genereren",
+    "generateQuery": "Query genereren",
+    "generateSQLTooltip": "Genereer een SQL-query uit natuurlijke taal (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Genereer een SQL-query op basis van natuurlijke taal",
+    "generating": "Genereren...",
+    "nlQueryGenerationFailed": "Het genereren van een query is mislukt. Probeer het opnieuw.",
+    "nlQueryGenerationSuccess": "Zoekopdracht succesvol gegenereerd!",
+    "nlpModeDisabledForVisualization": "De modus Natural Language kan niet worden uitgeschakeld tijdens visualisatie met meerdere streams",
+    "askAIPlaceholder": "Vraag AI om hulp bij je vraag...",
+    "aiBarSuccessPlaceholder": "Wat zou je hierna willen doen?",
+    "askAI": "Vraag het aan AI",
+    "askAITooltip": "Vraag AI om hulp bij je vraag",
+    "enterPrompt": "Voer een prompt in om een query te genereren",
+    "analyzingQuery": "Zoekopdracht analyseren...",
+    "generatingQuery": "Zoekopdracht genereren...",
+    "queryGeneratedSuccess": "Zoekopdracht succesvol gegenereerd!",
+    "queryGenerationStopped": "Het genereren van query's is gestopt.",
+    "queryGenerationFailed": "Het genereren van query's is mislukt.",
+    "fetchingResults": "Zoekresultaten ophalen...",
+    "noResultsFound": "Geen resultaten gevonden",
+    "errorFetchingResults": "Fout bij het ophalen van resultaten",
+    "somethingWentWrong": "Er is iets misgegaan",
+    "selectStreamForAI": "Selecteer eerst een stream om AI te gebruiken",
+    "collapseFields": "Velden samenvouwen",
+    "openFields": "Open velden",
+    "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
+    "enterFunctionPrompt": "Voer een prompt in om een functie te genereren",
+    "recordsPerPage": "Records per pagina",
+    "searchDimension": "Afmetingen zoeken"
   },
   "menu": {
     "home": "Home",
@@ -965,7 +997,10 @@
     "jsType": "JavaScript (ES2023)",
     "vrlfunction": "VRL-functie",
     "jsFunctionHint": "Gebruik het object `row` om logvelden te openen en te wijzigen. Voorbeeld: row.new_field = row.existing_field + 'processed';",
-    "vrlFunctionHint": "Gebruik de `.` om de huidige gebeurtenis weer te geven. Voorbeeld: .new_field = .existing_field + 'verwerkt'"
+    "vrlFunctionHint": "Gebruik de `.` om de huidige gebeurtenis weer te geven. Voorbeeld: .new_field = .existing_field + 'verwerkt'",
+    "jsErrorDetails": "Details van JavaScript-fouten",
+    "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
+    "enterFunctionPrompt": "Voer een prompt in om een functie te genereren"
   },
   "confirmDialog": {
     "cancel": "Annuleer",
@@ -1417,6 +1452,13 @@
     "columnsDefaultOrder": "De kolommen worden in hun standaardvolgorde weergegeven",
     "moveUp": "Ga omhoog",
     "moveDown": "Naar beneden gaan",
+    "toggleFunctionEditor": "Functie-editor in- en uitschakelen",
+    "useSavedFunction": "Gebruik de functie Opgeslagen",
+    "showQueryResults": "Resultaten van de zoekopdracht weergeven",
+    "hideQueryResults": "Resultaten van zoekopdrachten verbergen",
+    "vrlExtractionTooltip": "Om geëxtraheerde VRL-velden in het diagram te gebruiken, schrijft u een VRL-functie en klikt u op de knop Toepassen. De velden worden geëxtraheerd, zodat u ze kunt gebruiken om de grafiek samen te stellen.",
+    "errorFetchingFunctions": "Fout bij het ophalen van functies",
+    "functionAppliedSuccess": "De functie {name} is succesvol toegepast.",
     "connectNullValuesTooltip": "Verbind datapunten over ontbrekende waarden met een lijn.",
     "panelTimeSettings": "Instellingen voor paneeltijd",
     "panelTimeEnabled": "Tijd op paneelniveau toestaan",
@@ -2014,7 +2056,20 @@
       "variablesTooltip": "Variabelen worden gebruikt om gegevens van de waarschuwing naar de bestemming door te geven.",
       "rowTemplateTooltip": "Rijsjabloon wordt gebruikt om het waarschuwingsbericht op te maken.",
       "templateType": "Sjabloontype:"
-    }
+    },
+    "addConditions": "Voorwaarden toevoegen",
+    "sqlEditor": "SQL-editor",
+    "promqlEditor": "ProMQL-editor",
+    "vrlEditor": "VRL-redacteur",
+    "generateVRL": "Genereer VRL",
+    "applyVRL": "VRL toepassen",
+    "runQuery": "Query uitvoeren",
+    "onStream": "op",
+    "streamLabel": "stroom",
+    "noStreamSelected": "Geen stream geselecteerd",
+    "resultsIncludeAllWindows": "De resultaten omvatten alle toevoegingen met meerdere vensters",
+    "runQueryForOutput": "Klik op Query uitvoeren om de uitvoer te zien",
+    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2272,6 +2327,7 @@
       "groupsLabel": "groepen",
       "noMatchingGroups": "Geen overeenkomende groepen",
       "fqnFormulaTitle": "Identiteitsformule",
+      "fqnFormulaTooltip": "Toont hoe de service-identiteit wordt berekend. Scope-dimensies (blauw) worden samengevoegd met '/'. De eerste niet-null workload-dimensie (groen) wordt de servicenaam.",
       "scopeDimension": "Scope-dimensie",
       "workloadDimension": "Workload-dimensie",
       "noFormulaConfigured": "Geen identiteitsformule geconfigureerd. Voeg hierboven dimensies toe.",
@@ -2428,7 +2484,11 @@
     "errorSavingPipeline": "Fout tijdens het opslaan van de pijplijn",
     "cancelChangesConfirm": "Weet je zeker dat je wijzigingen wilt annuleren?",
     "cancel": "Annuleer",
-    "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten"
+    "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten",
+    "promqlOnlyForMetrics": "ProMQL is alleen beschikbaar voor het streamtype voor statistieken",
+    "invalidCronExpression": "Ongeldige cron-expressie",
+    "thresholdShouldNotBeEmpty": "Drempelwaarde mag niet leeg zijn",
+    "errorGettingResults": "Fout bij het verkrijgen van resultaten"
   },
   "reports": {
     "header": "Rapporten",
@@ -2487,7 +2547,18 @@
     "timeRangeUpdated": "Dit spoor is niet opgenomen in het geselecteerde tijdbereik. Het tijdbereik is bijgewerkt zodat het overeenkomt met de tijdstempel van de trace.",
     "fetchingMoreTraces": "Nog meer sporen ophalen...",
     "showErrorOnly": "Alleen fout weergeven",
-    "openInTraces": "Openen in Traces"
+    "openInTraces": "Openen in Traces",
+    "errorRetrievingTraces": "Er is een fout opgetreden bij het ophalen van sporen.",
+    "fetchingTraces": "Hou je vast, we halen je sporen op.",
+    "noTracesFoundAdjust": "Geen sporen gevonden. Pas de filters aan en probeer het opnieuw.",
+    "tracesTitle": "SPOREN",
+    "tracesFound": "Sporen gevonden",
+    "error": "FOUT",
+    "errors": "FOUTEN",
+    "success": "SUCCES",
+    "today": "Vandaag",
+    "yesterday": "Gisteren",
+    "spanColorPalettePreview": "Voorbeeld van het kleurenpalet van Span"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -2885,7 +2956,8 @@
     "tracesErrorDetails": "Er is een fout opgetreden tijdens het ophalen van traceergegevens. Probeer het nog eens.",
     "metricsError": "Kan statistieken niet laden",
     "metricsErrorDetails": "Er is een fout opgetreden tijdens het ophalen van metrische gegevens. Probeer het nog eens.",
-    "noMetricsDescription": "Er zijn geen statistieken gevonden voor deze correlatie in het geselecteerde tijdbereik."
+    "noMetricsDescription": "Er zijn geen statistieken gevonden voor deze correlatie in het geselecteerde tijdbereik.",
+    "errorRetrievingTraces": "Er is een fout opgetreden bij het ophalen van sporen."
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",
@@ -2934,5 +3006,10 @@
     "invalidFormat": "Ongeldig formaat",
     "mustBeGreaterThan": "Moet groter zijn dan {value}",
     "mustBeLessThan": "Moet kleiner zijn dan {value}"
+  },
+  "nlMode": {
+    "toggle": "Modus voor natuurlijke taal",
+    "noAdditionalOptions": "Geen aanvullende opties",
+    "generateVRL": "Genereer VRL"
   }
 }

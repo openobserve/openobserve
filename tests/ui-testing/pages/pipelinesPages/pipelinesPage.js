@@ -60,7 +60,8 @@ export class PipelinesPage {
         this.pipelineSearchInput = page.locator('[data-test="pipeline-list-search-input"]');
         this.deletionSuccessMessage = page.getByText('Pipeline deleted successfully')
         this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
-        this.sqlQueryInput = page.locator('.monaco-editor').locator('.inputarea');
+        // Get the innermost Monaco editor element (handles nested .monaco-editor elements)
+        this.sqlQueryInput = page.locator('.monaco-editor').last();
         this.frequencyUnit = page.locator('[data-test="scheduled-pipeline-frequency-unit"]');
         this.saveQueryButton = page.locator('[data-test="stream-routing-query-save-btn"]');
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
@@ -153,9 +154,11 @@ export class PipelinesPage {
 
         // Additional locators for raw selector fixes
         this.functionIcon = page.getByRole("img", { name: "Function", exact: true });
-        this.vrlFunctionEditor = page.locator('[data-test="logs-vrl-function-editor"]');
-        this.vrlEditorViewLines = page.locator('[data-test="logs-vrl-function-editor"] .view-lines');
-        this.vrlEditorMonaco = page.locator('[data-test="logs-vrl-function-editor"]').locator('.monaco-editor');
+        // VRL editor uses unified-query-editor with data-test attribute (may have multiple matches)
+        this.vrlFunctionEditor = page.locator('[data-test="logs-vrl-function-editor"]').first();
+        this.vrlEditorViewLines = page.locator('[data-test="logs-vrl-function-editor"]').first().locator('.view-lines');
+        // Get the innermost Monaco editor element (handles nested .monaco-editor elements)
+        this.vrlEditorMonaco = page.locator('[data-test="logs-vrl-function-editor"]').first().locator('.monaco-editor').last();
         this.noteText = page.getByText("Note: The function will be");
         this.streamTypeDropdown = page.locator('div').filter({ hasText: /^Stream Type \*$/ }).first();
         this.streamTypeLabel = page.getByLabel('Stream Type *');

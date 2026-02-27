@@ -26,9 +26,35 @@ vi.mock("monaco-editor/esm/vs/editor/editor.all.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
   default: {},
   editor: {
-    create: vi.fn(() => null),
+    create: vi.fn(() => ({
+      onDidChangeModelContent: vi.fn(),
+      createContextKey: vi.fn(),
+      addCommand: vi.fn(),
+      onDidFocusEditorWidget: vi.fn(),
+      onDidBlurEditorWidget: vi.fn(),
+      dispose: vi.fn(),
+      getValue: vi.fn(() => ""),
+      setValue: vi.fn(),
+      layout: vi.fn(),
+      getModel: vi.fn(() => ({
+        getValue: vi.fn(() => ""),
+        setValue: vi.fn(),
+        getLineCount: vi.fn(() => 1),
+        getLineLength: vi.fn(() => 0),
+        pushEditOperations: vi.fn(),
+        getOffsetAt: vi.fn(() => 0),
+      })),
+      updateOptions: vi.fn(),
+      hasWidgetFocus: vi.fn(() => false),
+      getRawOptions: vi.fn(() => ({ readOnly: false })),
+      deltaDecorations: vi.fn(() => []),
+      getPosition: vi.fn(() => ({ lineNumber: 1, column: 1 })),
+      trigger: vi.fn(),
+      getAction: vi.fn(() => ({ run: vi.fn(() => Promise.resolve()) })),
+    })),
     defineTheme: vi.fn(),
     setTheme: vi.fn(),
+    setModelMarkers: vi.fn(),
   },
   languages: {
     CompletionItemKind: {},
@@ -49,10 +75,41 @@ vi.mock("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js"
 vi.mock("monaco-editor/esm/vs/basic-languages/python/python.contribution.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js", () => ({}));
 
-vi.mock("@/composables/useLogs", () => ({
+// Fix: component imports default from "@/composables/useLogs/searchState"
+vi.mock("@/composables/useLogs/searchState", () => ({
   default: () => ({
     searchObj: { data: {}, meta: {} },
   }),
+  searchState: () => ({
+    searchObj: { data: {}, meta: {} },
+  }),
+}));
+
+vi.mock("@/composables/useNLQuery", () => ({
+  useNLQuery: () => ({
+    detectNaturalLanguage: vi.fn(() => false),
+    generateSQL: vi.fn(() => Promise.resolve(null)),
+    transformToSQL: vi.fn((_nl: string, sql: string) => sql),
+    isGenerating: { value: false },
+    streamingResponse: { value: "" },
+  }),
+}));
+
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({
+    t: (key: string) => key,
+  }),
+}));
+
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({
+    showErrorNotification: vi.fn(),
+    showPositiveNotification: vi.fn(),
+  }),
+}));
+
+vi.mock("@/utils/zincutils", () => ({
+  getImageURL: vi.fn((path: string) => `/mocked/${path}`),
 }));
 
 vi.mock("@/utils/query/vrlLanguageDefinition", () => ({

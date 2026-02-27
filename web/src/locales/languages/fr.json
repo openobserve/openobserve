@@ -116,7 +116,9 @@
     "set": "+ Ensemble",
     "copy": "Copier",
     "copySuccess": "Copié dans le presse-papiers",
-    "copyError": "Impossible de copier dans le presse-papiers"
+    "copyError": "Impossible de copier dans le presse-papiers",
+    "goBack": "Retourner",
+    "stopGenerating": "Arrêtez de générer"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -129,7 +131,7 @@
     "source": "_source",
     "noResult": "Aucun résultat",
     "syntaxGuide": "Guide de syntaxe",
-    "recordsPerPage": "Enregistrements par page",
+    "rowsPerPage": "Enregistrements par page",
     "showing": "Montrant",
     "of": "de",
     "rowDetail": "Détails de la source",
@@ -320,7 +322,37 @@
     "buildQuery": "Construisez",
     "enableSqlModeForBuild": "Activez le mode SQL et sélectionnez un seul flux pour utiliser le générateur de requêtes",
     "applyToSearch": "Appliquer à la recherche",
-    "complexQueryDetected": "Requête complexe détectée. Utilisation du mode personnalisé."
+    "complexQueryDetected": "Requête complexe détectée. Utilisation du mode personnalisé.",
+    "nlpModeLabel": "Mode langage naturel",
+    "generateSQL": "Générer du code SQL",
+    "generateQuery": "Générer une requête",
+    "generateSQLTooltip": "Générer une requête SQL à partir du langage naturel (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Générer une requête SQL à partir du langage naturel",
+    "generating": "Génération de...",
+    "nlQueryGenerationFailed": "Impossible de générer la requête. Veuillez réessayer.",
+    "nlQueryGenerationSuccess": "Requête générée avec succès !",
+    "nlpModeDisabledForVisualization": "Le mode langage naturel ne peut pas être désactivé lors de la visualisation avec plusieurs flux",
+    "askAIPlaceholder": "Demandez à AI de l'aide pour répondre à votre requête...",
+    "aiBarSuccessPlaceholder": "Qu'aimerais-tu faire ensuite ?",
+    "askAI": "Demandez à AI",
+    "askAITooltip": "Demandez à AI de l'aide pour votre requête",
+    "enterPrompt": "Entrez une invite pour générer une requête",
+    "analyzingQuery": "Analyse de la requête...",
+    "generatingQuery": "Génération d'une requête...",
+    "queryGeneratedSuccess": "Requête générée avec succès !",
+    "queryGenerationStopped": "La génération de requêtes a été arrêtée.",
+    "queryGenerationFailed": "La génération de la requête a échoué.",
+    "fetchingResults": "Récupération des résultats de recherche...",
+    "noResultsFound": "Aucun résultat n'a été trouvé",
+    "errorFetchingResults": "Erreur lors de la récupération des résultats",
+    "somethingWentWrong": "Quelque chose s'est mal passé",
+    "selectStreamForAI": "Sélectionnez d'abord un flux pour utiliser l'IA",
+    "collapseFields": "Effondrer les champs",
+    "openFields": "Champs ouverts",
+    "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
+    "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
+    "recordsPerPage": "Enregistrements par page",
+    "searchDimension": "Dimensions de recherche"
   },
   "menu": {
     "home": "Accueil",
@@ -965,7 +997,10 @@
     "jsType": "JavaScript (ES 2023)",
     "vrlfunction": "Fonction VRL",
     "jsFunctionHint": "Utilisez l'objet row pour accéder aux champs du journal et les modifier. Exemple : row.new_field = row.existing_field + « traité » ;",
-    "vrlFunctionHint": "Utilisez le «. » pour représenter l'événement en cours. Exemple : .new_field = .existing_field + « traité »"
+    "vrlFunctionHint": "Utilisez le «. » pour représenter l'événement en cours. Exemple : .new_field = .existing_field + « traité »",
+    "jsErrorDetails": "Détails de l'erreur JavaScript",
+    "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
+    "enterFunctionPrompt": "Entrez une invite pour générer une fonction"
   },
   "confirmDialog": {
     "cancel": "Annuler",
@@ -1417,6 +1452,13 @@
     "columnsDefaultOrder": "Les colonnes seront affichées dans leur ordre par défaut",
     "moveUp": "Monter",
     "moveDown": "Déplacer vers le bas",
+    "toggleFunctionEditor": "Éditeur de fonctions Toggle",
+    "useSavedFunction": "Utiliser la fonction enregistrée",
+    "showQueryResults": "Afficher les résultats de la requête",
+    "hideQueryResults": "Masquer les résultats de la requête",
+    "vrlExtractionTooltip": "Pour utiliser les champs VRL extraits dans le graphique, écrivez une fonction VRL et cliquez sur le bouton Appliquer. Les champs seront extraits, ce qui vous permettra de les utiliser pour créer le graphique.",
+    "errorFetchingFunctions": "Erreur lors de la récupération des fonctions",
+    "functionAppliedSuccess": "La fonction {name} a été appliquée avec succès.",
     "panelTimeSettings": "Réglages de l'heure du panneau",
     "panelTimeEnabled": "Laisser passer du temps au niveau du panneau",
     "useGlobalTime": "Utiliser l'heure mondiale",
@@ -2014,7 +2056,20 @@
       "variablesTooltip": "Les variables sont utilisées pour transmettre les données de l'alerte à la destination.",
       "rowTemplateTooltip": "Le modèle de ligne est utilisé pour mettre en forme le message d'alerte.",
       "templateType": "Type de modèle :"
-    }
+    },
+    "addConditions": "Ajouter des conditions",
+    "sqlEditor": "Éditeur SQL",
+    "promqlEditor": "Éditeur ProMQL",
+    "vrlEditor": "Éditeur VRL",
+    "generateVRL": "Générer VRL",
+    "applyVRL": "Appliquer VRL",
+    "runQuery": "Exécuter une requête",
+    "onStream": "sur",
+    "streamLabel": "flux",
+    "noStreamSelected": "Aucun flux sélectionné",
+    "resultsIncludeAllWindows": "Les résultats incluent tous les ajouts multi-fenêtres",
+    "runQueryForOutput": "Cliquez sur Exécuter la requête pour voir le résultat",
+    "applyVRLForOutput": "Cliquez sur Appliquer VRL pour voir la sortie combinée"
   },
   "alert_templates": {
     "header": "Modèles",
@@ -2272,6 +2327,7 @@
       "groupsLabel": "groupes",
       "noMatchingGroups": "Aucun groupe correspondant",
       "fqnFormulaTitle": "Formule d'identité",
+      "fqnFormulaTooltip": "Montre comment l'identité de service sera calculée. Les dimensions de portée (bleu) sont concaténées avec '/'. La première dimension de charge de travail non nulle (vert) devient le nom du service.",
       "scopeDimension": "Dimension de portée",
       "workloadDimension": "Dimension de charge de travail",
       "noFormulaConfigured": "Aucune formule d'identité configurée. Ajoutez des dimensions ci-dessus.",
@@ -2428,7 +2484,11 @@
     "errorSavingPipeline": "Erreur lors de l'enregistrement du pipeline",
     "cancelChangesConfirm": "Êtes-vous sûr de vouloir annuler les modifications ?",
     "cancel": "Annuler",
-    "dragDropNodesHere": "Faites glisser et déposez les nœuds ici"
+    "dragDropNodesHere": "Faites glisser et déposez les nœuds ici",
+    "promqlOnlyForMetrics": "ProMQL n'est disponible que pour le type de flux de métriques",
+    "invalidCronExpression": "Expression cron non valide",
+    "thresholdShouldNotBeEmpty": "Le seuil ne doit pas être vide",
+    "errorGettingResults": "Erreur lors de l'obtention des résultats"
   },
   "reports": {
     "header": "Rapports",
@@ -2487,7 +2547,18 @@
     "timeRangeUpdated": "La plage de temps sélectionnée n'incluait pas cette trace. La plage horaire a été mise à jour pour correspondre à l'horodatage de la trace.",
     "fetchingMoreTraces": "À la recherche de nouvelles traces...",
     "showErrorOnly": "Afficher uniquement l'erreur",
-    "openInTraces": "Ouvrir dans Traces"
+    "openInTraces": "Ouvrir dans Traces",
+    "errorRetrievingTraces": "Une erreur s'est produite lors de la récupération des traces.",
+    "fetchingTraces": "Tiens bon, on va chercher tes traces.",
+    "noTracesFoundAdjust": "Aucune trace n'a été trouvée. Veuillez ajuster les filtres et réessayer.",
+    "tracesTitle": "TRACES",
+    "tracesFound": "Traces trouvées",
+    "error": "ERREUR",
+    "errors": "ERREURS",
+    "success": "SUCCÈS",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier",
+    "spanColorPalettePreview": "Aperçu de la palette de couleurs Span"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -2885,7 +2956,8 @@
     "tracesErrorDetails": "Une erreur s'est produite lors de la récupération des données de trace. Veuillez réessayer.",
     "metricsError": "Impossible de charger les métriques",
     "metricsErrorDetails": "Une erreur s'est produite lors de la récupération des données des métriques. Veuillez réessayer.",
-    "noMetricsDescription": "Aucune métrique n'a été trouvée pour cette corrélation dans la plage de temps sélectionnée."
+    "noMetricsDescription": "Aucune métrique n'a été trouvée pour cette corrélation dans la plage de temps sélectionnée.",
+    "errorRetrievingTraces": "Une erreur s'est produite lors de la récupération des traces."
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",
@@ -2934,5 +3006,10 @@
     "invalidFormat": "Format non valide",
     "mustBeGreaterThan": "Doit être supérieur à {value}",
     "mustBeLessThan": "Doit être inférieur à {value}"
+  },
+  "nlMode": {
+    "toggle": "Mode langage naturel",
+    "noAdditionalOptions": "Aucune option supplémentaire",
+    "generateVRL": "Générer VRL"
   }
 }

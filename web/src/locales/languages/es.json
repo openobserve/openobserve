@@ -116,7 +116,9 @@
     "set": "+ Set",
     "copy": "Copiar",
     "copySuccess": "Copiado al portapapeles",
-    "copyError": "No se pudo copiar al portapapeles"
+    "copyError": "No se pudo copiar al portapapeles",
+    "goBack": "Regresar",
+    "stopGenerating": "Deja de generar"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -129,7 +131,7 @@
     "source": "Fuente",
     "noResult": "Sin resultados",
     "syntaxGuide": "Guía de sintaxis",
-    "recordsPerPage": "Registros por página",
+    "rowsPerPage": "Registros por página",
     "showing": "Mostrando",
     "of": "de",
     "rowDetail": "Detalles de la fila",
@@ -320,7 +322,37 @@
     "buildQuery": "Construir",
     "enableSqlModeForBuild": "Habilite el modo SQL y seleccione una sola secuencia para usar el generador de consultas",
     "applyToSearch": "Aplicar a la búsqueda",
-    "complexQueryDetected": "Se detectó una consulta compleja. Uso del modo personalizado."
+    "complexQueryDetected": "Se detectó una consulta compleja. Uso del modo personalizado.",
+    "nlpModeLabel": "Modo de lenguaje natural",
+    "generateSQL": "Generar SQL",
+    "generateQuery": "Generar consulta",
+    "generateSQLTooltip": "Generar una consulta SQL desde lenguaje natural (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Generar consultas SQL a partir de lenguaje natural",
+    "generating": "Generando...",
+    "nlQueryGenerationFailed": "No se pudo generar la consulta. Por favor, inténtelo de nuevo.",
+    "nlQueryGenerationSuccess": "¡Consulta generada correctamente!",
+    "nlpModeDisabledForVisualization": "El modo de lenguaje natural no se puede deshabilitar durante la visualización con varias transmisiones",
+    "askAIPlaceholder": "Pídele a la IA que te ayude con tu consulta...",
+    "aiBarSuccessPlaceholder": "¿Qué le gustaría hacer a continuación?",
+    "askAI": "Pregúntale a AI",
+    "askAITooltip": "Pídele a la IA que te ayude con tu consulta",
+    "enterPrompt": "Introduzca un mensaje para generar una consulta",
+    "analyzingQuery": "Analizando la consulta...",
+    "generatingQuery": "Generando consulta...",
+    "queryGeneratedSuccess": "¡Consulta generada correctamente!",
+    "queryGenerationStopped": "Se detuvo la generación de consultas.",
+    "queryGenerationFailed": "No se pudo generar la consulta.",
+    "fetchingResults": "Obteniendo resultados de búsqueda...",
+    "noResultsFound": "No se han encontrado resultados",
+    "errorFetchingResults": "Error al obtener los resultados",
+    "somethingWentWrong": "Algo salió mal",
+    "selectStreamForAI": "Selecciona primero una transmisión para usar la IA",
+    "collapseFields": "Campos colapsados",
+    "openFields": "Campos abiertos",
+    "askAIFunctionPlaceholder": "Pídele a la IA que te ayude con tu función...",
+    "enterFunctionPrompt": "Introduzca un mensaje para generar la función",
+    "recordsPerPage": "Registros por página",
+    "searchDimension": "Dimensiones de búsqueda"
   },
   "menu": {
     "home": "Inicio",
@@ -965,7 +997,10 @@
     "jsType": "JavaScript (ES 2023)",
     "vrlfunction": "Función VRL",
     "jsFunctionHint": "Utilice el objeto `fila` para acceder a los campos de registro y modificarlos. Ejemplo: row.new_field = row.existing_field + 'processed';",
-    "vrlFunctionHint": "Usa el `.` para representar el evento actual. Ejemplo: .new_field = .existing_field + 'procesado'"
+    "vrlFunctionHint": "Usa el `.` para representar el evento actual. Ejemplo: .new_field = .existing_field + 'procesado'",
+    "jsErrorDetails": "Detalles del error de JavaScript",
+    "askAIFunctionPlaceholder": "Pídele a la IA que te ayude con tu función...",
+    "enterFunctionPrompt": "Introduzca un mensaje para generar la función"
   },
   "confirmDialog": {
     "cancel": "Cancelar",
@@ -1417,6 +1452,13 @@
     "columnsDefaultOrder": "Las columnas se mostrarán en su orden predeterminado",
     "moveUp": "Muévete hacia arriba",
     "moveDown": "Muévete hacia abajo",
+    "toggleFunctionEditor": "Alternar editor de funciones",
+    "useSavedFunction": "Usar la función Guardado",
+    "showQueryResults": "Mostrar los resultados de la consulta",
+    "hideQueryResults": "Ocultar los resultados de la consulta",
+    "vrlExtractionTooltip": "Para usar los campos VRL extraídos en el gráfico, escriba una función VRL y haga clic en el botón Aplicar. Los campos se extraerán, lo que le permitirá usarlos para crear el gráfico.",
+    "errorFetchingFunctions": "Error al recuperar las funciones",
+    "functionAppliedSuccess": "La función {name} se aplicó correctamente.",
     "panelTimeSettings": "Configuración de tiempo del panel",
     "panelTimeEnabled": "Permitir tiempo a nivel de panel",
     "useGlobalTime": "Usa la hora global",
@@ -2014,7 +2056,20 @@
       "variablesTooltip": "Las variables se utilizan para pasar datos de la alerta al destino.",
       "rowTemplateTooltip": "La plantilla de fila se utiliza para dar formato al mensaje de alerta.",
       "templateType": "Tipo de plantilla:"
-    }
+    },
+    "addConditions": "Agregar condiciones",
+    "sqlEditor": "Editor SQL",
+    "promqlEditor": "Editor ProMQL",
+    "vrlEditor": "Editor VRL",
+    "generateVRL": "Generar VRL",
+    "applyVRL": "Aplicar VRL",
+    "runQuery": "Ejecutar consulta",
+    "onStream": "en",
+    "streamLabel": "corriente",
+    "noStreamSelected": "No se ha seleccionado ninguna transmisión",
+    "resultsIncludeAllWindows": "Los resultados incluyen todas las adiciones de ventanas múltiples",
+    "runQueryForOutput": "Haga clic en Ejecutar consulta para ver el resultado",
+    "applyVRLForOutput": "Haga clic en Aplicar VRL para ver la salida combinada"
   },
   "alert_templates": {
     "header": "Plantillas",
@@ -2270,6 +2325,7 @@
       "groupsLabel": "grupos",
       "noMatchingGroups": "No hay grupos coincidentes",
       "fqnFormulaTitle": "Fórmula de identidad",
+      "fqnFormulaTooltip": "Muestra cómo se calculará la identidad del servicio. Las dimensiones de alcance (azul) se concatenan con '/'. La primera dimensión de carga de trabajo no nula (verde) se convierte en el nombre del servicio.",
       "scopeDimension": "Dimensión de alcance",
       "workloadDimension": "Dimensión de carga de trabajo",
       "noFormulaConfigured": "No hay fórmula de identidad configurada. Agregue dimensiones arriba.",
@@ -2426,7 +2482,11 @@
     "errorSavingPipeline": "Error al guardar la canalización",
     "cancelChangesConfirm": "¿Estás seguro de que deseas cancelar los cambios?",
     "cancel": "Cancelar",
-    "dragDropNodesHere": "Arrastra y suelta los nodos aquí"
+    "dragDropNodesHere": "Arrastra y suelta los nodos aquí",
+    "promqlOnlyForMetrics": "PromQL solo está disponible para el tipo de flujo de métricas",
+    "invalidCronExpression": "Expresión cron no válida",
+    "thresholdShouldNotBeEmpty": "El umbral no debe estar vacío",
+    "errorGettingResults": "Error al obtener los resultados"
   },
   "reports": {
     "header": "Informes",
@@ -2485,7 +2545,18 @@
     "timeRangeUpdated": "El intervalo de tiempo seleccionado no incluía este seguimiento. El intervalo de tiempo se actualizó para que coincida con la marca de tiempo del rastreo.",
     "fetchingMoreTraces": "Buscando más rastros...",
     "showErrorOnly": "Mostrar solo error",
-    "openInTraces": "Abrir en Traces"
+    "openInTraces": "Abrir en Traces",
+    "errorRetrievingTraces": "Se ha producido un error al recuperar los rastros.",
+    "fetchingTraces": "Agárrate fuerte, estamos buscando tus rastros.",
+    "noTracesFoundAdjust": "No se han encontrado rastros. Por favor, ajusta los filtros e inténtalo de nuevo.",
+    "tracesTitle": "HUELLAS",
+    "tracesFound": "Rastros encontrados",
+    "error": "ERROR",
+    "errors": "ERRORES",
+    "success": "ÉXITO",
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "spanColorPalettePreview": "Vista previa de la paleta de colores Span"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -2883,7 +2954,8 @@
     "tracesErrorDetails": "Se ha producido un error al obtener los datos de seguimiento. Vuelva a intentarlo.",
     "metricsError": "No se pueden cargar las métricas",
     "metricsErrorDetails": "Se ha producido un error al obtener los datos de las métricas. Por favor, inténtalo de nuevo.",
-    "noMetricsDescription": "No se han encontrado métricas para esta correlación en el intervalo de tiempo seleccionado."
+    "noMetricsDescription": "No se han encontrado métricas para esta correlación en el intervalo de tiempo seleccionado.",
+    "errorRetrievingTraces": "Se ha producido un error al recuperar los rastros."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",
@@ -2932,5 +3004,10 @@
     "invalidFormat": "Formato no válido",
     "mustBeGreaterThan": "Debe ser mayor que {value}",
     "mustBeLessThan": "Debe ser inferior a {value}"
+  },
+  "nlMode": {
+    "toggle": "Modo de lenguaje natural",
+    "noAdditionalOptions": "Sin opciones adicionales",
+    "generateVRL": "Generar VRL"
   }
 }
