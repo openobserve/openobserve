@@ -17,19 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="trace-row-latency-bar"
-    class="row no-wrap"
-    :style="{
-      height: '0.85rem',
-      borderRadius: '4px',
-      overflow: 'hidden',
-      width: '100%',
-      background: 'var(--o2-border-color, rgba(0, 0, 0, 0.08))',
-    }"
+    class="row no-wrap tw:h-[0.85rem] tw:rounded tw:overflow-hidden tw:w-full tw:bg-[var(--o2-border-color)]"
   >
     <div
       v-for="[service, svc] in serviceEntries"
       :key="service"
       data-test="trace-row-latency-segment"
+      class="tw:h-full tw:min-w-[0.125rem]"
       :style="segmentStyle(service, svc as any)"
     >
       <QTooltip
@@ -73,8 +67,6 @@ function segmentStyle(service: string, svc: any): Record<string, string> {
   return {
     width: `${segmentPercent(svc)}%`,
     backgroundColor: serviceColors.value[service] || "#9e9e9e",
-    height: "100%",
-    minWidth: "2px",
   };
 }
 </script>

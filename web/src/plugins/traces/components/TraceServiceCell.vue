@@ -19,20 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Service colour dot -->
     <span
       data-test="trace-row-service-dot"
-      class="q-mr-sm"
+      class="q-mr-sm tw:inline-block tw:w-[0.625rem] tw:h-[0.625rem] tw:rounded-full tw:shrink-0"
       :style="{
-        display: 'inline-block',
-        width: '10px',
-        height: '10px',
-        borderRadius: '50%',
-        flexShrink: '0',
         backgroundColor: rootColor,
         boxShadow: `0 0 0.5rem ${rootColor}`,
       }"
     />
 
     <!-- Service name + operation -->
-    <div class="column" style="min-width: 0">
+    <div class="column tw:min-w-0">
       <span
         data-test="trace-row-service-name"
         class="text-weight-bold ellipsis tw:text-[var(--o2-text-4)]! tw:text-[0.875rem]! tw:tracking-[0.03rem]!"
@@ -65,11 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center"
         >
           <div
+            class="tw:h-2 tw:w-2 tw:rounded-sm tw:mr-2"
             :style="{
-              height: '0.5rem',
-              width: '0.5rem',
-              borderRadius: '2px',
-              marginRight: '0.5rem',
               backgroundColor: svc.color,
               boxShadow: `0 0 0.5rem ${svc.color}`,
             }"

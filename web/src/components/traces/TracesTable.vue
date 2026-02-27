@@ -40,15 +40,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (use this to trigger server-side fetching of more pages)
 -->
 <template>
-  <div ref="scrollerRef" class="oz-table" @scroll.passive="handleScroll">
+  <div
+    ref="scrollerRef"
+    class="tw:flex tw:flex-col tw:h-full tw:overflow-y-auto tw:overflow-x-auto"
+    @scroll.passive="handleScroll"
+  >
     <!-- ── Sticky header ─────────────────────────────────────────────────── -->
     <div
-      class="oz-table__head tw:bg-[var(--o2-card-bg-solid)]! row no-wrap items-center q-px-sm tw:border-[var(--o2-border-color)]!"
+      class="tw:sticky tw:top-0 tw:z-[2] tw:min-h-[2.25rem] tw:shrink-0 tw:tracking-[0.125rem] tw:text-[var(--o2-text-3)] tw:bg-[var(--o2-card-bg-solid)]! tw:border-b tw:border-[var(--o2-border-color)]! row no-wrap items-center q-px-sm"
     >
       <div
         v-for="header in table.getHeaderGroups()[0].headers"
         :key="header.id"
-        class="oz-table__th text-caption text-weight-bold"
+        class="tw:px-2 tw:truncate text-caption text-weight-bold"
         :class="getAlignClass(header.column)"
         :style="getColumnStyle(header.column)"
       >
@@ -62,22 +66,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Virtual rows ───────────────────────────────────────────────────── -->
     <template v-if="!loading && allRows.length">
       <div
-        :style="{
-          height: `${rowVirtualizer.getTotalSize()}px`,
-          position: 'relative',
-          width: '100%',
-        }"
+        class="tw:relative tw:w-full"
+        :style="{ height: `${rowVirtualizer.getTotalSize()}px` }"
       >
         <div
           v-for="virtualRow in rowVirtualizer.getVirtualItems()"
           :key="virtualRow.key"
-          class="oz-table__row tw:bg-[var(--o2-card-bg)] row no-wrap items-center q-px-sm cursor-pointer tw:border-b tw:border-[var(--o2-border-2)]!"
+          class="oz-table__row tw:absolute tw:top-0 tw:left-0 tw:w-full tw:bg-[var(--o2-card-bg)] row no-wrap items-center q-px-sm cursor-pointer tw:border-b tw:border-[var(--o2-border-2)]!"
           :class="rowClass?.(allRows[virtualRow.index].original)"
           :style="{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
             height: `${virtualRow.size}px`,
             transform: `translateY(${virtualRow.start}px)`,
           }"
@@ -86,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="cell in allRows[virtualRow.index].getVisibleCells()"
             :key="cell.id"
-            class="oz-table__td"
+            class="tw:p-2 tw:overflow-hidden"
             :class="getAlignClass(cell.column)"
             :style="getColumnStyle(cell.column)"
           >
@@ -232,36 +229,8 @@ function getAlignClass(column: Column<T, unknown>): string {
 </script>
 
 <style lang="scss" scoped>
-.oz-table {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: auto;
-}
-
-/* ── Header ──────────────────────────────────────────────────────────────── */
-.oz-table__head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  min-height: 36px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  letter-spacing: 2px;
-  color: var(--o2-text-3);
-  flex-shrink: 0;
-}
-
-.oz-table__th {
-  padding: 0 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* ── Rows ────────────────────────────────────────────────────────────────── */
 .oz-table__row {
-  height: 52px; /* fixed — must match ROW_HEIGHT in script */
   transition: background 0.15s ease;
 
   &:hover {
@@ -277,14 +246,9 @@ function getAlignClass(column: Column<T, unknown>): string {
    *   rowClass: (row) => row.errors > 0 ? 'oz-table__row--error' : ''
    */
   &--error {
-    border-left: 3px solid var(--q-negative);
-    padding-left: 5px;
+    border-left: 0.1875rem solid var(--q-negative);
+    padding-left: 0.3125rem;
   }
-}
-
-.oz-table__td {
-  padding: 8px;
-  overflow: hidden;
 }
 
 body.body--dark {

@@ -17,34 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="trace-row-status-pill"
-    :style="{
-      borderRadius: '12px',
-      padding: '2px 10px',
-      display: 'inline-flex',
-      alignItems: 'center',
-      width: 'fit-content',
-      background: pillBg,
-      color: pillColor,
-    }"
+    class="tw:rounded-xl tw:py-[0.125rem] tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit"
+    :style="{ background: pillBg, color: pillColor }"
   >
     <span
-      class="q-mr-xs"
-      :style="{
-        display: 'inline-block',
-        width: '7px',
-        height: '7px',
-        borderRadius: '50%',
-        flexShrink: '0',
-        backgroundColor: dotColor,
-      }"
+      class="q-mr-xs tw:inline-block tw:w-[0.4375rem] tw:h-[0.4375rem] tw:rounded-full tw:shrink-0"
+      :style="{ backgroundColor: dotColor }"
     />
     <span
-      :style="{
-        fontSize: '0.7rem',
-        letterSpacing: '0.03em',
-        textTransform: 'uppercase',
-        fontWeight: 'bold',
-      }"
+      class="tw:text-[0.7rem] tw:tracking-[0.03em] tw:uppercase tw:font-bold"
     >
       {{ label }}
     </span>

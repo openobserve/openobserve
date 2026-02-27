@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-spinner-hourglass
           color="primary"
           size="40px"
-          style="margin: 0 auto; display: block"
+          class="tw:mx-auto tw:block"
         />
         <span class="text-center">
           {{ t('traces.fetchingTraces') }}
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════════════════ Empty State ════════════════════ -->
     <div
       v-else-if="noResults"
-      class="text-center tw:mx-[10%] tw:my-[40px] tw:text-[20px]"
+      class="text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
     >
       <q-icon name="info" color="primary" size="md" /> {{ t('traces.noTracesFoundAdjust') }}
     </div>
@@ -46,13 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-show="hasResults"
       data-test="traces-table-wrapper"
-      class="traces-section column tw:h-full"
+      class="column tw:h-full tw:flex-1 tw:min-h-0"
     >
       <!-- Section header: title + count badge -->
       <div
         v-if="showHeader"
         data-test="traces-section-header"
-        class="traces-section-header row items-center q-px-sm q-py-xs tw:bg-[var(--o2-section-header-bg)]!"
+        class="row items-center q-px-sm q-py-xs tw:shrink-0 tw:min-h-[2.5rem] tw:border-t tw:border-[rgba(0,0,0,0.07)] tw:bg-[var(--o2-section-header-bg)]!"
       >
         <span
           data-test="traces-section-title"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Table scroll area -->
       <div
         data-test="traces-search-result-list"
-        class="traces-table-scroll-area tw:w-full"
+        class="tw:w-full tw:flex-1 tw:overflow-y-auto tw:overflow-x-auto tw:relative"
       >
         <TracesTable
           :columns="tracesColumns"
@@ -205,26 +205,3 @@ const hasResults = computed(
   () => props.searchPerformed && props.hits.length > 0,
 );
 </script>
-
-<style lang="scss" scoped>
-.traces-section {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.traces-section-header {
-  flex-shrink: 0;
-  min-height: 40px;
-  border-top: 1px solid rgba(0, 0, 0, 0.07);
-  padding: 4px 8px;
-}
-
-.traces-table-scroll-area {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: auto;
-  position: relative;
-}
-</style>
