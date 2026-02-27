@@ -4270,51 +4270,6 @@ export default defineComponent({
       );
     });
 
-    const handleNavigationAction = (action: {
-      resource_type: string;
-      action: string;
-      label?: string;
-      target: Record<string, any>;
-    }) => {
-      const { resource_type, action: actionType, target } = action;
-
-      if (actionType === 'load_query' && resource_type === 'logs') {
-        const query: Record<string, string> = {
-          stream_type: 'logs',
-          type: 'ai_chat_query',
-          sql_mode: String(target.sql_mode ?? true),
-          query: target.query ?? '',
-          from: String(target.from ?? ''),
-          to: String(target.to ?? ''),
-        };
-        if (target.stream && target.stream.length > 0) {
-          query.stream = target.stream[0];
-        }
-        if (target.functionContent) {
-          query.fn_editor = 'true';
-          query.functionContent = target.functionContent;
-        }
-        router.push({ path: '/logs', query });
-      } else if (actionType === 'navigate_direct') {
-        if (resource_type === 'alert') {
-          router.push({
-            path: '/alerts',
-            query: { action: 'update', alert_id: target.alert_id, name: target.name, folder: target.folder },
-          });
-        } else if (resource_type === 'dashboard') {
-          router.push({
-            path: '/dashboards/view',
-            query: { dashboard: target.dashboard_id, folder: target.folder },
-          });
-        } else if (resource_type === 'pipeline') {
-          router.push({
-            path: '/pipeline/pipelines/edit',
-            query: { id: target.pipeline_id, name: target.name },
-          });
-        }
-      }
-    };
-
     return {
       inputMessage,
       chatMessages,
