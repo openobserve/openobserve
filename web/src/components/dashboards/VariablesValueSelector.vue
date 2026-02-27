@@ -749,19 +749,43 @@ export default defineComponent({
     const resolveVariableValue = (value: string): string => {
       if (!value || typeof value !== 'string') return value ?? "";
 
+      // Build a merged lookup map with scope precedence: global → tab → current scope
+      // This allows tab/panel-level variables to reference global (or tab) variables
+      // in their stream/field, which is critical for cross-scope variable substitution.
+      // Filter substitution works via processVariableContent which already handles
+      // all scopes; this function is specifically for stream/field resolution.
+      const varLookup: Record<string, any> = {};
+
+      if (useManager && manager) {
+        // Global (lowest precedence) — always available as parent scope
+        (manager.variablesData.global || []).forEach((v: any) => {
+          varLookup[v.name] = v.value;
+        });
+        // Tab-level variables (if a tabId is in context)
+        if (props.tabId && manager.variablesData.tabs?.[props.tabId]) {
+          manager.variablesData.tabs[props.tabId].forEach((v: any) => {
+            varLookup[v.name] = v.value;
+          });
+        }
+        // Current scope variables (highest precedence — overrides global/tab)
+        variablesData.values.forEach((v: any) => {
+          varLookup[v.name] = v.value;
+        });
+      } else {
+        // Non-manager mode: use variablesData.values as-is
+        variablesData.values.forEach((v: any) => {
+          varLookup[v.name] = v.value;
+        });
+      }
+
       // Replace all variable references ($variableName) with their resolved values
       // Using replace callback avoids regex exec loop risks and handles
       // special replacement patterns ($1, $&, etc.) safely
       const resolvedValue = value.replace(
         /\$([a-zA-Z0-9_-]+)/g,
         (fullMatch, varName) => {
-          // Find the variable in variablesData.values
-          const referencedVar = variablesData.values.find(
-            (v: any) => v.name === varName,
-          );
-
-          if (referencedVar) {
-            let varValue = referencedVar.value;
+          if (varName in varLookup) {
+            let varValue = varLookup[varName];
 
             // Handle array values (multi-select)
             // Stream and field must be single tokens, use first element only

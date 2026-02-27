@@ -19,6 +19,8 @@ import {
   deleteDashboard,
   setupTestDashboard,
   cleanupTestDashboard,
+  reopenDashboardFromList,
+  addSimplePanel,
 } from "./utils/dashCreation.js";
 import { monitorVariableAPICalls } from "../utils/variable-helpers.js";
 const {
@@ -30,6 +32,7 @@ const {
   SELECTORS,
   getVariableSelector,
   getEditVariableBtn,
+  getTabSelector,
 } = require("../../pages/dashboardPages/dashboard-selectors.js");
 
 test.describe.configure({ mode: "parallel" });
@@ -41,6 +44,21 @@ async function setupDashboardAndOpenVariables(page, pm, dashboardName) {
   await setupTestDashboard(page, pm, dashboardName);
   await pm.dashboardSetting.openSetting();
   await pm.dashboardSetting.openVariables();
+}
+
+/**
+ * Navigate from the dashboard list into a dashboard that already has panels.
+ * Cannot use reopenDashboardFromList() for this because that function waits
+ * for the "add panel if no panel" button which is hidden when panels exist.
+ */
+async function openDashboardWithPanels(page, dashboardName) {
+  const dashboardRow = page
+    .locator('//tr[.//div[@title="' + dashboardName + '"]]')
+    .nth(0);
+  await dashboardRow.locator('div[title="' + dashboardName + '"]').click();
+  await page
+    .locator('[data-test="dashboard-panel-container"]')
+    .waitFor({ state: "visible", timeout: 20000 });
 }
 
 // Helper: Close settings, reopen, and go back to variables tab
@@ -403,7 +421,7 @@ test.describe(
       await ingestion(page);
     });
 
-    test.skip("cross-source cycles: multi-variable chain and edit-introduced cycle", async ({
+    test("cross-source cycles: multi-variable chain and edit-introduced cycle", async ({
       page,
     }) => {
       test.slow(); // Triple timeout — this test creates 7 variables and performs multiple edit cycles
@@ -540,10 +558,10 @@ test.describe(
       await ingestion(page);
     });
 
-    test.skip("runtime cascade: parent changes reload children via stream and field dependencies", async ({
+    test("runtime cascade: parent changes reload children via stream and field dependencies", async ({
       page,
     }) => {
-      test.slow(); // Triple timeout — this test creates 5 variables and monitors cascade API calls
+      test.slow(); // Triple timeout — creates 5 variables, fresh reload, and cascade API monitoring
       const pm = new PageManager(page);
       const scopedVars = new DashboardVariablesScoped(page);
       const dashboardName = `Dash_G_${Date.now()}`;
@@ -593,78 +611,82 @@ test.describe(
       );
       await reopenSettingsVariables(page, pm);
 
+      // Close settings and navigate away then back for a clean initial load.
+      // This ensures variables are resolved from a fresh state (no leftover
+      // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
       await safeWaitForHidden(page, ".q-dialog", { timeout: 10000 });
+      await pm.dashboardCreate.backToDashboardList();
+      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await safeWaitForNetworkIdle(page, { timeout: 5000 });
+
+      // Reopen dashboard — this is the initial load we want to test
+      await reopenDashboardFromList(page, dashboardName);
       await safeWaitForNetworkIdle(page, { timeout: 15000 });
+      await page.waitForTimeout(2000);
 
-      // Extra wait for dashboard to stabilize in CI/CD environments
-      await page.waitForTimeout(3000);
-
-      // Wait for all variables to be visible on dashboard with increased timeout 
+      // --- G3: Verify all variables loaded on initial fresh dashboard load ---
       await scopedVars.waitForVariableSelectorVisible("streamName", { timeout: 40000 });
       await scopedVars.waitForVariableSelectorVisible("fieldName", { timeout: 40000 });
       await scopedVars.waitForVariableSelectorVisible("streamChild", { timeout: 40000 });
       await scopedVars.waitForVariableSelectorVisible("fieldChild", { timeout: 40000 });
 
-      // Allow all initial variable API calls to complete before cascade testing
-      await safeWaitForNetworkIdle(page, { timeout: 10000 });
-      await page.waitForTimeout(2000);
-
-      // --- G3: Verify all variables are visible and loaded on dashboard ---
       await expect(page.locator(getVariableSelector("streamName"))).toBeVisible();
       await expect(page.locator(getVariableSelector("streamChild"))).toBeVisible();
       await expect(page.locator(getVariableSelector("fieldName"))).toBeVisible();
       await expect(page.locator(getVariableSelector("fieldChild"))).toBeVisible();
 
-      // --- G1: Change streamName from "e2e_automate" to "default" ---
-      // Custom variables don't make API calls when opening their dropdown, so we
-      // start monitoring manually and use changeVariableValue (no waitForValuesStreamComplete).
-      // streamChild has stream=$streamName, so the cascade call will use the new
-      // resolved stream "default". Match on stream to avoid false positives.
+      // Allow all initial variable API calls to settle before cascade testing
+      await safeWaitForNetworkIdle(page, { timeout: 10000 });
+      await page.waitForTimeout(2000);
+
+      // --- G1: Change streamName → "default"; streamChild must cascade-reload
+      // with stream="default" (resolved, not "$streamName")
       const streamMonitor = monitorVariableAPICalls(page, {
         expectedCount: 1,
-        timeout: 45000, // Increased for CI/CD stability
+        timeout: 45000,
         matchFn: (call) =>
-          call.url.includes("/_values_stream") &&
-          (call.url.includes("/default/_values_stream") || call.stream === "default"),
+          call.url.includes("_values_stream") &&
+          (call.url.includes("/default/") || call.stream === "default"),
       });
       await scopedVars.changeVariableValue("streamName", { optionText: "default", timeout: 25000 });
       const streamResult = await streamMonitor;
 
       expect(streamResult.matchedCount).toBeGreaterThanOrEqual(1);
 
-      // Wait for all G1 cascade responses to settle before starting G2 monitor
-      // Increased wait times for CI/CD environments under heavy load
-      await safeWaitForNetworkIdle(page, { timeout: 15000 });
-      await page.waitForTimeout(5000);
+      // Confirm the cascade call used the resolved value, not the literal "$streamName"
+      const streamLiteralCall = streamResult.calls.find(
+        (c) => (c.stream && c.stream.includes("$")) || (c.url && c.url.includes("%24"))
+      );
+      expect(streamLiteralCall).toBeUndefined();
 
-      // --- G2: Change fieldName from "kubernetes_namespace_name" to "kubernetes_container_name" ---
-      // fieldChild has stream=e2e_automate (fixed), field=$fieldName.
-      // Use matchFn to filter for fieldChild's cascade call specifically,
-      // ignoring any stale streamChild calls from G1.
+      // Allow G1 responses to settle before G2
+      await safeWaitForNetworkIdle(page, { timeout: 10000 });
+      await page.waitForTimeout(3000);
+
+      // --- G2: Change fieldName → "kubernetes_container_name"; fieldChild must reload
+      // with field="kubernetes_container_name" (resolved, not "$fieldName")
       const fieldMonitor = monitorVariableAPICalls(page, {
         expectedCount: 1,
-        timeout: 45000, // Increased for CI/CD stability
+        timeout: 45000,
         matchFn: (call) =>
-          call.url.includes("/_values_stream") &&
-          (call.url.includes("e2e_automate") ||
-            call.stream === "e2e_automate" ||
-            call.url.includes("kubernetes_container_name") ||
+          call.url.includes("_values_stream") &&
+          (call.url.includes("kubernetes_container_name") ||
             (call.field && call.field.includes("kubernetes_container_name"))),
       });
-      await scopedVars.changeVariableValue("fieldName", { optionText: "kubernetes_container_name", timeout: 25000 });
+      await scopedVars.changeVariableValue("fieldName", {
+        optionText: "kubernetes_container_name",
+        timeout: 25000,
+      });
       const fieldResult = await fieldMonitor;
 
       expect(fieldResult.matchedCount).toBeGreaterThanOrEqual(1);
-      // Verify the matched cascade call used the new field value
-      const matchedCall = fieldResult.calls.find(
-        (c) =>
-          c.url.includes("kubernetes_container_name") ||
-          (c.field && c.field.includes("kubernetes_container_name")) ||
-          c.url.includes("e2e_automate") ||
-          c.stream === "e2e_automate"
+
+      // Confirm resolved field was used, not "$fieldName"
+      const fieldLiteralCall = fieldResult.calls.find(
+        (c) => (c.field && c.field.includes("$")) || (c.url && c.url.includes("%24"))
       );
-      expect(matchedCall).toBeTruthy();
+      expect(fieldLiteralCall).toBeUndefined();
 
       // Cleanup
       await pm.dashboardCreate.backToDashboardList();
@@ -756,6 +778,589 @@ test.describe(
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashboardName);
+    });
+  }
+);
+
+// ============================================================================
+// I. Cross-Scope Stream/Field Variable Substitution (View Dashboard)
+//
+// Regression tests for the bug where global-level constant/custom variables
+// referenced as $varName in the stream or field of a tab-level or panel-level
+// query_values variable were NOT being resolved in view-dashboard mode.
+//
+// Root cause: resolveVariableValue() in VariablesValueSelector.vue only
+// searched variablesData.values (current scope), missing global variables.
+//
+// Fix: In manager mode, also search manager.variablesData.global (and
+// manager.variablesData.tabs[tabId]) so that cross-scope references resolve.
+//
+// Covers:
+//   I1 – Global constant used in stream of a tab-scoped query_values variable
+//   I2 – Global constant used in field of a tab-scoped query_values variable
+//   I3 – Global custom used in stream of a tab-scoped query_values variable
+// ============================================================================
+test.describe(
+  "I - Cross-Scope Stream/Field Substitution (View Dashboard)",
+  {
+    tag: [
+      "@dashboards",
+      "@dashboardVariables",
+      "@streamFieldVariables",
+      "@crossScope",
+      "@P0",
+    ],
+  },
+  () => {
+    test.beforeEach(async ({ page }) => {
+      await navigateToBase(page);
+      await ingestion(page);
+    });
+
+    // -------------------------------------------------------------------------
+    // I1: Global constant → stream of tab-scoped query_values variable
+    // -------------------------------------------------------------------------
+    test("I1 - global constant in tab-level variable stream resolves correctly on view dashboard", async ({
+      page,
+    }) => {
+      test.slow(); // Triple timeout — navigate-away/back for clean initial load
+      const pm = new PageManager(page);
+      const scopedVars = new DashboardVariablesScoped(page);
+      const dashboardName = `Dash_I1_${Date.now()}`;
+
+      await setupTestDashboard(page, pm, dashboardName);
+      await pm.dashboardSetting.openSetting();
+      await pm.dashboardSetting.addTabAndWait("Tab1");
+
+      // Global constant holds the stream name
+      await scopedVars.addConstantVariable("globalStream", "e2e_automate");
+      await reopenSettingsVariables(page, pm);
+
+      // Need a field constant: when stream is a variable ref the field dropdown
+      // shows only variable options (no schema is loaded), so we must use $fieldConst
+      await scopedVars.addConstantVariable("fieldConst", "kubernetes_namespace_name");
+      await reopenSettingsVariables(page, pm);
+
+      // Tab-scoped query_values variable references the global constant in stream
+      await scopedVars.addScopedVariable(
+        "tabChildVar",
+        "logs",
+        "$globalStream",
+        "$fieldConst",
+        { scope: "tabs", assignedTabs: ["tab1"] }
+      );
+      await page
+        .locator(getEditVariableBtn("tabChildVar"))
+        .waitFor({ state: "visible", timeout: 15000 });
+
+      // Close settings and navigate away then back for a clean initial load.
+      // This ensures variables are resolved from a fresh state (no leftover
+      // settings-dialog state) which is the real-world usage scenario.
+      await pm.dashboardSetting.closeSettingWindow();
+      await safeWaitForHidden(page, ".q-dialog", { timeout: 10000 });
+      await pm.dashboardCreate.backToDashboardList();
+      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await safeWaitForNetworkIdle(page, { timeout: 5000 });
+
+      // Reopen dashboard — this is the initial load we want to test
+      await reopenDashboardFromList(page, dashboardName);
+      await safeWaitForNetworkIdle(page, { timeout: 15000 });
+      await page.waitForTimeout(2000);
+
+      // Monitor _values_stream calls while switching to Tab1
+      const apiMonitor = monitorVariableAPICalls(page, {
+        expectedCount: 1,
+        timeout: 45000,
+        matchFn: (call) => {
+          const url = call.url || "";
+          const stream = call.stream || "";
+          const isResolvedStream =
+            stream === "e2e_automate" ||
+            url.includes("/e2e_automate/") ||
+            url.includes("e2e_automate");
+          const isLiteralRef =
+            stream.includes("$") || url.includes("%24globalStream");
+          return (
+            url.includes("_values_stream") && isResolvedStream && !isLiteralRef
+          );
+        },
+      });
+
+      await page.locator(getTabSelector("Tab1")).click();
+      await page
+        .locator(getVariableSelector("tabChildVar"))
+        .waitFor({ state: "visible", timeout: 20000 });
+
+      const result = await apiMonitor;
+
+      // Must have received at least one call using the resolved stream name
+      expect(result.matchedCount).toBeGreaterThanOrEqual(1);
+
+      // No call must contain the literal variable reference ($globalStream)
+      const literalRefCall = result.calls.find(
+        (c) =>
+          (c.stream && c.stream.includes("$")) ||
+          (c.url && c.url.includes("%24"))
+      );
+      expect(literalRefCall).toBeUndefined();
+
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashboardName);
+    });
+
+    // -------------------------------------------------------------------------
+    // I2: Global constant → field of tab-scoped query_values variable
+    // -------------------------------------------------------------------------
+    test("I2 - global constant in tab-level variable field resolves correctly on view dashboard", async ({
+      page,
+    }) => {
+      test.slow(); // Triple timeout — navigate-away/back for clean initial load
+      const pm = new PageManager(page);
+      const scopedVars = new DashboardVariablesScoped(page);
+      const dashboardName = `Dash_I2_${Date.now()}`;
+
+      await setupTestDashboard(page, pm, dashboardName);
+      await pm.dashboardSetting.openSetting();
+      await pm.dashboardSetting.addTabAndWait("Tab1");
+
+      // Global constant holds the field name
+      await scopedVars.addConstantVariable(
+        "globalField",
+        "kubernetes_namespace_name"
+      );
+      await reopenSettingsVariables(page, pm);
+
+      // Tab-scoped query_values variable references global constant in field
+      await scopedVars.addScopedVariable(
+        "tabFieldVar",
+        "logs",
+        "e2e_automate",
+        "$globalField",
+        { scope: "tabs", assignedTabs: ["tab1"] }
+      );
+      await page
+        .locator(getEditVariableBtn("tabFieldVar"))
+        .waitFor({ state: "visible", timeout: 15000 });
+
+      // Close settings and navigate away then back for a clean initial load.
+      // This ensures variables are resolved from a fresh state (no leftover
+      // settings-dialog state) which is the real-world usage scenario.
+      await pm.dashboardSetting.closeSettingWindow();
+      await safeWaitForHidden(page, ".q-dialog", { timeout: 10000 });
+      await pm.dashboardCreate.backToDashboardList();
+      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await safeWaitForNetworkIdle(page, { timeout: 5000 });
+
+      // Reopen dashboard — this is the initial load we want to test
+      await reopenDashboardFromList(page, dashboardName);
+      await safeWaitForNetworkIdle(page, { timeout: 15000 });
+      await page.waitForTimeout(2000);
+
+      const apiMonitor = monitorVariableAPICalls(page, {
+        expectedCount: 1,
+        timeout: 45000,
+        matchFn: (call) => {
+          const url = call.url || "";
+          const field = call.field || "";
+          const hasResolvedField =
+            field.includes("kubernetes_namespace_name") ||
+            url.includes("kubernetes_namespace_name");
+          const hasLiteralRef =
+            field.includes("$") || url.includes("%24globalField");
+          return (
+            url.includes("_values_stream") && hasResolvedField && !hasLiteralRef
+          );
+        },
+      });
+
+      await page.locator(getTabSelector("Tab1")).click();
+      await page
+        .locator(getVariableSelector("tabFieldVar"))
+        .waitFor({ state: "visible", timeout: 20000 });
+
+      const result = await apiMonitor;
+
+      expect(result.matchedCount).toBeGreaterThanOrEqual(1);
+
+      const literalRefCall = result.calls.find(
+        (c) =>
+          (c.field && c.field.includes("$")) ||
+          (c.url && c.url.includes("%24"))
+      );
+      expect(literalRefCall).toBeUndefined();
+
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashboardName);
+    });
+
+    // -------------------------------------------------------------------------
+    // I3: Global custom variable → stream of tab-scoped query_values variable
+    // -------------------------------------------------------------------------
+    test("I3 - global custom variable in tab-level variable stream resolves correctly on view dashboard", async ({
+      page,
+    }) => {
+      test.slow(); // Triple timeout — navigate-away/back for clean initial load
+      const pm = new PageManager(page);
+      const scopedVars = new DashboardVariablesScoped(page);
+      const dashboardName = `Dash_I3_${Date.now()}`;
+
+      await setupTestDashboard(page, pm, dashboardName);
+      await pm.dashboardSetting.openSetting();
+      await pm.dashboardSetting.addTabAndWait("Tab1");
+
+      // Global custom variable selecting the stream
+      await scopedVars.addCustomVariable("streamSelector", [
+        { label: "e2e_automate", value: "e2e_automate", selected: true },
+      ]);
+      await reopenSettingsVariables(page, pm);
+
+      // Need a field constant: when stream is a variable ref the field dropdown
+      // shows only variable options (no schema is loaded), so we must use $fieldConst
+      await scopedVars.addConstantVariable("fieldConst", "kubernetes_namespace_name");
+      await reopenSettingsVariables(page, pm);
+
+      // Tab-scoped query_values variable uses $streamSelector as its stream
+      await scopedVars.addScopedVariable(
+        "tabCustomChild",
+        "logs",
+        "$streamSelector",
+        "$fieldConst",
+        { scope: "tabs", assignedTabs: ["tab1"] }
+      );
+      await page
+        .locator(getEditVariableBtn("tabCustomChild"))
+        .waitFor({ state: "visible", timeout: 15000 });
+
+      // Close settings and navigate away then back for a clean initial load.
+      // This ensures variables are resolved from a fresh state (no leftover
+      // settings-dialog state) which is the real-world usage scenario.
+      await pm.dashboardSetting.closeSettingWindow();
+      await safeWaitForHidden(page, ".q-dialog", { timeout: 10000 });
+      await pm.dashboardCreate.backToDashboardList();
+      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await safeWaitForNetworkIdle(page, { timeout: 5000 });
+
+      // Reopen dashboard — this is the initial load we want to test
+      await reopenDashboardFromList(page, dashboardName);
+      await safeWaitForNetworkIdle(page, { timeout: 15000 });
+      await page.waitForTimeout(2000);
+
+      const apiMonitor = monitorVariableAPICalls(page, {
+        expectedCount: 1,
+        timeout: 45000,
+        matchFn: (call) => {
+          const url = call.url || "";
+          const stream = call.stream || "";
+          const isResolvedStream =
+            stream === "e2e_automate" ||
+            url.includes("/e2e_automate/") ||
+            url.includes("e2e_automate");
+          const isLiteralRef =
+            stream.includes("$") || url.includes("%24streamSelector");
+          return (
+            url.includes("_values_stream") && isResolvedStream && !isLiteralRef
+          );
+        },
+      });
+
+      await page.locator(getTabSelector("Tab1")).click();
+      await page
+        .locator(getVariableSelector("tabCustomChild"))
+        .waitFor({ state: "visible", timeout: 20000 });
+
+      const result = await apiMonitor;
+
+      expect(result.matchedCount).toBeGreaterThanOrEqual(1);
+
+      const literalRefCall = result.calls.find(
+        (c) =>
+          (c.stream && c.stream.includes("$")) ||
+          (c.url && c.url.includes("%24"))
+      );
+      expect(literalRefCall).toBeUndefined();
+
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashboardName);
+    });
+  }
+);
+
+// ============================================================================
+// J. Cross-Scope Stream/Field Variable Substitution at Panel Level (View Dashboard)
+//
+// Same regression as section I but for panel-scoped variables.
+// A global constant/custom variable referenced as $varName in the stream or
+// field of a panel-scoped query_values variable must be resolved when the
+// panel renders (initial dashboard load).
+//
+// Key difference from I tests:
+//   - A real panel must exist before creating panel-scoped variables
+//   - Panel variables load on initial dashboard render (not on tab click)
+//   - API monitor starts BEFORE reopening the dashboard
+//   - Uses openDashboardWithPanels() instead of reopenDashboardFromList()
+//     because the "no panel" button is hidden when panels exist
+//
+// Covers:
+//   J1 – Global constant used in stream of a panel-scoped query_values variable
+//   J2 – Global constant used in field of a panel-scoped query_values variable
+//   J3 – Global custom used in stream of a panel-scoped query_values variable
+// ============================================================================
+test.describe(
+  "J - Cross-Scope Stream/Field Substitution at Panel Level (View Dashboard)",
+  {
+    tag: [
+      "@dashboards",
+      "@dashboardVariables",
+      "@streamFieldVariables",
+      "@crossScope",
+      "@P0",
+    ],
+  },
+  () => {
+    test.beforeEach(async ({ page }) => {
+      await navigateToBase(page);
+      await ingestion(page);
+    });
+
+    // -------------------------------------------------------------------------
+    // J1: Global constant → stream of panel-scoped query_values variable
+    // -------------------------------------------------------------------------
+    test("J1 - global constant in panel-level variable stream resolves correctly on view dashboard", async ({
+      page,
+    }) => {
+      test.slow(); // Triple timeout — panel creation + navigate-away/back + API monitoring
+      const pm = new PageManager(page);
+      const scopedVars = new DashboardVariablesScoped(page);
+      const dashboardName = `Dash_J1_${Date.now()}`;
+
+      // Create dashboard and add a panel (required to assign the panel-scoped variable to it)
+      await setupTestDashboard(page, pm, dashboardName);
+      await addSimplePanel(pm, "TestPanel");
+
+      // Open settings and navigate to variables tab
+      await pm.dashboardSetting.openSetting();
+      await pm.dashboardSetting.openVariables();
+      await page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout: 10000 });
+
+      // Global constant holds the stream name
+      await scopedVars.addConstantVariable("globalStream", "e2e_automate");
+      await reopenSettingsVariables(page, pm);
+
+      // Field constant: when stream is a variable ref the field dropdown shows only
+      // variable options (no schema loaded), so we use $fieldConst instead of a literal
+      await scopedVars.addConstantVariable("fieldConst", "kubernetes_namespace_name");
+      await reopenSettingsVariables(page, pm);
+
+      // Panel-scoped variable referencing the global constant in stream
+      await scopedVars.addScopedVariable(
+        "panelChildVar",
+        "logs",
+        "$globalStream",
+        "$fieldConst",
+        { scope: "panels", assignedPanels: ["TestPanel"] }
+      );
+      await page
+        .locator(getEditVariableBtn("panelChildVar"))
+        .waitFor({ state: "visible", timeout: 15000 });
+
+      // Close settings and navigate away for a clean initial load
+      await pm.dashboardSetting.closeSettingWindow();
+      await safeWaitForHidden(page, ".q-dialog", { timeout: 10000 });
+      await pm.dashboardCreate.backToDashboardList();
+      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await safeWaitForNetworkIdle(page, { timeout: 5000 });
+
+      // Start monitor BEFORE reopening — panel variables load on initial dashboard render
+      const apiMonitor = monitorVariableAPICalls(page, {
+        expectedCount: 1,
+        timeout: 45000,
+        matchFn: (call) => {
+          const url = call.url || "";
+          const stream = call.stream || "";
+          const isResolvedStream =
+            stream === "e2e_automate" ||
+            url.includes("/e2e_automate/") ||
+            url.includes("e2e_automate");
+          const isLiteralRef =
+            stream.includes("$") || url.includes("%24globalStream");
+          return url.includes("_values_stream") && isResolvedStream && !isLiteralRef;
+        },
+      });
+
+      // Reopen dashboard — panel variable loads when the panel renders
+      await openDashboardWithPanels(page, dashboardName);
+      await safeWaitForNetworkIdle(page, { timeout: 15000 });
+      await page.waitForTimeout(2000);
+
+      const result = await apiMonitor;
+
+      expect(result.matchedCount).toBeGreaterThanOrEqual(1);
+
+      const literalRefCallJ1 = result.calls.find(
+        (c) =>
+          (c.stream && c.stream.includes("$")) ||
+          (c.url && c.url.includes("%24"))
+      );
+      expect(literalRefCallJ1).toBeUndefined();
+
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashboardName);
+    });
+
+    // -------------------------------------------------------------------------
+    // J2: Global constant → field of panel-scoped query_values variable
+    // -------------------------------------------------------------------------
+    test("J2 - global constant in panel-level variable field resolves correctly on view dashboard", async ({
+      page,
+    }) => {
+      test.slow(); // Triple timeout — panel creation + navigate-away/back + API monitoring
+      const pm = new PageManager(page);
+      const scopedVars = new DashboardVariablesScoped(page);
+      const dashboardName = `Dash_J2_${Date.now()}`;
+
+      await setupTestDashboard(page, pm, dashboardName);
+      await addSimplePanel(pm, "TestPanel");
+
+      await pm.dashboardSetting.openSetting();
+      await pm.dashboardSetting.openVariables();
+      await page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout: 10000 });
+
+      // Global constant holds the field name
+      await scopedVars.addConstantVariable("globalField", "kubernetes_namespace_name");
+      await reopenSettingsVariables(page, pm);
+
+      // Panel-scoped variable using real stream so the field dropdown shows real
+      // field names alongside variable options — allows $globalField to be selected
+      await scopedVars.addScopedVariable(
+        "panelFieldVar",
+        "logs",
+        "e2e_automate",
+        "$globalField",
+        { scope: "panels", assignedPanels: ["TestPanel"] }
+      );
+      await page
+        .locator(getEditVariableBtn("panelFieldVar"))
+        .waitFor({ state: "visible", timeout: 15000 });
+
+      await pm.dashboardSetting.closeSettingWindow();
+      await safeWaitForHidden(page, ".q-dialog", { timeout: 10000 });
+      await pm.dashboardCreate.backToDashboardList();
+      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await safeWaitForNetworkIdle(page, { timeout: 5000 });
+
+      const apiMonitor = monitorVariableAPICalls(page, {
+        expectedCount: 1,
+        timeout: 45000,
+        matchFn: (call) => {
+          const url = call.url || "";
+          const field = call.field || "";
+          const hasResolvedField =
+            field.includes("kubernetes_namespace_name") ||
+            url.includes("kubernetes_namespace_name");
+          const hasLiteralRef =
+            field.includes("$") || url.includes("%24globalField");
+          return url.includes("_values_stream") && hasResolvedField && !hasLiteralRef;
+        },
+      });
+
+      await openDashboardWithPanels(page, dashboardName);
+      await safeWaitForNetworkIdle(page, { timeout: 15000 });
+      await page.waitForTimeout(2000);
+
+      const result = await apiMonitor;
+
+      expect(result.matchedCount).toBeGreaterThanOrEqual(1);
+
+      const literalRefCallJ2 = result.calls.find(
+        (c) =>
+          (c.field && c.field.includes("$")) ||
+          (c.url && c.url.includes("%24"))
+      );
+      expect(literalRefCallJ2).toBeUndefined();
+
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashboardName);
+    });
+
+    // -------------------------------------------------------------------------
+    // J3: Global custom variable → stream of panel-scoped query_values variable
+    // -------------------------------------------------------------------------
+    test("J3 - global custom variable in panel-level variable stream resolves correctly on view dashboard", async ({
+      page,
+    }) => {
+      test.slow(); // Triple timeout — panel creation + navigate-away/back + API monitoring
+      const pm = new PageManager(page);
+      const scopedVars = new DashboardVariablesScoped(page);
+      const dashboardName = `Dash_J3_${Date.now()}`;
+
+      await setupTestDashboard(page, pm, dashboardName);
+      await addSimplePanel(pm, "TestPanel");
+
+      await pm.dashboardSetting.openSetting();
+      await pm.dashboardSetting.openVariables();
+      await page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout: 10000 });
+
+      // Global custom variable selecting the stream
+      await scopedVars.addCustomVariable("streamSelector", [
+        { label: "e2e_automate", value: "e2e_automate", selected: true },
+      ]);
+      await reopenSettingsVariables(page, pm);
+
+      // Field constant: needed since stream is a variable ref (field dropdown is empty)
+      await scopedVars.addConstantVariable("fieldConst", "kubernetes_namespace_name");
+      await reopenSettingsVariables(page, pm);
+
+      // Panel-scoped variable using global custom in stream
+      await scopedVars.addScopedVariable(
+        "panelCustomChild",
+        "logs",
+        "$streamSelector",
+        "$fieldConst",
+        { scope: "panels", assignedPanels: ["TestPanel"] }
+      );
+      await page
+        .locator(getEditVariableBtn("panelCustomChild"))
+        .waitFor({ state: "visible", timeout: 15000 });
+
+      await pm.dashboardSetting.closeSettingWindow();
+      await safeWaitForHidden(page, ".q-dialog", { timeout: 10000 });
+      await pm.dashboardCreate.backToDashboardList();
+      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await safeWaitForNetworkIdle(page, { timeout: 5000 });
+
+      const apiMonitor = monitorVariableAPICalls(page, {
+        expectedCount: 1,
+        timeout: 45000,
+        matchFn: (call) => {
+          const url = call.url || "";
+          const stream = call.stream || "";
+          const isResolvedStream =
+            stream === "e2e_automate" ||
+            url.includes("/e2e_automate/") ||
+            url.includes("e2e_automate");
+          const isLiteralRef =
+            stream.includes("$") || url.includes("%24streamSelector");
+          return url.includes("_values_stream") && isResolvedStream && !isLiteralRef;
+        },
+      });
+
+      await openDashboardWithPanels(page, dashboardName);
+      await safeWaitForNetworkIdle(page, { timeout: 15000 });
+      await page.waitForTimeout(2000);
+
+      const result = await apiMonitor;
+
+      expect(result.matchedCount).toBeGreaterThanOrEqual(1);
+
+      const literalRefCallJ3 = result.calls.find(
+        (c) =>
+          (c.stream && c.stream.includes("$")) ||
+          (c.url && c.url.includes("%24"))
+      );
+      expect(literalRefCallJ3).toBeUndefined();
+
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
     });
