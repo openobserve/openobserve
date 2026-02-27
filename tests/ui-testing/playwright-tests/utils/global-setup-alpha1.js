@@ -31,7 +31,7 @@ async function globalSetup() {
   });
 
   try {
-    const baseUrl = process.env.ZO_BASE_URL;
+    const baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
     if (!baseUrl) {
       throw new Error('ZO_BASE_URL must be set');
     }
