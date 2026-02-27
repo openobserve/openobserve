@@ -1686,8 +1686,7 @@ async fn process_dest_template(
             // Create JSON array from the row template values as-is (each row produces
             // one JSON value — object or array — and {rows} is the array of those values)
             let json_array = Value::Array(limited_rows.to_vec());
-            let json_str =
-                serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
+            let json_str = serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
 
             // Replace either "{rows}" or "{rows:N}" pattern
             if let Some(n) = row_limit {
