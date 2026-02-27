@@ -916,4 +916,188 @@ describe("JsonPreview Component", () => {
       expect(wrapper.vm.activeTab).toBe("unflattened");
     });
   });
+
+  describe("Cross-Linking Functionality", () => {
+    const mockCrossLinks = {
+      stream_links: [
+        {
+          name: "View Trace",
+          url: "https://traces.example.com/${trace_id}",
+          fields: [{ name: "trace_id", alias: "field1" }],
+        },
+      ],
+      org_links: [
+        {
+          name: "View Dashboard",
+          url: "https://dashboard.example.com/${host}",
+          fields: [{ name: "host", alias: "field2" }],
+        },
+      ],
+    };
+
+    it("should return empty array when enable_cross_linking is false", () => {
+      store.state.zoConfig.enable_cross_linking = false;
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toEqual([]);
+    });
+
+    it("should return empty array when crossLinks is undefined", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = undefined;
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toEqual([]);
+    });
+
+    it("should return empty array when crossLinks is null", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = null;
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toEqual([]);
+    });
+
+    it("should return matching stream links with resolved URLs", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = mockCrossLinks;
+
+      await wrapper.setProps({
+        value: {
+          ...mockValue,
+          field1: "trace-abc-123",
+          field2: "host-xyz",
+        },
+      });
+
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("View Trace");
+      expect(result[0].resolvedUrl).toBe(
+        "https://traces.example.com/trace-abc-123",
+      );
+    });
+
+    it("should fall back to org links when stream does not cover the field", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = mockCrossLinks;
+
+      await wrapper.setProps({
+        value: {
+          ...mockValue,
+          field1: "trace-abc-123",
+          field2: "host-xyz",
+        },
+      });
+
+      const result = wrapper.vm.getCrossLinksForField("field2");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("View Dashboard");
+      expect(result[0].resolvedUrl).toBe(
+        "https://dashboard.example.com/host-xyz",
+      );
+    });
+
+    it("should prioritize stream links over org links for same field", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = {
+        stream_links: [
+          {
+            name: "Stream Link",
+            url: "https://stream.example.com/${trace_id}",
+            fields: [{ name: "trace_id", alias: "field1" }],
+          },
+        ],
+        org_links: [
+          {
+            name: "Org Link",
+            url: "https://org.example.com/${trace_id}",
+            fields: [{ name: "trace_id", alias: "field1" }],
+          },
+        ],
+      };
+
+      await wrapper.setProps({
+        value: { ...mockValue, field1: "val123" },
+      });
+
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("Stream Link");
+    });
+
+    it("should return empty when field has no matching links", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = mockCrossLinks;
+      const result = wrapper.vm.getCrossLinksForField("nonexistent_field");
+      expect(result).toEqual([]);
+    });
+
+    it("should call window.open when openCrossLink is called", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      wrapper.vm.openCrossLink("https://example.com/trace/123");
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/trace/123",
+        "_blank",
+      );
+      openSpy.mockRestore();
+    });
+
+    it("should encode URI components in resolved URLs", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = {
+        stream_links: [
+          {
+            name: "Encoded",
+            url: "https://example.com/search?q=${trace_id}",
+            fields: [{ name: "trace_id", alias: "field1" }],
+          },
+        ],
+        org_links: [],
+      };
+
+      await wrapper.setProps({
+        value: { ...mockValue, field1: "hello world&foo=bar" },
+      });
+
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toHaveLength(1);
+      expect(result[0].resolvedUrl).toBe(
+        "https://example.com/search?q=hello%20world%26foo%3Dbar",
+      );
+    });
+
+    it("should return empty when URL has unresolvable placeholders", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = {
+        stream_links: [
+          {
+            name: "Partial",
+            url: "https://example.com/${trace_id}/${missing}",
+            fields: [
+              { name: "trace_id", alias: "field1" },
+              { name: "missing", alias: "missing" },
+            ],
+          },
+        ],
+        org_links: [],
+      };
+
+      await wrapper.setProps({
+        value: { ...mockValue, field1: "val123" },
+      });
+
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toEqual([]);
+    });
+
+    it("should handle empty crossLinks object", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = {
+        stream_links: [],
+        org_links: [],
+      };
+
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toEqual([]);
+    });
+  });
 });

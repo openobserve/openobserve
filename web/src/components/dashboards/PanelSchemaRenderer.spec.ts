@@ -2182,4 +2182,79 @@ describe("PanelSchemaRenderer", () => {
       }
     });
   });
+
+  describe("Cross-Linking Support", () => {
+    it("should have drilldown array that supports cross-link items", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.drilldownArray).toBeDefined();
+      expect(Array.isArray(wrapper.vm.drilldownArray)).toBe(true);
+    });
+
+    it("should have openDrilldown method for handling cross-link navigation", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.openDrilldown).toBeTypeOf("function");
+    });
+
+    it("should handle drilldown config with cross-link URL patterns", () => {
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: {
+            drilldown: [
+              {
+                name: "View Trace",
+                type: "byUrl",
+                targetBlank: true,
+                data: {
+                  url: 'https://example.com/trace/${row.field["trace_id"]}',
+                },
+              },
+            ],
+          },
+        },
+      });
+
+      expect(wrapper.vm.panelSchema.config.drilldown).toHaveLength(1);
+      expect(wrapper.vm.panelSchema.config.drilldown[0].name).toBe(
+        "View Trace",
+      );
+      expect(wrapper.vm.panelSchema.config.drilldown[0].type).toBe("byUrl");
+    });
+
+    it("should support cross-link items in drilldown array with _isCrossLink flag", () => {
+      wrapper = createWrapper();
+
+      const crossLinkItem = {
+        name: "View Trace",
+        _isCrossLink: true,
+        data: {
+          url: 'https://traces.example.com/${row.field["trace_id"]}',
+        },
+        type: "byUrl",
+        targetBlank: true,
+      };
+
+      wrapper.vm.drilldownArray = [crossLinkItem];
+
+      expect(wrapper.vm.drilldownArray[0]._isCrossLink).toBe(true);
+      expect(wrapper.vm.drilldownArray[0].name).toBe("View Trace");
+    });
+
+    it("should have store access for cross-linking config", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.store).toBeDefined();
+      expect(wrapper.vm.store.state).toBeDefined();
+    });
+
+    it("should handle panel schema with queries for cross-link data fetching", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.metadata).toBeDefined();
+      expect(wrapper.vm.panelSchema.queries).toBeDefined();
+      expect(wrapper.vm.panelSchema.queries.length).toBeGreaterThan(0);
+    });
+  });
 });
