@@ -1,7 +1,7 @@
 // cloudLoginPage.js - Cloud Login & Sanity Page Object for Alpha1
-import { expect } from '@playwright/test';
+const { expect } = require('@playwright/test');
 
-export class CloudLoginPage {
+class CloudLoginPage {
     constructor(page) {
         this.page = page;
 
@@ -40,3 +40,5 @@ export class CloudLoginPage {
         await this.page.waitForLoadState('domcontentloaded');
     }
 }
+
+module.exports = { CloudLoginPage };
