@@ -64,19 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
-                <q-circular-progress
-                  v-if="dialogConfig.showUsageIndicator"
-                  :value="dialogConfig.usagePercentage"
-                  size="40px"
-                  :thickness="0.18"
-                  :color="getProgressColor(dialogConfig.usagePercentage)"
-                  track-color="rgba(255, 255, 255, 0.3)"
-                  class="usage-indicator"
-                  show-value
-                  font-size="10px"
-                >
-                  <span style="color: white; font-weight: 700; font-size: 10px;">{{ Math.round(dialogConfig.usagePercentage) }}%</span>
-                </q-circular-progress>
                 <div class="offer-badge" :class="{ 'licensed-badge': dialogConfig.isLicensed }">
                   <q-icon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
                   <span>{{ dialogConfig.badgeText }}</span>
@@ -767,10 +754,102 @@ export default defineComponent({
     // Generate usage chart data for ChartRenderer
     const generateUsageDashboard = async () => {
       try {
-        const ingestionLimit = ingestionLimitGB.value;
+        // Get ingestion history from store
+        const ingestionHistory = store.state.zoConfig?.ingestion_history || [];
+
+        // Don't generate chart if there's no ingestion history data
+        if (!ingestionHistory || ingestionHistory.length === 0) {
+          chartData.value = null;
+          return;
+        }
+
+        const dates = [];
+        let values = [];
+        let dataUnit = 'GB'; // Default unit
+        let unitDivisor = 1024; // Default: MB to GB
+
+        // Use actual ingestion history data
+        // Data format: [{ ts: "2026-02-27T00:00:00", value: 202.90125079791258 }]
+        // Values are in MB, determine best unit based on data range
+        if (ingestionHistory.length > 0) {
+          // Sort by timestamp to ensure chronological order
+          const sortedHistory = [...ingestionHistory].sort((a, b) =>
+            new Date(a.ts).getTime() - new Date(b.ts).getTime()
+          );
+
+          // Find max value to determine appropriate unit
+          const maxValueMB = Math.max(...sortedHistory.map((item: any) => item.value));
+
+          // Determine best unit based on max value
+          if (maxValueMB >= 1024 * 1024) {
+            // Use TB if max value is >= 1 TB
+            dataUnit = 'TB';
+            unitDivisor = 1024 * 1024;
+          } else if (maxValueMB >= 1024) {
+            // Use GB if max value is >= 1 GB
+            dataUnit = 'GB';
+            unitDivisor = 1024;
+          } else {
+            // Use MB for smaller values
+            dataUnit = 'MB';
+            unitDivisor = 1;
+          }
+
+          sortedHistory.forEach((item: any) => {
+            const date = new Date(item.ts);
+            const day = date.getDate();
+            dates.push(`${day}`);
+            // Convert MB to appropriate unit
+            values.push(item.value / unitDivisor);
+          });
+        }
+
+        // Calculate Y-axis max and interval based on ingestion limit
+        const thresholdGB = ingestionLimitGB.value;
+        const maxDataValue = values.length > 0 ? Math.max(...values) : 0;
+
+        // Convert threshold to the same unit as data
+        let thresholdInDataUnit = 0;
+        if (thresholdGB && thresholdGB > 0) {
+          if (dataUnit === 'TB') {
+            thresholdInDataUnit = thresholdGB / 1024; // GB to TB
+          } else if (dataUnit === 'GB') {
+            thresholdInDataUnit = thresholdGB; // Already in GB
+          } else {
+            thresholdInDataUnit = thresholdGB * 1024; // GB to MB
+          }
+        }
+
+        // Determine Y-axis max: use the greater of (threshold * 1.2) or (maxData * 1.2)
+        let yAxisMax;
+        if (thresholdInDataUnit > 0) {
+          yAxisMax = Math.max(thresholdInDataUnit * 1.2, maxDataValue * 1.2);
+        } else {
+          yAxisMax = maxDataValue * 1.2;
+        }
+
+        // Calculate nice interval for Y-axis (aim for 4-5 grid lines)
+        const calculateInterval = (max: number) => {
+          const targetIntervals = 4;
+          const rawInterval = max / targetIntervals;
+
+          // Round to nice numbers (1, 2, 5, 10, 20, 50, 100, etc.)
+          const magnitude = Math.pow(10, Math.floor(Math.log10(rawInterval)));
+          const normalized = rawInterval / magnitude;
+
+          let niceInterval;
+          if (normalized <= 1) niceInterval = 1 * magnitude;
+          else if (normalized <= 2) niceInterval = 2 * magnitude;
+          else if (normalized <= 5) niceInterval = 5 * magnitude;
+          else niceInterval = 10 * magnitude;
+
+          return niceInterval;
+        };
+
+        const yAxisInterval = yAxisMax > 0 ? calculateInterval(yAxisMax) : undefined;
 
         // Create mark line for threshold if limit exists
-        const markLine: any = ingestionLimit && ingestionLimit > 0 ? {
+        const markLine: any = thresholdGB && thresholdGB > 0 ? {
           silent: true,
           symbol: 'none',
           label: {
@@ -782,41 +861,9 @@ export default defineComponent({
             type: 'solid'
           },
           data: [{
-            yAxis: ingestionLimit
+            yAxis: thresholdInDataUnit
           }]
         } : undefined;
-
-        // Get ingestion history from store
-        const ingestionHistory = store.state.zoConfig?.ingestion_history || [];
-
-        const dates = [];
-        const values = [];
-
-        // Use actual ingestion history data
-        // Data format: [{ ts: "2026-02-27T00:00:00", value: 202.90125079791258 }]
-        // Values are in MB, convert to GB
-        if (ingestionHistory.length > 0) {
-          // Sort by timestamp to ensure chronological order
-          const sortedHistory = [...ingestionHistory].sort((a, b) =>
-            new Date(a.ts).getTime() - new Date(b.ts).getTime()
-          );
-
-          sortedHistory.forEach((item: any) => {
-            const date = new Date(item.ts);
-            const day = date.getDate();
-            dates.push(`${day}`);
-            // Convert MB to GB (divide by 1024)
-            values.push(item.value / 1024);
-          });
-        } else {
-          // Fallback: if no data available, show empty chart
-          const now = new Date();
-          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-          for (let i = 1; i <= daysInMonth; i++) {
-            dates.push(`${i}`);
-            values.push(0);
-          }
-        }
 
         // Simple echarts configuration for bar chart
         // ChartRenderer expects data in format: { options: { ... } }
@@ -850,6 +897,9 @@ export default defineComponent({
             },
             yAxis: {
               type: 'value',
+              min: 0,
+              max: yAxisMax,
+              interval: yAxisInterval,
               axisLine: {
                 show: true,
                 lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
@@ -863,10 +913,7 @@ export default defineComponent({
                 color: 'rgba(255, 255, 255, 0.8)',
                 fontSize: 10,
                 formatter: (value: number) => {
-                  if (value >= 1000) {
-                    return (value / 1000).toFixed(0) + 'TB';
-                  }
-                  return value.toFixed(0) + 'GB';
+                  return value.toFixed(0) + dataUnit;
                 }
               },
               splitLine: {
@@ -879,10 +926,16 @@ export default defineComponent({
             },
             series: [{
               type: 'bar',
-              data: values,
-              itemStyle: {
-                color: '#FF6B6B'
-              },
+              data: values.map((value, index) => {
+                // Color bars red if they exceed threshold, otherwise green
+                const exceeds = thresholdInDataUnit > 0 && value > thresholdInDataUnit;
+                return {
+                  value: value,
+                  itemStyle: {
+                    color: exceeds ? '#FF6B6B' : '#22c55e' // Red if exceeds, green if within limit
+                  }
+                };
+              }),
               barWidth: '60%',
               markLine: markLine
             }],
@@ -899,9 +952,7 @@ export default defineComponent({
               formatter: (params: any) => {
                 const dayNum = params[0].name;
                 const value = params[0].value;
-                const formattedValue = value >= 1000
-                  ? (value / 1000).toFixed(2) + ' TB'
-                  : value.toFixed(2) + ' GB';
+                const formattedValue = value.toFixed(2) + ' ' + dataUnit;
 
                 // Get the actual date from ingestion history for this day
                 const ingestionHistory = store.state.zoConfig?.ingestion_history || [];
