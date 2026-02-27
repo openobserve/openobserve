@@ -15,7 +15,6 @@ export const LIGHT_SPAN_COLORS = [
   "#F59E0B",
   "#14B8A6",
   "#D946EF",
-  "#16A34A",
   "#7C3AED",
   "#F59E0B",
   "#0284C7",
@@ -27,7 +26,7 @@ export const LIGHT_SPAN_COLORS = [
   "#F97316",
   "#22D3EE",
   "#06B6D4",
-  "#22C55E",
+  "#21cb60",
   "#A855F7",
   "#FBBF24",
   "#3B82F6",
@@ -84,21 +83,6 @@ export const DARK_SPAN_COLORS = [
   "#D9F99D",
   "#A5B4FC",
   "#FED7AA",
-  "#7DD3FC",
-  "#FBCFE8",
-  "#A5F3FC",
-  "#DDD6FE",
-  "#BBF7D0",
-  "#FED7AA",
-  "#C7D2FE",
-  "#FEF3C7",
-  "#99F6E4",
-  "#FBE2F4",
-  "#CFFAFE",
-  "#EDE9FE",
-  "#D1FAE5",
-  "#FEF9C3",
-  "#FEE2E2",
 ] as const;
 
 /**
@@ -124,8 +108,8 @@ export const getSpanColorHex = (
   theme: "light" | "dark" = "light",
 ): string => {
   const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
-  const colorIndex = LIGHT_SPAN_COLORS.length - index;
-  console.log("color Index", colorIndex);
+  const colorIndex =
+    (((index - 1) % colors.length) + colors.length) % colors.length;
   return colors[colorIndex];
 };
 
