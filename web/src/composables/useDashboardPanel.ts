@@ -18,7 +18,7 @@ import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
 import { b64EncodeUnicode, isStreamingEnabled } from "@/utils/zincutils";
 import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
-import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { validatePanel } from "@/utils/dashboard/panelValidation";
 import useStreams from "./useStreams";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
 import queryService from "@/services/search";

@@ -14,15 +14,19 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import {
-  calculateOptimalFontSize,
-  formatDate,
   formatUnitValue,
-  getContrastColor,
-  applySeriesColorMappings,
   getUnitValue,
+} from "./convertDataIntoUnitValue";
+import {
+  applySeriesColorMappings,
+  getContrastColor,
+} from "./chartColorUtils";
+import {
+  calculateOptimalFontSize,
   calculateDynamicNameGap,
   calculateRotatedLabelBottomSpace,
-} from "./convertDataIntoUnitValue";
+} from "./chartDimensionUtils";
+import { formatDate } from "./dateTimeUtils";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import {
@@ -36,6 +40,8 @@ import {
   calculateRightLegendWidth,
 } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
+import { getPromqlLegendName, getLegendPosition } from "./promql/shared/legendBuilder";
+import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 
 let moment: any;
 let momentInitialized = false;
@@ -1154,177 +1160,4 @@ export const convertPromQLData = async (
   };
 };
 
-const calculateWidthText = (text: string): number => {
-  if (!text) return 0;
 
-  const span = document.createElement("span");
-  document.body.appendChild(span);
-
-  span.style.font = "sans-serif";
-  span.style.fontSize = "12px";
-  span.style.height = "auto";
-  span.style.width = "auto";
-  span.style.top = "0px";
-  span.style.position = "absolute";
-  span.style.whiteSpace = "no-wrap";
-  span.innerHTML = text;
-
-  const width = Math.ceil(span.clientWidth);
-  span.remove();
-  return width;
-};
-
-
-
-/**
- * Retrieves the legend name for a given metric and label.
- *
- * @param {any} metric - The metric object containing the values for the legend name placeholders.
- * @param {string} label - The label template for the legend name. If null or empty, the metric object will be converted to a JSON string and returned.
- * @return {string} The legend name with the placeholders replaced by the corresponding values from the metric object.
- */
-const getPromqlLegendName = (metric: any, label: string) => {
-  if (label) {
-    let template = label || "";
-    const placeholders = template.match(/\{([^}]+)\}/g);
-
-    // Step 2: Iterate through each placeholder
-    placeholders?.forEach(function (placeholder: any) {
-      // Step 3: Extract the key from the placeholder
-      const key = placeholder.replace("{", "").replace("}", "");
-
-      // Step 4: Retrieve the corresponding value from the JSON object
-      const value = metric[key];
-
-      // Step 5: Replace the placeholder with the value in the template
-      if (value) {
-        template = template.replace(placeholder, value);
-      }
-    });
-    return template;
-  } else {
-    return JSON.stringify(metric);
-  }
-};
-
-/**
- * Determines the position of the legend based on the provided legendPosition.
- *
- * @param {string} legendPosition - The desired position of the legend. Possible values are "bottom" or "right".
- * @return {string} The position of the legend. Possible values are "horizontal" or "vertical".
- */
-const getLegendPosition = (legendPosition: string) => {
-  switch (legendPosition) {
-    case "bottom":
-      return "horizontal";
-    case "right":
-      return "vertical";
-    default:
-      return "horizontal";
-  }
-};
-
-/**
- * Returns the props object based on the given chart type.
- *
- * @param {string} type - The chart type.
- * @return {object} The props object for the given chart type.
- */
-export const getPropsByChartTypeForSeries = (type: string) => {
-  switch (type) {
-    case "bar":
-      return {
-        type: "bar",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "line":
-      return {
-        type: "line",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "scatter":
-      return {
-        type: "scatter",
-        emphasis: { focus: "series" },
-        symbolSize: 5,
-      };
-    case "pie":
-      return {
-        type: "pie",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "donut":
-      return {
-        type: "pie",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "h-bar":
-      return {
-        type: "bar",
-        orientation: "h",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "area":
-      return {
-        type: "line",
-        emphasis: { focus: "series" },
-        areaStyle: {},
-        lineStyle: { width: 1.5 },
-      };
-    case "stacked":
-      return {
-        type: "bar",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "area-stacked":
-      return {
-        type: "line",
-        stack: "Total",
-        areaStyle: {},
-        emphasis: {
-          focus: "series",
-        },
-        lineStyle: { width: 1.5 },
-      };
-    case "gauge":
-      return {
-        type: "gauge",
-        startAngle: 205,
-        endAngle: -25,
-        pointer: {
-          show: false,
-        },
-        axisTick: {
-          show: false,
-        },
-        splitLine: {
-          show: false,
-        },
-        axisLabel: {
-          show: false,
-        },
-      };
-    case "metric":
-      return {
-        type: "custom",
-        coordinateSystem: "polar",
-      };
-    case "h-stacked":
-      return {
-        type: "bar",
-        emphasis: { focus: "series" },
-        orientation: "h",
-        lineStyle: { width: 1.5 },
-      };
-    default:
-      return {
-        type: "bar",
-      };
-  }
-};

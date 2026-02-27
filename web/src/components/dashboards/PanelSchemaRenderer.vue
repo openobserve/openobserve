@@ -363,10 +363,8 @@ import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
-import {
-  getUTCTimestampFromZonedTimestamp,
-  validateSQLPanelFields,
-} from "@/utils/dashboard/convertDataIntoUnitValue";
+import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
+import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 import { exportFile } from "quasar";
