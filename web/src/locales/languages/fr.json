@@ -351,7 +351,8 @@
     "openFields": "Champs ouverts",
     "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
     "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
-    "recordsPerPage": "Enregistrements par page"
+    "recordsPerPage": "Enregistrements par page",
+    "searchDimension": "Dimensions de recherche"
   },
   "menu": {
     "home": "Accueil",
@@ -2546,7 +2547,18 @@
     "timeRangeUpdated": "La plage de temps sélectionnée n'incluait pas cette trace. La plage horaire a été mise à jour pour correspondre à l'horodatage de la trace.",
     "fetchingMoreTraces": "À la recherche de nouvelles traces...",
     "showErrorOnly": "Afficher uniquement l'erreur",
-    "openInTraces": "Ouvrir dans Traces"
+    "openInTraces": "Ouvrir dans Traces",
+    "errorRetrievingTraces": "Une erreur s'est produite lors de la récupération des traces.",
+    "fetchingTraces": "Tiens bon, on va chercher tes traces.",
+    "noTracesFoundAdjust": "Aucune trace n'a été trouvée. Veuillez ajuster les filtres et réessayer.",
+    "tracesTitle": "TRACES",
+    "tracesFound": "Traces trouvées",
+    "error": "ERREUR",
+    "errors": "ERREURS",
+    "success": "SUCCÈS",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier",
+    "spanColorPalettePreview": "Aperçu de la palette de couleurs Span"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -2944,7 +2956,8 @@
     "tracesErrorDetails": "Une erreur s'est produite lors de la récupération des données de trace. Veuillez réessayer.",
     "metricsError": "Impossible de charger les métriques",
     "metricsErrorDetails": "Une erreur s'est produite lors de la récupération des données des métriques. Veuillez réessayer.",
-    "noMetricsDescription": "Aucune métrique n'a été trouvée pour cette corrélation dans la plage de temps sélectionnée."
+    "noMetricsDescription": "Aucune métrique n'a été trouvée pour cette corrélation dans la plage de temps sélectionnée.",
+    "errorRetrievingTraces": "Une erreur s'est produite lors de la récupération des traces."
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",

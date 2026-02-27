@@ -238,6 +238,31 @@ export default defineComponent({
       values: [],
     });
 
+    // Cached lookup map for resolveVariableValue — rebuilt only when the reactive
+    // sources (global/tab/current-scope variable values) actually change.
+    // Avoids iterating all variable arrays on every stream/field resolution call.
+    const resolvedVarLookup = computed((): Record<string, any> => {
+      const lookup: Record<string, any> = {};
+      if (useManager && manager) {
+        (manager.variablesData.global || []).forEach((v: any) => {
+          lookup[v.name] = v.value;
+        });
+        if (props.tabId && manager.variablesData.tabs?.[props.tabId]) {
+          manager.variablesData.tabs[props.tabId].forEach((v: any) => {
+            lookup[v.name] = v.value;
+          });
+        }
+        variablesData.values.forEach((v: any) => {
+          lookup[v.name] = v.value;
+        });
+      } else {
+        variablesData.values.forEach((v: any) => {
+          lookup[v.name] = v.value;
+        });
+      }
+      return lookup;
+    });
+
 // ================== FOR DEBUGGING PURPOSES ONLY ==================
     // watch for changes in variablesData.values
     let previousValues: any[] = [];
@@ -745,23 +770,21 @@ export default defineComponent({
         reset: handleSearchReset,
       });
     };
-    // Helper function to resolve variable references in a string
+    // Helper function to resolve variable references in a string.
+    // Uses the cached resolvedVarLookup computed (scope precedence: global → tab → current).
     const resolveVariableValue = (value: string): string => {
       if (!value || typeof value !== 'string') return value ?? "";
 
-      // Replace all variable references ($variableName) with their resolved values
+      const varLookup = resolvedVarLookup.value;
+
+      // Replace all variable references ($variableName) with their resolved values.
       // Using replace callback avoids regex exec loop risks and handles
-      // special replacement patterns ($1, $&, etc.) safely
-      const resolvedValue = value.replace(
+      // special replacement patterns ($1, $&, etc.) safely.
+      return value.replace(
         /\$([a-zA-Z0-9_-]+)/g,
         (fullMatch, varName) => {
-          // Find the variable in variablesData.values
-          const referencedVar = variablesData.values.find(
-            (v: any) => v.name === varName,
-          );
-
-          if (referencedVar) {
-            let varValue = referencedVar.value;
+          if (varName in varLookup) {
+            let varValue = varLookup[varName];
 
             // Handle array values (multi-select)
             // Stream and field must be single tokens, use first element only
@@ -776,8 +799,6 @@ export default defineComponent({
           return fullMatch;
         },
       );
-
-      return resolvedValue;
     };
 
     const fetchFieldValuesWithWebsocket = (
