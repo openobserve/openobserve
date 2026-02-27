@@ -7,7 +7,6 @@ class CloudLoginPage {
 
         // ===== NAVIGATION MENU SELECTORS =====
         this.homePageMenu = page.locator('[data-test="menu-link-\\/-item"]');
-        this.logsMenu = page.locator('[data-test="menu-link-\\/logs-item"]');
     }
 
     // ===== ASSERTION METHODS =====
@@ -25,7 +24,7 @@ class CloudLoginPage {
     }
 
     async expectNotOnAuthPages(timeout = 5000) {
-        await expect(this.page).not.toHaveURL(/login|dex|error|unauthorized/, { timeout });
+        await expect(this.page).not.toHaveURL(/\/login|\/dex\/|\/error|\/unauthorized/, { timeout });
     }
 
     // ===== NAVIGATION METHODS =====

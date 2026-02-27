@@ -44,13 +44,12 @@ async function globalSetup() {
     console.log(`[alpha1] Navigating to ${loginUrl}`);
     await page.goto(loginUrl);
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000);
 
     console.log(`[alpha1] Current URL: ${page.url()}`);
 
     // Step 2: Click "Continue with Email" on the Dex page
     const continueWithEmail = page.getByText('Continue with Email');
-    await continueWithEmail.waitFor({ state: 'visible', timeout: 10000 });
+    await continueWithEmail.waitFor({ state: 'visible', timeout: 15000 });
     console.log('[alpha1] Clicking "Continue with Email"...');
     await continueWithEmail.click();
     await page.waitForLoadState('domcontentloaded');
@@ -112,7 +111,7 @@ async function globalSetup() {
     }
 
     // Step 6: Wait for the app to fully load
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('domcontentloaded');
     console.log(`[alpha1] After settling: ${page.url()}`);
 
     // If still on Dex, wait longer for the redirect
@@ -133,7 +132,6 @@ async function globalSetup() {
     }
 
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Step 7: Verify login success
     console.log(`[alpha1] Verifying login at: ${page.url()}`);

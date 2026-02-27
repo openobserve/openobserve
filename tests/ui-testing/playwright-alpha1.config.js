@@ -24,6 +24,7 @@ if (!process.env.ALPHA1_USER_EMAIL || !process.env.ALPHA1_USER_PASSWORD) {
  */
 module.exports = defineConfig({
   testDir: './playwright-tests',
+  testMatch: ['**/Cloud/**/*.spec.js'],
   outputDir: './test-results',
   testIgnore: ['**/test-archives/**', '**/*_old.js'],
 
