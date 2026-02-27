@@ -1843,7 +1843,7 @@ pub struct DiskCache {
     // Disk data cache bucket num, multiple bucket means multiple locker, default is 0
     #[env_config(name = "ZO_DISK_CACHE_BUCKET_NUM", default = 0)]
     pub bucket_num: usize,
-    // MB, default is 50% of local volume available space and maximum 100GB
+    // MB, default is 50% of local volume available space and maximum 500GB
     #[env_config(name = "ZO_DISK_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
     // MB, default is 10% of local volume available space and maximum 20GB
@@ -2945,9 +2945,15 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.limit.disk_total = disk_total as usize;
     cfg.limit.disk_free = disk_free as usize;
     if cfg.disk_cache.max_size == 0 {
-        cfg.disk_cache.max_size = cfg.limit.disk_free / 2; // 50%
-        if cfg.disk_cache.max_size > 1024 * 1024 * 1024 * 100 {
-            cfg.disk_cache.max_size = 1024 * 1024 * 1024 * 100; // 100GB
+        // Add the current cache directory size back to free space so the limit is
+        // stable across restarts.  Without this correction the measured "free" space
+        // shrinks every time the app restarts with a full cache, causing the limit to
+        // drift lower on each startup.
+        let cache_current_size = crate::utils::file::get_dir_size(cache_dir);
+        let effective_free = cfg.limit.disk_free + cache_current_size;
+        cfg.disk_cache.max_size = effective_free / 2; // 50%
+        if cfg.disk_cache.max_size > 1024 * 1024 * 1024 * 500 {
+            cfg.disk_cache.max_size = 1024 * 1024 * 1024 * 500; // 500GB
         }
     } else {
         cfg.disk_cache.max_size *= 1024 * 1024;
