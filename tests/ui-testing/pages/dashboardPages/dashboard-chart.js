@@ -382,8 +382,7 @@ export default class ChartTypeSelector {
    * @param {string} query - The SQL query to enter
    */
   async enterCustomSQL(query) {
-    await this.queryEditor.locator(".view-line").first().click();
-    await this.queryEditor.locator(".monaco-editor").click();
+    await this.queryEditor.getByRole('code').click();
     await this.queryEditor.locator(".inputarea").fill(query);
     testLogger.debug('Entered custom SQL query', { query });
   }

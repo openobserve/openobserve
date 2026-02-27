@@ -88,11 +88,16 @@ async fn get_bucket_by_key<'a>(
             bucket.limit_markers = Some(ttl);
         }
     }
-    let kv = jetstream.create_key_value(bucket).await.map_err(|e| {
-        Error::Message(format!(
-            "[NATS:get_bucket_by_key] create jetstream kv {bucket_name} error: {e}"
-        ))
-    })?;
+    // Try to get the existing bucket first to avoid conflicts when the bucket was created
+    // with different parameters
+    let kv = match jetstream.get_key_value(&bucket.bucket).await {
+        Ok(kv) => kv,
+        Err(_) => jetstream.create_key_value(bucket).await.map_err(|e| {
+            Error::Message(format!(
+                "[NATS:get_bucket_by_key] create jetstream kv {bucket_name} error: {e}"
+            ))
+        })?,
+    };
     Ok((kv, key.trim_start_matches(bucket_name)))
 }
 

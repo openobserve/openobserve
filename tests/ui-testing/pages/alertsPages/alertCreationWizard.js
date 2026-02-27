@@ -338,9 +338,12 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        const sqlEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.inputarea');
-        await this.page.locator(this.locators.viewLineLocator).first().click();
-        await sqlEditor.fill('SELECT kubernetes_labels_name FROM "e2e_automate" where kubernetes_labels_name = \'ziox-querier\'');
+        // Get the Monaco editor (innermost .monaco-editor element)
+        const monacoEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.monaco-editor').last();
+        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
+        await monacoEditor.click({ force: true });
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.type('SELECT kubernetes_labels_name FROM "e2e_automate" where kubernetes_labels_name = \'ziox-querier\'');
 
         await this.page.locator(this.locators.runQueryButton).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -697,9 +700,12 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
         testLogger.info('Opened SQL Editor dialog');
 
-        const sqlEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.inputarea');
-        await this.page.locator(this.locators.viewLineLocator).first().click();
-        await sqlEditor.fill(`SELECT kubernetes_labels_name FROM "${streamName}" where kubernetes_labels_name = 'ziox-querier'`);
+        // Get the Monaco editor (innermost .monaco-editor element)
+        const monacoEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.monaco-editor').last();
+        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
+        await monacoEditor.click({ force: true });
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.type(`SELECT kubernetes_labels_name FROM "${streamName}" where kubernetes_labels_name = 'ziox-querier'`);
         testLogger.info('Entered SQL query');
 
         await this.page.locator(this.locators.runQueryButton).click();
@@ -1106,9 +1112,12 @@ export class AlertCreationWizard {
         // Use SQL query that selects data matching our condition
         // Use same query format as working createScheduledAlertWithSQL method
         const sqlQuery = `SELECT ${column} FROM "${streamName}" WHERE ${column} = '${value}'`;
-        const sqlEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.inputarea');
-        await this.page.locator(this.locators.viewLineLocator).first().click();
-        await sqlEditor.fill(sqlQuery);
+        // Get the Monaco editor (innermost .monaco-editor element)
+        const monacoEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.monaco-editor').last();
+        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
+        await monacoEditor.click({ force: true });
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.type(sqlQuery);
         testLogger.info('Entered SQL query', { sqlQuery });
 
         await this.page.locator(this.locators.runQueryButton).click();

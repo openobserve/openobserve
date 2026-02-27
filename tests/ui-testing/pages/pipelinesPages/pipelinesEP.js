@@ -104,7 +104,9 @@ export class PipelinesEP {
 
         const success = await this.page.evaluate((code) => {
             // Try finding Monaco editor instance via the DOM element
-            const editorElement = document.querySelector('[data-test="logs-vrl-function-editor"] .monaco-editor');
+            // Use querySelectorAll and get the last one (innermost editor) to handle nested .monaco-editor elements
+            const editorElements = document.querySelectorAll('[data-test="logs-vrl-function-editor"] .monaco-editor');
+            const editorElement = editorElements[editorElements.length - 1];
             if (editorElement && editorElement.__vscode_monaco_editor__) {
                 editorElement.__vscode_monaco_editor__.setValue(code);
                 return true;

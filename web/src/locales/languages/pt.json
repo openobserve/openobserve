@@ -116,7 +116,9 @@
     "set": "+ Conjunto",
     "copy": "Copiar",
     "copySuccess": "Copiado para a prancheta",
-    "copyError": "Falha ao copiar para a área de transferência"
+    "copyError": "Falha ao copiar para a área de transferência",
+    "goBack": "Voltar",
+    "stopGenerating": "Pare de gerar"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -129,7 +131,7 @@
     "source": "_fonte",
     "noResult": "Sem resultado",
     "syntaxGuide": "Guia de sintaxe",
-    "recordsPerPage": "Registros por página",
+    "rowsPerPage": "Registros por página",
     "showing": "Mostrando",
     "of": "do",
     "rowDetail": "Detalhes da fonte",
@@ -320,7 +322,36 @@
     "buildQuery": "Construir",
     "enableSqlModeForBuild": "Ative o modo SQL e selecione um único fluxo para usar o construtor de consultas",
     "applyToSearch": "Aplicar para pesquisar",
-    "complexQueryDetected": "Consulta complexa detectada. Usando o modo personalizado."
+    "complexQueryDetected": "Consulta complexa detectada. Usando o modo personalizado.",
+    "nlpModeLabel": "Modo de linguagem natural",
+    "generateSQL": "Gerar SQL",
+    "generateQuery": "Gerar consulta",
+    "generateSQLTooltip": "Gerar consulta SQL a partir de linguagem natural (Ctrl/Cmd+Enter)",
+    "generateQueryTooltip": "Gere uma consulta SQL a partir de linguagem natural",
+    "generating": "Gerando...",
+    "nlQueryGenerationFailed": "Falha ao gerar consulta. Por favor, tente novamente.",
+    "nlQueryGenerationSuccess": "Consulta gerada com sucesso!",
+    "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos",
+    "askAIPlaceholder": "Peça ajuda à IA com sua consulta...",
+    "aiBarSuccessPlaceholder": "O que você gostaria de fazer a seguir?",
+    "askAI": "Pergunte à IA",
+    "askAITooltip": "Peça ajuda à IA com sua consulta",
+    "enterPrompt": "Insira um prompt para gerar a consulta",
+    "analyzingQuery": "Analisando a consulta...",
+    "generatingQuery": "Gerando consulta...",
+    "queryGeneratedSuccess": "Consulta gerada com sucesso!",
+    "queryGenerationStopped": "A geração de consultas foi interrompida.",
+    "queryGenerationFailed": "Falha na geração da consulta.",
+    "fetchingResults": "Buscando resultados da pesquisa...",
+    "noResultsFound": "Nenhum resultado encontrado",
+    "errorFetchingResults": "Erro ao buscar resultados",
+    "somethingWentWrong": "Algo deu errado",
+    "selectStreamForAI": "Selecione primeiro um stream para usar a IA",
+    "collapseFields": "Colapsar campos",
+    "openFields": "Campos abertos",
+    "askAIFunctionPlaceholder": "Peça ajuda à IA com sua função...",
+    "enterFunctionPrompt": "Insira um prompt para gerar a função",
+    "recordsPerPage": "Registros por página"
   },
   "menu": {
     "home": "Início",
@@ -965,7 +996,10 @@
     "jsType": "JavaScript (ES2023)",
     "vrlfunction": "Função VRL",
     "jsFunctionHint": "Use o objeto `row` para acessar e modificar os campos de registro. Exemplo: row.new_field = row.existing_field + 'processado';",
-    "vrlFunctionHint": "Use o `.` para representar o evento atual. Exemplo: .new_field = .existing_field + 'processado'"
+    "vrlFunctionHint": "Use o `.` para representar o evento atual. Exemplo: .new_field = .existing_field + 'processado'",
+    "jsErrorDetails": "Detalhes do erro de JavaScript",
+    "askAIFunctionPlaceholder": "Peça ajuda à IA com sua função...",
+    "enterFunctionPrompt": "Insira um prompt para gerar a função"
   },
   "confirmDialog": {
     "cancel": "Cancelar",
@@ -1417,6 +1451,13 @@
     "columnsDefaultOrder": "As colunas serão exibidas em sua ordem padrão",
     "moveUp": "Mova-se para cima",
     "moveDown": "Mover para baixo",
+    "toggleFunctionEditor": "Alternar editor de funções",
+    "useSavedFunction": "Use a função Salva",
+    "showQueryResults": "Mostrar resultados da consulta",
+    "hideQueryResults": "Ocultar resultados da consulta",
+    "vrlExtractionTooltip": "Para usar campos VRL extraídos no gráfico, escreva uma função VRL e clique no botão Aplicar. Os campos serão extraídos, permitindo que você os use para criar o gráfico.",
+    "errorFetchingFunctions": "Erro ao buscar funções",
+    "functionAppliedSuccess": "função {name} aplicada com sucesso.",
     "connectNullValuesTooltip": "Conecte pontos de dados entre valores ausentes com uma linha.",
     "panelTimeSettings": "Configurações de tempo do painel",
     "panelTimeEnabled": "Permitir tempo no nível do painel",
@@ -2014,7 +2055,20 @@
       "variablesTooltip": "As variáveis são usadas para passar dados do alerta para o destino.",
       "rowTemplateTooltip": "O modelo de linha é usado para formatar a mensagem de alerta.",
       "templateType": "Tipo de modelo:"
-    }
+    },
+    "addConditions": "Adicionar condições",
+    "sqlEditor": "Editor SQL",
+    "promqlEditor": "Editor ProMQL",
+    "vrlEditor": "Editor VRL",
+    "generateVRL": "Gerar VRL",
+    "applyVRL": "Aplicar VRL",
+    "runQuery": "Executar consulta",
+    "onStream": "em",
+    "streamLabel": "fluxo",
+    "noStreamSelected": "Nenhum stream selecionado",
+    "resultsIncludeAllWindows": "Os resultados incluem todas as adições de várias janelas",
+    "runQueryForOutput": "Clique em Executar consulta para ver a saída",
+    "applyVRLForOutput": "Clique em Aplicar VRL para ver a saída combinada"
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2272,6 +2326,7 @@
       "groupsLabel": "grupos",
       "noMatchingGroups": "Nenhum grupo correspondente",
       "fqnFormulaTitle": "Fórmula de identidade",
+      "fqnFormulaTooltip": "Mostra como a identidade do serviço será calculada. As dimensões de escopo (azul) são concatenadas com '/'. A primeira dimensão de carga de trabalho não nula (verde) se torna o nome do serviço.",
       "scopeDimension": "Dimensão de escopo",
       "workloadDimension": "Dimensão de carga de trabalho",
       "noFormulaConfigured": "Nenhuma fórmula de identidade configurada. Adicione dimensões acima.",
@@ -2428,7 +2483,11 @@
     "errorSavingPipeline": "Erro ao salvar o pipeline",
     "cancelChangesConfirm": "Tem certeza de que deseja cancelar as alterações?",
     "cancel": "Cancelar",
-    "dragDropNodesHere": "Arraste e solte os nós aqui"
+    "dragDropNodesHere": "Arraste e solte os nós aqui",
+    "promqlOnlyForMetrics": "O ProMQL só está disponível para o tipo de fluxo de métricas",
+    "invalidCronExpression": "Expressão cron inválida",
+    "thresholdShouldNotBeEmpty": "O limite não deve estar vazio",
+    "errorGettingResults": "Erro ao obter resultados"
   },
   "reports": {
     "header": "Relatórios",
@@ -2934,5 +2993,10 @@
     "invalidFormat": "Formato inválido",
     "mustBeGreaterThan": "Deve ser maior que {value}",
     "mustBeLessThan": "Deve ser menor que {value}"
+  },
+  "nlMode": {
+    "toggle": "Modo de linguagem natural",
+    "noAdditionalOptions": "Sem opções adicionais",
+    "generateVRL": "Gerar VRL"
   }
 }
