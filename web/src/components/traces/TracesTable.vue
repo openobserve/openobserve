@@ -117,8 +117,8 @@ declare module "@tanstack/vue-table" {
   interface ColumnMeta<TData, TValue> {
     /** flex: 1 1 0 — column grows to fill remaining space */
     grow?: boolean;
-    /** min-width in px when grow is true (falls back to ColumnDef.minSize) */
-    minWidth?: number;
+    /** base width in px when grow is true (falls back to ColumnDef.minSize) */
+    width?: number;
     /** text alignment for both header and cell */
     align?: "left" | "center" | "right";
   }
