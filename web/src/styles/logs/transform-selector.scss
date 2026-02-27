@@ -31,7 +31,7 @@
   :deep(.transform-icon),
   :deep(.function-icon) {
     .q-icon {
-      &.on-left {
+      img {
         filter: invert(1);
       }
     }
