@@ -1242,7 +1242,7 @@ async fn process_latest_traces_stream(
             .collect();
         let trace_ids_str = sanitized_ids.join("','");
         let detail_sql = format!(
-            "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, span_status \
+            "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status \
              FROM \"{stream_name}\" WHERE trace_id IN ('{trace_ids_str}') ORDER BY {TIMESTAMP_COL_NAME} ASC"
         );
 
