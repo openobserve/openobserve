@@ -77,15 +77,20 @@ async function globalSetup() {
     console.log('[alpha1] Password entered');
 
     // Step 4: Submit and wait for redirect back to alpha1
-    const submitButton = page.locator(
+    const submitButton = page.locator('form').locator(
       'button:has-text("Login"), button:has-text("Sign In"), button:has-text("Log In")'
     );
 
     await submitButton.first().click();
     await page.waitForURL(
-      /web\/|dex\/approval/,
+      /web\/|dex\/approval|dex\/auth.*error/,
       { timeout: 15000 }
     );
+
+    // Check if login failed (Dex error page)
+    if (page.url().includes('error')) {
+      throw new Error(`Login failed — Dex returned error page: ${page.url()}`);
+    }
     console.log(`[alpha1] After submit navigation: ${page.url()}`);
 
     // Step 5: Check if we're on a Dex approval page
@@ -107,8 +112,12 @@ async function globalSetup() {
           { timeout: 15000 }
         );
         console.log(`[alpha1] After grant approval: ${page.url()}`);
-      } catch {
-        console.log('[alpha1] No grant button found, continuing...');
+      } catch (e) {
+        if (e.name === 'TimeoutError') {
+          console.log('[alpha1] No grant button found, continuing...');
+        } else {
+          throw e;
+        }
       }
     }
 
