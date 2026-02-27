@@ -94,8 +94,8 @@ async function globalSetup() {
       console.log('[alpha1] On Dex approval/auth page, looking for grant button...');
 
       const grantButton = page.locator(
-        'button[type="submit"], button:has-text("Grant Access"), button:has-text("Approve"), ' +
-        'input[type="submit"][value="Approve"], button[value="approve"]'
+        'button:has-text("Grant Access"), button:has-text("Approve"), button[value="approve"], ' +
+        'input[type="submit"][value="Approve"], button[type="submit"]'
       );
 
       try {
@@ -156,6 +156,10 @@ async function globalSetup() {
     console.error(`[alpha1] Login failed. Screenshot: ${screenshotPath}`);
     console.error(`[alpha1] Current URL: ${page.url()}`);
     console.error(`[alpha1] Error: ${error.message}`);
+    // Clean up stale auth file on failure so it's not reused
+    if (fs.existsSync(authFile)) {
+      fs.unlinkSync(authFile);
+    }
     throw error;
   } finally {
     await context.close();

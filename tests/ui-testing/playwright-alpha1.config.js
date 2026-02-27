@@ -3,11 +3,11 @@ const { defineConfig, devices } = require('@playwright/test');
 const dotenv = require('dotenv');
 
 // Load environment variables from .env file
-try {
-  dotenv.config();
+const envResult = dotenv.config();
+if (envResult.error) {
+  console.warn('⚠️  No .env file found, using system environment variables');
+} else {
   console.log('✅ Environment variables loaded from .env file');
-} catch (error) {
-  console.warn('⚠️  dotenv not available, using system environment variables');
 }
 
 // Check alpha1-specific environment variables
