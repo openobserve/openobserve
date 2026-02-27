@@ -2915,24 +2915,6 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Returns the total size (in bytes) of all files under `dir`, recursively.
-/// Returns 0 if the directory does not exist or cannot be read.
-fn get_dir_size(dir: &str) -> usize {
-    let mut total: usize = 0;
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return 0;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            total += get_dir_size(path.to_str().unwrap_or(""));
-        } else if let Ok(meta) = entry.metadata() {
-            total += meta.len() as usize;
-        }
-    }
-    total
-}
-
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
     let cache_dir = Path::new(&cfg.common.data_cache_dir)
@@ -2967,7 +2949,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         // stable across restarts.  Without this correction the measured "free" space
         // shrinks every time the app restarts with a full cache, causing the limit to
         // drift lower on each startup.
-        let cache_current_size = get_dir_size(cache_dir);
+        let cache_current_size = crate::utils::file::get_dir_size(cache_dir);
         let effective_free = cfg.limit.disk_free + cache_current_size;
         cfg.disk_cache.max_size = effective_free / 2; // 50%
         if cfg.disk_cache.max_size > 1024 * 1024 * 1024 * 500 {
