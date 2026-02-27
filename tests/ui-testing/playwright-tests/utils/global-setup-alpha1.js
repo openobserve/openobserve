@@ -36,10 +36,10 @@ async function globalSetup() {
     if (!baseUrl) {
       throw new Error('ZO_BASE_URL must be set');
     }
-    const userEmail = process.env.ALPHA1_USER_EMAIL;
-    const userPassword = process.env.ALPHA1_USER_PASSWORD;
+    const userEmail = (process.env.ALPHA1_USER_EMAIL || '').trim();
+    const userPassword = (process.env.ALPHA1_USER_PASSWORD || '').trim();
 
-    if (!userEmail?.trim() || !userPassword?.trim()) {
+    if (!userEmail || !userPassword) {
       throw new Error('ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set');
     }
 
