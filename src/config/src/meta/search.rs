@@ -1318,6 +1318,8 @@ pub struct PaginationQuery {
 pub struct ValuesRequest {
     pub fields: Vec<String>,
     #[serde(default)]
+    pub keyword: String,
+    #[serde(default)]
     pub from: Option<i64>,
     #[serde(default)]
     pub size: Option<i64>,
@@ -2793,6 +2795,7 @@ mod tests {
     #[test]
     fn test_values_request() {
         let request = ValuesRequest {
+            keyword: "test_keyword".to_string(),
             fields: vec!["field1".to_string(), "field2".to_string()],
             from: None,
             size: Some(100),
