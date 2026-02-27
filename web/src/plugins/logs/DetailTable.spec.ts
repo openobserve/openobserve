@@ -806,14 +806,14 @@ describe("DetailTable Component", () => {
       stream_links: [
         {
           name: "View Trace",
-          url: "https://traces.example.com/${trace_id}",
+          url: "https://traces.example.com/${field.__value}",
           fields: [{ name: "trace_id", alias: "kubernetes_container_name" }],
         },
       ],
       org_links: [
         {
           name: "View Dashboard",
-          url: "https://dashboard.example.com/${host}",
+          url: "https://dashboard.example.com/${field.__value}",
           fields: [{ name: "host", alias: "kubernetes_container_hash" }],
         },
       ],
@@ -877,14 +877,14 @@ describe("DetailTable Component", () => {
         stream_links: [
           {
             name: "Stream Link",
-            url: "https://stream.example.com/${trace_id}",
+            url: "https://stream.example.com/${field.__value}",
             fields: [{ name: "trace_id", alias: "kubernetes_container_name" }],
           },
         ],
         org_links: [
           {
             name: "Org Link",
-            url: "https://org.example.com/${trace_id}",
+            url: "https://org.example.com/${field.__value}",
             fields: [{ name: "trace_id", alias: "kubernetes_container_name" }],
           },
         ],
@@ -903,7 +903,7 @@ describe("DetailTable Component", () => {
         stream_links: [
           {
             name: "No Match",
-            url: "https://example.com/${foo}",
+            url: "https://example.com/${field.__value}",
             fields: [{ name: "foo", alias: "bar" }],
           },
         ],
@@ -915,16 +915,15 @@ describe("DetailTable Component", () => {
       expect(result).toEqual([]);
     });
 
-    it("should return null URL when not all placeholders can be resolved", () => {
+    it("should resolve all 6 fixed variables in URL template", () => {
       store.state.zoConfig.enable_cross_linking = true;
       wrapper.vm.searchObj.data.crossLinks = {
         stream_links: [
           {
-            name: "Partial",
-            url: "https://example.com/${trace_id}/${missing_field}",
+            name: "Full Template",
+            url: "https://example.com/${field.__name}/${field.__value}?from=${start_time}&to=${end_time}",
             fields: [
               { name: "trace_id", alias: "kubernetes_container_name" },
-              { name: "missing_field", alias: "missing_field" },
             ],
           },
         ],
@@ -933,7 +932,10 @@ describe("DetailTable Component", () => {
       wrapper.vm.rowData = { kubernetes_container_name: "val123" };
 
       const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      // field.__name = originalFieldName = "trace_id", field.__value = "val123"
+      expect(result[0].resolvedUrl).toContain("trace_id");
+      expect(result[0].resolvedUrl).toContain("val123");
     });
 
     it("should call window.open when openCrossLink is called", () => {
@@ -953,7 +955,7 @@ describe("DetailTable Component", () => {
         stream_links: [
           {
             name: "Encoded",
-            url: "https://example.com/search?q=${trace_id}",
+            url: "https://example.com/search?q=${field.__value}",
             fields: [{ name: "trace_id", alias: "kubernetes_container_name" }],
           },
         ],

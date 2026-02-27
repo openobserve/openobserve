@@ -922,14 +922,14 @@ describe("JsonPreview Component", () => {
       stream_links: [
         {
           name: "View Trace",
-          url: "https://traces.example.com/${trace_id}",
+          url: "https://traces.example.com/${field.__value}",
           fields: [{ name: "trace_id", alias: "field1" }],
         },
       ],
       org_links: [
         {
           name: "View Dashboard",
-          url: "https://dashboard.example.com/${host}",
+          url: "https://dashboard.example.com/${field.__value}",
           fields: [{ name: "host", alias: "field2" }],
         },
       ],
@@ -1001,14 +1001,14 @@ describe("JsonPreview Component", () => {
         stream_links: [
           {
             name: "Stream Link",
-            url: "https://stream.example.com/${trace_id}",
+            url: "https://stream.example.com/${field.__value}",
             fields: [{ name: "trace_id", alias: "field1" }],
           },
         ],
         org_links: [
           {
             name: "Org Link",
-            url: "https://org.example.com/${trace_id}",
+            url: "https://org.example.com/${field.__value}",
             fields: [{ name: "trace_id", alias: "field1" }],
           },
         ],
@@ -1047,7 +1047,7 @@ describe("JsonPreview Component", () => {
         stream_links: [
           {
             name: "Encoded",
-            url: "https://example.com/search?q=${trace_id}",
+            url: "https://example.com/search?q=${field.__value}",
             fields: [{ name: "trace_id", alias: "field1" }],
           },
         ],
@@ -1065,17 +1065,14 @@ describe("JsonPreview Component", () => {
       );
     });
 
-    it("should return empty when URL has unresolvable placeholders", async () => {
+    it("should resolve all 6 fixed variables in URL template", async () => {
       store.state.zoConfig.enable_cross_linking = true;
       wrapper.vm.searchObj.data.crossLinks = {
         stream_links: [
           {
-            name: "Partial",
-            url: "https://example.com/${trace_id}/${missing}",
-            fields: [
-              { name: "trace_id", alias: "field1" },
-              { name: "missing", alias: "missing" },
-            ],
+            name: "Full Template",
+            url: "https://example.com/${field.__name}/${field.__value}?from=${start_time}&to=${end_time}",
+            fields: [{ name: "trace_id", alias: "field1" }],
           },
         ],
         org_links: [],
@@ -1086,7 +1083,10 @@ describe("JsonPreview Component", () => {
       });
 
       const result = wrapper.vm.getCrossLinksForField("field1");
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      // field.__name = originalFieldName = "trace_id", field.__value = "val123"
+      expect(result[0].resolvedUrl).toContain("trace_id");
+      expect(result[0].resolvedUrl).toContain("val123");
     });
 
     it("should handle empty crossLinks object", () => {

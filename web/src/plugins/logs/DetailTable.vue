@@ -785,6 +785,7 @@ export default defineComponent({
       }
 
       const originalFieldName = aliasToOriginal[fieldName] || fieldName;
+      const fieldValue = rowData.value?.[fieldName];
 
       const streamCoveredFields = new Set<string>();
       for (const link of stream_links) {
@@ -797,16 +798,16 @@ export default defineComponent({
 
       for (const link of stream_links) {
         if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
-          const resolved = resolveCrossLinkUrl(link.url, rowData.value, link.fields);
-          if (resolved) results.push({ name: link.name, resolvedUrl: resolved });
+          const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
+          results.push({ name: link.name, resolvedUrl: resolved });
         }
       }
 
       if (!streamCoveredFields.has(originalFieldName)) {
         for (const link of org_links) {
           if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
-            const resolved = resolveCrossLinkUrl(link.url, rowData.value, link.fields);
-            if (resolved) results.push({ name: link.name, resolvedUrl: resolved });
+            const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
+            results.push({ name: link.name, resolvedUrl: resolved });
           }
         }
       }
@@ -816,23 +817,20 @@ export default defineComponent({
 
     const resolveCrossLinkUrl = (
       urlTemplate: string,
-      record: Record<string, any>,
-      fields: any[],
-    ): string | null => {
-      const aliasMap: Record<string, string> = {};
-      for (const f of fields || []) {
-        aliasMap[f.name] = f.alias || f.name;
-      }
-      const resolved = urlTemplate.replace(
-        /\$?\{(\w+)\}/g,
-        (match: string, name: string) => {
-          const alias = aliasMap[name] || name;
-          const val = record[alias] ?? record[name];
-          if (val === undefined || val === null) return match;
-          return encodeURIComponent(String(val));
-        },
-      );
-      return resolved.includes("{") ? null : resolved;
+      fieldName: string,
+      fieldValue: any,
+    ): string => {
+      const startTime = searchObj.data.datetime?.startTime || 0;
+      const endTime = searchObj.data.datetime?.endTime || 0;
+      const query = searchObj.data.crossLinkQuery || searchObj.data.query || "";
+
+      return urlTemplate
+        .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
+        .replace(/\$\{field\.__value\}/g, encodeURIComponent(String(fieldValue ?? "")))
+        .replace(/\$\{start_time\}/g, String(startTime))
+        .replace(/\$\{end_time\}/g, String(endTime))
+        .replace(/\$\{query\}/g, encodeURIComponent(query))
+        .replace(/\$\{query_encoded\}/g, btoa(query));
     };
 
     const openCrossLink = (url: string) => {

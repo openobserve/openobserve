@@ -446,6 +446,8 @@ export const useSearchBar = () => {
       if (store.state.zoConfig?.enable_cross_linking) {
         const searchPayload = buildSearch(true);
         const crossLinkQuery = searchPayload?.query?.sql;
+        // Store the built query so resolveCrossLinkUrl can use it (searchObj.data.query is empty in non-SQL mode)
+        searchObj.data.crossLinkQuery = crossLinkQuery || "";
         if (crossLinkQuery) {
           searchService
             .result_schema(

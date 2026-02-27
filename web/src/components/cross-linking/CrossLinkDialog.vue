@@ -2,8 +2,11 @@
   <q-dialog v-model="dialogVisible" persistent>
     <q-card style="min-width: 500px">
       <q-card-section>
-        <div class="text-h6">
-          {{ isEditing ? "Edit" : "Add" }} Cross-Link
+        <div class="tw:flex tw:items-center tw:justify-between">
+          <div class="text-h6">
+            {{ isEditing ? "Edit" : "Add" }} Cross-Link
+          </div>
+          <CrossLinkUserGuide />
         </div>
       </q-card-section>
 
@@ -29,14 +32,14 @@
             <q-input
               v-model="form.url"
               dense
-              placeholder="e.g., https://example.com/trace/${trace_id}"
+              placeholder="e.g., https://example.com/trace/${field.__value}?from=${start_time}&to=${end_time}"
               :rules="[(val: string) => !!val || 'URL is required']"
               borderless
               hide-bottom-space
               data-test="cross-link-url-input"
             />
             <div class="tw:text-xs tw:mt-1" style="color: var(--o2-text-muted)">
-              Use ${field_name} for dynamic field values
+              Use ${field.__name}, ${field.__value}, ${start_time}, ${end_time}, ${query}, ${query_encoded}
             </div>
           </div>
 
@@ -145,6 +148,7 @@
 <script lang="ts">
 import { defineComponent, ref, watch, computed, type PropType } from "vue";
 import { useStore } from "vuex";
+import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 
 export interface CrossLink {
   name: string;
@@ -154,6 +158,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
+  components: { CrossLinkUserGuide },
   props: {
     modelValue: {
       type: Boolean,

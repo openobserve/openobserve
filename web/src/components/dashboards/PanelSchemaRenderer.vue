@@ -1833,73 +1833,64 @@ export default defineComponent({
       const drilldownItem = drilldownArray.value[index];
       if (drilldownItem?._isCrossLink) {
         try {
+          const rawUrl = drilldownItem.data._rawUrl;
+          const linkFields = drilldownItem.data._fields || [];
+
+          // Find the first matching field from cross-link's fields array that has a value
+          let fieldName = "";
+          let fieldValue: any = "";
+
           if (panelSchema.value?.type === "table" && drilldownParams[1]?.[0]) {
-            // Table: use existing replacePlaceholders approach (row data directly available)
-            const drilldownVariables: any = {};
-            const fields: any = {};
+            // Table: row data is directly available
+            const rowData = drilldownParams[1][0];
             const panelFields: any = [
               ...(panelSchema.value.queries?.[0]?.fields?.x || []),
               ...(panelSchema.value.queries?.[0]?.fields?.y || []),
               ...(panelSchema.value.queries?.[0]?.fields?.z || []),
             ];
-            panelFields.forEach((field: any) => {
-              fields[field.label] = drilldownParams[1][0][field.alias];
-              fields[field.alias] = drilldownParams[1][0][field.alias];
-            });
-            drilldownVariables.row = { field: fields };
-            const resolvedUrl = replacePlaceholders(
-              drilldownItem.data.url,
-              drilldownVariables,
-            );
-            window.open(resolvedUrl, "_blank");
+            for (const lf of linkFields) {
+              const alias = lf.alias || lf.name;
+              const pf = panelFields.find((f: any) => f.alias === alias || f.label === lf.name);
+              const val = rowData[alias] ?? rowData[lf.name];
+              if (val !== undefined && val !== null) {
+                fieldName = lf.name;
+                fieldValue = val;
+                break;
+              }
+            }
           } else {
-            // Non-table: resolve URL directly from raw data + chart click values
-            const rawUrl = drilldownItem.data._rawUrl;
-            const linkFields = drilldownItem.data._fields || [];
+            // Non-table: find value from raw query data or chart click
             const chartType = panelSchema.value?.type;
             const isPieOrDonut = ["pie", "donut"].includes(chartType);
-
-            // Build a record of field values from the chart click
-            const record: Record<string, any> = {};
-
-            // Determine x-axis value based on chart type
             const dataIndex = drilldownParams[0]?.dataIndex;
+            const xAxisData = panelData.value?.options?.xAxis?.[0]?.data;
+
+            // Build a record from raw data
+            const record: Record<string, any> = {};
+            const queryResult = data.value?.[0]?.result;
+            const xFields = panelSchema.value?.queries?.[0]?.fields?.x || [];
+            const breakdownFields = panelSchema.value?.queries?.[0]?.fields?.breakdown || [];
+
             let xAxisValue: any;
             if (isPieOrDonut) {
-              // Pie/donut: slice name IS the x-field value
               xAxisValue = drilldownParams[0]?.name;
             } else if (chartType === "heatmap") {
-              // Heatmap: value is [x, y, val]
               xAxisValue = drilldownParams[0]?.value?.[0];
             } else {
-              // Line/bar/area/scatter etc: x value from xAxis data
-              const xAxisData = panelData.value?.options?.xAxis?.[0]?.data;
               xAxisValue = xAxisData?.[dataIndex];
             }
-
-            // Series name: pie/donut use params.name, others use params.seriesName
             const seriesName = isPieOrDonut
               ? drilldownParams[0]?.name
               : drilldownParams[0]?.seriesName;
 
-            const xFields = panelSchema.value?.queries?.[0]?.fields?.x || [];
-            const yFields = panelSchema.value?.queries?.[0]?.fields?.y || [];
-            const breakdownFields = panelSchema.value?.queries?.[0]?.fields?.breakdown || [];
-
-            // Try to find the matching row in raw query results
-            const queryResult = data.value?.[0]?.result;
             if (queryResult?.length > 0) {
               for (const row of queryResult) {
                 let matches = true;
                 if (xFields.length > 0 && xAxisValue !== undefined) {
-                  if (String(row[xFields[0].alias]) !== String(xAxisValue)) {
-                    matches = false;
-                  }
+                  if (String(row[xFields[0].alias]) !== String(xAxisValue)) matches = false;
                 }
                 if (matches && breakdownFields.length > 0 && seriesName && !isPieOrDonut) {
-                  if (String(row[breakdownFields[0].alias]) !== String(seriesName)) {
-                    matches = false;
-                  }
+                  if (String(row[breakdownFields[0].alias]) !== String(seriesName)) matches = false;
                 }
                 if (matches) {
                   Object.assign(record, row);
@@ -1908,43 +1899,42 @@ export default defineComponent({
               }
             }
 
-            // Fallback: populate from chart click values for any missing fields
-            const yValue = isPieOrDonut
-              ? drilldownParams[0]?.value
-              : Array.isArray(drilldownParams[0]?.value)
-                ? drilldownParams[0]?.value?.[drilldownParams[0]?.value?.length - 1]
-                : drilldownParams[0]?.value;
-
-            xFields.forEach((f: any) => {
-              if (record[f.alias] === undefined) record[f.alias] = xAxisValue;
-              if (record[f.label] === undefined) record[f.label] = xAxisValue;
-            });
-            yFields.forEach((f: any) => {
-              if (record[f.alias] === undefined) record[f.alias] = yValue;
-              if (record[f.label] === undefined) record[f.label] = yValue;
-            });
-            breakdownFields.forEach((f: any) => {
-              if (record[f.alias] === undefined) record[f.alias] = seriesName;
-              if (record[f.label] === undefined) record[f.label] = seriesName;
-            });
-
-            // Resolve {field_name} in URL using alias mapping from result_schema
-            const aliasMap: Record<string, string> = {};
-            for (const f of linkFields) {
-              aliasMap[f.name] = f.alias || f.name;
+            // Find first matching field with a value
+            for (const lf of linkFields) {
+              const alias = lf.alias || lf.name;
+              const val = record[alias] ?? record[lf.name];
+              if (val !== undefined && val !== null) {
+                fieldName = lf.name;
+                fieldValue = val;
+                break;
+              }
             }
-
-            const resolvedUrl = rawUrl.replace(
-              /\$?\{(\w+)\}/g,
-              (_match: string, fieldName: string) => {
-                const alias = aliasMap[fieldName] || fieldName;
-                const val = record[alias] ?? record[fieldName];
-                if (val === undefined || val === null) return _match;
-                return encodeURIComponent(String(val));
-              },
-            );
-            window.open(resolvedUrl, "_blank");
           }
+
+          // Get time range
+          const startTime = selectedTimeObj?.value?.start_time
+            ? new Date(selectedTimeObj.value.start_time.toISOString()).getTime()
+            : 0;
+          const endTime = selectedTimeObj?.value?.end_time
+            ? new Date(selectedTimeObj.value.end_time.toISOString()).getTime()
+            : 0;
+
+          // Get query
+          const currentQuery =
+            metadata?.value?.queries?.[0]?.query ??
+            panelSchema?.value?.queries?.[0]?.query ??
+            "";
+
+          // Resolve the 6 fixed variables
+          const resolvedUrl = rawUrl
+            .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
+            .replace(/\$\{field\.__value\}/g, encodeURIComponent(String(fieldValue)))
+            .replace(/\$\{start_time\}/g, String(startTime))
+            .replace(/\$\{end_time\}/g, String(endTime))
+            .replace(/\$\{query\}/g, encodeURIComponent(currentQuery))
+            .replace(/\$\{query_encoded\}/g, b64EncodeUnicode(currentQuery));
+
+          window.open(resolvedUrl, "_blank");
         } catch (error) {
           console.error("Failed to open cross-link:", error);
         }
