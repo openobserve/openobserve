@@ -84,6 +84,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </div>
 
+            <!-- Usage Chart (only for Enterprise with license) -->
+            <div v-if="dialogConfig.isLicensed && chartData" class="usage-chart-section">
+              <div class="chart-wrapper">
+                <div class="usage-chart-container" style="height: 150px; width: 100%;">
+                  <ChartRenderer
+                    :key="dashboardRenderKey"
+                    :data="chartData"
+                  />
+                </div>
+                <div v-if="isIngestionUnlimited" class="text-caption" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
+                  {{ t('about.usage_shows_zero_unlimited') }}
+                </div>
+              </div>
+            </div>
+
             <!-- License Limit Note (only for Enterprise without license) -->
             <div v-if="dialogConfig.showLicenseNote" class="license-note">
               <q-icon name="info" size="14px" class="q-mr-xs" />
@@ -207,13 +222,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, PropType, watch } from "vue";
+import { defineComponent, ref, computed, PropType, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
+
+const ChartRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/ChartRenderer.vue")
+);
 
 // Feature documentation links configuration
 const FEATURE_DOCS_BASE_URL = "https://o2.ws/";
@@ -258,6 +277,9 @@ const FEATURE_LINKS = {
 
 export default defineComponent({
   name: "EnterpriseUpgradeDialog",
+  components: {
+    ChartRenderer,
+  },
   props: {
     modelValue: {
       type: Boolean,
@@ -273,6 +295,8 @@ export default defineComponent({
     const { t } = useI18n();
     const licenseData = ref<any>(null);
     const isLoadingLicense = ref(false);
+    const chartData = ref<any>(null);
+    const dashboardRenderKey = ref(0);
 
     // Fetch license data when dialog opens for Enterprise with license
     const fetchLicenseData = async () => {
@@ -286,6 +310,8 @@ export default defineComponent({
         try {
           const response = await licenseServer.get_license();
           licenseData.value = response.data;
+          // Generate dashboard after license data is fetched
+          generateUsageDashboard();
         } catch (error) {
           console.error("Failed to fetch license data:", error);
           // On error, set default values (0% usage, unlimited)
@@ -725,6 +751,153 @@ export default defineComponent({
       }
     };
 
+    // Check if ingestion is unlimited
+    const isIngestionUnlimited = computed(() => {
+      return licenseData.value?.license?.limits?.Ingestion?.typ === "Unlimited";
+    });
+
+    // Get ingestion limit value for threshold
+    const ingestionLimitGB = computed(() => {
+      if (isIngestionUnlimited.value) {
+        return null; // No limit for unlimited plans
+      }
+      return licenseData.value?.license?.limits?.Ingestion?.value || 100;
+    });
+
+    // Generate usage chart data for ChartRenderer
+    const generateUsageDashboard = async () => {
+      try {
+        const ingestionLimit = ingestionLimitGB.value;
+
+        // Create mark line for threshold if limit exists
+        const markLine: any = ingestionLimit && ingestionLimit > 0 ? {
+          silent: true,
+          symbol: 'none',
+          label: {
+            show: false
+          },
+          lineStyle: {
+            color: '#FF0000',
+            width: 2,
+            type: 'solid'
+          },
+          data: [{
+            yAxis: ingestionLimit
+          }]
+        } : undefined;
+
+        // Generate sample dates for current month
+        const now = new Date();
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const dates = [];
+        const values = [];
+
+        // Create sample data for visualization
+        for (let i = 1; i <= daysInMonth; i++) {
+          dates.push(`${i}`);
+          // Random values for demonstration
+          values.push(Math.random() * (ingestionLimit || 100) * 0.8);
+        }
+
+        // Simple echarts configuration for bar chart
+        // ChartRenderer expects data in format: { options: { ... } }
+        chartData.value = {
+          options: {
+            backgroundColor: 'transparent',
+            grid: {
+              left: '10%',
+              right: '5%',
+              top: '10%',
+              bottom: '15%',
+              containLabel: true
+            },
+            xAxis: {
+              type: 'category',
+              data: dates,
+              axisLine: {
+                show: true,
+                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+              },
+              axisTick: {
+                show: true,
+                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+              },
+              axisLabel: {
+                show: true,
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: 10,
+                interval: Math.floor(daysInMonth / 6) // Show ~6 labels
+              }
+            },
+            yAxis: {
+              type: 'value',
+              axisLine: {
+                show: true,
+                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+              },
+              axisTick: {
+                show: true,
+                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+              },
+              axisLabel: {
+                show: true,
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: 10,
+                formatter: (value: number) => {
+                  if (value >= 1000) {
+                    return (value / 1000).toFixed(0) + 'TB';
+                  }
+                  return value.toFixed(0) + 'GB';
+                }
+              },
+              splitLine: {
+                show: true,
+                lineStyle: {
+                  color: 'rgba(255, 255, 255, 0.1)',
+                  type: 'dashed'
+                }
+              }
+            },
+            series: [{
+              type: 'bar',
+              data: values,
+              itemStyle: {
+                color: '#FF6B6B'
+              },
+              barWidth: '60%',
+              markLine: markLine
+            }],
+            tooltip: {
+              show: true,
+              trigger: 'axis',
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              borderColor: 'rgba(255, 255, 255, 0.2)',
+              borderWidth: 1,
+              textStyle: {
+                color: '#fff',
+                fontSize: 12
+              },
+              formatter: (params: any) => {
+                const date = params[0].name;
+                const value = params[0].value;
+                const formattedValue = value >= 1000
+                  ? (value / 1000).toFixed(2) + ' TB'
+                  : value.toFixed(2) + ' GB';
+
+                const monthName = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleString('default', { month: 'short' });
+                return `${monthName} ${date}<br/>Usage: ${formattedValue}`;
+              }
+            },
+            animation: true
+          }
+        };
+
+        dashboardRenderKey.value++;
+      } catch (error) {
+        console.error("Failed to generate chart data:", error);
+      }
+    };
+
     // Watch for dialog opening to fetch license data
     watch(showDialog, (newVal) => {
       if (newVal) {
@@ -746,6 +919,10 @@ export default defineComponent({
       handlePrimaryButtonClick,
       getProgressColor,
       isLoadingLicense,
+      licenseData,
+      chartData,
+      dashboardRenderKey,
+      isIngestionUnlimited,
       t,
       Math,
     };
@@ -889,6 +1066,34 @@ export default defineComponent({
         .q-icon {
           color: white;
         }
+      }
+    }
+  }
+
+  .usage-chart-section {
+    width: 100%;
+    margin-bottom: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+
+    .chart-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .usage-chart-container {
+      width: 100%;
+      overflow: visible;
+      padding: 0;
+      margin: 0 auto;
+      min-height: 150px;
+      max-height: 150px;
+
+      .grid-stack-item-content {
+        border: 0px !important;
       }
     }
   }
