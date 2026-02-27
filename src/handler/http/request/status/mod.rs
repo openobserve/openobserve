@@ -180,6 +180,8 @@ struct ConfigResponse<'a> {
     license_server_url: String,
     #[cfg(feature = "enterprise")]
     ingestion_quota_used: f64,
+    #[cfg(feature = "enterprise")]
+    ingestion_history: Vec<o2_enterprise::enterprise::license::UsageResult>,
     log_page_default_field_list: String,
     query_values_default_num: i64,
     alert_preview_timerange_minutes: i64,
@@ -337,6 +339,8 @@ pub async fn zo_config() -> impl IntoResponse {
     let license_server_url = o2cfg.common.license_server_url.to_string();
     #[cfg(feature = "enterprise")]
     let ingestion_quota_used = o2_enterprise::enterprise::license::ingestion_used() * 100.0;
+    #[cfg(feature = "enterprise")]
+    let ingestion_history = o2_enterprise::enterprise::license::get_ingestion_history().await;
 
     let usage_enabled = enterprise_value!(cfg.common.usage_enabled, true);
 
@@ -413,6 +417,8 @@ pub async fn zo_config() -> impl IntoResponse {
         license_server_url,
         #[cfg(feature = "enterprise")]
         ingestion_quota_used,
+        #[cfg(feature = "enterprise")]
+        ingestion_history,
         query_values_default_num: cfg.limit.query_values_default_num,
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         service_graph_enabled,
