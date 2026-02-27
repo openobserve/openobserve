@@ -232,18 +232,13 @@ export function useLatencyInsightsDashboard() {
           : "count(_timestamp)";
 
       // Check if we should use single query or comparison query
-      // For TRACES: Check if filters have time-based selection (timeStart/timeEnd)
+      // For TRACES: Only check the rateFilter (volume-specific) — a brush on the
+      // duration or error chart must not trigger comparison mode for volume panels.
       // For LOGS: Check if time ranges are the same (no brush selection)
       const hasTimeBasedFilter =
-        (config.durationFilter !== undefined &&
-          config.durationFilter.timeStart !== undefined &&
-          config.durationFilter.timeEnd !== undefined) ||
-        (config.rateFilter !== undefined &&
-          config.rateFilter.timeStart !== undefined &&
-          config.rateFilter.timeEnd !== undefined) ||
-        (config.errorFilter !== undefined &&
-          config.errorFilter.timeStart !== undefined &&
-          config.errorFilter.timeEnd !== undefined);
+        config.rateFilter !== undefined &&
+        config.rateFilter.timeStart !== undefined &&
+        config.rateFilter.timeEnd !== undefined;
 
       const isSameTimeRange =
         config.streamType === "logs" &&
@@ -303,18 +298,13 @@ export function useLatencyInsightsDashboard() {
       // Error % = (error_traces / total_traces) * 100
 
       // Check if we should use single query (baseline-only mode)
-      // For TRACES: Check if filters have time-based selection (timeStart/timeEnd)
+      // For TRACES: Only check the errorFilter (error-specific) — a brush on the
+      // duration or rate chart must not trigger comparison mode for error panels.
       // For LOGS: Check if time ranges are the same (no brush selection)
       const hasTimeBasedFilter =
-        (config.durationFilter !== undefined &&
-          config.durationFilter.timeStart !== undefined &&
-          config.durationFilter.timeEnd !== undefined) ||
-        (config.rateFilter !== undefined &&
-          config.rateFilter.timeStart !== undefined &&
-          config.rateFilter.timeEnd !== undefined) ||
-        (config.errorFilter !== undefined &&
-          config.errorFilter.timeStart !== undefined &&
-          config.errorFilter.timeEnd !== undefined);
+        config.errorFilter !== undefined &&
+        config.errorFilter.timeStart !== undefined &&
+        config.errorFilter.timeEnd !== undefined;
 
       const isSameTimeRange =
         config.streamType === "logs" &&
@@ -375,18 +365,13 @@ export function useLatencyInsightsDashboard() {
       // Latency Analysis: Compare percentile latencies by dimension
 
       // Check if we should use single query (baseline-only mode)
-      // For TRACES: Check if filters have time-based selection (timeStart/timeEnd)
+      // For TRACES: Only check the durationFilter (latency-specific) — a brush on the
+      // rate or error chart must not trigger comparison mode for latency panels.
       // For LOGS: Check if time ranges are the same (no brush selection)
       const hasTimeBasedFilter =
-        (config.durationFilter !== undefined &&
-          config.durationFilter.timeStart !== undefined &&
-          config.durationFilter.timeEnd !== undefined) ||
-        (config.rateFilter !== undefined &&
-          config.rateFilter.timeStart !== undefined &&
-          config.rateFilter.timeEnd !== undefined) ||
-        (config.errorFilter !== undefined &&
-          config.errorFilter.timeStart !== undefined &&
-          config.errorFilter.timeEnd !== undefined);
+        config.durationFilter !== undefined &&
+        config.durationFilter.timeStart !== undefined &&
+        config.durationFilter.timeEnd !== undefined;
 
       const isSameTimeRange =
         config.streamType === "logs" &&

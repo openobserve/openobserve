@@ -35,7 +35,6 @@ const _momentReady = import("moment-timezone").then((m) => {
 
 <script setup lang="ts">
 import { ref, watch, onBeforeMount } from "vue";
-import { date as qDate } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -51,10 +50,8 @@ function buildFormatted() {
   if (!_moment) return;
   const tz = store.state.timezone;
   const ts = (props.item.trace_start_time || 0) / 1000;
-  const FMT = "YYYY-MM-DD HH:mm:ss";
   const tsMoment = _moment.tz(new Date(ts), tz);
-  const nowStr = _moment.tz(new Date(), tz).format(FMT);
-  const diffSec = qDate.getDateDiff(nowStr, tsMoment.format(FMT), "seconds");
+  const diffSec = _moment.tz(new Date(), tz).diff(tsMoment, "seconds");
 
   let day = "";
   if (diffSec < 86400) day = t('traces.today');
