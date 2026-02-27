@@ -130,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @add-search-term="addSearchTerm"
         @add-multiple-search-terms="addMultipleSearchTerms"
         @search-field-values="searchFieldValues"
+        @load-more-values="loadMoreFieldValues"
         @before-show="openFilterCreator"
         @before-hide="cancelFilterCreator"
         @toggle-group="toggleFieldGroup"
@@ -314,6 +315,7 @@ export default defineComponent({
         isLoading: boolean;
         values: { key: string; count: number }[];
         errMsg?: string;
+        hasMore?: boolean;
       };
     }> = ref({});
 
@@ -324,6 +326,8 @@ export default defineComponent({
     // Caches the original (no-keyword) values so clearing the search box
     // restores them instantly without a new API call.
     const cachedFieldValues = ref<Record<string, { key: string; count: number }[]>>({});
+    // Tracks the current `from` offset for each field's "load more" pagination.
+    const fieldValuesPage = ref<Record<string, number>>({});
 
     // New state to store field values with stream context
     const streamFieldValues: Ref<{
@@ -653,6 +657,7 @@ export default defineComponent({
         };
         lastFieldFetchPayloads.value[name] = [];
         delete cachedFieldValues.value[name];
+        fieldValuesPage.value[name] = 0;
         let query_context = "";
         let query = searchObj.data.query;
         let whereClause = "";
@@ -891,7 +896,30 @@ export default defineComponent({
       return b64EncodeUnicode(modifiedSQL) || encodedSQL;
     };
 
+    const loadMoreFieldValues = (fieldName: string) => {
+      const payloads = lastFieldFetchPayloads.value[fieldName];
+      if (!payloads?.length) return;
+
+      const size = store.state.zoConfig?.query_values_default_num || 10;
+      const currentFrom = fieldValuesPage.value[fieldName] || 0;
+      const nextFrom = currentFrom + size;
+      fieldValuesPage.value[fieldName] = nextFrom;
+
+      // Show loading without wiping existing values while the next page arrives.
+      if (fieldValues.value[fieldName]) {
+        fieldValues.value[fieldName].isLoading = true;
+        fieldValues.value[fieldName].hasMore = false;
+      }
+
+      for (const payload of payloads) {
+        fetchValuesWithWebsocket({ ...payload, from: nextFrom, size });
+      }
+    };
+
     const searchFieldValues = (fieldName: string, searchTerm: string) => {
+      // Reset pagination whenever the search term changes.
+      fieldValuesPage.value[fieldName] = 0;
+
       // Restore from cache when the search term is cleared — no API call needed.
       if (!searchTerm && cachedFieldValues.value[fieldName]) {
         fieldValues.value[fieldName] = {
@@ -1221,11 +1249,11 @@ export default defineComponent({
     const fetchValuesWithWebsocket = (payload: any) => {
       const fieldName = payload.fields[0];
       const streamName = payload.stream_name;
+      const isAppend = (payload.from ?? 0) > 0;
 
-      // Pre-allocate the stream slot so handleSearchResponse can write directly
-      // to .values without a null check. The field-level object is guaranteed
-      // to exist because resetFieldValues always runs before this function.
-      if (fieldName && streamName && streamFieldValues.value[fieldName])
+      // Pre-allocate the stream slot on fresh loads. In append mode we keep the
+      // existing accumulated values so handleSearchResponse can concat to them.
+      if (!isAppend && fieldName && streamName && streamFieldValues.value[fieldName])
         streamFieldValues.value[fieldName][streamName] = { values: [] };
 
       const wsPayload = {
@@ -1315,6 +1343,11 @@ export default defineComponent({
     const handleSearchResponse = (payload: any, response: any) => {
       const fieldName = payload?.queryReq?.fields[0];
       const streamName = payload?.queryReq?.stream_name;
+      const isAppend = (payload?.queryReq?.from ?? 0) > 0;
+      const pageSize =
+        payload?.queryReq?.size ||
+        store.state.zoConfig?.query_values_default_num ||
+        10;
 
       try {
         // We don't need to handle search_response_metadata
@@ -1333,6 +1366,7 @@ export default defineComponent({
             values: [],
             isLoading: false,
             errMsg: "",
+            hasMore: false,
           };
         }
 
@@ -1348,7 +1382,7 @@ export default defineComponent({
 
         // Process the results
         if (response.content.results.hits.length) {
-          // Store stream-specific values
+          // Collect values from this response chunk
           const streamValues: { key: string; count: number }[] = [];
 
           response.content.results.hits.forEach((item: any) => {
@@ -1360,13 +1394,21 @@ export default defineComponent({
             });
           });
 
-          // Update stream-specific values
-          streamFieldValues.value[fieldName][streamName].values = streamValues;
+          // Append to existing stream values in paginated mode; replace on fresh load.
+          if (isAppend) {
+            const existing =
+              streamFieldValues.value[fieldName][streamName].values || [];
+            streamFieldValues.value[fieldName][streamName].values = [
+              ...existing,
+              ...streamValues,
+            ];
+          } else {
+            streamFieldValues.value[fieldName][streamName].values = streamValues;
+          }
 
           // Aggregate values across all streams
           const aggregatedValues: { [key: string]: number } = {};
 
-          // Collect all values from all streams
           Object.keys(streamFieldValues.value[fieldName]).forEach((stream) => {
             streamFieldValues.value[fieldName][stream].values.forEach(
               (value) => {
@@ -1379,20 +1421,24 @@ export default defineComponent({
             );
           });
 
-          // Convert aggregated values to array and sort
+          // Convert aggregated values to array and sort by count descending
           const aggregatedArray = Object.keys(aggregatedValues).map((key) => ({
             key,
             count: aggregatedValues[key],
           }));
-
-          // Sort by count in descending order
           aggregatedArray.sort((a, b) => b.count - a.count);
 
-          // Take top N
-          fieldValues.value[fieldName].values = aggregatedArray.slice(
-            0,
-            store.state.zoConfig?.query_values_default_num || 10,
-          );
+          // In append mode keep all accumulated values; slice to page size on fresh load.
+          fieldValues.value[fieldName].values = isAppend
+            ? aggregatedArray
+            : aggregatedArray.slice(
+                0,
+                store.state.zoConfig?.query_values_default_num || 10,
+              );
+
+          // Show "load more" only when this stream returned a full page of results.
+          fieldValues.value[fieldName].hasMore =
+            streamValues.length >= pageSize;
         }
 
         // Mark as not loading
@@ -1413,6 +1459,7 @@ export default defineComponent({
         values: [],
         isLoading,
         errMsg: "",
+        hasMore: false,
       };
 
       // Reset the streamFieldValues state for this field
@@ -1450,6 +1497,7 @@ export default defineComponent({
       cancelValueApi(row.name);
       delete lastFieldFetchPayloads.value[row.name];
       delete cachedFieldValues.value[row.name];
+      delete fieldValuesPage.value[row.name];
     };
 
     const cancelTraceId = (field: string) => {
@@ -1514,6 +1562,7 @@ export default defineComponent({
       clickFieldFn,
       addMultipleSearchTerms,
       searchFieldValues,
+      loadMoreFieldValues,
       getImageURL,
       filterStreamFn,
       openFilterCreator,
