@@ -1688,10 +1688,19 @@ async fn process_dest_template(
             let json_array = Value::Array(limited_rows.to_vec());
             let json_str = serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
 
-            // Replace either "{rows}" or "{rows:N}" pattern
+            // Replace either "{rows}" or "{rows:N}" pattern.
+            // When a row_limit is present, replace "{rows:N}" with the limited array.
+            // Also replace any plain "{rows}" (no limit) that may coexist in the same template.
             if let Some(n) = row_limit {
                 let pattern = format!("\"{{rows:{n}}}\"");
                 resp = resp.replace(&pattern, &json_str);
+                // Replace plain "{rows}" with an unlimited array if it also appears
+                if resp.contains("\"{rows}\"") {
+                    let all_rows_array = Value::Array(rows_tpl_val.to_vec());
+                    let all_rows_str = serde_json::to_string(&all_rows_array)
+                        .unwrap_or_else(|_| "[]".to_string());
+                    resp = resp.replace("\"{rows}\"", &all_rows_str);
+                }
             } else {
                 resp = resp.replace("\"{rows}\"", &json_str);
             }
