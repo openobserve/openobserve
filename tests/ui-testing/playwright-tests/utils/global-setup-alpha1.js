@@ -17,12 +17,6 @@ async function globalSetup() {
   }
   const authFile = path.join(authDir, 'user.json');
 
-  // Debug screenshots go to test-results directory
-  const debugDir = path.join(__dirname, '..', '..', 'test-results');
-  if (!fs.existsSync(debugDir)) {
-    fs.mkdirSync(debugDir, { recursive: true });
-  }
-
   const browser = await chromium.launch();
   const context = await browser.newContext({
     viewport: { width: 1500, height: 1024 },
@@ -97,7 +91,6 @@ async function globalSetup() {
     const currentUrl = page.url();
     if (currentUrl.includes('dex/approval') || currentUrl.includes('dex/auth')) {
       console.log('[alpha1] On Dex approval/auth page, looking for grant button...');
-      await page.screenshot({ path: path.join(debugDir, 'debug-dex-approval.png') });
 
       const grantButton = page.locator(
         'button[type="submit"], button:has-text("Grant Access"), button:has-text("Approve"), ' +
@@ -125,7 +118,6 @@ async function globalSetup() {
     // If still on Dex, wait longer for the redirect
     if (page.url().includes('dex')) {
       console.log('[alpha1] Still on Dex, waiting for redirect...');
-      await page.screenshot({ path: path.join(debugDir, 'debug-still-on-dex.png') });
       await page.waitForURL(
         url => !url.toString().includes('dex'),
         { timeout: 30000 }
@@ -145,7 +137,6 @@ async function globalSetup() {
 
     // Step 7: Verify login success
     console.log(`[alpha1] Verifying login at: ${page.url()}`);
-    await page.screenshot({ path: path.join(debugDir, 'debug-alpha1-after-login.png') });
 
     const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
     await menuItem.waitFor({ state: 'visible', timeout: 15000 });
@@ -156,6 +147,10 @@ async function globalSetup() {
     console.log(`[alpha1] Auth state saved to ${authFile}`);
 
   } catch (error) {
+    const debugDir = path.join(__dirname, '..', '..', 'test-results');
+    if (!fs.existsSync(debugDir)) {
+      fs.mkdirSync(debugDir, { recursive: true });
+    }
     const screenshotPath = path.join(debugDir, 'debug-alpha1-login.png');
     await page.screenshot({ path: screenshotPath }).catch(() => {});
     console.error(`[alpha1] Login failed. Screenshot: ${screenshotPath}`);
