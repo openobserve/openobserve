@@ -82,6 +82,7 @@ async function globalSetup() {
       'button:has-text("Login"), button:has-text("Sign In"), button:has-text("Log In")'
     );
 
+    await submitButton.first().waitFor({ state: 'visible', timeout: 10000 });
     await submitButton.first().click();
     await page.waitForURL(
       /web\/|dex\/approval|dex\/auth.*error/,
