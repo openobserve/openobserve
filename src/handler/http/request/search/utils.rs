@@ -74,7 +74,7 @@ pub async fn check_stream_permissions(
                 }
             }
             StreamPermissionResourceType::Insights => {
-                if config.logs_insights_rbac_enabled {
+                if config.logs_pattern_rbac_enabled {
                     o2_model_type = LOGS_INSIGHTS_KEY;
                 }
             }
