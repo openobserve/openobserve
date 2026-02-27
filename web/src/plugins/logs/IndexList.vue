@@ -113,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-quick-mode="searchObj.meta.quickMode"
         :field-values="fieldValues"
         :selected-streams-count="searchObj.data.stream.selectedStream.length"
+        :default-values-count="store.state.zoConfig?.query_values_default_num || 10"
         :show-user-defined-schema-toggle="showUserDefinedSchemaToggle"
         :use-user-defined-schemas="searchObj.meta.useUserDefinedSchemas"
         :user-defined-schema-btn-group-option="userDefinedSchemaBtnGroupOption"
@@ -128,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @toggle-interesting="addToInterestingFieldList"
         @add-search-term="addSearchTerm"
         @add-multiple-search-terms="addMultipleSearchTerms"
+        @search-field-values="searchFieldValues"
         @before-show="openFilterCreator"
         @before-hide="cancelFilterCreator"
         @toggle-group="toggleFieldGroup"
@@ -159,6 +161,7 @@ import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
 import {
   b64EncodeUnicode,
+  b64DecodeUnicode,
   getImageURL,
   convertTimeFromMicroToMilli,
   formatLargeNumber,
@@ -315,6 +318,12 @@ export default defineComponent({
     }> = ref({});
 
     const openedFilterFields = ref<string[]>([]);
+
+    // Stores the last fetch payloads per field so value-search can reuse them
+    const lastFieldFetchPayloads = ref<Record<string, any[]>>({});
+    // Caches the original (no-keyword) values so clearing the search box
+    // restores them instantly without a new API call.
+    const cachedFieldValues = ref<Record<string, { key: string; count: number }[]>>({});
 
     // New state to store field values with stream context
     const streamFieldValues: Ref<{
@@ -642,6 +651,8 @@ export default defineComponent({
           values: [],
           errMsg: "",
         };
+        lastFieldFetchPayloads.value[name] = [];
+        delete cachedFieldValues.value[name];
         let query_context = "";
         let query = searchObj.data.query;
         let whereClause = "";
@@ -763,8 +774,7 @@ export default defineComponent({
           if (query_context !== "") {
             query_context = query_context == undefined ? "" : query_context;
 
-            // Implement streaming based field values, check getQueryData in useLogs for streaming enabled
-            fetchValuesWithWebsocket({
+            const fetchPayload = {
               fields: [name],
               size: store.state.zoConfig?.query_values_default_num || 10,
               no_count: false,
@@ -781,7 +791,16 @@ export default defineComponent({
                 b64EncodeUnicode(
                   query_context.replace("[INDEX_NAME]", selectedStream),
                 ) || "",
-            });
+            };
+
+            // Store for reuse by searchFieldValues
+            if (!lastFieldFetchPayloads.value[name]) {
+              lastFieldFetchPayloads.value[name] = [];
+            }
+            lastFieldFetchPayloads.value[name].push(fetchPayload);
+
+            // Implement streaming based field values, check getQueryData in useLogs for streaming enabled
+            fetchValuesWithWebsocket(fetchPayload);
           }
         }
 
@@ -848,6 +867,68 @@ export default defineComponent({
           : expressions[0];
 
       searchObj.data.stream.addToFilter = combined;
+    };
+
+    /**
+     * Injects `str_match_ignore_case(field, 'term')` into a base64-encoded SQL
+     * query, appending it to an existing WHERE clause or creating a new one.
+     */
+    const addStrMatchToSQL = (
+      encodedSQL: string,
+      fieldName: string,
+      searchTerm: string,
+    ): string => {
+      const sql = b64DecodeUnicode(encodedSQL);
+      if (!sql) return encodedSQL;
+
+      // Single-quote escape to prevent injection in the SQL string literal.
+      const escapedTerm = searchTerm.replace(/'/g, "''");
+      const condition = `str_match_ignore_case(${fieldName}, '${escapedTerm}')`;
+      const modifiedSQL = /\bWHERE\b/i.test(sql)
+        ? `${sql} AND ${condition}`
+        : `${sql} WHERE ${condition}`;
+
+      return b64EncodeUnicode(modifiedSQL) || encodedSQL;
+    };
+
+    const searchFieldValues = (fieldName: string, searchTerm: string) => {
+      // Restore from cache when the search term is cleared — no API call needed.
+      if (!searchTerm && cachedFieldValues.value[fieldName]) {
+        fieldValues.value[fieldName] = {
+          isLoading: false,
+          values: [...cachedFieldValues.value[fieldName]],
+          errMsg: "",
+        };
+        return;
+      }
+
+      const payloads = lastFieldFetchPayloads.value[fieldName];
+      if (!payloads?.length) return;
+
+      // Snapshot the current values as cache before the first keyword search.
+      if (searchTerm && !cachedFieldValues.value[fieldName]) {
+        const current = fieldValues.value[fieldName]?.values;
+        if (current?.length) {
+          cachedFieldValues.value[fieldName] = [...current];
+        }
+      }
+
+      fieldValues.value[fieldName] = {
+        isLoading: true,
+        values: [],
+        errMsg: "",
+      };
+      resetFieldValues(fieldName, true);
+
+      for (const payload of payloads) {
+        const modifiedPayload = searchTerm
+          ? {
+              ...payload,
+              sql: addStrMatchToSQL(payload.sql, fieldName, searchTerm),
+            }
+          : payload;
+        fetchValuesWithWebsocket(modifiedPayload);
+      }
     };
 
     let fieldIndex: any = -1;
@@ -1367,6 +1448,8 @@ export default defineComponent({
       //if it is websocker based then cancel the trace id
       //else cancel the further value api calls using the openedFilterFields
       cancelValueApi(row.name);
+      delete lastFieldFetchPayloads.value[row.name];
+      delete cachedFieldValues.value[row.name];
     };
 
     const cancelTraceId = (field: string) => {
@@ -1430,6 +1513,7 @@ export default defineComponent({
       addToFilter,
       clickFieldFn,
       addMultipleSearchTerms,
+      searchFieldValues,
       getImageURL,
       filterStreamFn,
       openFilterCreator,
