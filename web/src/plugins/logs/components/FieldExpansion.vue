@@ -108,15 +108,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card>
       <q-card-section class="q-pl-md q-pr-xs q-py-xs">
         <div class="filter-values-container">
-          <!-- Loading state -->
+          <!-- Value search input — only when fetched count hits the limit -->
           <div
-            v-show="fieldValues?.isLoading"
+            v-if="showValueSearch"
+            class="value-search-container q-mb-xs"
+          >
+            <q-input
+              v-model="valueSearchTerm"
+              dense
+              borderless
+              clearable
+              :placeholder="`Search ${field.name} values…`"
+              class="value-search-input"
+              @clear="valueSearchTerm = ''"
+            >
+              <template #prepend>
+                <q-icon name="search" size="0.875rem" />
+              </template>
+            </q-input>
+          </div>
+
+          <!-- Loading state (only shown when there are no interim cached results) -->
+          <div
+            v-show="fieldValues?.isLoading && !displayValues.length"
             class="q-pl-md q-py-xs"
             style="height: 3.75rem"
           >
             <q-inner-loading
               size="xs"
-              :showing="fieldValues?.isLoading"
+              :showing="fieldValues?.isLoading && !displayValues.length"
               label="Fetching values..."
               label-style="font-size: 1.1em"
             />
@@ -124,14 +144,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- No values found -->
           <div
-            v-show="!fieldValues?.values?.length && !fieldValues?.isLoading"
+            v-show="!displayValues.length && !fieldValues?.isLoading"
             class="q-pl-md q-py-xs text-subtitle2"
           >
             {{ fieldValues?.errMsg || "No values found" }}
           </div>
 
           <!-- Field values list -->
-          <div v-for="value in fieldValues?.values || []" :key="value.key">
+          <div v-for="value in displayValues" :key="value.key">
             <q-list dense>
               <q-item
                 tag="label"
@@ -273,7 +293,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { watchDebounced } from "@vueuse/core";
 import {
   outlinedAdd,
   outlinedVisibility,
@@ -294,6 +315,7 @@ interface Props {
   selectedStreamsCount: number;
   theme: string;
   showQuickMode: boolean;
+  defaultValuesCount: number;
 }
 
 const props = defineProps<Props>();
@@ -308,14 +330,55 @@ const emit = defineEmits<{
     values: string[],
     action: string,
   ];
+  "search-field-values": [fieldName: string, searchTerm: string];
   "before-show": [event: any, field: any];
   "before-hide": [field: any];
 }>();
 
 const selectedValues = ref<string[]>([]);
+const valueSearchTerm = ref("");
+const cachedValues = ref<{ key: string; count: number }[]>([]);
+
+// Cache the original values whenever they arrive with no active search term.
+watch(
+  () => props.fieldValues?.values,
+  (newVals) => {
+    if (!valueSearchTerm.value && newVals?.length) {
+      cachedValues.value = [...newVals];
+    }
+  },
+);
+
+// Show interim locally-filtered cache while the API responds to a search term.
+const displayValues = computed(() => {
+  if (
+    props.fieldValues?.isLoading &&
+    valueSearchTerm.value &&
+    cachedValues.value.length
+  ) {
+    const term = valueSearchTerm.value.toLowerCase();
+    return cachedValues.value.filter((v) =>
+      String(v.key).toLowerCase().includes(term),
+    );
+  }
+  return props.fieldValues?.values || [];
+});
+
+// Search box is visible once the original values hit the fetch limit.
+const showValueSearch = computed(
+  () => cachedValues.value.length >= props.defaultValuesCount,
+);
 
 const isFieldSelected = computed(() =>
   props.selectedFields.includes(props.field.name),
+);
+
+watchDebounced(
+  valueSearchTerm,
+  (term) => {
+    emit("search-field-values", props.field.name, term ?? "");
+  },
+  { debounce: 300 },
 );
 
 const handleBeforeShow = (event: any) => {
@@ -324,6 +387,8 @@ const handleBeforeShow = (event: any) => {
 
 const handleBeforeHide = () => {
   selectedValues.value = [];
+  valueSearchTerm.value = "";
+  cachedValues.value = [];
   emit("before-hide", props.field);
 };
 
@@ -361,6 +426,41 @@ const handleApplyMultiSelect = (action: string) => {
 
 :deep(.q-expansion-item):hover .field_overlay {
   display: flex;
+}
+
+.value-search-container {
+  border-bottom: 1px solid var(--o2-border-color);
+
+  .value-search-input {
+    font-size: 0.75rem;
+
+    :deep(.q-field__control) {
+      height: 1.65rem;
+      min-height: 1.65rem;
+      padding: 0 0.25rem;
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--o2-border-color);
+      border-radius: 0.25rem;
+    }
+
+    :deep(.q-field__prepend),
+    :deep(.q-field__append) {
+      height: 1.65rem;
+      display: flex;
+      align-items: center;
+      padding-right: 0.25rem;
+    }
+
+    :deep(.q-field__native) {
+      padding: 0;
+      line-height: 1.3;
+    }
+
+    :deep(.q-field__append .q-icon) {
+      font-size: 0.875rem;
+    }
+  }
 }
 
 .multi-select-action-bar {
