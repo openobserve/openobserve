@@ -1697,8 +1697,8 @@ async fn process_dest_template(
                 // Replace plain "{rows}" with an unlimited array if it also appears
                 if resp.contains("\"{rows}\"") {
                     let all_rows_array = Value::Array(rows_tpl_val.to_vec());
-                    let all_rows_str = serde_json::to_string(&all_rows_array)
-                        .unwrap_or_else(|_| "[]".to_string());
+                    let all_rows_str =
+                        serde_json::to_string(&all_rows_array).unwrap_or_else(|_| "[]".to_string());
                     resp = resp.replace("\"{rows}\"", &all_rows_str);
                 }
             } else {
