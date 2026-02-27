@@ -33,7 +33,7 @@ import {
 } from "./legendConfiguration";
 
 // Mock calculateWidthText
-vi.mock("./convertDataIntoUnitValue", () => ({
+vi.mock("./chartDimensionUtils", () => ({
   calculateWidthText: vi.fn((text: string) => {
     // Simple mock: return text length * 8 as approximate width
     return (text?.length || 0) * 8;
