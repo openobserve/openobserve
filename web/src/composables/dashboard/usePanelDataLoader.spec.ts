@@ -102,7 +102,7 @@ vi.mock("./usePanelCache", () => ({
   })),
 }));
 
-vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
+vi.mock("@/utils/dashboard/dateTimeUtils", () => ({
   convertOffsetToSeconds: vi.fn(() => ({ seconds: 3600, periodAsStr: "1h" })),
 }));
 
