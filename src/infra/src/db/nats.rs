@@ -89,8 +89,7 @@ async fn get_bucket_by_key<'a>(
         }
     }
     // Try to get the existing bucket first to avoid conflicts when the bucket was created
-    // with different parameters (e.g. existing deployments created `locker` with unlimited
-    // max_age before ZO_NATS_LOCK_MAX_AGE was introduced). Only create if it doesn't exist.
+    // with different parameters
     let kv = match jetstream.get_key_value(&bucket.bucket).await {
         Ok(kv) => kv,
         Err(_) => jetstream.create_key_value(bucket).await.map_err(|e| {
