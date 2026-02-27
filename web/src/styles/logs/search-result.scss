@@ -2,6 +2,18 @@
   width: 170px;
 }
 
+.analyze-button {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0 0.75rem;
+  transition: all 0.2s;
+
+  &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+}
+
 .pagination-block {
   .q-field--dense .q-field__control,
   .q-field--dense .q-field__marginal {

@@ -65,7 +65,7 @@ export interface LatencyInsightsConfig {
   };
   baseFilter?: string;
   dimensions: string[]; // List of dimension names to analyze
-  analysisType?: "latency" | "volume" | "error"; // Type of analysis to perform
+  analysisType?: "duration" | "volume" | "error"; // Type of analysis to perform
   percentile?: string; // Latency percentile value (e.g., "0.95" for P95)
 }
 
@@ -84,7 +84,7 @@ export function useLatencyInsightsAnalysis() {
     timeRange: { startTime: number; endTime: number },
     durationFilter: { start: number; end: number } | null,
     baseFilter?: string,
-    applyDurationFilter: boolean = true
+    applyDurationFilter: boolean = true,
   ) => {
     const filters: string[] = [];
 
@@ -94,7 +94,7 @@ export function useLatencyInsightsAnalysis() {
     // Add duration filter ONLY if requested (for selected queries, not baseline)
     if (applyDurationFilter && durationFilter) {
       filters.push(
-        `duration >= ${durationFilter.start} AND duration <= ${durationFilter.end}`
+        `duration >= ${durationFilter.start} AND duration <= ${durationFilter.end}`,
       );
     }
 
@@ -103,7 +103,8 @@ export function useLatencyInsightsAnalysis() {
       filters.push(baseFilter.trim());
     }
 
-    const whereClause = filters.length > 0 ? "WHERE " + filters.join(" AND ") : "";
+    const whereClause =
+      filters.length > 0 ? "WHERE " + filters.join(" AND ") : "";
 
     // Query to get value distribution
     // We use COALESCE to handle null values as "(no value)"
@@ -133,14 +134,14 @@ export function useLatencyInsightsAnalysis() {
     timeRange: { startTime: number; endTime: number },
     durationFilter: { start: number; end: number } | null,
     baseFilter?: string,
-    applyDurationFilter: boolean = true
+    applyDurationFilter: boolean = true,
   ) => {
     const filters: string[] = [];
 
     // Add duration filter ONLY if requested (for selected queries, not baseline)
     if (applyDurationFilter && durationFilter) {
       filters.push(
-        `duration >= ${durationFilter.start} AND duration <= ${durationFilter.end}`
+        `duration >= ${durationFilter.start} AND duration <= ${durationFilter.end}`,
       );
     }
 
@@ -149,7 +150,8 @@ export function useLatencyInsightsAnalysis() {
       filters.push(baseFilter.trim());
     }
 
-    const whereClause = filters.length > 0 ? "WHERE " + filters.join(" AND ") : "";
+    const whereClause =
+      filters.length > 0 ? "WHERE " + filters.join(" AND ") : "";
 
     // Query to get total count and populated count
     const query = `
@@ -171,7 +173,7 @@ export function useLatencyInsightsAnalysis() {
     streamName: string,
     streamType: string,
     orgIdentifier: string,
-    timeRange: { startTime: number; endTime: number }
+    timeRange: { startTime: number; endTime: number },
   ) => {
     try {
       const payload = {
@@ -192,7 +194,7 @@ export function useLatencyInsightsAnalysis() {
           query: payload,
           page_type: streamType,
         },
-        "ui" // search_type parameter
+        "ui", // search_type parameter
       );
 
       return response.data;
@@ -207,7 +209,7 @@ export function useLatencyInsightsAnalysis() {
    */
   const calculateDistribution = (
     data: any[],
-    totalCount: number
+    totalCount: number,
   ): Map<string | number, { count: number; percent: number }> => {
     const distribution = new Map();
 
@@ -226,8 +228,14 @@ export function useLatencyInsightsAnalysis() {
    * Merge baseline and selected distributions into comparison data
    */
   const mergeDistributions = (
-    baselineDistribution: Map<string | number, { count: number; percent: number }>,
-    selectedDistribution: Map<string | number, { count: number; percent: number }>
+    baselineDistribution: Map<
+      string | number,
+      { count: number; percent: number }
+    >,
+    selectedDistribution: Map<
+      string | number,
+      { count: number; percent: number }
+    >,
   ): ValueDistribution[] => {
     // Get all unique values from both distributions
     const allValues = new Set([
@@ -238,8 +246,14 @@ export function useLatencyInsightsAnalysis() {
     const merged: ValueDistribution[] = [];
 
     allValues.forEach((value) => {
-      const baseline = baselineDistribution.get(value) || { count: 0, percent: 0 };
-      const selected = selectedDistribution.get(value) || { count: 0, percent: 0 };
+      const baseline = baselineDistribution.get(value) || {
+        count: 0,
+        percent: 0,
+      };
+      const selected = selectedDistribution.get(value) || {
+        count: 0,
+        percent: 0,
+      };
 
       merged.push({
         value,
@@ -274,7 +288,7 @@ export function useLatencyInsightsAnalysis() {
    */
   const analyzeDimension = async (
     dimensionName: string,
-    config: LatencyInsightsConfig
+    config: LatencyInsightsConfig,
   ): Promise<DimensionAnalysis> => {
     try {
       // Check if we have any time-based filters - if not, we're in baseline-only mode
@@ -282,9 +296,15 @@ export function useLatencyInsightsAnalysis() {
       // 1. The filter object exists (not undefined), AND
       // 2. It has both timeStart and timeEnd set (indicating a brush selection was made)
       const hasFilters =
-        (config.durationFilter !== undefined && config.durationFilter.timeStart !== undefined && config.durationFilter.timeEnd !== undefined) ||
-        (config.rateFilter !== undefined && config.rateFilter.timeStart !== undefined && config.rateFilter.timeEnd !== undefined) ||
-        (config.errorFilter !== undefined && config.errorFilter.timeStart !== undefined && config.errorFilter.timeEnd !== undefined);
+        (config.durationFilter !== undefined &&
+          config.durationFilter.timeStart !== undefined &&
+          config.durationFilter.timeEnd !== undefined) ||
+        (config.rateFilter !== undefined &&
+          config.rateFilter.timeStart !== undefined &&
+          config.rateFilter.timeEnd !== undefined) ||
+        (config.errorFilter !== undefined &&
+          config.errorFilter.timeStart !== undefined &&
+          config.errorFilter.timeEnd !== undefined);
 
       // Get baseline distribution (WITHOUT duration filter - all traces)
       const baselineDistQuery = buildDistributionQuery(
@@ -293,7 +313,7 @@ export function useLatencyInsightsAnalysis() {
         config.baselineTimeRange,
         config.durationFilter,
         config.baseFilter,
-        false // DON'T apply duration filter for baseline
+        false, // DON'T apply duration filter for baseline
       );
 
       const baselineDistResult = await executeQuery(
@@ -301,7 +321,7 @@ export function useLatencyInsightsAnalysis() {
         config.streamName,
         config.streamType,
         config.orgIdentifier,
-        config.baselineTimeRange
+        config.baselineTimeRange,
       );
 
       // Get baseline population stats (WITHOUT duration filter)
@@ -311,7 +331,7 @@ export function useLatencyInsightsAnalysis() {
         config.baselineTimeRange,
         config.durationFilter,
         config.baseFilter,
-        false // DON'T apply duration filter for baseline
+        false, // DON'T apply duration filter for baseline
       );
 
       const baselinePopResult = await executeQuery(
@@ -319,14 +339,14 @@ export function useLatencyInsightsAnalysis() {
         config.streamName,
         config.streamType,
         config.orgIdentifier,
-        config.baselineTimeRange
+        config.baselineTimeRange,
       );
 
       // Calculate baseline distribution
       const baselineTotalCount = baselinePopResult.hits?.[0]?.total_count || 0;
       const baselineDistribution = calculateDistribution(
         baselineDistResult.hits || [],
-        baselineTotalCount
+        baselineTotalCount,
       );
 
       let data: ValueDistribution[];
@@ -335,13 +355,15 @@ export function useLatencyInsightsAnalysis() {
 
       if (!hasFilters) {
         // Baseline-only mode: Show only baseline data (no comparison)
-        data = Array.from(baselineDistribution.entries()).map(([value, stats]) => ({
-          value,
-          baselineCount: stats.count,
-          baselinePercent: stats.percent,
-          selectedCount: 0,
-          selectedPercent: 0,
-        }));
+        data = Array.from(baselineDistribution.entries()).map(
+          ([value, stats]) => ({
+            value,
+            baselineCount: stats.count,
+            baselinePercent: stats.percent,
+            selectedCount: 0,
+            selectedPercent: 0,
+          }),
+        );
 
         // Sort by baseline percentage
         data.sort((a, b) => b.baselinePercent - a.baselinePercent);
@@ -355,7 +377,7 @@ export function useLatencyInsightsAnalysis() {
           config.selectedTimeRange,
           config.durationFilter,
           config.baseFilter,
-          true // DO apply duration filter for selected
+          true, // DO apply duration filter for selected
         );
 
         const selectedDistResult = await executeQuery(
@@ -363,7 +385,7 @@ export function useLatencyInsightsAnalysis() {
           config.streamName,
           config.streamType,
           config.orgIdentifier,
-          config.selectedTimeRange
+          config.selectedTimeRange,
         );
 
         // Get selected population stats (WITH duration filter)
@@ -373,7 +395,7 @@ export function useLatencyInsightsAnalysis() {
           config.selectedTimeRange,
           config.durationFilter,
           config.baseFilter,
-          true // DO apply duration filter for selected
+          true, // DO apply duration filter for selected
         );
 
         const selectedPopResult = await executeQuery(
@@ -381,31 +403,38 @@ export function useLatencyInsightsAnalysis() {
           config.streamName,
           config.streamType,
           config.orgIdentifier,
-          config.selectedTimeRange
+          config.selectedTimeRange,
         );
 
-        const selectedTotalCount = selectedPopResult.hits?.[0]?.total_count || 0;
+        const selectedTotalCount =
+          selectedPopResult.hits?.[0]?.total_count || 0;
         const selectedDistribution = calculateDistribution(
           selectedDistResult.hits || [],
-          selectedTotalCount
+          selectedTotalCount,
         );
 
         // Merge distributions for comparison
         data = mergeDistributions(baselineDistribution, selectedDistribution);
 
         // Calculate selected population
-        const selectedPopulatedCount = selectedPopResult.hits?.[0]?.populated_count || 0;
+        const selectedPopulatedCount =
+          selectedPopResult.hits?.[0]?.populated_count || 0;
         selectedPopulation =
-          selectedTotalCount > 0 ? selectedPopulatedCount / selectedTotalCount : 0;
+          selectedTotalCount > 0
+            ? selectedPopulatedCount / selectedTotalCount
+            : 0;
 
         // Calculate difference score for ranking
         differenceScore = calculateDifferenceScore(data);
       }
 
       // Calculate baseline population percentage
-      const baselinePopulatedCount = baselinePopResult.hits?.[0]?.populated_count || 0;
+      const baselinePopulatedCount =
+        baselinePopResult.hits?.[0]?.populated_count || 0;
       const baselinePopulation =
-        baselineTotalCount > 0 ? baselinePopulatedCount / baselineTotalCount : 0;
+        baselineTotalCount > 0
+          ? baselinePopulatedCount / baselineTotalCount
+          : 0;
 
       return {
         dimensionName,
@@ -424,7 +453,7 @@ export function useLatencyInsightsAnalysis() {
    * Analyze all dimensions and return ranked results
    */
   const analyzeAllDimensions = async (
-    config: LatencyInsightsConfig
+    config: LatencyInsightsConfig,
   ): Promise<DimensionAnalysis[]> => {
     try {
       loading.value = true;

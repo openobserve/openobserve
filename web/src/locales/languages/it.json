@@ -351,7 +351,8 @@
     "openFields": "Campi aperti",
     "askAIFunctionPlaceholder": "Chiedi all'IA di aiutarti con la tua funzione...",
     "enterFunctionPrompt": "Inserisci un prompt per generare la funzione",
-    "recordsPerPage": "Record per pagina"
+    "recordsPerPage": "Record per pagina",
+    "searchDimension": "Dimensioni di ricerca"
   },
   "menu": {
     "home": "Home",
@@ -2544,7 +2545,18 @@
     "timeRangeUpdated": "L'intervallo di tempo selezionato non includeva questa traccia. L'intervallo di tempo è stato aggiornato in modo che corrisponda al timestamp della traccia.",
     "fetchingMoreTraces": "Recuperando altre tracce...",
     "showErrorOnly": "Mostra solo errori",
-    "openInTraces": "Apri in Traces"
+    "openInTraces": "Apri in Traces",
+    "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce.",
+    "fetchingTraces": "Resisti, stiamo cercando le tue tracce.",
+    "noTracesFoundAdjust": "Nessuna traccia trovata. Modifica i filtri e riprova.",
+    "tracesTitle": "TRACCE",
+    "tracesFound": "Tracce trovate",
+    "error": "ERRORE",
+    "errors": "ERRORI",
+    "success": "SUCCESSO",
+    "today": "Oggi",
+    "yesterday": "Ieri",
+    "spanColorPalettePreview": "Anteprima della palette di colori Span"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -2942,7 +2954,8 @@
     "tracesErrorDetails": "Si è verificato un errore durante il recupero dei dati di traccia. Per favore riprova.",
     "metricsError": "Impossibile caricare le metriche",
     "metricsErrorDetails": "Si è verificato un errore durante il recupero dei dati delle metriche. Riprova.",
-    "noMetricsDescription": "Nessuna metrica trovata per questa correlazione nell'intervallo di tempo selezionato."
+    "noMetricsDescription": "Nessuna metrica trovata per questa correlazione nell'intervallo di tempo selezionato.",
+    "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

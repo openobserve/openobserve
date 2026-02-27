@@ -44,7 +44,8 @@ export function useMetricsCorrelationDashboard() {
    */
   const generateDashboard = (
     streams: StreamInfo[],
-    config: MetricsCorrelationConfig
+    config: MetricsCorrelationConfig,
+    _theme: "dark" | "light" = "dark",
   ) => {
     const panels = streams.map((stream, index) => {
       return createMetricPanel(stream, index, config);

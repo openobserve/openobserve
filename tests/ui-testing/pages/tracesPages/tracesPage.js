@@ -25,7 +25,7 @@ export class TracesPage {
 
     // Main Components
     this.searchBar = '[data-test="logs-search-bar"]';
-    this.indexList = '[data-test="logs-search-index-list"]';
+    this.indexList = '[data-test="traces-search-index-list"]';
     this.fieldListCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
     this.searchResult = '[data-test="logs-search-search-result"]';
 
@@ -73,7 +73,7 @@ export class TracesPage {
     // Analysis Dashboard Tabs (i18n labels: "Rate", "Latency", "Errors")
     this.analysisDashboardTabs = '.analysis-dashboard-card .q-tabs';
     this.rateTab = '.analysis-dashboard-card .q-tab:has-text("Rate")';
-    this.latencyTab = '.analysis-dashboard-card .q-tab:has-text("Latency")';
+    this.latencyTab = '.analysis-dashboard-card .q-tab:has-text("Duration")';
     this.errorsTab = '.analysis-dashboard-card .q-tab:has-text("Errors")';
     // Analysis dashboard states
     this.analysisDashboardLoading = '.analysis-dashboard-card .q-spinner, .analysis-dashboard-card .q-spinner-hourglass';
