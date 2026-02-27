@@ -35,7 +35,7 @@ module.exports = defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 3 : 0,
-  workers: 5,
+  workers: process.env.CI ? 2 : 5,
 
   reporter: process.env.CI
     ? [
@@ -47,7 +47,7 @@ module.exports = defineConfig({
       ],
 
   use: {
-    baseURL: process.env["ZO_BASE_URL"],
+    baseURL: process.env.ZO_BASE_URL,
     trace: 'on-first-retry',
     navigationTimeout: process.env.CI ? 90000 : 30000,
     actionTimeout: process.env.CI ? 45000 : 15000,

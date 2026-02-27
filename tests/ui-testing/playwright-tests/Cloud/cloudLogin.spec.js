@@ -33,6 +33,9 @@ test.describe("Alpha1 Cloud Login & Sanity", () => {
       testLogger.step("Verify main menu is visible (auth state persisted)");
       await cloudLoginPage.expectHomePageMenuVisible();
 
+      testLogger.step("Verify no auth error redirects");
+      await cloudLoginPage.expectNotOnAuthPages();
+
       testLogger.info("Home page loaded successfully with auth state");
     }
   );
@@ -48,23 +51,6 @@ test.describe("Alpha1 Cloud Login & Sanity", () => {
       await cloudLoginPage.expectOnLogsPage();
 
       testLogger.info("Logs page loaded successfully");
-    }
-  );
-
-  test(
-    "should verify app is functional after login",
-    { tag: ["@cloudLogin", "@smoke", "@P0", "@cloud", "@all"] },
-    async () => {
-      testLogger.step("Navigate to alpha1 home page");
-      await cloudLoginPage.gotoHomePage();
-
-      testLogger.step("Verify on web page");
-      await cloudLoginPage.expectOnWebPage();
-
-      testLogger.step("Verify no auth error redirects");
-      await cloudLoginPage.expectNotOnAuthPages();
-
-      testLogger.info("App is functional - no auth errors detected");
     }
   );
 });
