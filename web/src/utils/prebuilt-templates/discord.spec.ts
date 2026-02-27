@@ -18,7 +18,7 @@ import { discordTemplate, discordConfig, discordDestinationType } from '@/utils/
 describe('discord template', () => {
   describe('discordTemplate', () => {
     it('has correct name', () => {
-      expect(discordTemplate.name).toBe('system-prebuilt-discord');
+      expect(discordTemplate.name).toBe('prebuilt_discord');
     });
 
     it('has type as http', () => {
@@ -68,7 +68,7 @@ describe('discord template', () => {
 
   describe('discordConfig', () => {
     it('references correct template name', () => {
-      expect(discordConfig.templateName).toBe('system-prebuilt-discord');
+      expect(discordConfig.templateName).toBe('prebuilt_discord');
     });
 
     it('has correct headers', () => {

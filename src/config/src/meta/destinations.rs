@@ -20,6 +20,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 
+use crate::stats::MemorySize;
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(default)]
 #[serde(rename_all = "snake_case")]
@@ -33,6 +35,15 @@ pub struct Destination {
 impl Destination {
     pub fn is_alert_destinations(&self) -> bool {
         matches!(&self.module, Module::Alert { .. })
+    }
+}
+
+impl MemorySize for Destination {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Destination>()
+            + self.id.mem_size()
+            + self.org_id.mem_size()
+            + self.name.mem_size()
     }
 }
 
@@ -138,6 +149,9 @@ pub enum HTTPOutputFormat {
     ESBulk {
         index: String,
     },
+    StringSeparated {
+        separator: String,
+    },
 }
 
 impl HTTPOutputFormat {
@@ -147,6 +161,8 @@ impl HTTPOutputFormat {
             Self::NDJSON => "application/x-ndjson",
             Self::NestedEvent => "application/x-ndjson",
             Self::ESBulk { .. } => "application/x-ndjson",
+            // this is not a json anymore, the handler must process it as a string
+            Self::StringSeparated { .. } => "text/plain",
         }
     }
 
@@ -194,6 +210,12 @@ impl HTTPOutputFormat {
                 temp.push(b'\n');
                 temp
             }
+            Self::StringSeparated { separator } => data
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(separator)
+                .into_bytes(),
         }
     }
 }
@@ -220,6 +242,16 @@ pub struct Template {
     #[serde(rename = "type")]
     pub template_type: TemplateType,
     pub body: String,
+}
+
+impl MemorySize for Template {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<Template>()
+            + self.id.mem_size()
+            + self.org_id.mem_size()
+            + self.name.mem_size()
+            + self.body.mem_size()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]

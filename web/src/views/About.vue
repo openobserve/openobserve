@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </tr>
                       <tr>
                         <td class="tw:font-semibold">{{ t("about.ingestion_limit") }}</td>
-                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '100 GB / day' }}</td>
+                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '50 GB / day' }}</td>
                       </tr>
                       <tr v-if="licenseData.ingestion_used !== undefined">
                         <td class="tw:font-semibold">{{ t("about.today_usage") }}</td>

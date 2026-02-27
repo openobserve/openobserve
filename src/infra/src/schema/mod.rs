@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,7 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
+    stats::MemorySize,
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
@@ -280,6 +281,13 @@ pub async fn get_flatten_level(org_id: &str, stream_name: &str, stream_type: Str
     get_config().limit.ingest_flatten_level
 }
 
+pub async fn get_is_llm_stream(org_id: &str, stream_name: &str, stream_type: StreamType) -> bool {
+    if let Some(settings) = get_settings(org_id, stream_name, stream_type).await {
+        return settings.is_llm_stream;
+    }
+    false
+}
+
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
     if schema.metadata().is_empty() {
         return None;
@@ -311,27 +319,13 @@ pub fn unwrap_stream_is_derived(schema: &Schema) -> Option<bool> {
         .and_then(|v| v.parse().ok())
 }
 
-pub fn unwrap_partition_time_level(
-    level: Option<PartitionTimeLevel>,
-    stream_type: StreamType,
-) -> PartitionTimeLevel {
-    let level = level.unwrap_or_default();
-    if level != PartitionTimeLevel::Unset {
-        level
-    } else {
-        let cfg = get_config();
-        match stream_type {
-            StreamType::Logs => PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str()),
-            StreamType::Metrics => {
-                PartitionTimeLevel::from(cfg.limit.metrics_file_retention.as_str())
-            }
-            StreamType::Traces => {
-                PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str())
-            }
-            // for file list dump streams, we want to compact by day
-            StreamType::Filelist => PartitionTimeLevel::Daily,
-            _ => PartitionTimeLevel::default(),
-        }
+pub fn get_partition_time_level(stream_type: StreamType) -> PartitionTimeLevel {
+    match stream_type {
+        // file retention is always hourly for logs, metrics, and traces
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces => PartitionTimeLevel::Hourly,
+        // for file list dump streams, we want to compact by day
+        StreamType::Filelist => PartitionTimeLevel::Daily,
+        _ => PartitionTimeLevel::default(),
     }
 }
 
@@ -804,9 +798,28 @@ impl SchemaCache {
     }
 }
 
+impl MemorySize for SchemaCache {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<SchemaCache>()
+            + self.schema.size()
+            + self.fields_map.mem_size()
+            + self.hash_key.mem_size()
+    }
+}
+
 pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
     let allowed_type = match from {
-        DataType::Boolean => vec![DataType::Utf8, DataType::LargeUtf8],
+        DataType::Boolean => vec![
+            DataType::Utf8,
+            DataType::LargeUtf8,
+            DataType::Int8,
+            DataType::Int16,
+            DataType::Int32,
+            DataType::Int64,
+            DataType::Float16,
+            DataType::Float32,
+            DataType::Float64,
+        ],
         DataType::Int8 => vec![
             DataType::Utf8,
             DataType::LargeUtf8,
@@ -985,21 +998,21 @@ mod tests {
     }
 
     #[test]
-    fn test_unwrap_partition_time_level() {
+    fn test_get_partition_time_level() {
         // Test with specific level
-        let level = unwrap_partition_time_level(Some(PartitionTimeLevel::Hourly), StreamType::Logs);
+        let level = get_partition_time_level(StreamType::Logs);
         assert_eq!(level, PartitionTimeLevel::Hourly);
 
-        // Test with Unset - should use stream type default
-        let level = unwrap_partition_time_level(Some(PartitionTimeLevel::Unset), StreamType::Logs);
-        assert_ne!(level, PartitionTimeLevel::Unset);
+        // Traces also always hourly
+        let level = get_partition_time_level(StreamType::Traces);
+        assert_eq!(level, PartitionTimeLevel::Hourly);
 
-        // Test with None - should use stream type default
-        let level = unwrap_partition_time_level(None, StreamType::Metrics);
-        assert_ne!(level, PartitionTimeLevel::Unset);
+        // Metrics also always hourly
+        let level = get_partition_time_level(StreamType::Metrics);
+        assert_eq!(level, PartitionTimeLevel::Hourly);
 
         // Test Filelist stream type
-        let level = unwrap_partition_time_level(None, StreamType::Filelist);
+        let level = get_partition_time_level(StreamType::Filelist);
         assert_eq!(level, PartitionTimeLevel::Daily);
     }
 

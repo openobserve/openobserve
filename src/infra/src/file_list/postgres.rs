@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,9 @@
 use std::collections::HashMap as stdHashMap;
 
 use async_trait::async_trait;
+use chrono::{DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc};
 use config::{
-    get_config,
+    RwHashSet, get_config,
     meta::stream::{
         FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType,
     },
@@ -28,8 +29,9 @@ use config::{
         time::{DAY_MICRO_SECS, end_of_the_day, now_micros},
     },
 };
-use hashbrown::HashMap;
-use sqlx::{Executor, Postgres, QueryBuilder, Row};
+use hashbrown::{HashMap, HashSet};
+use once_cell::sync::Lazy;
+use sqlx::{Executor, PgConnection, Postgres, QueryBuilder, Row};
 
 use crate::{
     db::{
@@ -39,6 +41,16 @@ use crate::{
     errors::{Error, Result},
     file_list::FileRecord,
 };
+
+/// In-memory cache of known partition names to avoid repeated DDL checks.
+/// Shared by all three partitioned tables (file_list, file_list_history, file_list_dump_stats).
+static PARTITION_CACHE: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
+
+/// The maximum number of rows allowed in a table before automatic migration is triggered.
+const FILE_LIST_MIGRATION_LIMIT: i64 = 1_000_000;
+
+/// The number of days to post-partition the file_list table.
+const FILE_LIST_POST_PARTITION_DAYS: i64 = 7;
 
 pub struct PostgresFileList {}
 
@@ -56,6 +68,25 @@ impl Default for PostgresFileList {
 
 #[async_trait]
 impl super::FileList for PostgresFileList {
+    async fn health_check(&self) -> Result<()> {
+        let pool = CLIENT.clone();
+        let is_writable: bool = sqlx::query_scalar(
+            r#"SELECT NOT pg_is_in_recovery() 
+            AND current_setting('transaction_read_only')::bool = false 
+            AND current_setting('default_transaction_read_only')::bool = false"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| Error::Message(format!("PostgreSQL health check failed: {e}")))?;
+        if !is_writable {
+            return Err(Error::Message(
+                "PostgreSQL health check: database is not writable (in recovery or read-only mode)"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     async fn create_table(&self) -> Result<()> {
         create_table().await
     }
@@ -108,7 +139,6 @@ impl super::FileList for PostgresFileList {
 
     async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
         let pool = CLIENT.clone();
-        let mut tx = pool.begin().await?;
 
         // insert the dump file into file_list table
         let (stream_key, date_key, file_name) =
@@ -116,11 +146,20 @@ impl super::FileList for PostgresFileList {
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         let meta = &dump_file.meta;
         let now_ts = now_micros();
+
+        // Ensure partition exists for this date
+        ensure_file_list_partition(&pool, "file_list", &date_key).await?;
+
+        let mut tx = pool.begin().await?;
         DB_QUERY_NUMS
             .with_label_values(&["insert", "file_list"])
             .inc();
-        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT DO NOTHING;"#
+        if let Err(e) = sqlx::query(
+            r#"INSERT INTO file_list 
+              (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at) 
+            VALUES 
+              ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) 
+            ON CONFLICT DO NOTHING"#
                 )
                 .bind(&dump_file.account)
                 .bind(org_id)
@@ -135,7 +174,6 @@ impl super::FileList for PostgresFileList {
                 .bind(meta.compressed_size)
                 .bind(meta.index_size)
                 .bind(meta.flattened)
-                .bind(now_ts)
                 .bind(now_ts)
                 .execute(&mut *tx).await
         {
@@ -412,10 +450,11 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         } else {
             let (time_start, time_end) = time_range;
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
+            let (date_from, date_to) = derive_date_range(time_start, time_end);
             let sql = r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
-    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
+    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND date >= $5 AND date < $6;
                 "#;
 
             sqlx::query_as::<_, super::FileRecord>(sql)
@@ -423,6 +462,8 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
                 .bind(time_start)
                 .bind(max_ts_upper_bound)
                 .bind(time_end)
+                .bind(date_from)
+                .bind(date_to)
                 .fetch_all(&pool)
                 .await
         };
@@ -487,13 +528,16 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .with_label_values(&["query", "file_list"])
             .inc();
         let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
+        let (date_from, date_to) = derive_date_range(time_start, time_end);
         let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"SELECT * FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
+            r#"SELECT * FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND date >= $5 AND date < $6;"#,
         )
         .bind(stream_key)
         .bind(time_start)
         .bind(max_ts_upper_bound)
         .bind(time_end)
+        .bind(date_from)
+        .bind(date_to)
         .fetch_all(&pool)
         .await;
 
@@ -605,12 +649,15 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
                 .with_label_values(&["query_ids", "file_list"])
                 .inc();
                 let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
-                let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;";
+                let (date_from, date_to) = derive_date_range(time_start, time_end);
+                let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND date >= $5 AND date < $6;";
                 sqlx::query_as::<_, super::FileId>(query)
                 .bind(stream_key)
                 .bind(time_start)
                 .bind(max_ts_upper_bound)
                 .bind(time_end)
+                .bind(date_from)
+                .bind(date_to)
                 .fetch_all(&pool)
                 .await
             }));
@@ -694,10 +741,11 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .inc();
         let cfg = get_config();
         let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
+        let (date_from, date_to) = derive_date_range(time_start, time_end);
         let sql = r#"
 SELECT date
     FROM file_list
-    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND records < $5
+    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND records < $5 AND date >= $7 AND date < $8
     GROUP BY date HAVING count(*) >= $6;
             "#;
 
@@ -708,6 +756,8 @@ SELECT date
             .bind(time_end)
             .bind(cfg.compact.old_data_min_records)
             .bind(cfg.compact.old_data_min_files)
+            .bind(date_from)
+            .bind(date_to)
             .fetch_all(&pool)
             .await?;
 
@@ -1606,6 +1656,10 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
             parse_file_key_columns(file).expect("parse file key failed");
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         let pool = CLIENT.clone();
+
+        // Ensure partition exists for this date
+        ensure_file_list_partition(&pool, "file_list_dump_stats", &date_key).await?;
+
         DB_QUERY_NUMS
             .with_label_values(&["insert", "file_list_dump_stats"])
             .inc();
@@ -1725,12 +1779,16 @@ impl PostgresFileList {
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+
+        // Ensure partition exists for this date
+        ensure_file_list_partition(&pool, table, &date_key).await?;
+
         DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
         let ret: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
             format!(
                 r#"
-INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     ON CONFLICT DO NOTHING
     RETURNING id;
                 "#
@@ -1749,7 +1807,6 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             .bind(meta.compressed_size)
             .bind(meta.index_size)
             .bind(meta.flattened)
-            .bind(now_ts)
             .bind(now_ts)
             .fetch_one(&pool).await;
         match ret {
@@ -1771,15 +1828,29 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
         }
 
         let pool = CLIENT.clone();
+
+        // Ensure partitions exist for all distinct date keys before batch INSERT
+        let add_items = files.iter().filter(|v| !v.deleted).collect::<Vec<_>>();
+        if !add_items.is_empty() {
+            let mut date_keys = HashSet::new();
+            for item in &add_items {
+                if let Ok((_, date_key, _)) = parse_file_key_columns(&item.key) {
+                    date_keys.insert(date_key);
+                }
+            }
+            for date_key in date_keys.iter() {
+                ensure_file_list_partition(&pool, table, date_key).await?;
+            }
+        }
+
         let mut tx = pool.begin().await?;
 
-        let add_items = files.iter().filter(|v| !v.deleted).collect::<Vec<_>>();
         if !add_items.is_empty() {
             let chunks = add_items.chunks(100);
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)").as_str()
+                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str()
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let Ok((stream_key, date_key, file_name)) = parse_file_key_columns(&item.key)
@@ -1805,7 +1876,6 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
                         .push_bind(item.meta.flattened)
-                        .push_bind(now_ts)
                         .push_bind(now_ts);
                 });
                 DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
@@ -1899,60 +1969,750 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
     }
 }
 
+/// Derive date range for partition pruning from microsecond timestamps.
+/// Returns (date_from, date_to) in "YYYY/MM/DD/HH" format suitable for `WHERE date >= $from AND
+/// date < $to`.
+fn derive_date_range(time_start: i64, time_end: i64) -> (String, String) {
+    let start_dt = chrono::Utc.timestamp_nanos(time_start * 1_000);
+    let end_dt = chrono::Utc.timestamp_nanos(time_end * 1_000);
+    // date_from: start of the day of time_start
+    let date_from = format!(
+        "{}/{}/{}/00",
+        start_dt.format("%Y"),
+        start_dt.format("%m"),
+        start_dt.format("%d")
+    );
+    // date_to: start of the day AFTER time_end (exclusive upper bound)
+    let end_date = end_dt + Duration::days(1);
+    let date_to = format!(
+        "{}/{}/{}/00",
+        end_date.format("%Y"),
+        end_date.format("%m"),
+        end_date.format("%d")
+    );
+    (date_from, date_to)
+}
+
+/// Check if a partition exists via pg_inherits + pg_class.
+async fn check_partition_exists(pool: &sqlx::Pool<Postgres>, partition_name: &str) -> Result<bool> {
+    let sql = r#"
+SELECT EXISTS (
+    SELECT 1 FROM pg_class c
+    JOIN pg_inherits i ON c.oid = i.inhrelid
+    WHERE c.relname = $1
+      AND c.relnamespace = 'public'::regnamespace
+) AS exists
+    "#;
+    let exists: bool = sqlx::query_scalar(sql)
+        .bind(partition_name)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+    Ok(exists)
+}
+
+/// Ensure a partition exists for the given date_key (format "YYYY/MM/DD/HH").
+/// Uses an in-memory cache to avoid repeated DDL on the hot path.
+async fn ensure_file_list_partition(
+    pool: &sqlx::Pool<Postgres>,
+    table: &str,
+    date_key: &str,
+) -> Result<()> {
+    // Extract YYYYMMDD from date_key (format "YYYY/MM/DD/HH")
+    let parts: Vec<&str> = date_key.split('/').collect();
+    if parts.len() < 3 {
+        return Ok(()); // Invalid date_key, let it fall into DEFAULT
+    }
+    let yyyymmdd = format!("{}{}{}", parts[0], parts[1], parts[2]);
+    let partition_name = format!("{table}_p_{yyyymmdd}");
+
+    // Hot path: cache hit
+    if PARTITION_CACHE.contains(&partition_name) {
+        return Ok(());
+    }
+
+    let cfg = get_config();
+    if cfg.common.meta_partition_mode == "manual" {
+        // Manual mode: check existence, cache result, do not create
+        let exists = check_partition_exists(pool, &partition_name).await?;
+        PARTITION_CACHE.insert(partition_name.clone());
+        if !exists {
+            log::warn!(
+                "[POSTGRES] partition missing in manual mode: {partition_name}, writes will fall into DEFAULT"
+            );
+        }
+        return Ok(());
+    }
+
+    // Auto mode: create partition
+    let range_from = format!("{}/{}/{}/00", parts[0], parts[1], parts[2]);
+    // Calculate next day
+    let year: i32 = parts[0].parse().unwrap_or(2026);
+    let month: u32 = parts[1].parse().unwrap_or(1);
+    let day: u32 = parts[2].parse().unwrap_or(1);
+    let next_day =
+        NaiveDate::from_ymd_opt(year, month, day).unwrap_or_default() + Duration::days(1);
+    let range_to = format!(
+        "{}/{}/{}/00",
+        next_day.format("%Y"),
+        next_day.format("%m"),
+        next_day.format("%d")
+    );
+
+    let sql = format!(
+        "CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF {table} FOR VALUES FROM ('{range_from}') TO ('{range_to}')"
+    );
+    match sqlx::query(&sql).execute(pool).await {
+        Ok(_) => {
+            PARTITION_CACHE.insert(partition_name);
+        }
+        Err(e) => {
+            let err_str = e.to_string();
+            // Check for default partition overlap (sqlstate 23514 or similar)
+            if err_str.contains("default partition")
+                || err_str.contains("would overlap")
+                || err_str.contains("23514")
+                || err_str.contains("check constraint")
+            {
+                // DEFAULT partition still has rows in this date range.
+                // Keep writing to DEFAULT and stop retrying this day.
+                log::warn!(
+                    "[POSTGRES] partition create blocked by DEFAULT overlap: {partition_name}"
+                );
+                PARTITION_CACHE.insert(partition_name);
+            } else if err_str.contains("already exists") {
+                PARTITION_CACHE.insert(partition_name);
+            } else {
+                return Err(Error::Message(format!("Failed to create partition: {e}")));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Pre-create partitions for all three partitioned tables in the date range
+/// [-ZO_INGEST_ALLOWED_UPTO hours .. +FILE_LIST_POST_PARTITION_DAYS days].
+async fn precreate_partitions(pool: &sqlx::Pool<Postgres>) -> Result<()> {
+    let cfg = get_config();
+    let today = Utc::now();
+    let past_days = std::cmp::min(30, (cfg.limit.ingest_allowed_upto / 24) + 1);
+    let start_date = today - Duration::days(past_days);
+    let end_date = today + Duration::days(FILE_LIST_POST_PARTITION_DAYS);
+
+    let tables = ["file_list", "file_list_history", "file_list_dump_stats"];
+    let mut date = start_date;
+    while date <= end_date {
+        let date_key = format!(
+            "{}/{}/{}/00",
+            date.format("%Y"),
+            date.format("%m"),
+            date.format("%d")
+        );
+        for table in &tables {
+            ensure_file_list_partition(pool, table, &date_key).await?;
+        }
+        date += Duration::days(1);
+    }
+    Ok(())
+}
+
+/// Get the relkind of a table from pg_class. Returns None if table doesn't exist.
+/// 'r' = regular table, 'p' = partitioned table
+async fn get_table_relkind(pool: &sqlx::Pool<Postgres>, table: &str) -> Result<Option<String>> {
+    let sql = "SELECT relkind::text FROM pg_class WHERE relname = $1 AND relnamespace = 'public'::regnamespace";
+    let ret: Option<String> = sqlx::query_scalar(sql)
+        .bind(table)
+        .fetch_optional(pool)
+        .await?;
+    Ok(ret)
+}
+
+/// Create a fresh partitioned file_list or file_list_history table (new install).
+async fn create_partitioned_file_list_table(
+    pool: &sqlx::Pool<Postgres>,
+    table: &str,
+) -> Result<()> {
+    sqlx::query(&file_list_partition_ddl(table))
+        .execute(pool)
+        .await?;
+
+    // Create indexes on parent
+    for ddl in file_list_partition_index_ddl(table) {
+        sqlx::query(&ddl).execute(pool).await?;
+    }
+
+    // Create DEFAULT partition
+    let default_name = format!("{table}_default");
+    sqlx::query(&format!(
+        "CREATE TABLE {default_name} PARTITION OF {table} DEFAULT"
+    ))
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Create a fresh partitioned file_list_dump_stats table (new install).
+async fn create_partitioned_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
+    sqlx::query(&file_list_dump_stats_partition_ddl())
+        .execute(pool)
+        .await?;
+
+    // Create indexes on parent
+    for ddl in file_list_dump_stats_partition_index_ddl() {
+        sqlx::query(&ddl).execute(pool).await?;
+    }
+
+    // Create DEFAULT partition
+    sqlx::query(
+        "CREATE TABLE file_list_dump_stats_default PARTITION OF file_list_dump_stats DEFAULT",
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Migrate an existing regular file_list or file_list_history table to partitioned.
+async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Result<()> {
+    log::info!("[POSTGRES] Starting partition migration for table: {table}");
+
+    // Pre-migration validation
+    let row_count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*)::BIGINT FROM {table}"))
+        .fetch_one(pool)
+        .await?;
+    if row_count > FILE_LIST_MIGRATION_LIMIT {
+        log::warn!(
+            "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
+            automatic migration is not supported for large tables. \
+            Please migrate the table manually and then restart the node. \
+            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+        );
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        }
+    }
+    log::info!("[POSTGRES] Table {table} has {row_count} rows.");
+
+    let today_str = Utc::now().format("%Y/%m/%d/23").to_string();
+    let max_date: Option<String> = sqlx::query_scalar(&format!("SELECT MAX(date) FROM {table}"))
+        .fetch_one(pool)
+        .await?;
+    if let Some(ref md) = max_date
+        && md > &today_str
+    {
+        log::warn!(
+            "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
+            automatic migration is not supported. \
+            Please migrate the table manually and then restart the node. \
+            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+        );
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        }
+    }
+    log::info!("[POSTGRES] Table {table} has max date {:?}.", max_date);
+
+    // Build the migration SQL as a single transaction
+    let default_name = format!("{table}_default");
+
+    log::info!("[POSTGRES] Table {table} start checking columns.");
+
+    // Execute migration in a transaction
+    let mut tx = pool.begin().await?;
+
+    // 1. Ensure all columns exist
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS account VARCHAR(32) DEFAULT '' NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS flattened BOOLEAN DEFAULT false NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS index_size BIGINT DEFAULT 0 NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS updated_at BIGINT DEFAULT 1762819200000000 NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
+
+    // 1b. Widen file column
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ALTER COLUMN file TYPE VARCHAR(1024)"
+    ))
+    .execute(&mut *tx)
+    .await?;
+
+    log::info!("[POSTGRES] Table {table} start renaming indexes.");
+
+    // 2. Rename existing indexes
+    sqlx::query(&format!(
+        "ALTER INDEX IF EXISTS {table}_stream_file_idx RENAME TO {table}_default_stream_file_idx"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
+        "ALTER INDEX IF EXISTS {table}_stream_ts_idx RENAME TO {table}_default_stream_ts_idx"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
+        "ALTER INDEX IF EXISTS {table}_stream_date_idx RENAME TO {table}_default_stream_date_idx"
+    ))
+    .execute(&mut *tx)
+    .await?;
+
+    log::info!("[POSTGRES] Table {table} start dropping unused indexes/columns.");
+
+    // 3. Drop unused indexes/columns
+    sqlx::query(&format!("DROP INDEX IF EXISTS {table}_org_idx"))
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DROP INDEX IF EXISTS file_list_updated_at_deleted_idx")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DROP INDEX IF EXISTS file_list_org_deleted_stream_idx")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DROP INDEX IF EXISTS file_list_deleted_idx")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(&format!(
+        "ALTER TABLE {table} DROP COLUMN IF EXISTS created_at"
+    ))
+    .execute(&mut *tx)
+    .await?;
+
+    log::info!("[POSTGRES] Table {table} start removing IDENTITY and PRIMARY KEY.");
+
+    // 4. Remove IDENTITY and PRIMARY KEY
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ALTER COLUMN id DROP IDENTITY IF EXISTS"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
+        "ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {table}_pkey"
+    ))
+    .execute(&mut *tx)
+    .await?;
+
+    log::info!("[POSTGRES] Table {table} start renaming old table.");
+
+    // 5. Rename old table
+    sqlx::query(&format!("ALTER TABLE {table} RENAME TO {default_name}"))
+        .execute(&mut *tx)
+        .await?;
+
+    log::info!("[POSTGRES] Table {table} start creating new partitioned parent table.");
+
+    // 6. Create new partitioned parent table
+    sqlx::query(&file_list_partition_ddl(table))
+        .execute(&mut *tx)
+        .await?;
+
+    log::info!("[POSTGRES] Table {table} start creating indexes on parent.");
+
+    // 7. Create indexes on parent
+    for ddl in file_list_partition_index_ddl(table) {
+        sqlx::query(&ddl).execute(&mut *tx).await?;
+    }
+
+    log::info!("[POSTGRES] Table {table} start attaching old table as DEFAULT partition.");
+
+    // 8. Attach old table as DEFAULT partition
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ATTACH PARTITION {default_name} DEFAULT"
+    ))
+    .execute(&mut *tx)
+    .await?;
+
+    log::info!("[POSTGRES] Table {table} start adding date index on DEFAULT partition.");
+
+    // 9. Add date index on DEFAULT partition
+    sqlx::query(&format!(
+        "CREATE INDEX IF NOT EXISTS {default_name}_date_idx ON {default_name} (date)"
+    ))
+    .execute(&mut *tx)
+    .await?;
+
+    log::info!("[POSTGRES] Table {table} start creating future date partitions.");
+
+    // 10. Create future date partitions
+    create_future_partitions(&mut tx, table).await?;
+
+    log::info!("[POSTGRES] Table {table} start aligning identity sequence.");
+
+    // 11. Align identity sequence
+    align_identity_sequence(&mut tx, table).await?;
+
+    tx.commit().await?;
+
+    log::info!("[POSTGRES] Table {table} migration completed successfully");
+
+    Ok(())
+}
+
+/// Migrate file_list_dump_stats to partitioned table.
+async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
+    let table = "file_list_dump_stats";
+    log::info!("[POSTGRES] Starting partition migration for table: {table}");
+
+    // Pre-migration validation
+    let row_count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*)::BIGINT FROM {table}"))
+        .fetch_one(pool)
+        .await?;
+    if row_count > FILE_LIST_MIGRATION_LIMIT {
+        log::warn!(
+            "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
+            automatic migration is not supported for large tables. \
+            Please migrate the table manually and then restart the node. \
+            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+        );
+        loop {
+            log::warn!(
+                "[POSTGRES] Maintenance hold: waiting for manual migration completion. Table={table}."
+            );
+            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        }
+    }
+    log::info!("[POSTGRES] Table {table} has {row_count} rows.");
+
+    let today_str = Utc::now().format("%Y/%m/%d/23").to_string();
+    let max_date: Option<String> = sqlx::query_scalar(&format!("SELECT MAX(date) FROM {table}"))
+        .fetch_one(pool)
+        .await?;
+    if let Some(ref md) = max_date
+        && md > &today_str
+    {
+        log::warn!(
+            "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
+            automatic migration is not supported. \
+            Please migrate the table manually and then restart the node. \
+            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+        );
+        loop {
+            log::warn!(
+                "[POSTGRES] Maintenance hold: waiting for manual migration completion. Table={table}."
+            );
+            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        }
+    }
+    log::info!("[POSTGRES] Table {table} has max date {:?}.", max_date);
+
+    log::info!("[POSTGRES] Table {table} start checking columns.");
+
+    let mut tx = pool.begin().await?;
+
+    // 1. Widen file column
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ALTER COLUMN file TYPE VARCHAR(1024)"
+    ))
+    .execute(&mut *tx)
+    .await?;
+
+    log::info!("[POSTGRES] Table {table} start renaming indexes.");
+
+    // 2. Rename existing indexes
+    sqlx::query("ALTER INDEX IF EXISTS file_list_dump_stats_stream_file_idx RENAME TO file_list_dump_stats_default_stream_file_idx")
+        .execute(&mut *tx)
+        .await?;
+
+    log::info!("[POSTGRES] Table {table} start dropping unused indexes.");
+
+    // 3. Drop unused indexes
+    sqlx::query("DROP INDEX IF EXISTS file_list_dump_stats_org_idx")
+        .execute(&mut *tx)
+        .await?;
+
+    log::info!("[POSTGRES] Table {table} start removing IDENTITY and PRIMARY KEY.");
+
+    // 4. Remove IDENTITY and PRIMARY KEY
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ALTER COLUMN id DROP IDENTITY IF EXISTS"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
+        "ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {table}_pkey"
+    ))
+    .execute(&mut *tx)
+    .await?;
+
+    log::info!("[POSTGRES] Table {table} start renaming old table.");
+
+    // 5. Rename old table
+    sqlx::query(&format!("ALTER TABLE {table} RENAME TO {table}_default"))
+        .execute(&mut *tx)
+        .await?;
+
+    log::info!("[POSTGRES] Table {table} start creating new partitioned parent table.");
+
+    // 6. Create new partitioned parent table
+    sqlx::query(&file_list_dump_stats_partition_ddl())
+        .execute(&mut *tx)
+        .await?;
+
+    log::info!("[POSTGRES] Table {table} start creating indexes on parent.");
+
+    // 7. Create indexes on parent
+    for ddl in file_list_dump_stats_partition_index_ddl() {
+        sqlx::query(&ddl).execute(&mut *tx).await?;
+    }
+
+    log::info!("[POSTGRES] Table {table} start attaching old table as DEFAULT partition.");
+
+    // 8. Attach old table as DEFAULT partition
+    sqlx::query(
+        "ALTER TABLE file_list_dump_stats ATTACH PARTITION file_list_dump_stats_default DEFAULT",
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    log::info!("[POSTGRES] Table {table} start adding date index on DEFAULT partition.");
+
+    // 9. Add date index on DEFAULT partition
+    sqlx::query("CREATE INDEX IF NOT EXISTS file_list_dump_stats_default_date_idx ON file_list_dump_stats_default (date)")
+        .execute(&mut *tx)
+        .await?;
+
+    log::info!("[POSTGRES] Table {table} start creating future date partitions.");
+
+    // 10. Create future date partitions
+    create_future_partitions(&mut tx, table).await?;
+
+    log::info!("[POSTGRES] Table {table} start aligning identity sequence.");
+
+    // 11. Align identity sequence
+    align_identity_sequence(&mut tx, table).await?;
+
+    tx.commit().await?;
+
+    log::info!("[POSTGRES] Table {table} migration completed successfully");
+
+    Ok(())
+}
+
+/// Apply autovacuum tuning to all file_list tables.
+async fn apply_autovacuum_tuning(pool: &sqlx::Pool<Postgres>) -> Result<()> {
+    let tables = ["file_list_deleted", "file_list_jobs"];
+    for table in &tables {
+        // Check if autovacuum is already tuned
+        let reloptions: Option<String> = sqlx::query_scalar(
+            "SELECT array_to_string(reloptions, ',') FROM pg_class WHERE relname = $1 AND relnamespace = 'public'::regnamespace",
+        )
+        .bind(table)
+        .fetch_optional(pool)
+        .await?
+        .flatten();
+
+        if let Some(ref opts) = reloptions
+            && opts.contains("autovacuum_vacuum_scale_factor=0.01")
+        {
+            continue; // Already tuned
+        }
+
+        let sql = format!(
+            r#"ALTER TABLE IF EXISTS {table} SET (
+                autovacuum_vacuum_scale_factor = 0.01,
+                autovacuum_vacuum_cost_delay = 2,
+                autovacuum_vacuum_cost_limit = 1000,
+                autovacuum_analyze_scale_factor = 0.02
+            )"#
+        );
+        if let Err(e) = sqlx::query(&sql).execute(pool).await {
+            log::warn!("[POSTGRES] Failed to set autovacuum tuning for {table}: {e}");
+        }
+    }
+    Ok(())
+}
+
+/// Apply column width compatibility for VARCHAR(file).
+async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
+    let tables = [
+        "file_list",
+        "file_list_history",
+        "file_list_deleted",
+        "file_list_dump_stats",
+    ];
+    for table in &tables {
+        let sql = format!("ALTER TABLE IF EXISTS {table} ALTER COLUMN file TYPE VARCHAR(1024)");
+        if let Err(e) = sqlx::query(&sql).execute(pool).await {
+            log::warn!("[POSTGRES] Failed to widen file column for {table}: {e}");
+        }
+    }
+    Ok(())
+}
+
+/// Handle partitioned table creation/migration for file_list, file_list_history,
+/// file_list_dump_stats.
+async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
+    let cfg = get_config();
+
+    // Handle file_list, file_list_history, and file_list_dump_stats
+    let tables = ["file_list", "file_list_history", "file_list_dump_stats"];
+    for table in &tables {
+        let relkind = get_table_relkind(pool, table).await?;
+        match relkind.as_deref() {
+            None => {
+                // Fresh install: create partitioned table directly
+                log::info!("[POSTGRES] Fresh install: creating partitioned table {table}");
+                if *table == "file_list_dump_stats" {
+                    create_partitioned_dump_stats_table(pool).await?;
+                } else {
+                    create_partitioned_file_list_table(pool, table).await?;
+                }
+            }
+            Some("p") => {
+                // Already partitioned: just ensure partitions exist
+                log::info!("[POSTGRES] Table {table} already partitioned, ensuring partitions");
+            }
+            Some("r") => {
+                // Regular table: needs migration
+                if cfg.common.meta_partition_mode != "manual" {
+                    if *table == "file_list_dump_stats" {
+                        migrate_dump_stats_table(pool).await?;
+                    } else {
+                        migrate_file_list_table(pool, table).await?;
+                    }
+                } else {
+                    log::warn!(
+                        "[POSTGRES] Table {table} is a regular table and needs to be converted to a partitioned table. \
+                        Since ZO_PG_PARTITION_MODE is set to 'manual', auto-migration is skipped. \
+                        Please migrate the table manually and then restart the node. \
+                        Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+                    );
+                    loop {
+                        log::warn!(
+                            "[POSTGRES] Maintenance hold: waiting for manual migration completion."
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                    }
+                }
+            }
+            Some(k) => {
+                log::warn!("[POSTGRES] Unexpected relkind '{k}' for table {table}");
+            }
+        }
+    }
+
+    // Pre-create partitions for upcoming dates
+    if cfg.common.meta_partition_mode != "manual" {
+        precreate_partitions(pool).await?;
+    }
+
+    Ok(())
+}
+
+/// Return the CREATE TABLE DDL for a partitioned file_list / file_list_history table.
+/// Return the CREATE INDEX DDL for a partitioned file_list / file_list_history table.
+fn file_list_partition_index_ddl(table: &str) -> Vec<String> {
+    vec![
+        format!("CREATE UNIQUE INDEX {table}_stream_file_idx ON {table} (stream, date, file)"),
+        format!("CREATE INDEX {table}_id_idx ON {table} (id)"),
+        format!("CREATE INDEX {table}_stream_ts_idx ON {table} (stream, max_ts, min_ts)"),
+        format!("CREATE INDEX {table}_stream_date_idx ON {table} (stream, date)"),
+        format!("CREATE INDEX {table}_updated_at_idx ON {table} (updated_at)"),
+    ]
+}
+
+fn file_list_partition_ddl(table: &str) -> String {
+    format!(
+        r#"
+CREATE TABLE {table} (
+    id              BIGINT GENERATED ALWAYS AS IDENTITY,
+    account         VARCHAR(32) NOT NULL,
+    org             VARCHAR(100) NOT NULL,
+    stream          VARCHAR(256) NOT NULL,
+    date            VARCHAR(16) NOT NULL,
+    file            VARCHAR(1024) NOT NULL,
+    deleted         BOOLEAN DEFAULT false NOT NULL,
+    flattened       BOOLEAN DEFAULT false NOT NULL,
+    min_ts          BIGINT NOT NULL,
+    max_ts          BIGINT NOT NULL,
+    records         BIGINT NOT NULL,
+    original_size   BIGINT NOT NULL,
+    compressed_size BIGINT NOT NULL,
+    index_size      BIGINT NOT NULL,
+    updated_at      BIGINT NOT NULL
+) PARTITION BY RANGE (date)
+        "#
+    )
+}
+
+/// Create future date partitions (tomorrow onward) for the given table.
+async fn create_future_partitions(conn: &mut PgConnection, table: &str) -> Result<()> {
+    let today = Utc::now();
+    for i in 1..=FILE_LIST_POST_PARTITION_DAYS {
+        let date = today + Duration::days(i);
+        let next = date + Duration::days(1);
+        let part_name = format!("{table}_p_{}", date.format("%Y%m%d"));
+        let range_from = format!("{}/00", date.format("%Y/%m/%d"));
+        let range_to = format!("{}/00", next.format("%Y/%m/%d"));
+        sqlx::query(&format!(
+            "CREATE TABLE IF NOT EXISTS {part_name} PARTITION OF {table} FOR VALUES FROM ('{range_from}') TO ('{range_to}')"
+        ))
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
+}
+
+/// Align the IDENTITY sequence for the given table so that the next generated id
+/// is one past the current maximum.
+async fn align_identity_sequence(conn: &mut PgConnection, table: &str) -> Result<()> {
+    sqlx::query(&format!(
+        "SELECT setval(pg_get_serial_sequence('public.{table}', 'id'), COALESCE((SELECT MAX(id) FROM public.{table}), 0) + 1, false)"
+    ))
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Return the CREATE TABLE DDL for a partitioned file_list_dump_stats table.
+/// Return the CREATE INDEX DDL for the partitioned file_list_dump_stats table.
+fn file_list_dump_stats_partition_index_ddl() -> Vec<String> {
+    vec![
+        "CREATE UNIQUE INDEX file_list_dump_stats_stream_file_idx ON file_list_dump_stats (stream, date, file)".to_string(),
+        "CREATE INDEX file_list_dump_stats_id_idx ON file_list_dump_stats (id)".to_string(),
+    ]
+}
+
+fn file_list_dump_stats_partition_ddl() -> String {
+    r#"
+CREATE TABLE file_list_dump_stats (
+    id              BIGINT GENERATED ALWAYS AS IDENTITY,
+    org             VARCHAR(100) NOT NULL,
+    stream          VARCHAR(256) NOT NULL,
+    date            VARCHAR(16) NOT NULL,
+    file            VARCHAR(1024) NOT NULL,
+    file_num        BIGINT DEFAULT 0 NOT NULL,
+    min_ts          BIGINT DEFAULT 0 NOT NULL,
+    max_ts          BIGINT DEFAULT 0 NOT NULL,
+    records         BIGINT DEFAULT 0 NOT NULL,
+    original_size   BIGINT DEFAULT 0 NOT NULL,
+    compressed_size BIGINT DEFAULT 0 NOT NULL,
+    index_size      BIGINT DEFAULT 0 NOT NULL
+) PARTITION BY RANGE (date)
+    "#
+    .to_string()
+}
+
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT_DDL.clone();
-    sqlx::query(
-        r#"
-CREATE TABLE IF NOT EXISTS file_list
-(
-    id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    account   VARCHAR(32)  not null,
-    org       VARCHAR(100) not null,
-    stream    VARCHAR(256) not null,
-    date      VARCHAR(16)  not null,
-    file      VARCHAR(1024) not null,
-    deleted   BOOLEAN default false not null,
-    flattened BOOLEAN default false not null,
-    min_ts    BIGINT not null,
-    max_ts    BIGINT not null,
-    records   BIGINT not null,
-    original_size   BIGINT not null,
-    compressed_size BIGINT not null,
-    index_size      BIGINT not null,
-    created_at      BIGINT not null,
-    updated_at      BIGINT not null
-);
-        "#,
-    )
-    .execute(&pool)
-    .await?;
+    let cfg = get_config();
 
-    sqlx::query(
-        r#"
-CREATE TABLE IF NOT EXISTS file_list_history
-(
-    id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    account   VARCHAR(32)  not null,
-    org       VARCHAR(100) not null,
-    stream    VARCHAR(256) not null,
-    date      VARCHAR(16)  not null,
-    file      VARCHAR(1024) not null,
-    deleted   BOOLEAN default false not null,
-    flattened BOOLEAN default false not null,
-    min_ts    BIGINT not null,
-    max_ts    BIGINT not null,
-    records   BIGINT not null,
-    original_size   BIGINT not null,
-    compressed_size BIGINT not null,
-    index_size      BIGINT not null,
-    created_at      BIGINT not null,
-    updated_at      BIGINT not null
-);
-        "#,
-    )
-    .execute(&pool)
-    .await?;
+    // Handle partitioned tables (file_list, file_list_history, file_list_dump_stats)
+    handle_partitioned_tables(&pool).await?;
 
+    // Non-partitioned tables
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list_deleted
@@ -2012,59 +2772,17 @@ CREATE TABLE IF NOT EXISTS stream_stats
     .execute(&pool)
     .await?;
 
-    sqlx::query(
-        r#"
-CREATE TABLE IF NOT EXISTS file_list_dump_stats
-(
-    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    org             VARCHAR(100) not null,
-    stream          VARCHAR(256) not null,
-    date            VARCHAR(16) not null,
-    file            VARCHAR(512) not null,
-    file_num        BIGINT default 0 not null,
-    min_ts          BIGINT default 0 not null,
-    max_ts          BIGINT default 0 not null,
-    records         BIGINT default 0 not null,
-    original_size   BIGINT default 0 not null,
-    compressed_size BIGINT default 0 not null,
-    index_size      BIGINT default 0 not null
-);
-        "#,
-    )
-    .execute(&pool)
-    .await?;
-
-    // create column flattened for old version <= 0.10.5
-    let column = "flattened";
-    let data_type = "BOOLEAN default false not null";
-    add_column("file_list", column, data_type).await?;
-    add_column("file_list_history", column, data_type).await?;
-    add_column("file_list_deleted", column, data_type).await?;
-
-    // create column started_at for old version <= 0.10.8
-    let column = "started_at";
-    let data_type = "BIGINT default 0 not null";
-    add_column("file_list_jobs", column, data_type).await?;
-
-    // create column index_size for old version <= 0.13.1
-    let column = "index_size";
-    let data_type = "BIGINT default 0 not null";
-    add_column("file_list", column, data_type).await?;
-    add_column("file_list_history", column, data_type).await?;
-    add_column("stream_stats", column, data_type).await?;
-    let column = "index_file";
-    let data_type = "BOOLEAN default false not null";
-    add_column("file_list_deleted", column, data_type).await?;
-
-    // create col dumped for file_list_jobs for version <=0.14.0
-    add_column("file_list_jobs", "dumped", "BOOLEAN default false not null").await?;
-
-    // create col account for multiple object storage account support, version >= 0.14.6
-    add_column("file_list", "account", "VARCHAR(32) default '' not null").await?;
+    // Column additions for non-partitioned tables (partitioned tables handle their own columns)
     add_column(
-        "file_list_history",
-        "account",
-        "VARCHAR(32) default '' not null",
+        "file_list_deleted",
+        "flattened",
+        "BOOLEAN default false not null",
+    )
+    .await?;
+    add_column(
+        "file_list_deleted",
+        "index_file",
+        "BOOLEAN default false not null",
     )
     .await?;
     add_column(
@@ -2073,19 +2791,9 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
         "VARCHAR(32) default '' not null",
     )
     .await?;
-
-    // create column created_at and updated_at for version >= 0.14.7
-    // Nov 11 2025, just a value, anything large than past is fine
-    let column = "created_at";
-    let data_type = "BIGINT default 1762819200000000 not null";
-    add_column("file_list", column, data_type).await?;
-    add_column("file_list_history", column, data_type).await?;
-    let column = "updated_at";
-    let data_type = "BIGINT default 1762819200000000 not null";
-    add_column("file_list", column, data_type).await?;
-    add_column("file_list_history", column, data_type).await?;
-
-    // create columns is_recent for stream_stats for version >= 0.30.0
+    add_column("file_list_jobs", "started_at", "BIGINT default 0 not null").await?;
+    add_column("file_list_jobs", "dumped", "BOOLEAN default false not null").await?;
+    add_column("stream_stats", "index_size", "BIGINT default 0 not null").await?;
     add_column(
         "stream_stats",
         "is_recent",
@@ -2093,35 +2801,31 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
     )
     .await?;
 
+    // Phase 1: Autovacuum tuning + column width compatibility
+    if cfg.common.meta_partition_mode == "auto" {
+        apply_autovacuum_tuning(&pool).await?;
+        apply_column_width_compat(&pool).await?;
+    }
+
     Ok(())
 }
 
 pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT_DDL.clone();
 
+    // Delete unused indexes for old version <= 0.60.0
+    delete_index("file_list_org_idx", "file_list").await?;
+    delete_index("file_list_history_org_idx", "file_list_history").await?;
+    delete_index("file_list_dump_stats_org_idx", "file_list_dump_stats").await?;
+    delete_index("file_list_deleted_stream_idx", "file_list_deleted").await?;
+    delete_index("file_list_updated_at_deleted_idx", "file_list").await?;
+
+    // Delete old index stream_stats_stream_idx for old version <= 0.30.0
+    delete_index("stream_stats_stream_idx", "stream_stats").await?;
+
+    // Indexes for non-partitioned tables only (partitioned tables get indexes during
+    // migration/creation)
     let indices: Vec<(&str, &str, &[&str])> = vec![
-        ("file_list_org_idx", "file_list", &["org"]),
-        (
-            "file_list_stream_ts_idx",
-            "file_list",
-            &["stream", "max_ts", "min_ts"],
-        ),
-        (
-            "file_list_stream_date_idx",
-            "file_list",
-            &["stream", "date"],
-        ),
-        (
-            "file_list_updated_at_deleted_idx",
-            "file_list",
-            &["updated_at", "deleted"],
-        ),
-        ("file_list_history_org_idx", "file_list_history", &["org"]),
-        (
-            "file_list_history_stream_ts_idx",
-            "file_list_history",
-            &["stream", "max_ts", "min_ts"],
-        ),
         (
             "file_list_deleted_created_at_idx",
             "file_list_deleted",
@@ -2143,22 +2847,12 @@ pub async fn create_table_index() -> Result<()> {
             &["status", "dumped"],
         ),
         ("stream_stats_org_idx", "stream_stats", &["org"]),
-        (
-            "file_list_dump_stats_org_idx",
-            "file_list_dump_stats",
-            &["org"],
-        ),
     ];
     for (idx, table, fields) in indices {
         create_index(IndexStatement::new(idx, table, false, fields)).await?;
     }
 
     let unique_indices: Vec<(&str, &str, &[&str])> = vec![
-        (
-            "file_list_history_stream_file_idx",
-            "file_list_history",
-            &["stream", "date", "file"],
-        ),
         (
             "file_list_jobs_stream_offsets_idx",
             "file_list_jobs",
@@ -2169,73 +2863,289 @@ pub async fn create_table_index() -> Result<()> {
             "stream_stats",
             &["stream", "is_recent"],
         ),
-        (
-            "file_list_dump_stats_stream_file_idx",
-            "file_list_dump_stats",
-            &["stream", "date", "file"],
-        ),
     ];
     for (idx, table, fields) in unique_indices {
         create_index(IndexStatement::new(idx, table, true, fields)).await?;
     }
 
-    // delete old index stream_stats_stream_idx for old version <= 0.30.0
-    delete_index("stream_stats_stream_idx", "stream_stats").await?;
-
-    // This is a case where we want to MAKE the index unique if it isn't
-    let res = create_index(IndexStatement::new(
-        "file_list_stream_file_idx",
-        "file_list",
-        true,
-        &["stream", "date", "file"],
-    ))
-    .await;
-    if let Err(e) = res {
-        if !e.to_string().contains("could not create unique index") {
-            return Err(e);
-        }
-        // delete duplicate records
-        log::warn!("[POSTGRES] starting delete duplicate records");
-        let ret = sqlx
-            ::query(
-                r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#
-            )
-            .fetch_all(&pool).await?;
-        log::warn!("[POSTGRES] total: {} duplicate records", ret.len());
-        for (i, r) in ret.iter().enumerate() {
-            let stream = r.get::<String, &str>("stream");
-            let date = r.get::<String, &str>("date");
-            let file = r.get::<String, &str>("file");
-            let id = r.get::<i64, &str>("id");
-            sqlx
-                ::query(
-                    r#"DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;"#
-                )
-                .bind(id)
-                .bind(stream)
-                .bind(date)
-                .bind(file)
-                .execute(&pool).await?;
-            if i.is_multiple_of(1000) {
-                log::warn!("[POSTGRES] delete duplicate records: {}/{}", i, ret.len());
-            }
-        }
-        log::warn!(
-            "[POSTGRES] delete duplicate records: {}/{}",
-            ret.len(),
-            ret.len()
-        );
-        // create index again
-        create_index(IndexStatement::new(
+    // For partitioned tables, check if the unique constraint already exists (it's created during
+    // migration) Only handle dedup logic if the table is NOT yet partitioned (edge case:
+    // migration wasn't run yet)
+    let relkind = get_table_relkind(&pool, "file_list").await?;
+    if relkind.as_deref() != Some("p") {
+        // Non-partitioned: handle the unique index creation with dedup logic
+        let res = create_index(IndexStatement::new(
             "file_list_stream_file_idx",
             "file_list",
             true,
             &["stream", "date", "file"],
         ))
-        .await?;
-        log::warn!("[POSTGRES] create table index(file_list_stream_file_idx) successfully");
+        .await;
+        if let Err(e) = res {
+            if !e.to_string().contains("could not create unique index") {
+                return Err(e);
+            }
+            // delete duplicate records
+            log::warn!("[POSTGRES] starting delete duplicate records");
+            let ret = sqlx::query(
+                r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
+            )
+            .fetch_all(&pool)
+            .await?;
+            log::warn!("[POSTGRES] total: {} duplicate records", ret.len());
+            for (i, r) in ret.iter().enumerate() {
+                let stream = r.get::<String, &str>("stream");
+                let date = r.get::<String, &str>("date");
+                let file = r.get::<String, &str>("file");
+                let id = r.get::<i64, &str>("id");
+                sqlx::query(
+                    r#"DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;"#,
+                )
+                .bind(id)
+                .bind(stream)
+                .bind(date)
+                .bind(file)
+                .execute(&pool)
+                .await?;
+                if i.is_multiple_of(1000) {
+                    log::warn!("[POSTGRES] delete duplicate records: {}/{}", i, ret.len());
+                }
+            }
+            log::warn!(
+                "[POSTGRES] delete duplicate records: {}/{}",
+                ret.len(),
+                ret.len()
+            );
+            create_index(IndexStatement::new(
+                "file_list_stream_file_idx",
+                "file_list",
+                true,
+                &["stream", "date", "file"],
+            ))
+            .await?;
+            log::warn!("[POSTGRES] create table index(file_list_stream_file_idx) successfully");
+        }
     }
 
+    Ok(())
+}
+
+/// Background maintenance task for PostgreSQL partition management.
+/// Only runs when meta_store == "postgres".
+pub async fn spawn_maintenance_task() -> std::result::Result<(), anyhow::Error> {
+    tokio::task::spawn(async move {
+        let cfg = get_config();
+        if cfg.common.meta_store != "postgres" || cfg.common.meta_partition_mode == "manual" {
+            return;
+        }
+
+        // Wait 5 minutes before first run to let the system stabilize
+        tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+
+        loop {
+            if let Err(e) = run_maintenance().await {
+                log::error!("[POSTGRES] maintenance task error: {e}");
+            }
+            // Sleep 24 hours between maintenance runs
+            tokio::time::sleep(tokio::time::Duration::from_secs(86400)).await;
+        }
+    });
+    Ok(())
+}
+
+async fn run_maintenance() -> Result<()> {
+    let pool = CLIENT.clone();
+
+    // Acquire advisory lock
+    let lock_key = "file_list_maintenance";
+    let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
+    let lock_id = if lock_id > (i64::MAX as u64) {
+        (lock_id >> 1) as i64
+    } else {
+        lock_id as i64
+    };
+
+    // Use a dedicated connection so lock and unlock happen on the same session
+    let mut conn = pool.acquire().await?;
+
+    let locked: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock($1)")
+        .bind(lock_id)
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap_or(false);
+
+    if !locked {
+        log::info!("[POSTGRES] maintenance: another node holds the lock, skipping");
+        return Ok(());
+    }
+
+    // Always release the advisory lock on exit
+    let result = run_maintenance_inner(&pool).await;
+
+    // Release advisory lock on the same connection that acquired it
+    if let Err(e) = sqlx::query("SELECT pg_advisory_unlock($1)")
+        .bind(lock_id)
+        .execute(&mut *conn)
+        .await
+    {
+        log::warn!("[POSTGRES] maintenance: failed to release advisory lock: {e}");
+    }
+
+    result
+}
+
+async fn run_maintenance_inner(pool: &sqlx::Pool<Postgres>) -> Result<()> {
+    log::info!("[POSTGRES] maintenance: starting");
+
+    // 6a: Pre-create partitions
+    precreate_partitions(pool).await?;
+
+    // 6b: Check if we should run DROP + REINDEX (respects retention_allowed_hours)
+    let cfg = get_config();
+    let should_run_heavy = if cfg.compact.retention_allowed_hours.is_empty() {
+        true
+    } else {
+        let current_hour = Utc::now().hour();
+        cfg.compact
+            .retention_allowed_hours
+            .split(',')
+            .filter_map(|h| h.trim().parse::<u32>().ok())
+            .any(|h| h == current_hour)
+    };
+
+    if should_run_heavy {
+        // DROP empty partitions
+        drop_empty_partitions(pool).await?;
+
+        // REINDEX non-partitioned tables
+        reindex_non_partitioned_tables(pool).await?;
+    }
+
+    log::info!("[POSTGRES] maintenance: completed");
+    Ok(())
+}
+
+async fn drop_empty_partitions(pool: &sqlx::Pool<Postgres>) -> Result<()> {
+    let cfg = get_config();
+    let safety_days = std::cmp::max(
+        cfg.limit.ingest_allowed_upto / 24 + 1,
+        cfg.compact.data_retention_days,
+    );
+    let today = Utc::now();
+    let cutoff_date = today - Duration::days(safety_days);
+
+    let tables = ["file_list", "file_list_history", "file_list_dump_stats"];
+    for table in &tables {
+        // List all partitions via pg_inherits
+        let partitions: Vec<String> = sqlx::query_scalar(
+            r#"
+SELECT c.relname
+FROM pg_inherits i
+JOIN pg_class c ON c.oid = i.inhrelid
+JOIN pg_class p ON p.oid = i.inhparent
+WHERE p.relname = $1
+  AND p.relnamespace = 'public'::regnamespace
+  AND c.relname != $2
+ORDER BY c.relname
+            "#,
+        )
+        .bind(table)
+        .bind(format!("{table}_default"))
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        for partition_name in partitions {
+            // Extract YYYYMMDD from partition name (e.g., "file_list_p_20260206")
+            let prefix = format!("{table}_p_");
+            let Some(date_str) = partition_name.strip_prefix(&prefix) else {
+                continue;
+            };
+            if date_str.len() != 8 {
+                continue;
+            }
+
+            // Parse date
+            let Ok(partition_date) = DateTime::parse_from_str(date_str, "%Y%m%d") else {
+                continue;
+            };
+            let partition_date = partition_date.with_timezone(&Utc);
+
+            // Skip partitions newer than cutoff
+            if partition_date >= cutoff_date {
+                continue;
+            }
+
+            // Check if partition is empty
+            let sql = format!("SELECT 1 FROM {partition_name} LIMIT 1");
+            let has_data: bool = sqlx::query(&sql)
+                .fetch_optional(pool)
+                .await
+                .unwrap_or(None)
+                .is_some();
+
+            if !has_data {
+                log::info!("[POSTGRES] maintenance: dropping empty partition {partition_name}");
+                let drop_sql = format!("DROP TABLE IF EXISTS {partition_name}");
+                if let Err(e) = sqlx::query(&drop_sql).execute(pool).await {
+                    log::error!("[POSTGRES] maintenance: failed to drop {partition_name}: {e}");
+                } else {
+                    // Remove from partition cache
+                    PARTITION_CACHE.remove(&partition_name);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn reindex_non_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
+    let indexes = [
+        ("file_list_deleted", "file_list_deleted_pkey"),
+        ("file_list_deleted", "file_list_deleted_created_at_idx"),
+        (
+            "file_list_deleted",
+            "file_list_deleted_stream_date_file_idx",
+        ),
+        ("file_list_jobs", "file_list_jobs_pkey"),
+        ("file_list_jobs", "file_list_jobs_stream_status_idx"),
+        ("file_list_jobs", "file_list_jobs_status_dumped_idx"),
+        ("file_list_jobs", "file_list_jobs_stream_offsets_idx"),
+    ];
+
+    for (table_name, index_name) in &indexes {
+        // Pre-check for invalid indexes and clean up stale artifacts
+        let invalid_indexes: Vec<String> = sqlx::query_scalar(
+            r#"
+SELECT c.relname AS index_name
+FROM pg_index i
+JOIN pg_class c ON c.oid = i.indexrelid
+JOIN pg_class t ON t.oid = i.indrelid
+WHERE t.relname = $1
+  AND i.indisvalid = false
+            "#,
+        )
+        .bind(table_name)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        for invalid_idx in &invalid_indexes {
+            if invalid_idx.contains("_ccnew") {
+                log::warn!("[POSTGRES] maintenance: dropping stale index artifact {invalid_idx}");
+                let drop_sql = format!("DROP INDEX IF EXISTS {invalid_idx}");
+                let _ = sqlx::query(&drop_sql).execute(pool).await;
+            }
+        }
+
+        // REINDEX CONCURRENTLY
+        let sql = format!("REINDEX INDEX CONCURRENTLY {index_name}");
+        log::info!("[POSTGRES] maintenance: reindexing {index_name}");
+        if let Err(e) = sqlx::query(&sql).execute(pool).await {
+            log::error!("[POSTGRES] maintenance: failed to reindex {index_name}: {e}");
+            // Continue with remaining indexes
+        }
+    }
     Ok(())
 }
 
@@ -2292,7 +3202,6 @@ mod tests {
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
                 index_size BIGINT not null,
-                created_at BIGINT not null,
                 updated_at BIGINT not null
             )
             "#,
@@ -2317,7 +3226,6 @@ mod tests {
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
                 index_size BIGINT not null,
-                created_at BIGINT not null,
                 updated_at BIGINT not null
             )
             "#,
@@ -2969,7 +3877,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_batch_add_with_timestamps_postgres() {
-        // Test that batch_add now includes created_at and updated_at timestamps
+        // Test that batch_add now includes updated_at timestamps
         let pool = setup_test_db().await;
         cleanup_test_data(&pool).await;
 

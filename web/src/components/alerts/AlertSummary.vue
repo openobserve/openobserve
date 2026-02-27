@@ -203,8 +203,7 @@ onMounted(async () => {
 
   // Styles for plain English section
   :deep(.plain-english-section) {
-    margin-top: 0.75rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
     border-radius: 0.375rem;
     background: linear-gradient(
       135deg,
@@ -212,10 +211,11 @@ onMounted(async () => {
       color-mix(in srgb, var(--q-primary) 8%, transparent)
     );
     border-left: 0.1875rem solid var(--q-primary);
-    font-size: 0.8125rem;
-    line-height: 1.6;
+    font-size: 0.875rem;
+    line-height: 1.7;
     font-style: italic;
-    opacity: 0.9;
+    opacity: 0.95;
+    font-weight: 500;
   }
 }
 

@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-bind="$attrs" ref="rootContainer">
+  <div
+    v-bind="$attrs"
+    ref="rootContainer"
+    :style="isSidebarOpen && { width: leftWidth + 'px' }"
+  >
     <template v-for="(span, index) in spans as any[]" :key="span.spanId">
       <div
         :style="{
@@ -24,7 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flexWrap: 'nowrap',
         }"
         class="flex span-row"
-        :class="spanHoveredIndex === index ? 'span-row-highlight' : ''"
+        :class="{
+          'span-row-highlight': spanHoveredIndex === index,
+          'span-row-selected': span.spanId === selectedSpanId,
+        }"
         :data-test="`trace-tree-span-container-${span.spanId}`"
         @mouseover="() => (spanHoveredIndex = index)"
         @mouseout="() => (spanHoveredIndex = -1)"
@@ -41,12 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     'px'
               }`,
             }"
-            class="flex items-start justify-start ellipsis"
+            class="flex flex-col items-start justify-start ellipsis"
             :title="span.operationName"
           >
             <div
-              class="flex no-wrap q-pt-sm full-width relative-position operation-name-container"
-              :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+              class="flex no-wrap full-width relative-position operation-name-container"
+              :class="[
+                store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
+                isLLMTrace(span) ? '' : 'q-pt-sm',
+              ]"
               :data-test="`trace-tree-span-operation-name-container-${span.spanId}`"
             >
               <div
@@ -70,10 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="span.hasChildSpans"
-                class="span-count-box cursor-pointer"
+                class="span-count-box cursor-pointer tw:border-[var(--o2-border-color)]!"
                 :ref="(el) => setBadgeRef(span.spanId, el)"
                 :style="{
-                  borderColor: span.style.color,
                   color: span.style.color,
                 }"
                 @click.stop="toggleSpanCollapse(span.spanId)"
@@ -97,53 +106,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="selectSpan(span.spanId)"
                 :data-test="`trace-tree-span-select-btn-${span.spanId}`"
               >
-                <q-icon
-                  v-if="span.spanStatus === 'ERROR'"
-                  name="error"
-                  class="text-red-6 q-mr-xs"
-                  title="Error Span"
-                  :data-test="`trace-tree-span-error-icon-${span.spanId}`"
-                />
-                <span
-                  class="text-subtitle2 text-bold q-mr-sm"
-                  :class="{
-                    highlighted: isHighlighted(span.spanId),
-                    'tw:text-gray-900':
-                      store.state.theme === 'dark' &&
-                      isHighlighted(span.spanId),
-                    'current-match': currentSelectedValue === span.spanId, // Current match class
-                  }"
-                  :data-test="`trace-tree-span-service-name-${span.spanId}`"
+                <div
+                  class="ellipsis flex items-center span-name-section-content"
                 >
-                  {{ span.serviceName }}
-                </span>
-                <span
-                  class="text-body2"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'text-grey-5'
-                      : 'text-blue-grey-9'
-                  "
-                  :data-test="`trace-tree-span-operation-name-${span.spanId}`"
-                  >{{ span.operationName }}</span
+                  <q-icon
+                    v-if="span.spanStatus === 'ERROR'"
+                    name="error"
+                    class="text-red-6 q-mr-xs"
+                    title="Error Span"
+                    :data-test="`trace-tree-span-error-icon-${span.spanId}`"
+                  />
+                  <span
+                    class="text-subtitle2 text-bold q-mr-sm"
+                    :class="{
+                      highlighted: isHighlighted(span.spanId),
+                      'tw:text-gray-900':
+                        store.state.theme === 'dark' &&
+                        isHighlighted(span.spanId),
+                      'current-match': currentSelectedValue === span.spanId, // Current match class
+                    }"
+                    :data-test="`trace-tree-span-service-name-${span.spanId}`"
+                  >
+                    {{ span.serviceName }}
+                  </span>
+                  <span
+                    class="text-body2"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'text-grey-5'
+                        : 'text-blue-grey-9'
+                    "
+                    :data-test="`trace-tree-span-operation-name-${span.spanId}`"
+                    >{{ span.operationName }}</span
+                  >
+                </div>
+                <!-- LLM Metrics -->
+                <div
+                  v-if="isLLMTrace(span)"
+                  class="flex items-center text-caption text-red-6"
+                  style="margin-top: -4px; margin-bottom: 2px; line-height: 1"
                 >
+                  <span v-if="span.llm_usage?.total > 0" class="q-mr-sm">
+                    <q-icon name="functions" size="10px" />
+                    {{ formatTokens(span.llm_usage.total) }}
+                  </span>
+                  <span v-if="span.llm_cost?.total > 0">
+                    <q-icon name="attach_money" size="10px" />
+                    {{ formatCost(span.llm_cost.total) }}
+                  </span>
+                </div>
               </div>
             </div>
             <div
               class="span-background-wrapper"
               :style="{
                 backgroundColor: span.style.backgroundColor,
-                height: `calc(100% - 1.875rem)`,
                 borderLeft: `0.1875rem solid ${span.style.color}`,
                 marginLeft: span.hasChildSpans ? '0.875rem' : '0',
                 width: '100%',
-                position: 'relative',
               }"
               :data-test="`trace-tree-span-background-${span.spanId}`"
             ></div>
           </div>
         </div>
-        <div :style="{ width: `calc(100% - ${leftWidth}px)` }">
+        <div
+          v-if="!isSidebarOpen"
+          :style="{ width: `calc(100% - ${leftWidth}px)` }"
+        >
           <span-block
             :span="span"
             :depth="depth"
@@ -224,6 +253,7 @@ import { useStore } from "vuex";
 import SpanBlock from "./SpanBlock.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
 
 export default defineComponent({
   name: "TraceTree",
@@ -268,6 +298,14 @@ export default defineComponent({
     spanList: {
       type: Array,
       default: () => [],
+    },
+    selectedSpanId: {
+      type: String,
+      default: "",
+    },
+    isSidebarOpen: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: [
@@ -390,7 +428,7 @@ export default defineComponent({
                 y1: parentY,
                 x2: parentX,
                 y2: lastChildY,
-                color: span.style.color,
+                color: "#e6e6e6",
                 children: childPositions,
               };
             }
@@ -557,6 +595,9 @@ export default defineComponent({
       connectorPaths,
       calculateConnectors,
       rootContainer,
+      formatTokens,
+      formatCost,
+      isLLMTrace,
     };
   },
   components: { SpanBlock },
@@ -573,10 +614,10 @@ export default defineComponent({
 }
 
 .span-count-box {
-  min-width: 1.5rem;
-  height: 1.25rem;
+  min-width: 1.2rem;
+  height: 1.2rem;
   padding: 0 0.25rem;
-  border-radius: 0.25rem;
+  border-radius: 50%;
   border: 0.0625rem solid;
   display: flex;
   align-items: center;
@@ -608,6 +649,15 @@ export default defineComponent({
   padding-left: 0.25rem;
 }
 
+.span-name-section-content {
+  display: block;
+}
+
+.span-background-wrapper {
+  flex-grow: 1;
+  position: relative;
+}
+
 .operation-name-container {
   height: 1.875rem;
   overflow: visible;
@@ -633,8 +683,26 @@ export default defineComponent({
       left: 0;
       right: 0;
       top: 0;
-      height: 1.875rem;
+      bottom: 0;
       background-color: rgba(0, 123, 255, 0.2);
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    .operation-name-container {
+      background-color: transparent !important;
+    }
+  }
+
+  &.span-row-selected {
+    &::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      background-color: rgba(0, 123, 255, 0.35);
       pointer-events: none;
       z-index: 999;
     }

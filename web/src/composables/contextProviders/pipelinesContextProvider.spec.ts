@@ -19,7 +19,7 @@ describe('createPipelinesContextProvider', () => {
   it('should create a context provider for creating new pipeline', () => {
     const pipelineObj = {
       currentSelectedPipeline: {
-        id: 'pipeline-123',
+        pipeline_id: 'pipeline-123',
         name: 'Test Pipeline'
       },
       isEditPipeline: false
@@ -40,13 +40,13 @@ describe('createPipelinesContextProvider', () => {
     expect(context.pipelineId).toBe('pipeline-123');
     expect(context.pipelineName).toBe('Test Pipeline');
     expect(context.organization_identifier).toBe('org-456');
-    expect(context.user_intent).toBe('create new pipeline');
+    expect(context.user_intent).toBe('create new pipeline query node');
   });
 
   it('should create a context provider for editing existing pipeline', () => {
     const pipelineObj = {
       currentSelectedPipeline: {
-        id: 'pipeline-789',
+        pipeline_id: 'pipeline-789',
         name: 'Updated Pipeline'
       },
       isEditPipeline: true

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row qp-2 tw:h-full tw:px-[0.625rem] tw:pt-[0.25rem]">
+  <div class="row qp-2 tw:h-full tw:px-[0.625rem]">
     <div class="col-12 row items-end tw:pb-[0.625rem]">
       <div class="col-12 row card-container tw:px-[0.625rem] tw:py-[0.625rem]">
         <div
@@ -422,7 +422,7 @@ const getSessionEvents = () => {
         !sessionDetails.value.user_email ||
         sessionDetails.value.user_email === "Unknown User"
       )
-        sessionDetails.value.user_email = res.data.hits[0].usr_email;
+        sessionDetails.value.user_email = res.data.hits[0]?.usr_email;
 
       segmentEvents.value = res.data.hits.filter((hit: any) => {
         return (
@@ -489,6 +489,11 @@ const getSessionErrorLogs = () => {
       });
 
       segmentEvents.value.sort((a, b) => a.timestamp - b.timestamp);
+
+      videoPlayerRef.value?.updatePlayerState();
+
+      // Calculate time_spent based on actual event timestamps (lastEvent - firstEvent)
+      // This matches rrweb-player's calculation
     })
     .catch((error) => {
       console.error("Failed to fetch sesion error logs:", error);

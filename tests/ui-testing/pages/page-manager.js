@@ -10,11 +10,13 @@ import DashboardVariables from "./dashboardPages/dashboard-variables";
 import DashboardVariablesScoped from "./dashboardPages/dashboard-variables-scoped.js";
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
+import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
 import DashboardImport from "./dashboardPages/dashboard-import.js";
 import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
 import DateTimeHelper from "./dashboardPages/dashboard-time";
+import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
@@ -32,7 +34,9 @@ import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
 import { MetricsPage } from "./metricsPages/metricsPage.js";
+import { MetricsQueryEditorPage } from "./metricsPages/metricsQueryEditorPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
+import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { RumPage } from "./logsPages/rumPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { DataPage } from "./generalPages/dataPage.js";
@@ -83,11 +87,13 @@ class PageManager {
     this.dashboardVariablesScoped = new DashboardVariablesScoped(page);
     this.chartTypeSelector = new ChartTypeSelector(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
+    this.dashboardLegendsCopy = new DashboardLegendsCopy(page);
     this.dashboardFilter = new DashboardFilter(page);
     this.dashboardImport = new DashboardImport(page);
     this.dashboardShareExport = new DashboardShareExportPage(page);
     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
     this.dateTimeHelper = new DateTimeHelper(page);
+    this.dashboardPanelTime = new DashboardPanelTime(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
 
@@ -110,7 +116,9 @@ class PageManager {
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
     this.metricsPage = new MetricsPage(page);
+    this.metricsQueryEditorPage = new MetricsQueryEditorPage(page);
     this.tracesPage = new TracesPage(page);
+    this.serviceGraphPage = new ServiceGraphPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
     this.dataPage = new DataPage(page);

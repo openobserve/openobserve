@@ -108,12 +108,17 @@
     "darkMode": "다크 모드",
     "manageTheme": "테마 관리",
     "url": "URL",
-    "chunkLoadError": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요.",
     "chunkLoadErrorMsg": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요.",
     "id": "신분증",
     "getStarted": "시작하기",
+    "copy": "복사",
+    "copySuccess": "클립보드에 복사됨",
+    "copyError": "클립보드에 복사하지 못했습니다.",
     "reset": "초기화",
-    "retry": "재시도"
+    "retry": "재시도",
+    "goBack": "뒤로 이동",
+    "stopGenerating": "생성 중지",
+    "set": "+ 세트"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -126,7 +131,7 @@
     "source": "_소스",
     "noResult": "결과 없음",
     "syntaxGuide": "구문 가이드",
-    "recordsPerPage": "페이지당 레코드",
+    "rowsPerPage": "페이지당 레코드",
     "showing": "표시",
     "of": "의",
     "rowDetail": "소스 세부 정보",
@@ -233,8 +238,10 @@
     "patternColumnHeader": "패턴",
     "occurrenceColumnHeader": "발생",
     "percentageColumnHeader": "백분율",
+    "anomalyColumnHeader": "변칙",
     "actionsColumnHeader": "액션",
     "anomalyLabel": "변칙",
+    "anomalyDetected": "변칙 감지됨",
     "includePatternInSearch": "검색에 패턴 포함",
     "excludePatternFromSearch": "검색에서 패턴 제외",
     "showPatternDetails": "세부 정보 보기 ({변수} 변수, {예제} 예제)",
@@ -308,7 +315,43 @@
     "show": "쇼",
     "editor": "에디터",
     "webUrlNotConfigured": "관리자가 ZO_WEB_URL을 구성할 때까지 URL 공유는 비활성화됩니다.",
-    "showHideColumns": "열 표시/숨기기"
+    "showHideColumns": "열 표시/숨기기",
+    "autoRefresh": "자동 새로고침",
+    "createSavedView": "저장된 뷰 생성",
+    "listSavedViews": "저장된 뷰 목록",
+    "buildQuery": "짓다",
+    "enableSqlModeForBuild": "SQL 모드를 활성화하고 쿼리 작성기를 사용할 단일 스트림을 선택하십시오.",
+    "applyToSearch": "검색에 적용",
+    "complexQueryDetected": "복잡한 쿼리가 감지되었습니다.커스텀 모드 사용.",
+    "nlpModeLabel": "자연어 모드",
+    "generateSQL": "SQL 생성",
+    "generateQuery": "쿼리 생성",
+    "generateSQLTooltip": "자연어에서 SQL 쿼리 생성 (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "자연어에서 SQL 쿼리 생성",
+    "generating": "생성 중...",
+    "nlQueryGenerationFailed": "쿼리를 생성하지 못했습니다.다시 시도해 주세요.",
+    "nlQueryGenerationSuccess": "쿼리가 성공적으로 생성되었습니다!",
+    "nlpModeDisabledForVisualization": "다중 스트림으로 시각화하는 동안에는 자연어 모드를 비활성화할 수 없습니다.",
+    "askAIPlaceholder": "AI에게 문의에 도움을 요청하세요...",
+    "aiBarSuccessPlaceholder": "다음에는 무엇을 하고 싶으세요?",
+    "askAI": "AI에게 물어보세요",
+    "askAITooltip": "AI가 쿼리에 도움을 요청하세요",
+    "enterPrompt": "쿼리를 생성하라는 프롬프트 입력",
+    "analyzingQuery": "쿼리 분석 중...",
+    "generatingQuery": "쿼리 생성 중...",
+    "queryGeneratedSuccess": "쿼리가 성공적으로 생성되었습니다!",
+    "queryGenerationStopped": "쿼리 생성이 중지되었습니다.",
+    "queryGenerationFailed": "쿼리 생성에 실패했습니다.",
+    "fetchingResults": "검색 결과를 가져오는 중...",
+    "noResultsFound": "검색된 결과 없음",
+    "errorFetchingResults": "결과를 가져오는 중 오류가 발생했습니다.",
+    "somethingWentWrong": "뭔가 잘못됐어",
+    "selectStreamForAI": "AI를 사용할 스트림을 먼저 선택하세요",
+    "collapseFields": "필드 축소",
+    "openFields": "오픈 필드",
+    "askAIFunctionPlaceholder": "AI에게 당신의 기능을 도와달라고 요청하세요...",
+    "enterFunctionPrompt": "함수 생성 프롬프트 입력",
+    "recordsPerPage": "페이지당 레코드 수"
   },
   "menu": {
     "home": "홈",
@@ -420,7 +463,6 @@
     "ingestion_type": "섭취 유형",
     "ingestion_limit": "섭취 제한",
     "today_usage": "오늘의 사용",
-    "feature_comparision_lbl": "기능 비교",
     "feature_comparision_ent_msg": "아래 나열된 모든 고급 기능에 액세스할 수 있는 OpenObserve 엔터프라이즈 에디션을 사용하고 있습니다.",
     "feature_comparision_plan_detail": "요금제: 엔터프라이즈 에디션은 하루 최대 200GB (~6TB/월) 의 데이터 통합에 대해 무료입니다.",
     "feature_comparision_os_msg": "현재 OpenObserve 오픈 소스 에디션을 사용하고 있습니다.엔터프라이즈 에디션으로 업그레이드하여 아래 비교표에 나열된 고급 기능을 잠금 해제하세요.",
@@ -954,7 +996,10 @@
     "jsType": "자바스크립트 (ES2023)",
     "vrlfunction": "VRL 함수",
     "jsFunctionHint": "`row` 객체를 사용하여 로그 필드에 액세스하고 수정합니다.예: row.new_field = row.기존_필드 + '처리됨';",
-    "vrlFunctionHint": "`.'를 사용하여 현재 이벤트를 나타냅니다.예: .new_field = .기존_필드 + '처리됨'"
+    "vrlFunctionHint": "`.'를 사용하여 현재 이벤트를 나타냅니다.예: .new_field = .기존_필드 + '처리됨'",
+    "jsErrorDetails": "자바스크립트 오류 세부 정보",
+    "askAIFunctionPlaceholder": "AI에게 당신의 기능을 도와달라고 요청하세요...",
+    "enterFunctionPrompt": "함수 생성 프롬프트 입력"
   },
   "confirmDialog": {
     "cancel": "취소",
@@ -1115,7 +1160,6 @@
     "unitLabel": "유닛",
     "basemapLabel": "기본 맵",
     "customunitLabel": "커스텀 유닛",
-    "lattitudeLabel": "래티튜드",
     "longitudeLabel": "경도",
     "zoomLabel": "줌",
     "legendLabel": "레전드",
@@ -1182,6 +1226,9 @@
     "wraptext": "랩 테이블 셀",
     "tableTranspose": "전치",
     "tableDynamicColumns": "동적 열 허용",
+    "pagination": "페이지네이션",
+    "rowsPerPage": "페이지당 행 수",
+    "rowsPerPageTooltip": "페이지당 표시할 기본 레코드 수를 설정합니다",
     "showBorder": "축 테두리 표시",
     "currencyDollar": "통화 - 달러 ($)",
     "currencyEuro": "통화 - 유로 (€)",
@@ -1403,7 +1450,27 @@
     "noColumnsOrdered": "정렬된 컬럼 없음",
     "columnsDefaultOrder": "열은 기본 순서로 표시됩니다.",
     "moveUp": "위로 이동",
-    "moveDown": "아래로 이동"
+    "moveDown": "아래로 이동",
+    "toggleFunctionEditor": "토글 함수 편집기",
+    "useSavedFunction": "저장된 함수 사용",
+    "showQueryResults": "쿼리 결과 보기",
+    "hideQueryResults": "쿼리 결과 숨기기",
+    "vrlExtractionTooltip": "차트에서 추출된 VRL 필드를 사용하려면 VRL 함수를 작성하고 적용 버튼을 클릭합니다.필드가 추출되어 차트를 작성하는 데 사용할 수 있습니다.",
+    "errorFetchingFunctions": "함수를 가져오는 중 오류가 발생했습니다.",
+    "functionAppliedSuccess": "{name} 함수가 성공적으로 적용되었습니다.",
+    "connectNullValuesTooltip": "결측값의 데이터 포인트를 선으로 연결합니다.",
+    "panelTimeSettings": "패널 시간 설정",
+    "panelTimeEnabled": "패널 레벨 시간 허용",
+    "useGlobalTime": "글로벌 타임 사용",
+    "useIndividualTime": "개별 시간 사용",
+    "panelTimeGlobalHint": "패널은 글로벌 대시보드 시간을 추적합니다.글로벌 시간을 변경하면 이 패널이 업데이트됩니다.",
+    "panelTimeIndividualHint": "패널은 자체 시간 범위를 사용합니다.아래 날짜 선택기를 사용하여 시간을 설정합니다.글로벌 시간 변경은 이 패널에 영향을 주지 않습니다.",
+    "panelTimeRange": "패널 시간 범위",
+    "panelTimeRangeTooltip": "이 시간 범위는 이 패널에만 적용됩니다.다른 패널은 자체적으로 구성된 시간 또는 글로벌 대시보드 시간을 사용합니다.",
+    "panelTimeSettingsTooltip": "이 패널에서 시간 범위를 결정하는 방법을 구성합니다.대시보드의 시간 범위를 사용하거나 이 패널에 사용자 지정 시간 범위를 설정할 수 있습니다.",
+    "panelTimeMode": "시간 범위 소스 (대시보드 로드 시)",
+    "useDefaultTimeTooltip": "활성화하면 이 패널은 글로벌 대시보드 시간 대신 구성된 기본 기간을 대시보드 로드 시 시간 범위로 사용합니다.",
+    "defaultDuration": "기본 기간"
   },
   "panel": {
     "header": "패널",
@@ -1426,7 +1493,6 @@
     "otherColumn": "기타 칼럼",
     "config": "구성",
     "filters": "필터",
-    "customSql": "사용자 지정 SQL",
     "field": "필드",
     "discard": "폐기",
     "edit": "편집",
@@ -1435,7 +1501,6 @@
     "layout": "레이아웃",
     "sql": "쿼리",
     "back": "<< 뒤로",
-    "auto": "자동",
     "promQL": "PromQL",
     "latitude": "위도",
     "longitude": "경도",
@@ -1468,9 +1533,6 @@
     "panelDuplicationFailed": "패널 복제 실패",
     "mapname": "이름",
     "mapvalue": "가치",
-    "customChartTypeSelector": "사용자 지정 차트 유형 선택기",
-    "customChartTypeSelectorHint": "eCharts 라이브러리에서 차트 유형을 선택하여 기본 코드 구조를 시작하세요.",
-    "selectChartType": "차트 유형 선택",
     "joins": "참여하다",
     "addJoin": "조인 추가",
     "removeJoin": "제거 조인",
@@ -1487,14 +1549,15 @@
     "SQL": "SQL",
     "builder": "건축업자",
     "custom": "사용자 지정",
-    "sqlBuilder": "SQL 빌더"
+    "sqlBuilder": "SQL 빌더",
+    "generatedSql": "생성된 SQL",
+    "enterCustomSql": "사용자 지정 SQL 쿼리를 입력하세요...",
+    "customSql": "사용자 지정 SQL"
   },
   "home": {
     "streams": "스트림",
     "totalDataIngested": "수집된 총 데이터",
     "view": "더 보기 >>",
-    "queryFunctions": "쿼리 함수",
-    "ingestFunctions": "인제스트 함수",
     "scheduledAlert": "예약된 알림",
     "rtAlert": "실시간 알림",
     "noData": "데이터 수집 안 함",
@@ -1588,15 +1651,12 @@
     "edit": "편집",
     "search": "검색 알림",
     "name": "이름",
-    "function": "알림 세부 정보",
     "save": "저장",
     "sql": "쿼리",
     "realTime": "리얼 타임",
     "scheduled": "예약됨",
-    "duration": "알림 평가 기간",
     "condition": "조건",
     "interval": "알림이 평가되는 빈도",
-    "delayNotificationUntil": "알림 1회 이후까지 알림 지연",
     "destination": "여행지",
     "stream_name": "스트림 이름",
     "actions": "액션",
@@ -1606,7 +1666,6 @@
     "addTitle": "알림 추가",
     "updateTitle": "업데이트 알림",
     "delete": "삭제",
-    "stream_type": "스트림 유형",
     "clone": "클론 경고",
     "column": "칼럼",
     "alertType": "경고 유형",
@@ -1770,7 +1829,9 @@
       "analyzeRca": "분석",
       "rcaInProgress": "근본 원인 분석 중...",
       "rcaCompleted": "근본 원인 분석 완료",
-      "noRcaYet": "근본 원인 분석이 없습니다.시작하려면 '분석'을 클릭하세요."
+      "noRcaYet": "근본 원인 분석이 없습니다.시작하려면 '분석'을 클릭하세요.",
+      "search": "인시던트 검색...",
+      "sreChat": "SRE 도우미에게 문의"
     },
     "events": "이벤트",
     "multiWindow": "과거와 비교하기",
@@ -1813,7 +1874,12 @@
         "alertMeWhen": "언제 알려줘",
         "butNoMoreThan": ", 하지만 한 번에 한 번만",
         "defaultConditions": "구성된 조건이 충족되면 알림 받기"
-      }
+      },
+      "title": "요약",
+      "alertName": "알림 이름",
+      "streamInfo": "데이터 소스",
+      "alertType": "알림 유형",
+      "queryCondition": "쿼리 조건"
     },
     "correlation": {
       "title": "경고 상관관계",
@@ -1895,7 +1961,114 @@
     "msteams": "마이크로소프트 팀즈",
     "pagerduty": "페이저 듀티",
     "opsgenie": "옵스제니",
-    "servicenow": "서비스 나우"
+    "servicenow": "서비스 나우",
+    "saveAlert": "알림 저장",
+    "aggregation_threshold": "그룹이 있는 경우 경고",
+    "thresholdDynamic": {
+      "alertMeWhen": "언제 알려줘",
+      "metricTypes": {
+        "resultsPassedFilter": "결과 통과 필터",
+        "distinctGroupsAffected": "별개의 그룹이 영향을 받음",
+        "metricsMatchCriteria": "지표 일치 기준",
+        "matchingLogsFound": "일치하는 로그가 발견됨",
+        "groupsPassFilter": "그룹이 필터 기준을 통과함",
+        "distinctGroups": "별개의 그룹이 발견됨",
+        "resultRows": "결과 행 반환",
+        "timeSeries": "활성 시계열이 발견됨",
+        "matchingRecords": "일치하는 레코드를 찾았습니다",
+        "groupsWithHaving": "그룹 일치 조건",
+        "uniqueGroups": "고유 그룹",
+        "events": "이벤트 일치 조건",
+        "aggregatedValue": "경기 조건"
+      },
+      "contextLabels": {
+        "groupedBy": "그룹화 기준:",
+        "havingConditions": "조건 있음:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "경고 이름",
+      "sqlQuery": "SQL 쿼리",
+      "promqlQuery": "프롬큐 쿼리",
+      "conditions": "조건",
+      "copy": "복사",
+      "noCondition": "조건 없음",
+      "noDescription": "설명 없음",
+      "evaluationHistory": "평가 기록",
+      "loadingHistory": "기록 로드 중...",
+      "noHistoryAvailable": "이 알림에 대한 평가 기록이 없습니다.",
+      "results": "결과"
+    },
+    "historyTable": {
+      "timestamp": "타임스탬프",
+      "status": "상태",
+      "evaluationTime": "평가 (들)",
+      "queryTime": "쿼리 (밀리초)",
+      "error": "오류"
+    },
+    "back": "뒤로",
+    "continue": "계속",
+    "wouldTrigger": "트리거할 것이다",
+    "wouldNotTrigger": "트리거하지 않을 것입니다",
+    "queryBuilder": "건축업자",
+    "groupByHelp": {
+      "description": "집계된 데이터를 특정 필드별로 그룹화하여 각 고유 값에 대해 별도의 알림을 생성합니다.",
+      "example": "예: “호스트 이름”별로 그룹화하여 서버당 개별 알림을 가져오거나 “status_code”별로 그룹화하여 오류를 개별적으로 추적합니다."
+    },
+    "conditions": {
+      "condition": "상태",
+      "conditionGroup": "조건 그룹",
+      "addConditionTooltip": "이 그룹에 새 조건 추가",
+      "addConditionGroupTooltip": "중첩된 조건 그룹 추가 (최대 깊이: 2)",
+      "maxDepthReachedTooltip": "최대 중첩 깊이에 도달했습니다."
+    },
+    "compareWithPast": {
+      "alertSetFor": "에 대한 경고 설정",
+      "currentWindow": "현재 창",
+      "cycle": "사이클",
+      "cycleTooltip": "이전 주기의 동일한 시간과 결과를 비교합니다.",
+      "runningFor": "모든 {빈도} 간격으로 {기간} 동안 실행",
+      "currentWindowCannotBeDeleted": "현재 창을 삭제할 수 없습니다.",
+      "comparingWith": "비교 대상",
+      "referenceWindow": "레퍼런스 윈도우",
+      "timeFrame": "타임 프레임",
+      "timeFrameTooltip": "쿼리의 시간 범위.",
+      "comparingText": "현재 윈도우 쿼리 결과를 이전 {offset} 의 쿼리 결과와 비교합니다.",
+      "addComparisonWindow": "비교 창 추가",
+      "goToConditions": "조건으로 이동",
+      "goToConditionsTooltip": "“조건으로 이동”을 클릭하여 선택한 비교 창의 이벤트를 확인합니다."
+    },
+    "alertSettings": {
+      "cronSchedule": "크론 스케줄",
+      "addNewDestination": "새 목적지 추가",
+      "cooldownTooltip": "경고가 트리거되면 다른 알림을 보내기 전에 얼마나 기다려야 합니까? 예를 들어 경보가 오후 4시에 트리거되고 무음 알림이 10분으로 설정된 경우 경고가 1분이 지난 후에도 오후 4시 10분까지는 다른 알림을 보내지 않습니다.이는 사용자에게 알림을 스팸으로 보내는 것을 방지하기 위한 것입니다.",
+      "thresholdTooltip": "이벤트 수 또는 집계된 값을 기반으로 알림이 트리거되는 시기를 정의합니다.예: “> 100\"으로 설정하면 이벤트 수가 100개를 초과할 때 알림이 트리거됩니다.",
+      "periodTooltip": "쿼리를 실행해야 하는 기간. 예를 들어 10분은 쿼리가 실행될 때마다 최근 10분의 데이터를 사용한다는 의미입니다.",
+      "frequencyTooltipMinutes": "작업 실행 빈도 (예: 5분마다)",
+      "frequencyTooltipCron": "공백으로 구분된 5개의 필드가 있는 표준 UNIX 크론 형식: [분 0-59] [시간 0-23] [월 1-31] [월 1-12일 또는 1월 12월] [요일 0-7 또는 '1L-7L', 일요일의 경우 0 및 7].",
+      "timezoneWarning": "경고: 표시된 시간대는 대략적인 시간대입니다.정확한 시간대를 수동으로 확인하고 선택하십시오.",
+      "destinationsTooltip": "경고 알림을 보낼 대상을 하나 이상 선택합니다.",
+      "templateTooltip": "선택 사항: 이 알림의 모든 대상에 사용할 템플릿을 선택합니다.템플릿을 사용하여 경고 메시지의 형식을 사용자 지정할 수 있습니다.선택하지 않을 경우 각 대상에서는 자체적으로 구성된 템플릿을 사용합니다."
+    },
+    "advanced": {
+      "addVariable": "변수 추가",
+      "variablesTooltip": "변수는 알림에서 대상으로 데이터를 전달하는 데 사용됩니다.",
+      "rowTemplateTooltip": "행 템플릿은 경고 메시지의 형식을 지정하는 데 사용됩니다.",
+      "templateType": "템플릿 유형:"
+    },
+    "addConditions": "조건 추가",
+    "sqlEditor": "SQL 에디터",
+    "promqlEditor": "프롬QL 에디터",
+    "vrlEditor": "VRL 에디터",
+    "generateVRL": "VRL 생성",
+    "applyVRL": "VRL 적용",
+    "runQuery": "쿼리 실행",
+    "onStream": "...에",
+    "streamLabel": "스트림",
+    "noStreamSelected": "선택한 스트림 없음",
+    "resultsIncludeAllWindows": "결과에는 모든 다중 창 추가 사항이 포함됩니다.",
+    "runQueryForOutput": "결과를 보려면 [쿼리 실행] 을 클릭하십시오.",
+    "applyVRLForOutput": "VRL 적용을 클릭하여 결합된 출력을 확인하십시오."
   },
   "alert_templates": {
     "header": "템플릿",
@@ -1942,7 +2115,14 @@
     "preview": "시사",
     "test": "테스트",
     "saved": "목적지가 성공적으로 저장되었습니다.",
-    "saveError": "대상 저장 실패"
+    "saveError": "대상 저장 실패",
+    "customWebhook": "사용자 지정 (웹후크)",
+    "customEmail": "사용자 지정 (이메일)",
+    "customAction": "사용자 지정 (액션)",
+    "custom": "사용자 지정",
+    "separator": "분리기",
+    "separator_placeholder": "구분자 입력 (예: |,\\n,\\ t, 공백)",
+    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)"
   },
   "metrics": {
     "searchMetric": "지표 검색",
@@ -2104,16 +2284,8 @@
       "howItWorksTitle": "서비스 아이덴티티 작동 방식",
       "howItWorksDescription": "(Fully Qualified Name) 은 다양한 데이터 소스에서 서비스를 고유하게 식별하고 상호 연관시키기 위해 원격 측정 차원에서 계산됩니다.",
       "priorityOrderLabel": "우선 순위:",
-      "priorityOrderDescription": "치수는 아래 나열된 순서대로 검사됩니다.값이 있는 첫 번째 차원이 서비스 FQN이 됩니다.",
       "exampleLabel": "예시:",
-      "exampleText1": "둘 다 있는 경우",
-      "exampleText2": "과",
-      "exampleText3": "FQN은 다음과 같습니다.",
-      "exampleText4": "왜냐하면",
-      "exampleText5": "우선 순위가 더 높습니다.",
       "correlationDescription": "FQN이 동일한 서비스는 서로 다르더라도 상관 관계가 있습니다.",
-      "correlationDescriptionField": "서비스",
-      "correlationDescriptionEnd": "이름.",
       "fqnPriorityTitle": "FQN 우선순위 치수",
       "fqnPriorityTooltip": "상관 관계를 위해 서비스 FQN을 도출하는 데 사용되는 차원을 정의합니다.값이 있는 첫 번째 차원이 우선합니다.인프라에 맞게 재정렬하세요.",
       "fqnPriorityDescription": "드래그하여 순서를 바꾸거나 화살표 버튼을 사용합니다.첫 번째로 일치하는 차원이 서비스 FQN을 결정합니다.",
@@ -2134,20 +2306,40 @@
       "traces": "트레이스",
       "metrics": "측정항목",
       "retry": "재시도",
-      "k8sDeployment": "쿠버네티스 디플로이먼트 이름",
-      "k8sStatefulSet": "쿠버네티스 스테이트풀셋 이름",
-      "k8sDaemonSet": "쿠버네티스 데몬셋 이름",
-      "k8sJob": "쿠버네티스 작업 이름",
-      "k8sReplicaSet": "쿠버네티스 레플리카셋 이름",
-      "k8sNamespace": "쿠버네티스 네임스페이스",
-      "awsEcsTask": "AWS ECS 태스크 패밀리",
-      "faasName": "람다, 클라우드 함수 등",
-      "gcpCloudRun": "구글 클라우드 런 서비스",
-      "azureCloudRole": "Azure 클라우드 역할 이름",
-      "processName": "베어메탈 프로세스 이름",
-      "serviceDim": "오픈 텔레메트리 서비스. 이름",
-      "host": "호스트/노드 이름",
-      "environment": "배포 환경"
+      "serviceIdentityLabel": "서비스 식별자",
+      "compoundFqnLabel": "식별자 형식:",
+      "compoundFqnDescription": "범위 차원은 '/'로 연결된 후 첫 번째 non-null 워크로드 차원이 추가됩니다.",
+      "exampleText": "{dim1} 및 {dim2}를 사용하면 식별자는 {value}가 됩니다.",
+      "correlationLabel": "상관관계:",
+      "addDimensionHint": "우선 순위 목록에 추가할 시맨틱 그룹을 선택하십시오.",
+      "selectSemanticGroup": "시맨틱 그룹 선택",
+      "noSemanticGroupsAvailable": "사용 가능한 시맨틱 그룹이 없습니다. 먼저 아래의 필드 매핑을 구성하십시오.",
+      "noSemanticGroupsConfigured": "시맨틱 그룹이 구성되지 않았습니다. 사용 가능한 차원을 정의하려면 아래에 필드 매핑을 추가하십시오.",
+      "configureSemanticGroupsFirst": "식별자 우선 순위에 대한 사용 가능한 차원을 정의하려면 아래의 시맨틱 필드 매핑을 구성하십시오.",
+      "saveFqnPriority": "식별자 우선 순위 저장",
+      "saveSemanticMappings": "시맨틱 매핑 저장",
+      "fqnPrioritySaved": "식별자 우선 순위 구성이 성공적으로 저장되었습니다",
+      "semanticMappingsSaved": "시맨틱 필드 매핑이 성공적으로 저장되었습니다",
+      "filters": "필터",
+      "availableDimensions": "사용 가능한 차원",
+      "semanticFieldGroupsTitle": "필드 매핑",
+      "groupsLabel": "그룹",
+      "noMatchingGroups": "일치하는 그룹 없음",
+      "fqnFormulaTitle": "식별자 공식",
+      "fqnFormulaTooltip": "서비스 식별자가 어떻게 계산되는지 보여줍니다. 범위 차원(파란색)은 '/'로 연결됩니다. 첫 번째 non-null 워크로드 차원(녹색)이 서비스 이름이 됩니다.",
+      "scopeDimension": "범위 차원",
+      "workloadDimension": "워크로드 차원",
+      "noFormulaConfigured": "식별자 공식이 구성되지 않았습니다. 위에 차원을 추가하십시오.",
+      "scopeLegend": "범위 (연결됨)",
+      "workloadLegend": "워크로드 (첫 번째 non-null)",
+      "firstNonNull": "첫 번째 non-null:",
+      "scopeTag": "범위",
+      "workloadTag": "워크로드",
+      "scopeOnly": "범위만",
+      "noMatchingDimensions": "일치하는 차원 없음",
+      "otherGroup": "기타",
+      "fallbackGroup": "폴백",
+      "fallbackNote": "폴백 차원(예: 'service')은 환경별 워크로드가 일치하지 않을 때 모든 환경에 적용됩니다."
     },
     "pageSubtitle": "애플리케이션 설정 조정",
     "platformSettings": "플랫폼 설정",
@@ -2291,7 +2483,11 @@
     "errorSavingPipeline": "파이프라인을 저장하는 중 오류가 발생했습니다.",
     "cancelChangesConfirm": "정말로 변경을 취소하시겠습니까?",
     "cancel": "취소",
-    "dragDropNodesHere": "노드를 여기로 드래그 앤 드롭하세요"
+    "dragDropNodesHere": "노드를 여기로 드래그 앤 드롭하세요",
+    "promqlOnlyForMetrics": "PromQL은 메트릭 스트림 유형에만 사용할 수 있습니다.",
+    "invalidCronExpression": "잘못된 크론 표현식",
+    "thresholdShouldNotBeEmpty": "임계값은 비어 있으면 안 됩니다.",
+    "errorGettingResults": "결과를 가져오는 중 오류가 발생했습니다."
   },
   "reports": {
     "header": "보고서",
@@ -2348,7 +2544,9 @@
     "collapseFields": "필드 축소",
     "openFields": "오픈 필드",
     "timeRangeUpdated": "선택한 시간 범위에는 이 추적이 포함되지 않았습니다.트레이스의 타임스탬프와 일치하도록 시간 범위가 업데이트되었습니다.",
-    "fetchingMoreTraces": "더 많은 트레이스를 가져오는 중..."
+    "fetchingMoreTraces": "더 많은 트레이스를 가져오는 중...",
+    "showErrorOnly": "오류만 보기",
+    "openInTraces": "오픈 인 트레이스"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -2521,7 +2719,8 @@
     "sql_query": "SQL 쿼리",
     "resuls": "결과",
     "wrapText": "줄 바꿈 텍스트",
-    "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다."
+    "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다.",
+    "results": "결과"
   },
   "search_scheduler_job": {
     "title": "작업 스케줄러 검색",
@@ -2585,7 +2784,8 @@
     "showLegends": "쇼 레전드"
   },
   "alert_list": {
-    "alert_details": "경고 세부 정보"
+    "alert_details": "경고 세부 정보",
+    "alert_history": "알림 기록"
   },
   "latencyInsights": {
     "title": "인사이트",
@@ -2612,7 +2812,8 @@
     "analyzeButtonLabel": "분석",
     "refreshTooltip": "업데이트된 백분위수로 분석 새로 고침",
     "customSQLFieldsDisabled": "사용자 지정 SQL 쿼리에는 필드 선택을 사용할 수 없습니다.차원은 쿼리 결과에서 추출됩니다.",
-    "timeRangeSelected": "시간 범위 선택"
+    "timeRangeSelected": "시간 범위 선택",
+    "dimensionsSelected": "치수 선택"
   },
   "volumeInsights": {
     "title": "인사이트",
@@ -2621,7 +2822,9 @@
     "analyzeTooltip": "차원 전반의 트레이스 레이트 패턴 분석",
     "analyzeTooltipLogs": "현재 시간 범위의 차원 분포 분석",
     "rateLabel": "요금:",
-    "timeRangeLabel": "시간 범위:"
+    "timeRangeLabel": "시간 범위:",
+    "analyzeTooltipTraces": "속도, 지연 및 오류 패턴에 대한 트레이스 차원 분석",
+    "insightsButtonLabel": "인사이트"
   },
   "errorInsights": {
     "title": "인사이트",
@@ -2733,7 +2936,15 @@
         "startBeforeEnd": "시작 시간은 종료 시간 이전이어야 합니다.",
         "endAfterStart": "종료 시간은 시작 시간 이후여야 합니다."
       }
-    }
+    },
+    "viewInTraces": "트레이스에서 보기",
+    "viewInTracesTooltip": "RED 메트릭 대시보드 및 모든 상관관계가 있는 트레이스가 있는 트레이스 페이지 열기",
+    "exportToJson": "JSON으로 내보내기",
+    "noLogsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 로그를 찾을 수 없습니다.",
+    "tracesErrorDetails": "추적 데이터를 가져오는 동안 오류가 발생했습니다.다시 시도해 주세요.",
+    "metricsError": "지표를 로드할 수 없음",
+    "metricsErrorDetails": "지표 데이터를 가져오는 동안 오류가 발생했습니다.다시 시도해 주세요.",
+    "noMetricsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 메트릭을 찾을 수 없습니다."
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",
@@ -2782,5 +2993,10 @@
     "invalidFormat": "잘못된 형식",
     "mustBeGreaterThan": "{value} 보다 커야 합니다.",
     "mustBeLessThan": "{value} 보다 작아야 합니다."
+  },
+  "nlMode": {
+    "toggle": "자연어 모드",
+    "noAdditionalOptions": "추가 옵션 없음",
+    "generateVRL": "VRL 생성"
   }
 }

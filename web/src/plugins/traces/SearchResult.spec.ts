@@ -244,7 +244,6 @@ describe("SearchResult", () => {
   it("should display correct trace count", () => {
     const traceCount = wrapper.find('[data-test="traces-search-result-count"]');
     expect(traceCount.exists()).toBe(true);
-    expect(traceCount.classes()).toContain("text-subtitle1");
     expect(traceCount.classes()).toContain("text-bold");
     expect(traceCount.text()).toBe("2 Traces");
   });
@@ -500,12 +499,13 @@ describe("SearchResult", () => {
     it("should declare all required emits", () => {
       const expectedEmits = [
         "update:scroll",
-        "update:datetime", 
+        "update:datetime",
         "remove:searchTerm",
         "search:timeboxed",
         "get:traceDetails",
+        "metrics:filters-updated",
       ];
-      
+
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
     });
   });

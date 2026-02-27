@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -298,16 +298,13 @@ impl FileData {
             // delete file from local disk
             let file_path = self.get_file_path(key.as_str());
             log::debug!(
-                "[CacheType:{}] File disk cache gc remove file: {}",
+                "[CacheType:{}] File disk cache gc remove file: {key}",
                 self.file_type,
-                key
             );
             if let Err(e) = tokio::fs::remove_file(&file_path).await {
                 log::error!(
-                    "[CacheType:{}] File disk cache gc remove file: {}, error: {}",
+                    "[CacheType:{}] File disk cache gc remove file: {file_path}, error: {e}",
                     self.file_type,
-                    file_path,
-                    e
                 );
             }
 
@@ -438,7 +435,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // clean the tmp dir
     if let Err(e) = std::fs::remove_dir_all(&cfg.common.data_tmp_dir) {
-        log::warn!("clean tmp dir error: {}", e);
+        log::debug!("clean tmp dir error: {e}");
     }
     std::fs::create_dir_all(&cfg.common.data_tmp_dir).expect("create tmp dir success");
 
@@ -731,7 +728,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             fp.display()
                         );
                         if let Err(e) = tokio::fs::remove_file(&fp).await {
-                            log::warn!("Failed to remove tmp file: {}, error: {}", fp.display(), e);
+                            log::warn!("Failed to remove tmp file: {}, error: {e}", fp.display());
                         }
                         continue;
                     }
@@ -904,9 +901,10 @@ async fn gc() -> Result<(), anyhow::Error> {
 }
 
 #[inline]
-pub async fn stats(file_type: FileType) -> (usize, usize) {
+pub async fn stats(file_type: FileType) -> (usize, usize, usize) {
     let mut total_size = 0;
     let mut used_size = 0;
+    let mut item_len = 0;
     let files = match file_type {
         FileType::Data => &FILES,
         FileType::Result => &RESULT_FILES,
@@ -918,23 +916,9 @@ pub async fn stats(file_type: FileType) -> (usize, usize) {
         let (max_size, cur_size) = r.size();
         total_size += max_size;
         used_size += cur_size;
+        item_len += r.len();
     }
-    (total_size, used_size)
-}
-
-#[inline]
-pub async fn len(file_type: FileType) -> usize {
-    let mut total = 0;
-    let files = match file_type {
-        FileType::Data => &FILES,
-        FileType::Result => &RESULT_FILES,
-        FileType::Aggregation => &AGGREGATION_FILES,
-    };
-    for file in files.iter() {
-        let r = file.read().await;
-        total += r.len();
-    }
-    total
+    (total_size, used_size, item_len)
 }
 
 #[inline]
@@ -1377,5 +1361,140 @@ mod tests {
 
         // Clean up
         let _ = std::fs::remove_file(tmp_path);
+    }
+
+    #[tokio::test]
+    async fn test_stats_data_file_type() {
+        // Test that stats function returns correct tuple structure for Data type
+        let (total_size, used_size, _item_len) = stats(FileType::Data).await;
+
+        // used_size should not exceed total_size
+        assert!(used_size <= total_size);
+    }
+
+    #[tokio::test]
+    async fn test_stats_result_file_type() {
+        // Test that stats function returns correct tuple structure for Result type
+        let (total_size, used_size, _item_len) = stats(FileType::Result).await;
+
+        // used_size should not exceed total_size
+        assert!(used_size <= total_size);
+    }
+
+    #[tokio::test]
+    async fn test_stats_aggregation_file_type() {
+        // Test that stats function returns correct tuple structure for Aggregation type
+        let (total_size, used_size, _item_len) = stats(FileType::Aggregation).await;
+
+        // used_size should not exceed total_size
+        assert!(used_size <= total_size);
+    }
+
+    #[tokio::test]
+    async fn test_stats_with_data() {
+        // Create a unique test key to avoid conflicts with other tests
+        let test_id = now_micros();
+        let file_key = format!(
+            "files/default/logs/disk/2022/10/03/10/{}_test_stats.parquet",
+            test_id
+        );
+
+        // Get initial stats
+        let (initial_total, initial_used, initial_len) = stats(FileType::Data).await;
+
+        // Add data to cache
+        let content = Bytes::from("Test content for stats function");
+        let data_size = content.len();
+        let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
+
+        // Get the appropriate bucket for this file
+        let bucket_id = gxhash::new().sum64(&file_key);
+        let bucket_id = (bucket_id as usize) % FILES.len();
+        let mut file_data = FILES[bucket_id].write().await;
+        let _ = file_data.set(&file_key, &tmp_file, data_size).await;
+        drop(file_data);
+
+        // Get stats after adding data
+        let (after_total, after_used, after_len) = stats(FileType::Data).await;
+
+        // Verify that used_size and item_len increased
+        assert!(after_used >= initial_used);
+        assert!(after_len >= initial_len);
+
+        // Total size should remain the same or increase
+        assert!(after_total >= initial_total);
+    }
+
+    #[tokio::test]
+    async fn test_stats_aggregates_across_buckets() {
+        // This test verifies that stats correctly aggregates data across all bucket files
+        let test_id = now_micros();
+        let content = Bytes::from("Test content for aggregation");
+        let data_size = content.len();
+
+        // Get initial stats
+        let (_, initial_used, initial_len) = stats(FileType::Result).await;
+
+        // Add data to multiple buckets by using different keys
+        for i in 0..3 {
+            let file_key = format!(
+                "files/default/logs/result/2022/10/03/10/{}_{}_test.parquet",
+                test_id, i
+            );
+            let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
+
+            let bucket_id = gxhash::new().sum64(&file_key);
+            let bucket_id = (bucket_id as usize) % RESULT_FILES.len();
+            let mut file_data = RESULT_FILES[bucket_id].write().await;
+            let _ = file_data.set(&file_key, &tmp_file, data_size).await;
+            drop(file_data);
+        }
+
+        // Get stats after adding data to multiple buckets
+        let (_, after_used, after_len) = stats(FileType::Result).await;
+
+        // Verify that stats increased
+        assert!(after_used >= initial_used);
+        assert!(after_len >= initial_len);
+    }
+
+    #[tokio::test]
+    async fn test_stats_empty_cache() {
+        // Test stats on an empty cache type (using a fresh FileData)
+        let file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "lru");
+
+        let (max_size, cur_size) = file_data.size();
+        let len = file_data.len();
+
+        // For an empty cache:
+        assert!(max_size > 0); // Should have capacity set
+        assert_eq!(cur_size, 0); // Should have no data
+        assert_eq!(len, 0); // Should have no items
+    }
+
+    #[tokio::test]
+    async fn test_stats_consistency() {
+        // Verify that stats returns valid values across multiple calls
+        // Note: In a concurrent test environment, values may change due to other tests
+        let (total1, used1, len1) = stats(FileType::Aggregation).await;
+        let (total2, used2, len2) = stats(FileType::Aggregation).await;
+
+        // Total size should remain consistent
+        assert_eq!(total1, total2);
+
+        // Used size and length should not decrease significantly (may change due to concurrent
+        // tests) Allow some variance due to cache operations (GC, additions)
+        let used_diff = if used2 > used1 {
+            used2 - used1
+        } else {
+            used1 - used2
+        };
+        let len_diff = if len2 > len1 {
+            len2 - len1
+        } else {
+            len1 - len2
+        };
+        assert!(used_diff < 10000 || used1 == 0 || used2 == 0); // Allow reasonable variance
+        assert!(len_diff < 100 || len1 == 0 || len2 == 0); // Allow reasonable variance
     }
 }

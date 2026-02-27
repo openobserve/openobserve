@@ -190,7 +190,6 @@ interface SemanticFieldGroup {
 
 interface OrganizationDeduplicationConfig {
   enabled: boolean;
-  semantic_field_groups?: SemanticFieldGroup[];
   alert_dedup_enabled?: boolean;
   alert_fingerprint_groups?: string[];
   time_window_minutes?: number;
@@ -215,16 +214,13 @@ const saving = ref(false);
 
 const localConfig = ref<OrganizationDeduplicationConfig>({
   enabled: true,
-  alert_dedup_enabled: props.config?.alert_dedup_enabled ?? true,
+  alert_dedup_enabled: props.config?.alert_dedup_enabled ?? false,
   alert_fingerprint_groups: props.config?.alert_fingerprint_groups ?? [],
   time_window_minutes: props.config?.time_window_minutes ?? undefined,
-  semantic_field_groups: props.config?.semantic_field_groups ?? [],
   fqn_priority_dimensions: props.config?.fqn_priority_dimensions,
 });
 
-const localSemanticGroups = ref<SemanticFieldGroup[]>(
-  props.config?.semantic_field_groups ?? [],
-);
+const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
 
 const toggleFingerprintGroup = (groupId: string, checked: boolean) => {
   if (!localConfig.value.alert_fingerprint_groups) {
@@ -261,9 +257,18 @@ const saveSettings = async () => {
 
   saving.value = true;
   try {
+    // Sanitize: convert empty string/NaN time_window_minutes to null
+    const rawWindow = localConfig.value.time_window_minutes;
+    const configToSave = {
+      ...localConfig.value,
+      time_window_minutes:
+        rawWindow == null || rawWindow === "" || isNaN(Number(rawWindow))
+          ? null
+          : Number(rawWindow),
+    };
     await alertsService.setOrganizationDeduplicationConfig(
       props.orgId,
-      localConfig.value,
+      configToSave,
     );
 
     $q.notify({
@@ -290,38 +295,34 @@ const saveSettings = async () => {
 const loadConfig = async () => {
   if (!props.config) {
     try {
-      // Try to get existing config
+      // Load dedup config (does NOT contain semantic groups)
       const response = await alertsService.getOrganizationDeduplicationConfig(props.orgId);
       const config = response.data;
       localConfig.value = {
         enabled: config.enabled ?? true,
-        alert_dedup_enabled: config.alert_dedup_enabled ?? true,
+        alert_dedup_enabled: config.alert_dedup_enabled ?? false,
         alert_fingerprint_groups: config.alert_fingerprint_groups ?? [],
         time_window_minutes: config.time_window_minutes ?? undefined,
-        semantic_field_groups: config.semantic_field_groups ?? [],
         fqn_priority_dimensions: config.fqn_priority_dimensions,
       };
-      localSemanticGroups.value = config.semantic_field_groups ?? [];
     } catch (error) {
-      // Load default semantic groups from backend
-      try {
-        const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
-        const defaultGroups = semanticGroupsResponse.data;
+      // No dedup config exists yet — use defaults
+      localConfig.value = {
+        enabled: true,
+        alert_dedup_enabled: false,
+        alert_fingerprint_groups: [],
+        time_window_minutes: undefined,
+        fqn_priority_dimensions: undefined,
+      };
+    }
 
-        localConfig.value = {
-          enabled: true,
-          alert_dedup_enabled: true,
-          alert_fingerprint_groups: [],
-          time_window_minutes: undefined,
-          semantic_field_groups: defaultGroups,
-          fqn_priority_dimensions: undefined,
-        };
-        localSemanticGroups.value = defaultGroups;
-      } catch (semanticError) {
-        console.error("Failed to load default semantic groups:", semanticError);
-        // Fallback to empty
-        localSemanticGroups.value = [];
-      }
+    // Always load semantic groups from system_settings (single source of truth)
+    try {
+      const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
+      localSemanticGroups.value = semanticGroupsResponse.data;
+    } catch (semanticError) {
+      console.error("Failed to load semantic groups:", semanticError);
+      localSemanticGroups.value = [];
     }
   }
 };
@@ -336,13 +337,11 @@ watch(
     if (newVal) {
       localConfig.value = {
         enabled: newVal.enabled ?? true,
-        alert_dedup_enabled: newVal.alert_dedup_enabled ?? true,
+        alert_dedup_enabled: newVal.alert_dedup_enabled ?? false,
         alert_fingerprint_groups: newVal.alert_fingerprint_groups ?? [],
         time_window_minutes: newVal.time_window_minutes ?? undefined,
-        semantic_field_groups: newVal.semantic_field_groups ?? [],
         fqn_priority_dimensions: newVal.fqn_priority_dimensions,
       };
-      localSemanticGroups.value = newVal.semantic_field_groups ?? [];
     }
   },
   { deep: true, immediate: true },

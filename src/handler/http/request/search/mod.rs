@@ -265,7 +265,7 @@ pub async fn search(
         }
     }
 
-    let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone())
     } else {
         Span::none()
@@ -578,7 +578,7 @@ pub async fn around_v1(
         }
     }
 
-    let http_span = if get_config().common.tracing_search_enabled {
+    let http_span = if get_config().common.should_create_span() {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
             org_id = org_id.clone(),
@@ -700,7 +700,7 @@ pub async fn around_v2(
         }
     }
 
-    let http_span = if get_config().common.tracing_search_enabled {
+    let http_span = if get_config().common.should_create_span() {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
             org_id = org_id.clone(),
@@ -804,7 +804,7 @@ pub async fn values(
     }
 
     let user_id = &user_email.user_id;
-    let http_span = if config::get_config().common.tracing_search_enabled {
+    let http_span = if config::get_config().common.should_create_span() {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_values",
             org_id = org_id.clone(),
@@ -1455,7 +1455,7 @@ pub async fn search_partition(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone())
     } else {
         Span::none()
@@ -1648,7 +1648,7 @@ pub async fn search_history(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!("/api/{org_id}/_search_history", org_id = org_id.clone())
     } else {
         Span::none()
@@ -1976,6 +1976,7 @@ pub async fn result_schema(
     Json(ResultSchemaResponse {
         projections: res_schema.projections,
         group_by: res_schema.group_by.into_iter().collect(),
+        having: res_schema.having,
         timeseries_field: res_schema.timeseries,
     })
     .into_response()

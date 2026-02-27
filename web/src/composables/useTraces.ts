@@ -22,6 +22,7 @@ import {
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
+import { getSpanColorHex } from "@/utils/traces/traceColors";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -329,6 +330,60 @@ const useTraces = () => {
     return shareURL;
   });
 
+  /**
+   * Format raw trace hits from API into structured trace metadata
+   * Assigns service colors using hash-based consistent coloring from traceColors utility
+   * @param traces - Raw trace hits from the API
+   * @returns Formatted trace metadata array
+   */
+  const formatTracesMetaData = (traces: any[]): any[] => {
+    if (!traces.length) return [];
+    let colorIndex = 0;
+
+    return traces.map((trace) => {
+      const _trace = {
+        trace_id: trace.trace_id,
+        trace_start_time: Math.round(trace.start_time / 1000),
+        trace_end_time: Math.round(trace.end_time / 1000),
+        service_name: trace.first_event?.service_name || "",
+        operation_name: trace.first_event?.operation_name || "",
+        spans: trace.spans?.[0] || 0,
+        errors: trace.spans?.[1] || 0,
+        duration: trace.duration || 0,
+        services: {} as Record<string, number>,
+        zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
+        _o2_llm_usage_details_input: trace._o2_llm_usage_details_input,
+        _o2_llm_usage_details_output: trace._o2_llm_usage_details_output,
+        _o2_llm_usage_details_total: trace._o2_llm_usage_details_total,
+        _o2_llm_cost_details_total: trace._o2_llm_cost_details_total,
+        _o2_llm_input: trace._o2_llm_input || {},
+      };
+
+      // Assign colors to services
+      if (trace.service_name && Array.isArray(trace.service_name)) {
+        trace.service_name.forEach((service: any, index: number) => {
+          const serviceName =
+            typeof service === "string" ? service : service.service_name;
+
+          if (!searchObj.meta.serviceColors[serviceName]) {
+            // Use hash-based color assignment for consistency
+            searchObj.meta.serviceColors[serviceName] =
+              getSpanColorHex(colorIndex);
+
+            colorIndex += 1;
+          }
+
+          // Track service span count
+          const serviceCount =
+            typeof service === "string" ? 1 : service.count || 1;
+          _trace.services[serviceName] = serviceCount;
+        });
+      }
+
+      return _trace;
+    });
+  };
+
   return {
     searchObj,
     resetSearchObj,
@@ -338,6 +393,7 @@ const useTraces = () => {
     buildQueryDetails,
     navigateToLogs,
     tracesShareURL,
+    formatTracesMetaData,
   };
 };
 

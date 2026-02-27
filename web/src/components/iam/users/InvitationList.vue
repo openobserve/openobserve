@@ -109,15 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" no-caps class="q-mr-sm o2-secondary-button">
             {{ t("invitation.cancel") }}
           </q-btn>
           <q-btn
             v-close-popup="true"
-            unelevated
             no-caps
-            class="no-border"
-            color="positive"
+            class="o2-primary-button"
             @click="confirmAcceptInvitation"
           >
             {{ t("invitation.accept") }}
@@ -140,15 +138,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" no-caps class="q-mr-sm o2-secondary-button">
             {{ t("invitation.cancel") }}
           </q-btn>
           <q-btn
             v-close-popup="true"
-            unelevated
             no-caps
-            class="no-border"
-            color="negative"
+            class="o2-primary-button"
             @click="confirmRejectInvitation"
           >
             {{ t("invitation.reject") }}
@@ -335,6 +331,11 @@ export default defineComponent({
           "confirm",
           selectedInvitation.value.org_id,
         );
+
+        // Refresh the organizations list in the store
+        const orgResponse = await organizationsService.list(0, 1000000, "name", false, "");
+        store.dispatch("setOrganizations", orgResponse.data.data);
+
         dismiss();
         $q.notify({
           color: "positive",

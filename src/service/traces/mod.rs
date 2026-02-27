@@ -34,12 +34,12 @@ use config::{
         alerts::alert::Alert,
         otlp::OtlpRequestType,
         self_reporting::usage::{RequestStats, UsageType},
-        stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
+        stream::{StreamParams, StreamPartition, StreamType},
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt, time::now_micros, util::DISTINCT_STREAM_PREFIX},
 };
-use infra::schema::{SchemaCache, unwrap_partition_time_level};
+use infra::schema::{SchemaCache, get_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::trace::v1::{
@@ -50,6 +50,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
+pub mod otel;
 pub mod service_graph;
 
 #[cfg(feature = "cloud")]
@@ -76,6 +77,7 @@ use crate::{
         },
         schema::{check_for_schema, stream_schema_exists},
         self_reporting::report_request_usage_stats,
+        traces::otel::{OtelIngestionProcessor, is_llm_trace},
     },
 };
 
@@ -201,9 +203,17 @@ pub async fn handle_otlp_request(
         Some(name) => format_stream_name(name.to_string()),
         None => "default".to_owned(),
     };
+
     let now = now_micros();
     let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
     let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
+
+    // llm stream detection
+    let mut is_llm_stream = false;
+    let mut need_mark_llm_stream = false;
+    if infra::schema::get_is_llm_stream(org_id, &traces_stream_name, StreamType::Traces).await {
+        is_llm_stream = true;
+    }
 
     // Start retrieving associated pipeline and construct pipeline params
     let stream_param = StreamParams::new(org_id, &traces_stream_name, StreamType::Traces);
@@ -213,9 +223,10 @@ pub async fn handle_otlp_request(
     // End pipeline params construction
 
     // Start get user defined schema
-    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
-    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
-    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> =
+        HashMap::with_capacity(1);
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::with_capacity(1);
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::with_capacity(1);
     crate::service::ingestion::get_uds_and_original_data_streams(
         std::slice::from_ref(&stream_param),
         &mut user_defined_schema_map,
@@ -229,8 +240,12 @@ pub async fn handle_otlp_request(
     let res_spans = request.resource_spans;
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
+
+    // Initialize OTEL processor for enriching spans with AI/ML observability attributes
+    let otel_processor = OtelIngestionProcessor::new();
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
+        let mut service_name_explicitly_set = false;
         if let Some(resource) = res_span.resource {
             for res_attr in resource.attributes {
                 if res_attr.key.eq(SERVICE_NAME) {
@@ -238,6 +253,9 @@ pub async fn handle_otlp_request(
                     if let Some(name) = loc_service_name.as_str() {
                         service_name = name.to_string();
                         service_att_map.insert(SERVICE_NAME.to_string(), loc_service_name);
+                        if service_name.to_lowercase().replace("_", " ") != "unknown service" {
+                            service_name_explicitly_set = true;
+                        }
                     }
                 } else {
                     service_att_map.insert(
@@ -289,6 +307,20 @@ pub async fn handle_otlp_request(
                     span_att_map.insert(key, get_val(&span_att.value.as_ref()));
                 }
 
+                // Use span attributes as service_name fallback if service_name is not explicitly
+                // set This handles the case where service.name is not present in
+                // resource attributes
+                let scope_name = inst_span.scope.as_ref().map(|s| s.name.as_str());
+                let is_llm_span = is_llm_trace(&span_att_map, scope_name);
+                if is_llm_span
+                    && !service_name_explicitly_set
+                    && let Some(val) = otel_processor.extract_service_name_from_span(&span_att_map)
+                {
+                    service_name = val.clone();
+                    service_att_map.insert(SERVICE_NAME.to_string(), json::json!(val));
+                    service_name_explicitly_set = true;
+                }
+
                 // special addition for https://github.com/openobserve/openobserve/issues/4851
                 // we set the status (error/non-error) properly, but skip the message
                 // however, that can be useful when debugging with traces, so we
@@ -304,11 +336,32 @@ pub async fn handle_otlp_request(
                     for event_att in event.attributes {
                         event_att_map.insert(event_att.key, get_val(&event_att.value.as_ref()));
                     }
+
                     events.push(Event {
                         name: event.name,
                         _timestamp: event.time_unix_nano,
                         attributes: event_att_map,
-                    })
+                    });
+                }
+
+                // Enrich span attributes with OTEL processor if enabled
+                // This adds AI/ML observability fields like model_name, usage_details, etc.
+                if is_llm_span {
+                    otel_processor.process_span(
+                        &mut span_att_map,
+                        &service_att_map,
+                        scope_name,
+                        &events,
+                    );
+
+                    // check if we have any LLM related attributes
+                    if !is_llm_stream
+                        && (span_att_map.contains_key(otel::attributes::O2Attributes::INPUT)
+                            || span_att_map.contains_key(otel::attributes::O2Attributes::OUTPUT))
+                    {
+                        is_llm_stream = true;
+                        need_mark_llm_stream = true;
+                    }
                 }
 
                 let mut links = vec![];
@@ -540,6 +593,19 @@ pub async fn handle_otlp_request(
             .into_response());
     }
 
+    // mark llm stream if needed
+    if need_mark_llm_stream
+        && let Err(e) = super::db::schema::set_stream_is_llm(
+            org_id,
+            &traces_stream_name,
+            StreamType::Traces,
+            true,
+        )
+        .await
+    {
+        log::error!("Error while marking llm stream: {e}");
+    }
+
     let time = start.elapsed().as_secs_f64();
     let ep = match req_type {
         OtlpRequestType::Grpc => "/grpc/otlp/traces",
@@ -587,6 +653,13 @@ pub async fn ingest_json(
 
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+
+    // llm stream detection
+    let mut is_llm_stream = false;
+    let mut need_mark_llm_stream = false;
+    if infra::schema::get_is_llm_stream(org_id, traces_stream_name, StreamType::Traces).await {
+        is_llm_stream = true;
+    }
 
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
@@ -651,6 +724,15 @@ pub async fn ingest_json(
             }
         };
 
+        // check if we have any LLM related attributes
+        if !is_llm_stream
+            && (record_val.contains_key(otel::attributes::O2Attributes::INPUT)
+                || record_val.contains_key(otel::attributes::O2Attributes::OUTPUT))
+        {
+            is_llm_stream = true;
+            need_mark_llm_stream = true;
+        }
+
         // add timestamp
         record_val.insert(
             TIMESTAMP_COL_NAME.to_string(),
@@ -691,6 +773,19 @@ pub async fn ingest_json(
             )),
         )
             .into_response());
+    }
+
+    // mark llm stream if needed
+    if need_mark_llm_stream
+        && let Err(e) = super::db::schema::set_stream_is_llm(
+            org_id,
+            traces_stream_name,
+            StreamType::Traces,
+            true,
+        )
+        .await
+    {
+        log::error!("Error while marking llm stream: {e}");
     }
 
     let time = start.elapsed().as_secs_f64();
@@ -834,18 +929,14 @@ async fn write_traces(
         .unwrap_or_default();
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
-    let mut partition_time_level =
-        PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str());
+    let partition_time_level = get_partition_time_level(StreamType::Traces);
     if stream_schema.has_partition_keys {
-        let partition_det = crate::service::ingestion::get_stream_partition_keys(
+        partition_keys = crate::service::ingestion::get_stream_partition_keys(
             org_id,
             &StreamType::Traces,
             stream_name,
         )
-        .await;
-        partition_keys = partition_det.partition_keys;
-        partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Traces);
+        .await
     }
 
     // Start get stream alerts

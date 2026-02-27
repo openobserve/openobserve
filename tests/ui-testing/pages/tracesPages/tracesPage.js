@@ -51,6 +51,35 @@ export class TracesPage {
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
 
+    // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
+    // TracesMetricsDashboard.vue: data-test="insights-button"
+    this.insightsButton = '[data-test="insights-button"]';
+    // Traces SearchBar.vue: data-test="traces-search-bar-error-only-toggle-btn"
+    this.errorOnlyToggle = '[data-test="traces-search-bar-error-only-toggle-btn"]';
+    // Traces SearchBar.vue: data-test="traces-search-bar-show-metrics-toggle-btn"
+    this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
+    // TracesAnalysisDashboard.vue: data-test="analysis-dashboard-close"
+    this.analysisDashboardClose = '[data-test="analysis-dashboard-close"]';
+    // TracesAnalysisDashboard.vue: dimension sidebar (visible by default, not a dialog)
+    this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
+    this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
+    this.dimensionSearchInput = '[data-test="dimension-search-input"]';
+    // TracesAnalysisDashboard.vue: data-test="percentile-refresh-button"
+    this.percentileRefreshButton = '[data-test="percentile-refresh-button"]';
+    // Analysis dashboard card (container)
+    this.analysisDashboardCard = '.analysis-dashboard-card';
+    // Metrics dashboard container
+    this.tracesMetricsDashboard = '.traces-metrics-dashboard';
+    // Analysis Dashboard Tabs (i18n labels: "Rate", "Latency", "Errors")
+    this.analysisDashboardTabs = '.analysis-dashboard-card .q-tabs';
+    this.rateTab = '.analysis-dashboard-card .q-tab:has-text("Rate")';
+    this.latencyTab = '.analysis-dashboard-card .q-tab:has-text("Latency")';
+    this.errorsTab = '.analysis-dashboard-card .q-tab:has-text("Errors")';
+    // Analysis dashboard states
+    this.analysisDashboardLoading = '.analysis-dashboard-card .q-spinner, .analysis-dashboard-card .q-spinner-hourglass';
+    this.analysisDashboardError = '.analysis-dashboard-card .q-banner--top-padding';
+    this.analysisDashboardRetryBtn = '.analysis-dashboard-card button:has-text("Retry")';
+
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
     this.fieldSearchInput = '[data-test="log-search-index-list-field-search-input"]';
@@ -171,12 +200,12 @@ export class TracesPage {
       await this.page.keyboard.press('Enter');
     }
 
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async runTraceSearch() {
     await this.page.locator(this.refreshButton).click();
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async resetAllFilters() {
@@ -206,7 +235,7 @@ export class TracesPage {
       try {
         if (await selector.isVisible({ timeout: 3000 })) {
           await selector.click();
-          await this.page.waitForLoadState('networkidle').catch(() => {});
+          await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
           // Wait for trace details to render
           await this.page.locator(this.traceDetailsTree).waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
           return;
@@ -228,7 +257,7 @@ export class TracesPage {
     const backButton = this.page.locator(this.traceDetailsBackButton);
     if (await backButton.isVisible({ timeout: 3000 }).catch(() => false)) {
       await backButton.click();
-      await this.page.waitForLoadState('networkidle').catch(() => {});
+      await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       return true;
     }
 
@@ -276,7 +305,7 @@ export class TracesPage {
 
   async switchToServiceMaps() {
     await this.page.locator(this.serviceMapsToggle).click();
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async switchToSearchView() {
@@ -289,7 +318,7 @@ export class TracesPage {
 
   async refreshServiceGraph() {
     await this.page.locator(this.serviceGraphRefreshButton).click();
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async expectErrorMessage(errorText) {
@@ -384,10 +413,11 @@ export class TracesPage {
 
   async enterSQLQuery(query) {
     // Try different editor selectors - check visibility for each
+    // Note: Use .fill() to avoid pointer interception issues
     const editorSelectors = [
+      this.page.locator('.monaco-editor .inputarea').first(),
       this.page.locator('.monaco-editor textarea').first(),
-      this.page.locator(this.queryEditor),
-      this.page.locator('.view-lines')
+      this.page.locator(this.queryEditor).locator('.inputarea, textarea').first()
     ];
 
     let editor = null;
@@ -399,13 +429,11 @@ export class TracesPage {
     }
 
     if (!editor) {
-      throw new Error('No visible editor found');
+      throw new Error('No visible editor input found');
     }
 
-    await editor.click();
-    await this.page.keyboard.press('Control+A');
-    await this.page.keyboard.press('Delete');
-    await this.page.keyboard.type(query);
+    // Use fill() instead of click + type to avoid pointer interception
+    await editor.fill(query);
   }
 
   async runQuery() {
@@ -597,7 +625,7 @@ export class TracesPage {
     await this.page.goto(tracesUrl);
 
     try {
-      await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+      await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     } catch {
     }
   }
@@ -611,7 +639,7 @@ export class TracesPage {
     const streamSelector = this.page.locator(this.streamSelect);
     if (await streamSelector.isVisible({ timeout: 5000 })) {
       await this.selectTraceStream(streamName);
-      await this.page.waitForLoadState('networkidle').catch(() => {});
+      await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     // Set time range to 15 minutes
@@ -619,7 +647,7 @@ export class TracesPage {
 
     // Run search and wait for results
     await this.runTraceSearch();
-    await this.waitForSearchCompletion(10000);
+    await this.waitForSearchCompletion(20000);
   }
 
   /**
@@ -631,19 +659,14 @@ export class TracesPage {
 
     try {
       await expect(queryEditor).toBeVisible({ timeout: 5000 });
-      await queryEditor.click();
 
-      const viewLines = this.page.locator('.view-lines');
-      await expect(viewLines).toBeVisible({ timeout: 3000 });
-      await viewLines.click();
-      await this.page.waitForTimeout(500);
+      // Use .fill() method to avoid pointer interception issues
+      // Try different selectors: .inputarea (Monaco's input area) or textarea (fallback)
+      const monacoInput = queryEditor.locator('.inputarea, textarea').first();
+      await expect(monacoInput).toBeVisible({ timeout: 3000 });
 
-      // Clear existing content
-      await this.page.keyboard.press('Control+A');
-      await this.page.keyboard.press('Delete');
-
-      // Type new query
-      await this.page.keyboard.type(query);
+      // Fill directly without clicking to avoid pointer interception
+      await monacoInput.fill(query);
       await this.page.waitForTimeout(500);
 
     } catch (error) {
@@ -660,44 +683,52 @@ export class TracesPage {
     try {
       const loadingIndicator = this.page.locator('[data-test*="loading"], .q-spinner').first();
       if (await loadingIndicator.isVisible({ timeout: 500 })) {
-        await loadingIndicator.waitFor({ state: 'hidden', timeout: 10000 });
+        await loadingIndicator.waitFor({ state: 'hidden', timeout: 15000 });
       }
     } catch {
     }
 
-    // Check for results
-    try {
-      const resultSelectors = [
-        this.page.locator(this.searchResultItem).first(),
-        this.page.locator('tbody tr').first(),
-        this.page.getByText(/Spans\s*:\s*\d+/).first()
-      ];
+    // Check for results with retries (handles parallel worker load)
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const resultSelectors = [
+          this.page.locator(this.searchResultItem).first(),
+          this.page.locator('tbody tr').first(),
+          this.page.getByText(/Spans\s*:\s*\d+/).first()
+        ];
 
-      for (const element of resultSelectors) {
-        if (await element.isVisible({ timeout: 1000 })) {
-          return true;
+        for (const element of resultSelectors) {
+          if (await element.isVisible({ timeout: 3000 })) {
+            return true;
+          }
         }
-      }
 
-      // Check for no results message
-      if (await this.page.locator(this.resultNotFoundText).isVisible({ timeout: 1000 })) {
-        return false;
-      }
+        // Check for no results message
+        if (await this.page.locator(this.resultNotFoundText).isVisible({ timeout: 2000 })) {
+          return false;
+        }
 
-      // Check for error
-      const errorElement = this.page.locator(this.errorMessage);
-      if (await errorElement.isVisible({ timeout: 1000 })) {
-        const errorText = await errorElement.textContent();
-        throw new Error(`Search failed with error: ${errorText}`);
-      }
+        // Check for error
+        const errorElement = this.page.locator(this.errorMessage);
+        if (await errorElement.isVisible({ timeout: 1000 })) {
+          const errorText = await errorElement.textContent();
+          throw new Error(`Search failed with error: ${errorText}`);
+        }
 
-      return false;
-    } catch (error) {
-      if (error.message.includes('Search failed')) {
-        throw error;
+        // If not the last attempt, wait and retry
+        if (attempt < maxAttempts) {
+          await this.page.waitForTimeout(2000);
+        }
+      } catch (error) {
+        if (error.message.includes('Search failed')) {
+          throw error;
+        }
+        if (attempt === maxAttempts) return false;
       }
-      return false;
     }
+
+    return false;
   }
 
   /**
@@ -741,7 +772,7 @@ export class TracesPage {
         await this.page.waitForTimeout(2000);
 
         // Wait for potential URL change or trace details to load
-        await this.page.waitForLoadState('networkidle').catch(() => {});
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         return;
       } catch {
         continue;
@@ -1376,7 +1407,7 @@ export class TracesPage {
    */
   async reloadPage() {
     await this.page.reload();
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   /**
@@ -1449,6 +1480,408 @@ export class TracesPage {
       return await this.isTraceDetailsTreeVisible() || await this.isAnyTraceDetailVisible();
     }
     return false;
+  }
+
+  // ===== ANALYZE DIMENSIONS POM METHODS =====
+  // Selectors verified against actual Vue source code
+
+  // --- Insights Button (TracesMetricsDashboard.vue) ---
+
+  /**
+   * Check if Insights button is visible.
+   * The Insights button is ALWAYS visible when metrics dashboard shows
+   * (does NOT require brush selection).
+   * @returns {Promise<boolean>}
+   */
+  async isInsightsButtonVisible() {
+    return await this.page.locator(this.insightsButton).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Click Insights button to open the Analysis Dashboard
+   */
+  async clickInsightsButton() {
+    await this.page.locator(this.insightsButton).click();
+    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  }
+
+  // --- Analysis Dashboard (TracesAnalysisDashboard.vue) ---
+
+  /**
+   * Check if Analysis Dashboard is visible
+   * @returns {Promise<boolean>}
+   */
+  async isAnalysisDashboardVisible() {
+    return await this.page.locator(this.analysisDashboardCard).isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  /**
+   * Close Analysis Dashboard via close button
+   */
+  async closeAnalysisDashboard() {
+    const closeBtn = this.page.locator(this.analysisDashboardClose);
+    if (await closeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await closeBtn.click();
+      await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    }
+  }
+
+  /**
+   * Wait for Analysis Dashboard to fully load (spinner gone + content visible)
+   */
+  async waitForAnalysisDashboardLoad() {
+    const spinner = this.page.locator(this.analysisDashboardLoading);
+    try {
+      if (await spinner.isVisible({ timeout: 2000 })) {
+        await spinner.waitFor({ state: 'hidden', timeout: 30000 });
+      }
+    } catch {
+      // Spinner might not appear or already hidden
+    }
+    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  }
+
+  /**
+   * Check if the analysis dashboard is in loading state
+   * @returns {Promise<boolean>}
+   */
+  async isAnalysisDashboardLoading() {
+    return await this.page.locator(this.analysisDashboardLoading).isVisible({ timeout: 2000 }).catch(() => false);
+  }
+
+  /**
+   * Check if the analysis dashboard shows an error state
+   * @returns {Promise<boolean>}
+   */
+  async isAnalysisDashboardError() {
+    return await this.page.locator(this.analysisDashboardError).isVisible({ timeout: 2000 }).catch(() => false);
+  }
+
+  /**
+   * Click the Retry button when analysis dashboard shows an error
+   */
+  async clickAnalysisDashboardRetry() {
+    const retryBtn = this.page.locator(this.analysisDashboardRetryBtn);
+    if (await retryBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await retryBtn.click();
+      await this.page.waitForTimeout(2000);
+    }
+  }
+
+  /**
+   * Check if analysis dashboard has chart panels rendered (actual content loaded)
+   * @returns {Promise<boolean>}
+   */
+  async hasAnalysisDashboardCharts() {
+    const chartPanel = this.page.locator('.analysis-dashboard-card canvas, .analysis-dashboard-card [data-test*="chart"]');
+    return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  // --- Error Only Toggle (Traces SearchBar.vue) ---
+
+  /**
+   * Check if Error Only toggle is visible
+   * @returns {Promise<boolean>}
+   */
+  async isErrorOnlyToggleVisible() {
+    return await this.page.locator(this.errorOnlyToggle).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Toggle Error Only filter
+   */
+  async toggleErrorOnlyFilter() {
+    await this.page.locator(this.errorOnlyToggle).click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  // --- Metrics Dashboard ---
+
+  /**
+   * Check if Traces Metrics Dashboard is visible
+   * @returns {Promise<boolean>}
+   */
+  async isTracesMetricsDashboardVisible() {
+    return await this.page.locator(this.tracesMetricsDashboard).isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  /**
+   * Perform brush selection on metrics chart (simulated via click and drag)
+   * @returns {Promise<boolean>} true if brush selection triggered a UI change
+   */
+  async performBrushSelectionOnChart() {
+    const chartSelectors = [
+      this.page.locator(this.tracesMetricsDashboard).locator('canvas').first(),
+      this.page.locator('[data-test="chart-renderer"] canvas').first(),
+      this.page.locator('.chart-container canvas').first(),
+      this.page.locator('canvas').first()
+    ];
+
+    let chart = null;
+    for (const selector of chartSelectors) {
+      if (await selector.isVisible({ timeout: 3000 }).catch(() => false)) {
+        chart = selector;
+        break;
+      }
+    }
+
+    if (!chart) return false;
+
+    const box = await chart.boundingBox();
+    if (!box) return false;
+
+    await this.page.waitForTimeout(2000);
+
+    // Use coordinate-based mouse operations only — no element references after
+    // bounding box capture, since ECharts may re-render and detach the element
+    const startX = box.x + box.width * 0.25;
+    const endX = box.x + box.width * 0.75;
+    const y = box.y + box.height / 2;
+
+    await this.page.mouse.move(startX, y);
+    await this.page.waitForTimeout(100);
+    await this.page.mouse.down();
+    await this.page.waitForTimeout(100);
+
+    const steps = 20;
+    for (let i = 1; i <= steps; i++) {
+      const currentX = startX + (endX - startX) * (i / steps);
+      await this.page.mouse.move(currentX, y);
+      await this.page.waitForTimeout(20);
+    }
+
+    await this.page.waitForTimeout(100);
+    await this.page.mouse.up();
+    await this.page.waitForTimeout(1500);
+
+    // Verify the page is still functional after brush interaction
+    const insightsVisible = await this.isInsightsButtonVisible();
+    return insightsVisible;
+  }
+
+  // --- Dimension Selector Sidebar (TracesAnalysisDashboard.vue) ---
+
+  /**
+   * Check if dimension selector sidebar is visible in Analysis Dashboard
+   * @returns {Promise<boolean>}
+   */
+  async isDimensionSidebarVisible() {
+    return await this.page.locator(this.dimensionSelectorSidebar).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Toggle dimension selector sidebar via collapse button
+   */
+  async toggleDimensionSidebar() {
+    const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
+    if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await btn.click();
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  /**
+   * Check if dimension search input is visible in sidebar
+   * @returns {Promise<boolean>}
+   */
+  async isDimensionSearchInputVisible() {
+    return await this.page.locator(this.dimensionSearchInput).isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Search for a dimension in the sidebar
+   * @param {string} searchText - text to type in dimension search
+   */
+  async searchDimension(searchText) {
+    const input = this.page.locator(this.dimensionSearchInput);
+    await input.click();
+    await input.fill(searchText);
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Get the count of dimension checkboxes visible in sidebar
+   * @returns {Promise<number>}
+   */
+  async getDimensionCheckboxCount() {
+    return await this.page.locator('[data-test^="dimension-checkbox-"]').count();
+  }
+
+  /**
+   * Toggle a specific dimension checkbox by its value
+   * @param {string} dimensionValue - the dimension value (used in data-test="dimension-checkbox-{value}")
+   * @returns {Promise<boolean>} true if toggled
+   */
+  async toggleDimensionCheckbox(dimensionValue) {
+    const checkbox = this.page.locator(`[data-test="dimension-checkbox-${dimensionValue}"]`);
+    if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await checkbox.click();
+      await this.page.waitForTimeout(500);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get the first dimension checkbox value that is visible
+   * @returns {Promise<string|null>}
+   */
+  async getFirstDimensionValue() {
+    const firstCheckbox = this.page.locator('[data-test^="dimension-checkbox-"]').first();
+    if (await firstCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+      const testAttr = await firstCheckbox.getAttribute('data-test');
+      return testAttr ? testAttr.replace('dimension-checkbox-', '') : null;
+    }
+    return null;
+  }
+
+  // --- Tab Navigation (TracesAnalysisDashboard.vue) ---
+  // Tab labels from i18n: "Rate" (volume), "Latency" (latency), "Errors" (error)
+
+  /**
+   * Check if Rate tab is visible
+   * @returns {Promise<boolean>}
+   */
+  async isRateTabVisible() {
+    return await this.page.locator(this.rateTab).first().isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Check if Latency tab is visible
+   * @returns {Promise<boolean>}
+   */
+  async isLatencyTabVisible() {
+    return await this.page.locator(this.latencyTab).first().isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Check if Errors tab is visible
+   * @returns {Promise<boolean>}
+   */
+  async isErrorsTabVisible() {
+    return await this.page.locator(this.errorsTab).first().isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Click Rate tab
+   */
+  async clickRateTab() {
+    await this.page.locator(this.rateTab).first().click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  /**
+   * Click Latency tab
+   */
+  async clickLatencyTab() {
+    await this.page.locator(this.latencyTab).first().click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  /**
+   * Click Errors tab
+   */
+  async clickErrorsTab() {
+    await this.page.locator(this.errorsTab).first().click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  /**
+   * Check if a specific tab is active in Analysis Dashboard
+   * @param {string} tabLabel - 'Rate', 'Latency', or 'Errors'
+   * @returns {Promise<boolean>}
+   */
+  async isTabActive(tabLabel) {
+    const activeTab = this.page.locator('.analysis-dashboard-card .q-tab--active, .analysis-dashboard-card .q-tab.q-tab--active')
+      .filter({ hasText: new RegExp(tabLabel, 'i') });
+    return await activeTab.first().isVisible({ timeout: 2000 }).catch(() => false);
+  }
+
+  /**
+   * Get the count of visible tabs in Analysis Dashboard
+   * @returns {Promise<number>}
+   */
+  async getVisibleTabCount() {
+    return await this.page.locator('.analysis-dashboard-card .q-tab').count();
+  }
+
+  // --- Percentile Refresh (Latency tab only) ---
+
+  /**
+   * Check if percentile refresh button is visible (only on latency tab after percentile change)
+   * @returns {Promise<boolean>}
+   */
+  async isPercentileRefreshVisible() {
+    return await this.page.locator(this.percentileRefreshButton).isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Click percentile refresh button
+   */
+  async clickPercentileRefresh() {
+    await this.page.locator(this.percentileRefreshButton).click();
+    await this.page.waitForTimeout(2000);
+  }
+
+  // --- Composite Helper Methods ---
+
+  /**
+   * Wait for trace search results to load after running search.
+   */
+  async waitForTraceSearchResults() {
+    try {
+      await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      const resultSelectors = [
+        this.page.locator(this.searchResultItem).first(),
+        this.page.locator(this.resultNotFoundText),
+        this.page.locator(this.errorMessage)
+      ];
+      await Promise.race(
+        resultSelectors.map(s => s.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {}))
+      );
+    } catch {
+      // timed out
+    }
+  }
+
+  /**
+   * Ensure metrics dashboard is visible, toggle if needed
+   * @returns {Promise<boolean>}
+   */
+  async ensureMetricsDashboardVisible() {
+    let visible = await this.isTracesMetricsDashboardVisible();
+    if (!visible) {
+      await this.toggleMetricsDashboard();
+      await this.page.waitForTimeout(1000);
+      visible = await this.isTracesMetricsDashboardVisible();
+    }
+    return visible;
+  }
+
+  /**
+   * Open insights dashboard from traces metrics.
+   * Sets up search, ensures metrics visible, clicks insights button, waits for load.
+   * @returns {Promise<boolean>} true if dashboard opened successfully
+   */
+  async openInsightsDashboard() {
+    await this.setupTraceSearch();
+    await this.waitForTraceSearchResults();
+    const metricsVisible = await this.ensureMetricsDashboardVisible();
+    if (!metricsVisible) return false;
+
+    const insightsVisible = await this.isInsightsButtonVisible();
+    if (!insightsVisible) return false;
+
+    await this.clickInsightsButton();
+    await this.waitForAnalysisDashboardLoad();
+    return await this.isAnalysisDashboardVisible();
+  }
+
+  /**
+   * Wait for dashboard close to complete
+   */
+  async waitForDashboardClose() {
+    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
 }

@@ -53,6 +53,19 @@ static GLOBAL_CACHE: Lazy<Vec<RwLock<MetricsIndex>>> = Lazy::new(|| {
     metrics
 });
 
+pub async fn get_cache_stats() -> (usize, usize, usize) {
+    let mut total_len = 0;
+    let mut total_cap = 0;
+    let mut total_mem = 0;
+    for bucket in GLOBAL_CACHE.iter() {
+        let (len, cap, mem_size) = bucket.read().await.stats();
+        total_len += len;
+        total_cap += cap;
+        total_mem += mem_size;
+    }
+    (total_len, total_cap, total_mem)
+}
+
 pub async fn init() -> Result<()> {
     let cfg = get_config();
     if !cfg.common.result_cache_enabled {
@@ -442,6 +455,19 @@ impl MetricsIndex {
             max_entries,
         }
     }
+
+    fn stats(&self) -> (usize, usize, usize) {
+        let mut total_len = 0;
+        let mut total_cap = 0;
+        let mut total_mem = 0;
+        for (k, v) in self.data.iter() {
+            let (len, cap, mem_size) = v.stats();
+            total_len += len;
+            total_cap += cap;
+            total_mem += mem_size + k.len();
+        }
+        (total_len, total_cap, total_mem)
+    }
 }
 
 struct MetricsIndexCache {
@@ -455,6 +481,13 @@ impl MetricsIndexCache {
             query: query.to_string(),
             entries: Vec::new(),
         }
+    }
+
+    fn stats(&self) -> (usize, usize, usize) {
+        let len = self.entries.len();
+        let cap = self.entries.capacity();
+        let mem_size = std::mem::size_of::<MetricsIndexCacheItem>() * len + self.query.len();
+        (len, cap, mem_size)
     }
 }
 
@@ -625,5 +658,146 @@ mod tests {
         for invalid_key in invalid_keys {
             assert!(parse_cache_item_key(invalid_key).is_none());
         }
+    }
+
+    #[tokio::test]
+    async fn test_get_cache_stats_basic() {
+        // Test that get_cache_stats returns valid tuple structure
+        let (total_len, total_cap, _total_mem) = get_cache_stats().await;
+
+        // Capacity should be >= length
+        assert!(total_cap >= total_len);
+    }
+
+    #[tokio::test]
+    async fn test_get_cache_stats_consistency() {
+        // Test that stats returns valid values across multiple calls
+        // Note: In a concurrent test environment, values may change due to other tests
+        let (len1, cap1, mem1) = get_cache_stats().await;
+        let (len2, cap2, mem2) = get_cache_stats().await;
+
+        // Capacity may change but should be reasonable
+        assert!(cap2 >= len2);
+        assert!(cap1 >= len1);
+
+        // Values may change due to concurrent tests, but should not vary wildly
+        let len_diff = len2.abs_diff(len1);
+        let cap_diff = cap2.abs_diff(cap1);
+        let mem_diff = mem2.abs_diff(mem1);
+        assert!(len_diff < 1000 || len1 == 0 || len2 == 0);
+        assert!(cap_diff < 10000 || cap1 == 0 || cap2 == 0);
+        assert!(mem_diff < 1000000 || mem1 == 0 || mem2 == 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_cache_stats_with_data() {
+        // Get initial stats
+        let (initial_len, initial_cap, initial_mem) = get_cache_stats().await;
+
+        // Add some cache data
+        let org = "test_org_stats";
+        let trace_id = "test_trace_stats";
+        let query = "test_query_stats";
+        let end = now_micros();
+        let start = end - second_micros(3600);
+        let step = second_micros(15);
+        let (start, end) = adjust_start_end(start, end, step);
+
+        let range_values = vec![RangeValue {
+            labels: Labels::new(),
+            samples: vec![Sample {
+                timestamp: start,
+                value: 42.0,
+            }],
+            exemplars: None,
+            time_window: None,
+        }];
+
+        let _ = set(trace_id, org, query, start, end, step, range_values, false).await;
+
+        // Get stats after adding data
+        let (after_len, after_cap, after_mem) = get_cache_stats().await;
+
+        // Verify that stats increased or stayed the same
+        assert!(after_len >= initial_len);
+        assert!(after_cap >= initial_cap);
+        assert!(after_mem >= initial_mem);
+    }
+
+    #[tokio::test]
+    async fn test_get_cache_stats_aggregates_all_buckets() {
+        // This test verifies that get_cache_stats correctly aggregates across all buckets
+        let (total_len, total_cap, total_mem) = get_cache_stats().await;
+
+        // Manually calculate stats for verification
+        let mut manual_len = 0;
+        let mut manual_cap = 0;
+        let mut manual_mem = 0;
+
+        for bucket in GLOBAL_CACHE.iter() {
+            let (len, cap, mem) = bucket.read().await.stats();
+            manual_len += len;
+            manual_cap += cap;
+            manual_mem += mem;
+        }
+
+        // The aggregated stats should match our manual calculation
+        assert_eq!(total_len, manual_len);
+        assert_eq!(total_cap, manual_cap);
+        assert_eq!(total_mem, manual_mem);
+    }
+
+    #[tokio::test]
+    async fn test_metrics_index_stats() {
+        // Test the MetricsIndex::stats() method directly
+        let mut metrics = MetricsIndex::new(100);
+
+        // Initial stats should be zero
+        let (len, _cap, mem) = metrics.stats();
+        assert_eq!(len, 0);
+        assert_eq!(mem, 0);
+
+        // Add an entry
+        let cache = MetricsIndexCache::new("test_query");
+        metrics.data.insert("test_key".to_string(), cache);
+
+        // Stats should reflect the added entry
+        let (len, cap, mem) = metrics.stats();
+        assert_eq!(len, 0); // No entries in the cache itself yet
+        assert_eq!(cap, 0);
+        assert!(mem > 0); // Should have memory for the key and query
+    }
+
+    #[tokio::test]
+    async fn test_metrics_index_cache_stats() {
+        // Test the MetricsIndexCache::stats() method directly
+        let mut cache = MetricsIndexCache::new("test_query");
+
+        // Initial stats
+        let (len, cap, mem) = cache.stats();
+        assert_eq!(len, 0);
+        assert_eq!(cap, 0);
+        assert!(mem > 0); // Should have memory for the query string
+
+        // Add an entry
+        let item = Arc::new(MetricsIndexCacheItem::new("test_key", 100, 200));
+        cache.entries.push(item);
+
+        // Stats should reflect the added entry
+        let (len, cap, mem) = cache.stats();
+        assert_eq!(len, 1);
+        assert!(cap >= 1);
+        assert!(mem > "test_query".len()); // Should include query + entry size
+    }
+
+    #[tokio::test]
+    async fn test_get_cache_stats_empty_buckets() {
+        // Test that get_cache_stats handles empty buckets correctly
+        // Even with empty buckets, the function should return valid values
+        let (len, cap, _mem) = get_cache_stats().await;
+
+        // All values should be non-negative (usize is always >= 0)
+        // The function should complete without panicking
+        assert!(len <= cap); // Length should not exceed capacity
     }
 }

@@ -35,6 +35,7 @@ pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod entity;
 pub mod folders;
+pub mod incident_events;
 pub mod kv_store;
 mod migration;
 pub mod org_users;

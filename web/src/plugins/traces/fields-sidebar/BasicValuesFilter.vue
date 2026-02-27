@@ -62,19 +62,19 @@
               <q-item tag="label" class="q-pr-none">
                 <div
                   class="flex row wrap justify-between"
-                  style="width: calc(100% - 46px)"
+                  style="width: calc(100% - 2.625rem)"
                 >
                   <div
                     :title="value.key"
                     class="ellipsis q-pr-xs"
-                    style="width: calc(100% - 50px)"
+                    style="width: calc(100% - 3.125rem)"
                   >
                     {{ value.key }}
                   </div>
                   <div
                     :title="value.count"
                     class="ellipsis text-right q-pr-sm"
-                    style="width: 50px"
+                    style="width: 3.125rem"
                   >
                     {{ value.count }}
                   </div>
@@ -86,24 +86,46 @@
                   "
                 >
                   <q-btn
-                    class="o2-custom-button-hover tw:ml-[0.25rem] tw:mr-[0.25rem] tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                    size="6px"
+                    class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
+                    size="5px"
                     title="Include Term"
                     round
-                    @click="addSearchTerm(`${row.name}='${value.key}'`)"
+                    @click="
+                      addSearchTerm(
+                        row.name === 'duration'
+                          ? `${row.name}>=${value.key}`
+                          : `${row.name}='${value.key}'`,
+                      )
+                    "
                   >
-                    <q-icon class="tw:h-[0.5rem] tw:w-[0.5rem]">
+                    <q-icon
+                      v-if="row.name === 'duration'"
+                      :name="outlinedArrowForwardIos"
+                      class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                    />
+                    <q-icon v-else class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
                       <EqualIcon></EqualIcon>
                     </q-icon>
                   </q-btn>
                   <q-btn
                     class="o2-custom-button-hover tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                    size="6px"
+                    size="5px"
                     title="Exclude Term"
                     round
-                    @click="addSearchTerm(`${row.name}!='${value.key}'`)"
+                    @click="
+                      addSearchTerm(
+                        row.name === 'duration'
+                          ? `${row.name}<=${value.key}`
+                          : `${row.name}!='${value.key}'`,
+                      )
+                    "
                   >
-                    <q-icon class="tw:h-[0.5rem] tw:w-[0.5rem]">
+                    <q-icon
+                      v-if="row.name === 'duration'"
+                      :name="outlinedArrowBackIos"
+                      class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                    />
+                    <q-icon v-else class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
                       <NotEqualIcon></NotEqualIcon>
                     </q-icon>
                   </q-btn>
@@ -126,7 +148,11 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedAdd,
+  outlinedArrowBackIos,
+  outlinedArrowForwardIos,
+} from "@quasar/extras/material-icons-outlined";
 
 const props = defineProps({
   row: {
@@ -203,7 +229,9 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
       //   "[WHERE_CLAUSE]",
       //   " WHERE " + whereClause,
       // );
-      query_context = query_context.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
+      query_context = query_context
+        .split("[WHERE_CLAUSE]")
+        .join(" WHERE " + whereClause);
     } else {
       query_context = query_context.replace("[WHERE_CLAUSE]", "");
     }

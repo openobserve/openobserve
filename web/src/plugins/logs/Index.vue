@@ -27,9 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
         horizontal
+        @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
-          <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+          <div
+            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+          >
             <search-bar
               data-test="logs-search-bar"
               ref="searchBarRef"
@@ -43,6 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @on-auto-interval-trigger="onAutoIntervalTrigger"
               @showSearchHistory="showSearchHistoryfn"
               @extractPatterns="extractPatternsForCurrentQuery"
+              @buildModeToggle="onBuildModeToggle"
+              @sendToAiChat="sendToAiChat"
             />
           </div>
         </template>
@@ -50,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
-            v-show="searchObj.meta.logsVisualizeToggle != 'visualize'"
+            v-show="searchObj.meta.logsVisualizeToggle == 'logs' || searchObj.meta.logsVisualizeToggle == 'patterns'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -75,16 +80,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   data-test="logs-search-field-list-collapse-btn"
                   :icon="
-                  searchObj.meta.showFields
-                    ? 'chevron_left'
-                    : 'chevron_right'
-                "
+                    searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
+                  "
                   :title="
                     searchObj.meta.showFields
                       ? 'Collapse Fields'
                       : 'Open Fields'
                   "
-                  :class="searchObj.meta.showFields ? 'logs-splitter-icon-expand' : 'logs-splitter-icon-collapse'"
+                  :class="
+                    searchObj.meta.showFields
+                      ? 'logs-splitter-icon-expand'
+                      : 'logs-splitter-icon-collapse'
+                  "
                   color="primary"
                   size="sm"
                   dense
@@ -93,9 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #after>
-                <div
-                  class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full"
-                >
+                <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
                   <div
                     class="card-container tw:h-full tw:w-full relative-position"
                   >
@@ -217,8 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
-size="md" />
+                        <q-icon name="info" color="primary" size="md" />
                         {{ t("search.noRecordFound") }}
                         <q-btn
                           v-if="
@@ -245,8 +249,7 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
-size="md" />
+                        <q-icon name="info" color="primary" size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -263,8 +266,7 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
-    size="md" />
+                        <q-icon name="info" color="primary" size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -316,7 +318,27 @@ size="md" />
               :searchResponse="searchResponseForVisualization"
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+              :histogramQuery="storedHistogramQuery"
             ></VisualizeLogsQuery>
+          </div>
+          <div
+            v-if="searchObj.meta.logsVisualizeToggle == 'build'"
+            class="build-container"
+            :style="{ '--splitter-height': `${splitterModel}vh` }"
+          >
+            <BuildQueryPage
+              ref="buildQueryPageRef"
+              :searchQuery="searchObj.data.query"
+              :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
+              :selectedDateTime="selectedDateTime"
+              :isFirstToggle="isFirstBuildToggle"
+              @apply="onBuildApply"
+              @cancel="onBuildCancel"
+              @queryGenerated="onBuildQueryGenerated"
+              @customQueryModeChanged="onCustomQueryModeChanged"
+              @initialized="onBuildInitialized"
+              @fieldsUpdated="updateUrlQueryParams(null, buildQueryPageRef?.dashboardPanelData)"
+            />
           </div>
         </template>
       </q-splitter>
@@ -350,8 +372,7 @@ size="md" />
             <div
               class="search-history-empty__info q-mt-sm flex items-center justify-center"
             >
-              <q-icon name="info" class="q-mr-xs"
-size="20px" />
+              <q-icon name="info" class="q-mr-xs" size="20px" />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
                 reporting.</span
@@ -397,6 +418,7 @@ import {
   onMounted,
   onBeforeUnmount,
   onUnmounted,
+  toRaw,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -465,6 +487,9 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     VisualizeLogsQuery: defineAsyncComponent(
       () => import("@/plugins/logs/VisualizeLogsQuery.vue"),
+    ),
+    BuildQueryPage: defineAsyncComponent(
+      () => import("@/plugins/logs/BuildQueryPage.vue"),
     ),
     SearchHistory: defineAsyncComponent(
       () => import("@/plugins/logs/SearchHistory.vue"),
@@ -664,6 +689,7 @@ export default defineComponent({
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
+    const buildQueryPageRef = ref(null);
     const showSearchHistory = ref(false);
     const showSearchScheduler = ref(false);
     const showJobScheduler = ref(false);
@@ -691,6 +717,14 @@ export default defineComponent({
       convertSchemaToFields,
       setFieldsBasedOnChartTypeValidation,
     } = useDashboardPanelData("logs");
+
+    // Get build page's dashboardPanelData for watching chart type/config changes
+    const {
+      dashboardPanelData: buildDashboardPanelData,
+      removeXYFilters: buildRemoveXYFilters,
+      updateXYFieldsForCustomQueryMode: buildUpdateXYFieldsForCustomQueryMode,
+    } = useDashboardPanelData("build");
+
     const visualizeErrorData: any = reactive({
       errors: [],
     });
@@ -759,11 +793,16 @@ export default defineComponent({
       // Clear any pending timeouts
       clearAllTimeouts();
       try {
-        if (searchObj)
-          await store.dispatch(
-            "logs/setLogs",
-            JSON.parse(JSON.stringify(searchObj)),
-          );
+        if (searchObj) {
+          // Turn off all loaders before saving view
+          let savedSearchObj = JSON.parse(JSON.stringify(searchObj));
+          savedSearchObj.loading = false;
+          savedSearchObj.loadingHistogram = false;
+          savedSearchObj.loadingCounter = false;
+          savedSearchObj.loadingStream = false;
+          savedSearchObj.loadingSavedView = false;
+          await store.dispatch("logs/setLogs", savedSearchObj);
+        }
       } catch (error) {
         console.error("Failed to set logs:", error.message);
       }
@@ -837,7 +876,7 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.type,
       async (type) => {
-        if (type == "search_history_re_apply") {
+        if (type == "search_history_re_apply" || type == "ai_chat_query") {
           searchObj.meta.jobId = "";
 
           searchObj.organizationIdetifier =
@@ -848,11 +887,20 @@ export default defineComponent({
             router.currentRoute.value.query.stream_type;
           resetSearchObj();
 
-          // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
-          searchBarRef.value.dateTimeRef.setRelativeTime(
-            router.currentRoute.value.query.period,
-          );
-          searchObj.data.datetime.type = "relative";
+          // Set time range based on source type
+          if (type == "ai_chat_query" && router.currentRoute.value.query.from && router.currentRoute.value.query.to) {
+            searchBarRef.value.dateTimeRef.setAbsoluteTime(
+              router.currentRoute.value.query.from,
+              router.currentRoute.value.query.to,
+            );
+            searchObj.data.datetime.type = "absolute";
+          } else {
+            // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
+            searchBarRef.value.dateTimeRef.setRelativeTime(
+              router.currentRoute.value.query.period,
+            );
+            searchObj.data.datetime.type = "relative";
+          }
 
           searchObj.data.queryResults.hits = [];
           searchObj.meta.searchApplied = false;
@@ -911,29 +959,73 @@ export default defineComponent({
      * Handles validation, loading states, and error handling
      */
     const extractPatternsForCurrentQuery = async (clear_cache = false) => {
-      console.log("[Index] Extracting patterns for current query");
       searchObj.meta.resultGrid.showPagination = false;
       searchObj.loading = true;
 
       try {
         const queryReq = buildSearch(false, false);
         if (!queryReq) {
-          console.log("[Index] No query request available");
           searchObj.loading = false;
           return;
         }
+
+        // Debug: Log the full queryReq structure
+        console.log("[Patterns Debug] Full queryReq structure:", JSON.stringify(queryReq, null, 2));
+        console.log("[Patterns Debug] selectedStream array:", searchObj.data.stream.selectedStream);
+        console.log("[Patterns Debug] SQL mode:", searchObj.meta.sqlMode);
+        console.log("[Patterns Debug] NLP mode:", searchObj.meta.nlpMode);
+        console.log("[Patterns Debug] Quick mode:", searchObj.meta.quickMode);
 
         // Set size to -1 to let backend determine sampling size based on config
-        console.log("[Patterns] Using default sampling from backend configuration");
         queryReq.query.size = -1;
 
-        const streamName = searchObj.data.stream.selectedStream[0];
-        if (!streamName) {
-          console.log("[Index] No stream selected");
-          searchObj.loading = false;
-          showErrorNotification("Please select a stream to extract patterns");
-          return;
+        // Extract stream name - priority order:
+        // 1. From SQL query (SQL mode)
+        // 2. From query_context.from (Quick mode / multi-stream)
+        // 3. From selectedStream array (fallback)
+        let streamName = null;
+
+        // Try SQL query first (SQL mode)
+        if (queryReq.query.sql) {
+          console.log("[Patterns Debug] SQL query exists:", queryReq.query.sql);
+          const fromMatch = queryReq.query.sql.match(/FROM\s+["']?([^"'\s,]+)["']?/i);
+          if (fromMatch && fromMatch[1]) {
+            streamName = fromMatch[1];
+            console.log(`[Patterns] ✅ Method 1: Extracted stream from SQL query: ${streamName}`);
+          } else {
+            console.log("[Patterns Debug] ❌ Method 1: Could not extract stream from SQL query");
+          }
+        } else {
+          console.log("[Patterns Debug] ⏭️  Method 1: No SQL query found (not in SQL mode)");
         }
+
+        // Try query_context.from (Quick mode - this is the actual stream being queried)
+        if (!streamName && queryReq.query_context?.from) {
+          streamName = queryReq.query_context.from;
+          console.log(`[Patterns] ✅ Method 2: Extracted stream from query_context.from: ${streamName}`);
+          console.log(`[Patterns Debug] query_context structure:`, queryReq.query_context);
+        } else if (!streamName) {
+          console.log("[Patterns Debug] ❌ Method 2: query_context.from not available");
+          console.log("[Patterns Debug] query_context value:", queryReq.query_context);
+        }
+
+        // Fallback to selectedStream
+        if (!streamName) {
+          const selectedStreams = searchObj.data.stream.selectedStream;
+          console.log("[Patterns Debug] Attempting fallback - selectedStreams:", selectedStreams);
+          if (!selectedStreams || selectedStreams.length === 0) {
+            console.log("[Index] ❌ No stream selected");
+            searchObj.loading = false;
+            showErrorNotification("Please select a stream to extract patterns");
+            return;
+          }
+          streamName = selectedStreams[0];
+          console.warn(`[Patterns] ⚠️  Method 3: Using fallback from selectedStream[0]: ${streamName}`);
+          console.warn(`[Patterns] ⚠️  All selected streams:`, selectedStreams);
+          console.warn(`[Patterns] ⚠️  This might not be the stream you're viewing if in Quick Mode!`);
+        }
+
+        console.log(`[Patterns] 🎯 FINAL STREAM SELECTED: ${streamName}`);
 
         await extractPatterns(
           searchObj.organizationIdentifier,
@@ -942,10 +1034,13 @@ export default defineComponent({
         );
         searchObj.loading = false;
 
-        // Set clear_cache flag before calling getQueryData
+        // Only update histogram for patterns mode, don't fetch logs data
+        // Patterns have their own separate state and don't need logs data
         searchObj.meta.clearCache = clear_cache;
         searchObj.meta.refreshHistogram = true;
-        await getQueryData();
+
+        // Fetch histogram data only (not logs) for patterns mode
+        await getHistogramData();
         refreshHistogramChart();
         console.log("[Index] Patterns extracted successfully");
       } catch (error) {
@@ -1236,7 +1331,7 @@ export default defineComponent({
           if (!hasSelect) {
             if (currentQuery != "") {
               if (currentQuery.trim() != "") {
-                  whereClause = "WHERE " + currentQuery;
+                whereClause = "WHERE " + currentQuery;
               }
             }
 
@@ -1420,9 +1515,11 @@ export default defineComponent({
           `"${searchObj.data.stream.selectedStream[0]}"`,
         );
 
-      searchObj.data.query = newQuery;
-      searchObj.data.editorValue = newQuery;
-      searchBarRef.value.updateQuery();
+      if (newQuery) {
+        searchObj.data.query = newQuery;
+        searchObj.data.editorValue = newQuery;
+        searchBarRef.value.updateQuery();
+      }
     };
 
     const processInterestingFiledInSQLQuery = (
@@ -1563,6 +1660,20 @@ export default defineComponent({
 
     const shouldUseHistogramQuery = ref(false);
     const shouldRefreshWithoutCache = ref(false);
+    // Store the histogram query so it persists even after searchResponse is cleared
+    const storedHistogramQuery = ref("");
+
+    // Watch for histogram query in search results and store it immediately
+    // This ensures the histogram query is saved before queryResults might be reset
+    watch(
+      () => searchObj.data.queryResults?.converted_histogram_query,
+      (newHistogramQuery) => {
+        if (newHistogramQuery) {
+          storedHistogramQuery.value = newHistogramQuery;
+        }
+      },
+      { immediate: true }
+    );
 
     // Flag to prevent unnecessary chart type changes during URL restoration
     const isRestoringFromUrl = ref(false);
@@ -1570,10 +1681,34 @@ export default defineComponent({
     // Flag to track if this is the first time switching to visualization mode
     const isFirstVisualizationToggle = ref(true);
 
+    // Flag to track if this is the first time switching to build mode
+    // Used to restore chart type from URL only on first toggle (for shared links)
+    const isFirstBuildToggle = ref(true);
+
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
         try {
+          // Reset buildModeQueryEditorDisabled when not in build mode
+          if (searchObj.meta.logsVisualizeToggle !== "build") {
+            searchObj.meta.buildModeQueryEditorDisabled = false;
+          }
+
+          // Set loading flag for build mode with SQL mode ON to prevent flicker between initialization and chart API call
+          // This will be cleared when trace IDs arrive (via watcher) or when unmounting
+          // When SQL mode is OFF, build page handles its own loading state
+          if (searchObj.meta.logsVisualizeToggle === "build" && searchObj.meta.sqlMode) {
+            variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
+
+            // Check for empty query - no API call will be made, so clear loading flag
+            if (!searchObj.data.query?.trim()) {
+              showErrorNotification(
+                "Query is empty, please select fields to build query",
+              );
+              variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+            }
+          }
+
           if (searchObj.meta.logsVisualizeToggle == "visualize") {
             // Enable quick mode automatically when switching to visualization if:
             // 1. SQL mode is disabled OR
@@ -1611,9 +1746,7 @@ export default defineComponent({
             ) {
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].vrlFunctionQuery = b64EncodeUnicode(
-                searchObj.data.tempFunctionContent,
-              );
+              ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
             } else {
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
@@ -1678,15 +1811,24 @@ export default defineComponent({
               isFirstVisualizationToggle.value = false;
             }
 
+            // Ensure stream fields are loaded before building the query.
+            // On page reload, loadVisualizeData() runs async and may not have
+            // finished populating interestingFieldList yet. Without fields,
+            // buildSearch() produces SELECT * which is invalid for visualization.
+            if (
+              searchObj.data.stream.selectedStream?.length > 0 &&
+              searchObj.data.stream.selectedStreamFields?.length === 0
+            ) {
+              await getStreamList();
+              await extractFields();
+            }
+
             let logsPageQuery = "";
 
-            // handle sql mode
-            if (!searchObj.meta.sqlMode) {
+
+            // Everytime, build the query inrespective of sqlMode
               const queryBuild = buildSearch();
               logsPageQuery = queryBuild?.query?.sql ?? "";
-            } else {
-              logsPageQuery = searchObj.data.query;
-            }
 
             // Check if query is SELECT * which is not supported for visualization
             if (
@@ -1721,6 +1863,24 @@ export default defineComponent({
               dashboardPanelData.data.config.table_dynamic_columns = true;
             }
 
+            // Clear VRL if chart type is not table (VRL only supported for table in visualization)
+            if (
+              dashboardPanelData.data.type !== "table" &&
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery
+            ) {
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery = "";
+            }
+
+            // Recalculate shouldUseHistogramQuery after chart type is finalized
+            // Table charts should not use histogram query
+            if (dashboardPanelData.data.type === "table") {
+              shouldUseHistogramQuery.value = false;
+            }
+
             // set logs page data to searchResponseForVisualization
             if (shouldUseHistogramQuery.value === true) {
               // only do it if is_histogram_eligible is true on logs page
@@ -1740,6 +1900,10 @@ export default defineComponent({
 
                 // assign converted_histogram_query to dashboardPanelData
                 if (searchObj.data.queryResults.converted_histogram_query) {
+                  // Store the histogram query so it persists for "Add to Dashboard"
+                  storedHistogramQuery.value =
+                    searchObj.data.queryResults.converted_histogram_query;
+
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].query =
@@ -1828,8 +1992,13 @@ export default defineComponent({
             await nextTick();
             isRestoringFromUrl.value = false;
 
-            // set fields extraction loading to false
-            variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+            // Only clear fieldsExtractionLoading if we have data to reuse (no API call needed)
+            // If searchResponseForVisualization has hits, data will be reused and no API call
+            // If empty, API call will happen and trace IDs watcher will clear the flag
+            const hasDataToReuse = searchResponseForVisualization.value?.hits?.length > 0;
+            if (hasDataToReuse) {
+              variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+            }
 
             // emit resize event
             // this will rerender/call resize method of already rendered chart to resize
@@ -1870,15 +2039,15 @@ export default defineComponent({
           ].customQuery = true;
 
           // Update VRL function query if present
+          // VRL is only supported for table chart type in visualization
           if (
             searchObj.data.tempFunctionContent &&
-            searchObj.data.transformType === "function"
+            searchObj.data.transformType === "function" &&
+            dashboardPanelData.data.type === "table"
           ) {
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].vrlFunctionQuery = b64EncodeUnicode(
-              searchObj.data.tempFunctionContent,
-            );
+            ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
           } else {
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -1948,6 +2117,17 @@ export default defineComponent({
       },
     );
 
+    // Watch for build page chart type changes to sync URL params
+    watch(
+      () => buildDashboardPanelData.data.type,
+      () => {
+        // Sync build data to URL parameters when chart type changes
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          updateUrlQueryParams(null, buildDashboardPanelData);
+        }
+      },
+    );
+
     watch(
       () => splitterModel.value,
       () => {
@@ -1974,6 +2154,33 @@ export default defineComponent({
     watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
       deep: true,
     });
+
+    // Watch for build page config changes to sync URL params
+    watch(
+      () => buildDashboardPanelData.data.config,
+      () => {
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          updateUrlQueryParams(null, buildDashboardPanelData);
+        }
+      },
+      { deep: true },
+    );
+
+    // Sync searchObj.data.query to build page's dashboardPanelData when in custom query mode
+    // This ensures edited queries are reflected in the panel schema immediately
+    watch(
+      () => searchObj.data.query,
+      (newQuery) => {
+        if (
+          searchObj.meta.logsVisualizeToggle === "build" &&
+          buildDashboardPanelData.data.queries[0]?.customQuery === true
+        ) {
+          buildDashboardPanelData.data.queries[
+            buildDashboardPanelData.layout.currentQueryIndex
+          ].query = newQuery;
+        }
+      },
+    );
 
     watch(
       () => [
@@ -2008,7 +2215,7 @@ export default defineComponent({
             searchObj.config.splitterModel = originalSplitterValue.value;
           }
         }
-      }
+      },
     );
 
     const handleRunQueryFn = async (clear_cache = false) => {
@@ -2017,15 +2224,23 @@ export default defineComponent({
         shouldRefreshWithoutCache.value = clear_cache;
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
+          // Ensure stream fields are loaded before building the query.
+          // On page reload, loadVisualizeData() runs async and may not have
+          // finished populating interestingFieldList yet. Without fields,
+          // buildSearch() produces SELECT * which is invalid for visualization.
+          if (
+            searchObj.data.stream.selectedStream?.length > 0 &&
+            searchObj.data.stream.selectedStreamFields?.length === 0
+          ) {
+            await getStreamList();
+            await extractFields();
+          }
+
           let logsPageQuery = "";
 
-          // handle sql mode
-          if (!searchObj.meta.sqlMode) {
-            const queryBuild = buildSearch();
-            logsPageQuery = queryBuild?.query?.sql ?? "";
-          } else {
-            logsPageQuery = searchObj.data.query;
-          }
+          // Build the query regardless of sqlMode
+          const queryBuild = buildSearch();
+          logsPageQuery = queryBuild?.query?.sql ?? "";
 
           // Check if query is SELECT * which is not supported for visualization
           if (
@@ -2103,6 +2318,38 @@ export default defineComponent({
         // Extract patterns when user clicks run query in patterns mode
         await extractPatternsForCurrentQuery(clear_cache);
       }
+
+      if (searchObj.meta.logsVisualizeToggle == "build") {
+        // Validate query before running - same as visualization mode
+        if (searchObj.meta.sqlMode && !searchObj.data.query?.trim()) {
+          showErrorNotification(
+            "Query is empty, please select fields to build query",
+          );
+          return;
+        }
+
+        // Run query in build mode - same approach as visualization
+        const dateTime =
+          searchObj.data.datetime.type === "relative"
+            ? getConsumableRelativeTime(
+                searchObj.data.datetime.relativeTimePeriod,
+              )
+            : cloneDeep(searchObj.data.datetime);
+
+        // Set datetime in build page's dashboardPanelData (same as visualization)
+        if (buildQueryPageRef.value?.dashboardPanelData) {
+          buildQueryPageRef.value.dashboardPanelData.meta.dateTime = {
+            start_time: new Date(dateTime.startTime),
+            end_time: new Date(dateTime.endTime),
+          };
+        }
+
+        // Trigger PanelEditor's runQuery
+        buildQueryPageRef.value?.runQuery(clear_cache);
+
+        // Sync build config to URL parameters
+        updateUrlQueryParams(null, buildQueryPageRef.value?.dashboardPanelData);
+      }
     };
 
     const handleChartApiError = (errorMessage: any) => {
@@ -2110,6 +2357,85 @@ export default defineComponent({
       errorList.splice(0);
       errorList.push(errorMessage);
     };
+
+    // Build Query Page handlers
+    const onBuildApply = (query: string) => {
+      // Apply the generated query from build page
+      searchObj.data.query = query;
+      searchObj.meta.logsVisualizeToggle = "logs";
+      handleRunQueryFn();
+    };
+
+    const onBuildCancel = () => {
+      // Cancel and return to logs view
+      searchObj.meta.logsVisualizeToggle = "logs";
+    };
+
+    const onBuildQueryGenerated = (query: string) => {
+      // Sync generated query to logs composables so user can see it in the editor
+      // Always update, including empty string when all fields are removed
+      searchObj.data.query = query;
+      searchObj.data.editorValue = query;
+    };
+
+    const onCustomQueryModeChanged = (isCustomMode: boolean) => {
+      // Disable query editor in build mode when customQuery is false (builder mode)
+      // In builder mode, query is auto-generated from fields - user shouldn't edit directly
+      searchObj.meta.buildModeQueryEditorDisabled = !isCustomMode;
+    };
+
+    // Handle build mode toggle from SearchBar (updates panel schema's customQuery)
+    const onBuildModeToggle = async (isCustomMode: boolean) => {
+      // Update the panel schema's customQuery flag
+      if (buildDashboardPanelData.data.queries[0]) {
+        buildDashboardPanelData.data.queries[0].customQuery = isCustomMode;
+
+        // Reuse the same logic as QueryTypeSelector's changeToggle:
+        // clear fields and query when switching modes
+        await nextTick();
+        buildRemoveXYFilters();
+        buildUpdateXYFieldsForCustomQueryMode();
+
+        // Clear query when switching from Custom to Builder mode
+        if (!isCustomMode) {
+          buildDashboardPanelData.data.queries[
+            buildDashboardPanelData.layout.currentQueryIndex
+          ].query = "";
+          // Also clear the search bar editor
+          searchObj.data.query = "";
+          searchObj.data.editorValue = "";
+        }
+      }
+    };
+
+    const onBuildInitialized = () => {
+      // Mark that we've processed the first build toggle
+      // After this, chart type will always be auto-selected on tab switch
+      if (isFirstBuildToggle.value) {
+        isFirstBuildToggle.value = false;
+      }
+
+      // Clear fields extraction loading flag since build page has finished initialization
+      // This prevents the cancel button from staying visible when no query is actually running
+      variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+    };
+
+    // Selected date time for BuildQueryPage
+    const selectedDateTime = computed(() => {
+      const dateTime =
+        searchObj.data.datetime.type === "relative"
+          ? getConsumableRelativeTime(
+              searchObj.data.datetime.relativeTimePeriod,
+            )
+          : cloneDeep(searchObj.data.datetime);
+
+      return {
+        start_time: new Date(dateTime.startTime),
+        end_time: new Date(dateTime.endTime),
+        valueType: searchObj.data.datetime.type,
+        relativeTimePeriod: searchObj.data.datetime.relativeTimePeriod,
+      };
+    });
 
     // [START] cancel running queries
 
@@ -2160,10 +2486,15 @@ export default defineComponent({
         }
 
         // Assign stream info to dashboardPanelData before copying
-        dashboardPanelData.data.queries[currentQueryIndex].fields.stream = streamName;
+        dashboardPanelData.data.queries[currentQueryIndex].fields.stream =
+          streamName;
         // stream_type should already be set, but ensure it's preserved
-        if (!dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type) {
-          dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type = "logs";
+        if (
+          !dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type
+        ) {
+          dashboardPanelData.data.queries[
+            currentQueryIndex
+          ].fields.stream_type = "logs";
         }
       }
 
@@ -2220,7 +2551,6 @@ export default defineComponent({
         } else {
           logsPageQuery = searchObj.data.query;
         }
-
         // return if query is empty and stream is not selected
         if (
           logsPageQuery === "" &&
@@ -2302,15 +2632,19 @@ export default defineComponent({
 
         checkAbort();
 
-        /* Decide whether to use histogram query - don't use for table charts, when there are group_by fields, or when VRL functions are present */
-        const hasVrlFunction =
-          searchObj.data.tempFunctionContent &&
-          searchObj.data.transformType === "function";
+        /* Decide whether to use histogram query - don't use for table charts or when there are group_by fields */
+        /* Note: VRL functions are only supported for table charts, and VRL will force table chart type */
+        /* So if VRL is present and autoSelectChartType is true, we know chart will be table */
+        const willBeTableChart =
+          dashboardPanelData.data.type === "table" ||
+          (autoSelectChartType &&
+            searchObj.data.tempFunctionContent &&
+            searchObj.data.transformType === "function");
 
         shouldUseHistogramQuery.value =
-          dashboardPanelData.data.type !== "table" &&
-          !(extractedFields?.group_by && extractedFields.group_by.length) &&
-          !hasVrlFunction;
+          !willBeTableChart &&
+          !(extractedFields?.group_by && extractedFields.group_by.length);
+
 
         const finalQuery = logsPageQuery;
 
@@ -2355,6 +2689,11 @@ export default defineComponent({
         );
 
         await copyDashboardDataToVisualize();
+
+        // Don't clear fieldsExtractionLoading here - let the watcher handle it.
+        // The watcher will clear it when:
+        // 1. Trace IDs appear (API call started) - existing watcher at line ~2630
+        // 2. Chart data is set AND no trace IDs (data reused) - new watcher below
 
         return shouldUseHistogramQuery.value;
       } catch (err) {
@@ -2616,10 +2955,20 @@ export default defineComponent({
       searchResponseForVisualization,
       shouldUseHistogramQuery,
       shouldRefreshWithoutCache,
+      storedHistogramQuery,
       clearSchemaCache,
       getHistogramData,
       extractPatternsForCurrentQuery,
       patternsState,
+      buildQueryPageRef,
+      onBuildApply,
+      onBuildCancel,
+      onBuildQueryGenerated,
+      onCustomQueryModeChanged,
+      onBuildModeToggle,
+      onBuildInitialized,
+      selectedDateTime,
+      isFirstBuildToggle,
     };
   },
   computed: {
@@ -2806,8 +3155,15 @@ export default defineComponent({
         }
       } else {
         this.searchObj.meta.sqlMode = false;
-        this.searchObj.data.query = "";
-        this.searchObj.data.editorValue = "";
+
+        // IMPORTANT: Don't clear query when switching from SQL mode to NLP mode
+        // User may want to refine/fix their existing SQL query using AI
+        // Only clear when not in NLP mode (i.e., switching to Quick mode or other modes)
+        if (!this.searchObj.meta.nlpMode) {
+          this.searchObj.data.query = "";
+          this.searchObj.data.editorValue = "";
+        }
+
         if (
           this.searchObj.loading == false &&
           this.searchObj.shouldIgnoreWatcher == false &&

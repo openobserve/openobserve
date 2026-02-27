@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="viewModeOptions"
           dense
           unelevated
+          padding="0.325rem 0.5rem"
           class="tw:border tw:rounded"
         />
         <q-input
@@ -149,14 +150,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- View: By FQN (default) - Compact table view -->
       <div class="app-table-container" v-if="viewMode === 'fqn'">
         <q-table
-          
+
           :rows="filteredGroups"
           :columns="fqnViewColumns"
           row-key="fqn"
           flat
           dense
           class="tw:rounded-lg tw:border"
-          :pagination="{ rowsPerPage: 20 }"
+          v-model:pagination="fqnPagination"
         >
           <template #body-cell-status="props">
             <q-td :props="props">
@@ -264,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           dense
           class="tw:rounded-lg tw:border"
-          :pagination="{ rowsPerPage: 20 }"
+          v-model:pagination="servicePagination"
         >
           <template #body-cell-service_name="props">
             <q-td :props="props">
@@ -690,6 +691,18 @@ const servicesDialog = ref(false);
 const showSuggestionsDialog = ref(false);
 const selectedService = ref<ServiceInGroup | FlatService | null>(null);
 const selectedFqnGroup = ref<ServiceFqnGroup | null>(null);
+
+// Pagination state for FQN view
+const fqnPagination = ref({
+  page: 1,
+  rowsPerPage: 20,
+});
+
+// Pagination state for service view
+const servicePagination = ref({
+  page: 1,
+  rowsPerPage: 20,
+});
 
 // Pagination state for stream view
 const streamPagination = ref({

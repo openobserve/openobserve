@@ -36,7 +36,7 @@ use lettre::{
     },
 };
 use once_cell::sync::Lazy;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha256::digest;
 
 use crate::{
@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 28;
+pub const DB_SCHEMA_VERSION: u64 = 32;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -70,7 +70,6 @@ pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
-pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
@@ -80,9 +79,15 @@ pub const SOURCEMAP_ZIP_MAX_SIZE: usize = 1024 * 1024 * 100; // 100 MB
 pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 50; // 50 MB
 pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
 
+#[inline]
+pub fn get_batch_size() -> usize {
+    get_config().limit.batch_size
+}
+
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
+pub const FILE_EXT_VORTEX: &str = ".vortex";
 pub const FILE_EXT_PUFFIN: &str = ".puffin";
 pub const FILE_EXT_TANTIVY: &str = ".ttv";
 
@@ -474,6 +479,54 @@ pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
         .collect()
 });
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum FileFormat {
+    #[default]
+    Parquet,
+    Vortex,
+}
+
+impl std::fmt::Display for FileFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Parquet => write!(f, "parquet"),
+            Self::Vortex => write!(f, "vortex"),
+        }
+    }
+}
+
+impl std::str::FromStr for FileFormat {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "parquet" => Ok(Self::Parquet),
+            "vortex" => Ok(Self::Vortex),
+            _ => Err(anyhow::anyhow!("Invalid file format: {}", s)),
+        }
+    }
+}
+
+impl FileFormat {
+    pub fn extension(&self) -> &'static str {
+        match self {
+            Self::Parquet => FILE_EXT_PARQUET,
+            Self::Vortex => FILE_EXT_VORTEX,
+        }
+    }
+
+    pub fn from_extension(path: &str) -> Option<Self> {
+        if path.ends_with(FILE_EXT_PARQUET) {
+            Some(Self::Parquet)
+        } else if path.ends_with(FILE_EXT_VORTEX) {
+            Some(Self::Vortex)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Config {
     pub auth: Auth,
@@ -592,24 +645,6 @@ pub struct Smtp {
 
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Profiling {
-    #[env_config(
-        name = "ZO_PROF_PPROF_ENABLED",
-        default = false,
-        help = "Enable pprof profiling with pprof-rs"
-    )]
-    pub pprof_enabled: bool,
-    #[env_config(
-        name = "ZO_PROF_PPROF_PROTOBUF_ENABLED",
-        default = false,
-        help = "Enable pprof profiling with pprof-rs encode to protobuf format"
-    )]
-    pub pprof_protobuf_enabled: bool,
-    #[env_config(
-        name = "ZO_PROF_PPROF_FLAMEGRAPH_PATH",
-        default = "",
-        help = "Path to save flamegraph"
-    )]
-    pub pprof_flamegraph_path: String,
     #[env_config(
         name = "ZO_PROF_PYROSCOPE_ENABLED",
         default = false,
@@ -774,12 +809,10 @@ pub struct Common {
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_POSTGRES_RO_DSN", default = "")]
     pub meta_postgres_ro_dsn: String, // postgres://postgres:12345678@readonly:5432/openobserve
-    #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
-    pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
-    #[env_config(name = "ZO_META_MYSQL_RO_DSN", default = "")]
-    pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
     #[env_config(name = "ZO_META_DDL_DSN", default = "")]
     pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
+    #[env_config(name = "ZO_META_PARTITION_MODE", default = "auto")]
+    pub meta_partition_mode: String, // "auto" or "manual"
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(
@@ -814,6 +847,13 @@ pub struct Common {
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
+    #[env_config(
+        name = "ZO_FILE_FORMAT",
+        parse,
+        default = "parquet",
+        help = "File format for data storage: parquet or vortex"
+    )]
+    pub file_format: FileFormat,
     #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
     pub parquet_compression: String,
     #[env_config(
@@ -1276,6 +1316,12 @@ pub struct Common {
     pub ingestion_log_enabled: bool,
 }
 
+impl Common {
+    pub fn should_create_span(&self) -> bool {
+        self.tracing_enabled || self.tracing_search_enabled || self.search_inspector_enabled
+    }
+}
+
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Limit {
     // no need set by environment
@@ -1344,6 +1390,8 @@ pub struct Limit {
     pub file_merge_thread_num: usize,
     #[env_config(name = "ZO_MEM_DUMP_THREAD_NUM", default = 0)]
     pub mem_dump_thread_num: usize,
+    #[env_config(name = "ZO_VORTEX_THREAD_NUM", default = 0)]
+    pub vortex_thread_num: usize,
     #[env_config(name = "ZO_USAGE_REPORTING_THREAD_NUM", default = 0)]
     pub usage_reporting_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
@@ -1397,12 +1445,19 @@ pub struct Limit {
     pub ingest_allowed_in_future_micro: i64,
     #[env_config(name = "ZO_INGEST_FLATTEN_LEVEL", default = 3)] // default flatten level
     pub ingest_flatten_level: u32,
+    // Deprecated: use ZO_LOGS_QUERY_RETENTION instead. Will be removed in a future version.
     #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]
     pub logs_file_retention: String,
+    // Deprecated: use ZO_TRACES_QUERY_RETENTION instead. Will be removed in a future version.
     #[env_config(name = "ZO_TRACES_FILE_RETENTION", default = "hourly")]
     pub traces_file_retention: String,
+    // Deprecated: use ZO_METRICS_QUERY_RETENTION instead. Will be removed in a future version.
     #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "hourly")]
     pub metrics_file_retention: String,
+    #[env_config(name = "ZO_LOGS_QUERY_RETENTION", default = "hourly")]
+    pub logs_query_retention: String,
+    #[env_config(name = "ZO_TRACES_QUERY_RETENTION", default = "hourly")]
+    pub traces_query_retention: String,
     #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "daily")]
     pub metrics_query_retention: String,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
@@ -1451,6 +1506,12 @@ pub struct Limit {
     pub alert_schedule_concurrency: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
+    #[env_config(
+        name = "ZO_ALERT_PREVIEW_TIMERANGE_MINUTES",
+        default = 0,
+        help = "Time range in minutes for alert preview. If set to 0 (default), uses the alert's period value. If greater than 0, overrides period for preview."
+    )]
+    pub alert_preview_timerange_minutes: i64,
     #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
     pub report_schedule_timeout: i64,
     #[env_config(name = "ZO_DERIVED_STREAM_SCHEDULE_INTERVAL", default = 300)] // seconds
@@ -1639,6 +1700,12 @@ pub struct Limit {
         help = "Aggregates approximate number of seconds for executing search"
     )]
     pub aggs_min_num_partition_secs: usize,
+    #[env_config(
+        name = "ZO_BATCH_SIZE",
+        default = 0,
+        help = "Default is 8192, Batch size for parquet read/write operations and datafusion execution. Range: [1024, 8192]. Should carefully set this value, default is enough for most cases."
+    )]
+    pub batch_size: usize,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -1781,7 +1848,7 @@ pub struct DiskCache {
     // Disk data cache bucket num, multiple bucket means multiple locker, default is 0
     #[env_config(name = "ZO_DISK_CACHE_BUCKET_NUM", default = 0)]
     pub bucket_num: usize,
-    // MB, default is 50% of local volume available space and maximum 100GB
+    // MB, default is 50% of local volume available space and maximum 500GB
     #[env_config(name = "ZO_DISK_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
     // MB, default is 10% of local volume available space and maximum 20GB
@@ -1854,7 +1921,7 @@ pub struct Nats {
     pub replicas: usize,
     #[env_config(
         name = "ZO_NATS_HISTORY",
-        default = 3,
+        default = 1,
         help = "in the context of KV to configure how many historical entries to keep for a given bucket.
         Can not be modified after bucket is initialized.
         To update this, delete and recreate the bucket."
@@ -1878,6 +1945,8 @@ pub struct Nats {
     pub queue_max_age: u64,
     #[env_config(name = "ZO_NATS_EVENT_MAX_AGE", default = 3600)] // seconds
     pub event_max_age: u64,
+    #[env_config(name = "ZO_NATS_LOCK_MAX_AGE", default = 7200)] // seconds
+    pub lock_max_age: u64,
     #[env_config(
         name = "ZO_NATS_QUEUE_MAX_SIZE",
         help = "The maximum size of the queue in MB, default is 2048MB",
@@ -2413,6 +2482,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.mem_dump_thread_num == 0 {
         cfg.limit.mem_dump_thread_num = cpu_num;
     }
+    // HACK for vortex_thread_num equal to CPU core
+    if cfg.limit.vortex_thread_num == 0 {
+        cfg.limit.vortex_thread_num = cpu_num;
+    }
     // HACK for usage_reporting_thread_num equal to half of CPU core
     if cfg.limit.usage_reporting_thread_num == 0 {
         if cfg.common.local_mode {
@@ -2472,10 +2545,33 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.calculate_stats_step_limit_secs = 86400;
     }
 
+    // migrate deprecated *_file_retention ENVs to *_query_retention for backward compatibility
+    // if the user explicitly set a non-hourly file retention, apply it to query retention
+    if cfg.limit.logs_file_retention != "hourly" && cfg.limit.logs_query_retention == "hourly" {
+        cfg.limit.logs_query_retention = cfg.limit.logs_file_retention.clone();
+    }
+    if cfg.limit.traces_file_retention != "hourly" && cfg.limit.traces_query_retention == "hourly" {
+        cfg.limit.traces_query_retention = cfg.limit.traces_file_retention.clone();
+    }
+    if cfg.limit.metrics_file_retention != "hourly" && cfg.limit.metrics_query_retention == "hourly"
+    {
+        cfg.limit.metrics_query_retention = cfg.limit.metrics_file_retention.clone();
+    }
+    // file retention is always hourly now
+    cfg.limit.logs_file_retention = "hourly".to_string();
+    cfg.limit.traces_file_retention = "hourly".to_string();
+    cfg.limit.metrics_file_retention = "hourly".to_string();
+
     // format ingest allowed upto and in future to micro
     cfg.limit.ingest_allowed_upto_micro = cfg.limit.ingest_allowed_upto * 3600 * 1_000_000;
     cfg.limit.ingest_allowed_in_future_micro =
         cfg.limit.ingest_allowed_in_future * 3600 * 1_000_000;
+
+    // clamp batch_size to [1024, 8192]
+    if cfg.limit.batch_size == 0 {
+        cfg.limit.batch_size = 8192;
+    }
+    cfg.limit.batch_size = cfg.limit.batch_size.clamp(1024, 8192);
 
     Ok(())
 }
@@ -2523,12 +2619,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("search job retention is set to zero"));
     }
 
-    if cfg.common.tracing_search_enabled
+    if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled)
         && cfg.common.otel_otlp_url.is_empty()
         && cfg.common.otel_otlp_grpc_url.is_empty()
     {
         return Err(anyhow::anyhow!(
-            "Either grpc or http url should be set when enabling tracing search"
+            "Either grpc or http url should be set when enabling tracing"
         ));
     }
 
@@ -2567,6 +2663,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
+    // Vortex file format requires enterprise feature, fallback to parquet
+    #[cfg(not(feature = "enterprise"))]
+    if cfg.common.file_format == FileFormat::Vortex {
+        return Err(anyhow::anyhow!(
+            "Vortex file format requires enterprise feature, please change ZO_FILE_FORMAT to parquet or unset it"
+        ));
+    }
+
     // format metadata storage
     if cfg.common.meta_store.is_empty() {
         if cfg.common.local_mode {
@@ -2576,12 +2680,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
-    if !cfg.common.local_mode
-        && !cfg.common.meta_store.starts_with("postgres")
-        && !cfg.common.meta_store.starts_with("mysql")
-    {
+    if !cfg.common.local_mode && !cfg.common.meta_store.starts_with("postgres") {
         return Err(anyhow::anyhow!(
-            "Meta store only support mysql or postgres in cluster mode."
+            "Meta store only supports postgres in cluster mode."
         ));
     }
     if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
@@ -2589,23 +2690,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "Meta store is PostgreSQL, you must set ZO_META_POSTGRES_DSN"
         ));
     }
-    if cfg.common.meta_store.starts_with("mysql") && cfg.common.meta_mysql_dsn.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Meta store is MySQL, you must set ZO_META_MYSQL_DSN"
-        ));
+
+    if cfg.common.meta_store.starts_with("mysql") {
+        return Err(anyhow::anyhow!("We don't support MySQL anymore."));
     }
 
-    // Print MySQL deprecation warning (logger not initialized yet at this stage)
-    if cfg.common.meta_store.starts_with("mysql") {
-        eprintln!("╔════════════════════════════════════════════════════════════════════════════╗");
-        eprintln!(
-            "║                              ⚠️  WARNING  ⚠️                                 ║"
-        );
-        eprintln!("║                                                                            ║");
-        eprintln!("║  MySQL support is DEPRECATED and will be removed in future.                ║");
-        eprintln!("║  Please migrate to PostgreSQL.                                             ║");
-        eprintln!("║                                                                            ║");
-        eprintln!("╚════════════════════════════════════════════════════════════════════════════╝");
+    // check meta partition mode
+    if cfg.common.meta_partition_mode != "manual" {
+        cfg.common.meta_partition_mode = "auto".to_string();
     }
 
     // If the default scrape interval is less than 5s, raise an error
@@ -2735,11 +2827,6 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
     }
 
-    // check for pprof flamegraph
-    if cfg.profiling.pprof_flamegraph_path.is_empty() {
-        cfg.profiling.pprof_flamegraph_path = format!("{}flamegraph.svg", cfg.common.data_dir);
-    }
-
     Ok(())
 }
 
@@ -2863,9 +2950,15 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.limit.disk_total = disk_total as usize;
     cfg.limit.disk_free = disk_free as usize;
     if cfg.disk_cache.max_size == 0 {
-        cfg.disk_cache.max_size = cfg.limit.disk_free / 2; // 50%
-        if cfg.disk_cache.max_size > 1024 * 1024 * 1024 * 100 {
-            cfg.disk_cache.max_size = 1024 * 1024 * 1024 * 100; // 100GB
+        // Add the current cache directory size back to free space so the limit is
+        // stable across restarts.  Without this correction the measured "free" space
+        // shrinks every time the app restarts with a full cache, causing the limit to
+        // drift lower on each startup.
+        let cache_current_size = crate::utils::file::get_dir_size(cache_dir);
+        let effective_free = cfg.limit.disk_free + cache_current_size;
+        cfg.disk_cache.max_size = effective_free / 2; // 50%
+        if cfg.disk_cache.max_size > 1024 * 1024 * 1024 * 500 {
+            cfg.disk_cache.max_size = 1024 * 1024 * 1024 * 500; // 500GB
         }
     } else {
         cfg.disk_cache.max_size *= 1024 * 1024;
@@ -3030,8 +3123,22 @@ fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if !cfg.s3.bucket_prefix.is_empty() && !cfg.s3.bucket_prefix.ends_with('/') {
-        cfg.s3.bucket_prefix = format!("{}/", cfg.s3.bucket_prefix);
+    // Ensure each bucket prefix ends with '/' for multi-bucket configurations
+    if !cfg.s3.bucket_prefix.is_empty() {
+        let prefixes: Vec<String> = cfg
+            .s3
+            .bucket_prefix
+            .split(',')
+            .map(|prefix| {
+                let trimmed = prefix.trim();
+                if trimmed.is_empty() || trimmed.ends_with('/') {
+                    trimmed.to_string()
+                } else {
+                    format!("{}/", trimmed)
+                }
+            })
+            .collect();
+        cfg.s3.bucket_prefix = prefixes.join(",");
     }
     if cfg.s3.provider.is_empty() {
         if cfg.s3.server_url.contains(".googleapis.com") {

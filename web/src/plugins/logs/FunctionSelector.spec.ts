@@ -72,6 +72,14 @@ describe("FunctionSelector", () => {
             template: '<div class="q-btn-dropdown" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
             props: ["modelValue", "size", "icon", "iconRight", "title", "split"],
           },
+          "q-btn": {
+            template: '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
+            props: ["icon", "class"],
+          },
+          "q-tooltip": {
+            template: '<div class="q-tooltip"><slot /></div>',
+            props: ["class", "offset", "delay"],
+          },
           "q-list": {
             template: '<div class="q-list" :data-test="$attrs[\'data-test\']"><slot /></div>',
           },
@@ -262,9 +270,9 @@ describe("FunctionSelector", () => {
   });
 
   // Template Interaction Tests
-  it("should emit save:function when dropdown is clicked", async () => {
-    const dropdown = wrapper.find('[data-test="logs-search-bar-function-dropdown"]');
-    await dropdown.trigger("click");
+  it("should emit save:function when save button is clicked", async () => {
+    const saveBtn = wrapper.find('[data-test="logs-search-bar-save-function-btn"]');
+    await saveBtn.trigger("click");
     expect(wrapper.emitted("save:function")).toBeTruthy();
   });
 

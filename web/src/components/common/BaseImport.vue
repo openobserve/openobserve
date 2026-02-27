@@ -595,6 +595,7 @@ export default defineComponent({
   resize: none;
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
+  width: calc(100% - 14px) !important;
 }
 
 .error-report-container {

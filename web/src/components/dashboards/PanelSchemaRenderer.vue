@@ -60,6 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @row-click="onChartClick"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
+          :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
+          :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -337,6 +339,7 @@ import {
   defineComponent,
   watch,
   ref,
+  shallowRef,
   toRefs,
   computed,
   inject,
@@ -584,7 +587,7 @@ export default defineComponent({
     });
 
     // stores the converted data which can be directly used for rendering different types of panels
-    const panelData: any = ref({}); // holds the data to render the panel after getting data from the api based on panel config
+    const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
     const drilldownArray: any = ref([]);
     const selectedAnnotationData: any = ref([]);

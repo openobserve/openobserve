@@ -108,12 +108,17 @@
     "darkMode": "ダークモード",
     "manageTheme": "テーマを管理",
     "url": "URL",
-    "chunkLoadError": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
     "chunkLoadErrorMsg": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
     "id": "ID",
     "getStarted": "始めよう",
+    "copy": "[コピー]",
+    "copySuccess": "クリップボードにコピー",
+    "copyError": "クリップボードへのコピーに失敗しました",
     "reset": "リセット",
-    "retry": "リトライ"
+    "retry": "リトライ",
+    "goBack": "戻る",
+    "stopGenerating": "生成を停止",
+    "set": "+ セット"
   },
   "search": {
     "metrics": "メトリクス",
@@ -127,7 +132,7 @@
     "source": "ソース",
     "noResult": "結果なし",
     "syntaxGuide": "シンタックスガイド",
-    "recordsPerPage": "1 ページあたりのレコード数",
+    "rowsPerPage": "1 ページあたりのレコード数",
     "showing": "表示中",
     "of": "の",
     "rowDetail": "ソース詳細",
@@ -233,8 +238,10 @@
     "patternColumnHeader": "パターン",
     "occurrenceColumnHeader": "発生",
     "percentageColumnHeader": "パーセンテージ",
+    "anomalyColumnHeader": "異常",
     "actionsColumnHeader": "[アクション]",
     "anomalyLabel": "異常",
+    "anomalyDetected": "異常を検出",
     "includePatternInSearch": "検索にパターンを含める",
     "excludePatternFromSearch": "検索からパターンを除外",
     "showPatternDetails": "詳細を表示 ({変数} 変数、{例} 例)",
@@ -308,7 +315,43 @@
     "show": "ショー",
     "editor": "エディター",
     "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。",
-    "showHideColumns": "列を表示/非表示"
+    "showHideColumns": "列を表示/非表示",
+    "autoRefresh": "自動更新",
+    "createSavedView": "保存済みビューを作成",
+    "listSavedViews": "保存済みビューを一覧表示",
+    "buildQuery": "ビルド",
+    "enableSqlModeForBuild": "SQL モードを有効にして、クエリビルダーを使用するストリームを 1 つ選択してください",
+    "applyToSearch": "検索に適用",
+    "complexQueryDetected": "複雑なクエリが検出されました。カスタムモードを使用する。",
+    "nlpModeLabel": "自然言語モード",
+    "generateSQL": "SQL を生成",
+    "generateQuery": "[クエリを生成]",
+    "generateSQLTooltip": "自然言語から SQL クエリを生成 (Ctrl/Cmd+Enter キー)",
+    "generateQueryTooltip": "自然言語から SQL クエリを生成",
+    "generating": "生成中...",
+    "nlQueryGenerationFailed": "クエリを生成できませんでした。もう一度試してください。",
+    "nlQueryGenerationSuccess": "クエリは正常に生成されました!",
+    "nlpModeDisabledForVisualization": "複数のストリームを含むビジュアライゼーションでは、自然言語モードを無効にすることはできません",
+    "askAIPlaceholder": "AIに問い合わせて...",
+    "aiBarSuccessPlaceholder": "次は何をしたいですか？",
+    "askAI": "AI に聞く",
+    "askAITooltip": "AIに問い合わせを依頼する",
+    "enterPrompt": "クエリを生成するプロンプトを入力してください",
+    "analyzingQuery": "クエリを分析中...",
+    "generatingQuery": "クエリーを生成中...",
+    "queryGeneratedSuccess": "クエリは正常に生成されました!",
+    "queryGenerationStopped": "クエリの生成が停止されました。",
+    "queryGenerationFailed": "クエリの生成が失敗しました。",
+    "fetchingResults": "検索結果を取得中...",
+    "noResultsFound": "結果が見つかりません",
+    "errorFetchingResults": "結果を取得中にエラーが発生しました",
+    "somethingWentWrong": "何かがおかしくなった",
+    "selectStreamForAI": "AI を使用するには、まずストリームを選択してください",
+    "collapseFields": "フィールドを折りたたむ",
+    "openFields": "オープンフィールド",
+    "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
+    "enterFunctionPrompt": "関数を生成するプロンプトを入力してください",
+    "recordsPerPage": "1 ページあたりのレコード数"
   },
   "menu": {
     "home": "ホーム",
@@ -420,7 +463,6 @@
     "ingestion_type": "インジェストタイプ",
     "ingestion_limit": "取り込み制限",
     "today_usage": "今日の使用状況",
-    "feature_comparision_lbl": "機能比較",
     "feature_comparision_ent_msg": "OpenObserveエンタープライズエディションを使用しており、以下にリストされているすべての高度な機能にアクセスできます。",
     "feature_comparision_plan_detail": "ご利用のプラン:エンタープライズエディションでは、1 日あたり最大 200 GB (最大 6 TB/月) のデータを無料で取り込むことができます。",
     "feature_comparision_os_msg": "現在 OpenObserve オープンソースエディションを使用しています。Enterprise Edition にアップグレードすると、下の比較表に記載されている高度な機能を活用できます。",
@@ -971,7 +1013,10 @@
     "jsType": "ジャバスクリプト (2023)",
     "vrlfunction": "VRL ファンクション",
     "jsFunctionHint": "`row` オブジェクトを使用して、ログフィールドにアクセスして変更します。例:row.new_field = row.existing_field + 'processed';",
-    "vrlFunctionHint": "現在のイベントを表すには `.` を使用してください。例:.new_field = .既存のフィールド + '処理済み'"
+    "vrlFunctionHint": "現在のイベントを表すには `.` を使用してください。例:.new_field = .既存のフィールド + '処理済み'",
+    "jsErrorDetails": "JavaScript エラーの詳細",
+    "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
+    "enterFunctionPrompt": "関数を生成するプロンプトを入力してください"
   },
   "confirmDialog": {
     "cancel": "キャンセル",
@@ -1199,6 +1244,9 @@
     "wraptext": "ラップテーブルセル",
     "tableTranspose": "トランスポーズ",
     "tableDynamicColumns": "動的列を許可",
+    "pagination": "ページネーション",
+    "rowsPerPage": "ページあたりの行数",
+    "rowsPerPageTooltip": "ページごとに表示するレコードのデフォルト数を設定します",
     "showBorder": "軸境界を表示",
     "currencyDollar": "通貨-ドル ($)",
     "currencyEuro": "通貨-ユーロ (€)",
@@ -1419,7 +1467,27 @@
     "noColumnsOrdered": "列は順序付けられていません",
     "columnsDefaultOrder": "列はデフォルトの順序で表示されます",
     "moveUp": "上へ移動",
-    "moveDown": "下に移動"
+    "moveDown": "下に移動",
+    "toggleFunctionEditor": "関数エディターの切り替え",
+    "useSavedFunction": "保存済み関数を使う",
+    "showQueryResults": "クエリ結果を表示",
+    "hideQueryResults": "クエリ結果を非表示にする",
+    "vrlExtractionTooltip": "抽出された VRL フィールドをチャートで使用するには、VRL 関数を記述して [適用] ボタンをクリックします。フィールドが抽出され、そのフィールドを使用してチャートを作成できます。",
+    "errorFetchingFunctions": "関数を取得中にエラーが発生しました",
+    "functionAppliedSuccess": "{name} 関数が正常に適用されました。",
+    "connectNullValuesTooltip": "欠損値のデータポイントを線で結びます。",
+    "panelTimeSettings": "パネルタイム設定",
+    "panelTimeEnabled": "パネルレベルの時間を許可",
+    "useGlobalTime": "グローバルタイムを使う",
+    "useIndividualTime": "個別の時間を使う",
+    "panelTimeGlobalHint": "パネルはグローバルダッシュボード時間を追跡します。グローバルタイムが変更されると、このパネルも更新されます。",
+    "panelTimeIndividualHint": "パネルは独自の時間範囲を使用します。以下の日付ピッカーを使用して時間を設定します。グローバル時間を変更しても、このパネルには影響しません。",
+    "panelTimeRange": "パネル時間範囲",
+    "panelTimeRangeTooltip": "この時間範囲はこのパネルにのみ適用されます。他のパネルは、独自に設定された時間またはグローバルダッシュボード時間を使用します。",
+    "panelTimeSettingsTooltip": "このパネルが時間範囲を決定する方法を設定します。このパネルには、ダッシュボードの時間範囲を使用することも、カスタムの時間範囲を設定することもできます。",
+    "panelTimeMode": "時間範囲ソース (ダッシュボードロード時)",
+    "useDefaultTimeTooltip": "有効にすると、このパネルは、ダッシュボードのグローバル時間ではなく、設定されたデフォルトの期間をダッシュボードロード時の時間範囲として使用します。",
+    "defaultDuration": "デフォルト期間"
   },
   "panel": {
     "header": "パネル",
@@ -1442,7 +1510,6 @@
     "otherColumn": "その他の列",
     "config": "設定",
     "filters": "フィルター",
-    "customSql": "カスタム SQL",
     "field": "フィールド",
     "discard": "破棄",
     "edit": "編集",
@@ -1451,7 +1518,6 @@
     "layout": "レイアウト",
     "sql": "クエリ",
     "back": "<< 戻る",
-    "auto": "オート",
     "promQL": "PromQL",
     "latitude": "緯度",
     "longitude": "経度",
@@ -1484,9 +1550,6 @@
     "unsupportedPanelTypeAlert": "{type} パネルからアラートを作成すると、期待どおりに動作しない場合があります",
     "panelDuplicatedSuccessfully": "パネルは正常に複製されました",
     "panelDuplicationFailed": "パネルを複製できませんでした",
-    "customChartTypeSelector": "カスタムチャートタイプセレクター",
-    "customChartTypeSelectorHint": "基本的なコード構造を始めるには、eCharts ライブラリからグラフの種類を選択します。",
-    "selectChartType": "チャートタイプを選択",
     "joins": "参加します",
     "addJoin": "追加ジョイン",
     "removeJoin": "[結合を削除]",
@@ -1503,7 +1566,10 @@
     "SQL": "SQL",
     "builder": "ビルダー",
     "custom": "カスタム",
-    "sqlBuilder": "SQL ビルダー"
+    "sqlBuilder": "SQL ビルダー",
+    "generatedSql": "生成された SQL",
+    "enterCustomSql": "カスタム SQL クエリを入力してください...",
+    "customSql": "カスタム SQL"
   },
   "home": {
     "streams": "ストリーム",
@@ -1780,7 +1846,9 @@
       "analyzeRca": "分析",
       "rcaInProgress": "根本原因を分析中...",
       "rcaCompleted": "根本原因分析が完了しました",
-      "noRcaYet": "根本原因分析はありません。[分析] をクリックして開始します。"
+      "noRcaYet": "根本原因分析はありません。[分析] をクリックして開始します。",
+      "search": "インシデントを検索...",
+      "sreChat": "SREアシスタントに聞く"
     },
     "events": "[イベント]",
     "multiWindow": "過去と比較",
@@ -1823,7 +1891,12 @@
         "alertMeWhen": "次の場合に通知する",
         "butNoMoreThan": "ただし、1回に限ります",
         "defaultConditions": "設定した条件が満たされたら通知を受け取る"
-      }
+      },
+      "title": "サマリー",
+      "alertName": "アラート名",
+      "streamInfo": "データソース",
+      "alertType": "アラートタイプ",
+      "queryCondition": "クエリ条件"
     },
     "correlation": {
       "title": "アラート相関",
@@ -1905,7 +1978,114 @@
     "msteams": "マイクロソフトチーム",
     "pagerduty": "ポケットベル・デューティ",
     "opsgenie": "オプスゲニー",
-    "servicenow": "サービスナウ"
+    "servicenow": "サービスナウ",
+    "saveAlert": "アラートを保存",
+    "aggregation_threshold": "グループがある場合はアラート",
+    "thresholdDynamic": {
+      "alertMeWhen": "次の場合に通知する",
+      "metricTypes": {
+        "resultsPassedFilter": "フィルターを通過した結果",
+        "distinctGroupsAffected": "個別のグループが影響を受ける",
+        "metricsMatchCriteria": "メトリックス一致基準",
+        "matchingLogsFound": "一致するログが見つかりました",
+        "groupsPassFilter": "グループはフィルター条件に合格します",
+        "distinctGroups": "異なるグループが見つかりました",
+        "resultRows": "結果行が返されました",
+        "timeSeries": "アクティブな時系列が見つかりました",
+        "matchingRecords": "一致するレコードが見つかりました",
+        "groupsWithHaving": "グループ一致条件",
+        "uniqueGroups": "ユニークグループ",
+        "events": "イベント一致条件",
+        "aggregatedValue": "マッチ条件"
+      },
+      "contextLabels": {
+        "groupedBy": "グループ化:",
+        "havingConditions": "条件がある:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "アラート名",
+      "sqlQuery": "SQL クエリー",
+      "promqlQuery": "プロムQL クエリ",
+      "conditions": "条件",
+      "copy": "[コピー]",
+      "noCondition": "条件なし",
+      "noDescription": "説明なし",
+      "evaluationHistory": "評価履歴",
+      "loadingHistory": "履歴をロード中...",
+      "noHistoryAvailable": "このアラートの評価履歴はありません",
+      "results": "結果"
+    },
+    "historyTable": {
+      "timestamp": "タイムスタンプ",
+      "status": "ステータス",
+      "evaluationTime": "評価 (s)",
+      "queryTime": "クエリ (ミリ秒)",
+      "error": "[エラー]"
+    },
+    "back": "戻る",
+    "continue": "続行",
+    "wouldTrigger": "トリガーする",
+    "wouldNotTrigger": "トリガーされない",
+    "queryBuilder": "ビルダー",
+    "groupByHelp": {
+      "description": "集計されたデータを特定のフィールドでグループ化し、一意の値ごとに個別のアラートを作成します。",
+      "example": "例:「hostname」でグループ化してサーバーごとに個別のアラートを取得するか、「status_code」でグループ化してエラーを個別に追跡します。"
+    },
+    "conditions": {
+      "condition": "コンディション",
+      "conditionGroup": "条件グループ",
+      "addConditionTooltip": "このグループに新しい条件を追加",
+      "addConditionGroupTooltip": "ネストされた条件グループの追加 (最大深度:2)",
+      "maxDepthReachedTooltip": "最大ネスティング深度に達しました"
+    },
+    "compareWithPast": {
+      "alertSetFor": "アラート設定",
+      "currentWindow": "現在のウィンドウ",
+      "cycle": "サイクル",
+      "cycleTooltip": "結果を前のサイクルの同じ時間と比較します。",
+      "runningFor": "毎回 {頻度} の間隔で {period} 実行中",
+      "currentWindowCannotBeDeleted": "現在のウィンドウは削除できません",
+      "comparingWith": "との比較",
+      "referenceWindow": "リファレンスウィンドウ",
+      "timeFrame": "タイムフレーム",
+      "timeFrameTooltip": "クエリの時間範囲。",
+      "comparingText": "現在のウィンドウのクエリ結果と前の {offset} のクエリ結果を比較します。",
+      "addComparisonWindow": "比較ウィンドウを追加",
+      "goToConditions": "条件に移動",
+      "goToConditionsTooltip": "「条件に移動」をクリックして、選択した比較ウィンドウのイベントを確認してください"
+    },
+    "alertSettings": {
+      "cronSchedule": "クローンスケジュール",
+      "addNewDestination": "新しい目的地を追加",
+      "cooldownTooltip": "アラートがトリガーされた場合、次の通知を送信するまでどのくらい待つ必要があります。たとえば、アラートが午後 4 時にトリガーされ、サイレンス通知が 10 分に設定されている場合、アラートが 1 分経っても午後 4 時 10 分まで別の通知は送信されません。これは、ユーザーに迷惑メールが送信されないようにするためです。",
+      "thresholdTooltip": "イベント数または集計値に基づいて、アラートをトリガーするタイミングを定義します。例:「> 100」に設定すると、イベント数が 100 イベントを超えたときにアラートがトリガーされます。",
+      "periodTooltip": "クエリの実行期間。たとえば、10 分ということは、クエリが実行されるたびに、直近の 10 分間のデータが使用されることを意味します。",
+      "frequencyTooltipMinutes": "タスクを実行する頻度 (例:5 分ごと)",
+      "frequencyTooltipCron": "5 つのフィールドをスペースで区切った標準 UNIX cron 形式:[分 0 ～ 59 分] [時間 0 ～ 23] [月 1 ～ 31 日] [月 1 ～ 12 月、または 1 月から 12 月] [曜日 0 ～ 7 日、日曜日は 0 と 7 日]。",
+      "timezoneWarning": "警告:表示されているタイムゾーンはおおよそのものです。正しいタイムゾーンを手動で確認して選択してください。",
+      "destinationsTooltip": "アラート通知を送信する宛先を 1 つ以上選択します。",
+      "templateTooltip": "オプション:このアラートのすべての宛先に使用するテンプレートを選択してください。テンプレートを使用すると、アラートメッセージの形式をカスタマイズできます。選択しない場合、各宛先は独自の構成済みテンプレートを使用します。"
+    },
+    "advanced": {
+      "addVariable": "[変数を追加]",
+      "variablesTooltip": "変数は、アラートから宛先にデータを渡すために使用されます。",
+      "rowTemplateTooltip": "行テンプレートはアラートメッセージのフォーマットに使用されます。",
+      "templateType": "テンプレートタイプ:"
+    },
+    "addConditions": "条件を追加",
+    "sqlEditor": "SQL エディター",
+    "promqlEditor": "プロムQL エディター",
+    "vrlEditor": "VRL エディター",
+    "generateVRL": "VRL を生成",
+    "applyVRL": "VRL を適用",
+    "runQuery": "クエリーを実行",
+    "onStream": "オン",
+    "streamLabel": "ストリーム",
+    "noStreamSelected": "ストリームが選択されていません",
+    "resultsIncludeAllWindows": "結果にはマルチウィンドウの追加がすべて含まれます",
+    "runQueryForOutput": "[クエリの実行] をクリックして出力を確認してください",
+    "applyVRLForOutput": "結合された出力を確認するには、[VRL を適用] をクリックしてください"
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -1952,7 +2132,14 @@
     "preview": "プレビュー",
     "test": "テスト",
     "saved": "目的地は正常に保存されました",
-    "saveError": "送信先を保存できませんでした"
+    "saveError": "送信先を保存できませんでした",
+    "customWebhook": "カスタム (ウェブフック)",
+    "customEmail": "カスタム (電子メール)",
+    "customAction": "カスタム (アクション)",
+    "custom": "カスタム",
+    "separator": "セパレーター",
+    "separator_placeholder": "セパレータを入力してください (例:|、\\n、\\ t、スペース)",
+    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)"
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",
@@ -2118,16 +2305,8 @@
       "howItWorksTitle": "サービス ID の仕組み",
       "howItWorksDescription": "（完全修飾名）はテレメトリディメンションから計算され、さまざまなデータソースにわたってサービスを一意に識別して関連付けることができます。",
       "priorityOrderLabel": "優先順位:",
-      "priorityOrderDescription": "寸法は以下の順序で確認されます。値のある最初のディメンションがサービス FQN になります。",
       "exampleLabel": "例:",
-      "exampleText1": "両方ある場合",
-      "exampleText2": "そして",
-      "exampleText3": "FQNは",
-      "exampleText4": "なぜなら",
-      "exampleText5": "優先度が高い。",
       "correlationDescription": "同じFQNのサービスは、異なっていても相関関係にあります",
-      "correlationDescriptionField": "サービス",
-      "correlationDescriptionEnd": "名前。",
       "fqnPriorityTitle": "FQN優先ディメンション",
       "fqnPriorityTooltip": "相関のためのサービスFQNの導出に使用するディメンションを定義します。値が指定されている最初のディメンションが優先されます。インフラストラクチャーに合わせて順序を変更してください。",
       "fqnPriorityDescription": "ドラッグして順序を変更するか、矢印ボタンを使用します。最初に一致するディメンションがサービス FQN を決定します。",
@@ -2148,20 +2327,40 @@
       "traces": "トレース",
       "metrics": "指標",
       "retry": "リトライ",
-      "k8sDeployment": "Kubernetes デプロイメント名",
-      "k8sStatefulSet": "Kubernetes ステートフルセット名",
-      "k8sDaemonSet": "Kubernetes デーモンセット名",
-      "k8sJob": "クベルネテスジョブ名",
-      "k8sReplicaSet": "Kubernetes レプリカセット名",
-      "k8sNamespace": "クベルネテス名前空間",
-      "awsEcsTask": "AWS ECS タスクファミリー",
-      "faasName": "ラムダ、クラウド関数など",
-      "gcpCloudRun": "Google クラウドランサービス",
-      "azureCloudRole": "Azure クラウドロール名",
-      "processName": "ベアメタルプロセス名",
-      "serviceDim": "テレメトリサービス.name を開きます",
-      "host": "ホスト/ノード名",
-      "environment": "デプロイ環境"
+      "serviceIdentityLabel": "サービス識別子",
+      "compoundFqnLabel": "識別子フォーマット:",
+      "compoundFqnDescription": "スコープディメンションは '/' で連結され、その後最初の非NULLワークロードディメンションが追加されます。",
+      "exampleText": "{dim1} と {dim2} で、識別子は {value} になります。",
+      "correlationLabel": "相関:",
+      "addDimensionHint": "優先リストに追加するセマンティックグループを選択してください。",
+      "selectSemanticGroup": "セマンティックグループを選択",
+      "noSemanticGroupsAvailable": "利用可能なセマンティックグループがありません。まず下でフィールドマッピングを設定してください。",
+      "noSemanticGroupsConfigured": "セマンティックグループが設定されていません。利用可能なディメンションを定義するには、下にフィールドマッピングを追加してください。",
+      "configureSemanticGroupsFirst": "識別子優先度のために利用可能なディメンションを定義するには、下のセマンティックフィールドマッピングを設定してください。",
+      "saveFqnPriority": "識別子優先度を保存",
+      "saveSemanticMappings": "セマンティックマッピングを保存",
+      "fqnPrioritySaved": "識別子優先度の設定が正常に保存されました",
+      "semanticMappingsSaved": "セマンティックフィールドマッピングが正常に保存されました",
+      "filters": "フィルター",
+      "availableDimensions": "利用可能なディメンション",
+      "semanticFieldGroupsTitle": "フィールドマッピング",
+      "groupsLabel": "グループ",
+      "noMatchingGroups": "一致するグループがありません",
+      "fqnFormulaTitle": "識別子フォーミュラ",
+      "fqnFormulaTooltip": "サービス識別子の計算方法を示します。スコープディメンション（青）は '/' で連結されます。最初の非NULLワークロードディメンション（緑）がサービス名になります。",
+      "scopeDimension": "スコープディメンション",
+      "workloadDimension": "ワークロードディメンション",
+      "noFormulaConfigured": "識別子フォーミュラが設定されていません。上でディメンションを追加してください。",
+      "scopeLegend": "スコープ（連結）",
+      "workloadLegend": "ワークロード（最初の非NULL）",
+      "firstNonNull": "最初の非NULLは",
+      "scopeTag": "スコープ",
+      "workloadTag": "ワークロード",
+      "scopeOnly": "スコープのみ",
+      "noMatchingDimensions": "一致するディメンションがありません",
+      "otherGroup": "その他",
+      "fallbackGroup": "フォールバック",
+      "fallbackNote": "フォールバックディメンション（'service' など）は、環境固有のワークロードが一致しない場合にすべての環境に適用されます。"
     },
     "pageSubtitle": "アプリケーションの設定を調整する",
     "platformSettings": "プラットフォーム設定",
@@ -2305,7 +2504,11 @@
     "errorSavingPipeline": "パイプラインの保存中にエラーが発生しました",
     "cancelChangesConfirm": "変更をキャンセルしてもよろしいですか?",
     "cancel": "[キャンセル]",
-    "dragDropNodesHere": "ここにノードをドラッグアンドドロップ"
+    "dragDropNodesHere": "ここにノードをドラッグアンドドロップ",
+    "promqlOnlyForMetrics": "PromQL はメトリクスストリームタイプでのみ使用できます",
+    "invalidCronExpression": "cron 表現が無効です",
+    "thresholdShouldNotBeEmpty": "敷居は空であってはなりません",
+    "errorGettingResults": "結果を取得中にエラーが発生しました"
   },
   "reports": {
     "header": "レポート",
@@ -2362,7 +2565,9 @@
     "collapseFields": "フィールドを折りたたむ",
     "openFields": "オープンフィールド",
     "timeRangeUpdated": "選択した時間範囲にはこのトレースが含まれていません。時間範囲はトレースのタイムスタンプと一致するように更新されました。",
-    "fetchingMoreTraces": "さらにトレースを取得中..."
+    "fetchingMoreTraces": "さらにトレースを取得中...",
+    "showErrorOnly": "エラーのみ表示",
+    "openInTraces": "トレースで開く"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -2514,7 +2719,8 @@
     "sql_query": "SQL クエリー",
     "resuls": "結果",
     "wrapText": "テキストを折り返す",
-    "delayMessage": "検索履歴は次の理由で遅延する可能性があります"
+    "delayMessage": "検索履歴は次の理由で遅延する可能性があります",
+    "results": "結果"
   },
   "search_scheduler_job": {
     "title": "ジョブスケジューラを検索する",
@@ -2578,7 +2784,8 @@
     "showLegends": "レジェンドを表示"
   },
   "alert_list": {
-    "alert_details": "アラートの詳細"
+    "alert_details": "アラートの詳細",
+    "alert_history": "アラート履歴"
   },
   "latencyInsights": {
     "title": "インサイト",
@@ -2605,7 +2812,8 @@
     "analyzeButtonLabel": "分析",
     "refreshTooltip": "パーセンタイルを更新して分析を更新",
     "customSQLFieldsDisabled": "フィールド選択はカスタム SQL クエリでは使用できません。ディメンションはクエリ結果から抽出されます。",
-    "timeRangeSelected": "選択した時間範囲"
+    "timeRangeSelected": "選択した時間範囲",
+    "dimensionsSelected": "ディメンションが選択されました"
   },
   "volumeInsights": {
     "title": "インサイト",
@@ -2614,7 +2822,9 @@
     "analyzeTooltip": "さまざまなディメンションにわたるトレースレートパターンを分析",
     "analyzeTooltipLogs": "現在の時間範囲のディメンション分布を分析",
     "rateLabel": "レート:",
-    "timeRangeLabel": "時間範囲:"
+    "timeRangeLabel": "時間範囲:",
+    "analyzeTooltipTraces": "レート、レイテンシー、エラーパターンのトレースディメンションを分析",
+    "insightsButtonLabel": "インサイト"
   },
   "errorInsights": {
     "title": "インサイト",
@@ -2726,7 +2936,15 @@
         "startBeforeEnd": "開始時刻は終了時刻より前でなければなりません",
         "endAfterStart": "終了時刻は開始時刻より後である必要があります"
       }
-    }
+    },
+    "viewInTraces": "トレースで表示",
+    "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く",
+    "exportToJson": "JSON へのエクスポート",
+    "noLogsDescription": "選択した時間範囲では、この相関関係のログは見つかりませんでした。",
+    "tracesErrorDetails": "トレースデータの取得中にエラーが発生しました。もう一度試してください。",
+    "metricsError": "メトリクスを読み込めません",
+    "metricsErrorDetails": "メトリックスデータの取得中にエラーが発生しました。もう一度試してください。",
+    "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",
@@ -2775,5 +2993,10 @@
     "invalidFormat": "形式が無効です",
     "mustBeGreaterThan": "{value} より大きくなければなりません",
     "mustBeLessThan": "{value} より小さくなければなりません"
+  },
+  "nlMode": {
+    "toggle": "自然言語モード",
+    "noAdditionalOptions": "追加オプションなし",
+    "generateVRL": "VRL を生成"
   }
 }

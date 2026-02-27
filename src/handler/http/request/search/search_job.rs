@@ -106,7 +106,7 @@ pub async fn submit_job(
     {
         let cfg = get_config();
 
-        let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+        let http_span = if cfg.common.should_create_span() {
             tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone())
         } else {
             Span::none()
@@ -531,7 +531,7 @@ pub async fn get_job_result(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a search job", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Delete a search job", "category": "search", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_job(

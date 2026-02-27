@@ -69,18 +69,30 @@ pub(crate) async fn around(
         query_fn = Some(format!("{vrl_function} \n ."));
     }
 
-    let default_sql = format!("SELECT * FROM \"{stream_name}\" ");
-    let mut around_sql = if let Some(sql) = sql {
-        sql
+    // For around search, we only use the stream name and ignore any SQL query
+    // Extract stream name from SQL if provided, otherwise use the stream_name parameter
+    let actual_stream_name = if let Some(sql) = sql.as_ref() {
+        // Extract stream name from SQL
+        config::meta::sql::resolve_stream_names_with_type(sql)
+            .ok()
+            .and_then(|tables| tables.first().map(|t| t.to_string()))
+            .unwrap_or_else(|| stream_name.to_string())
+    } else if let Some(sql_param) = query.get("sql") {
+        // Decode and extract stream name from SQL parameter
+        base64::decode_url(sql_param)
+            .ok()
+            .and_then(|sql| {
+                config::meta::sql::resolve_stream_names_with_type(&sql)
+                    .ok()
+                    .and_then(|tables| tables.first().map(|t| t.to_string()))
+            })
+            .unwrap_or_else(|| stream_name.to_string())
     } else {
-        match query.get("sql") {
-            None => default_sql,
-            Some(v) => match base64::decode_url(v) {
-                Err(_) => default_sql,
-                Ok(sql) => sql,
-            },
-        }
+        stream_name.to_string()
     };
+
+    // Build the base SQL using only the stream name
+    let mut around_sql = format!("SELECT * FROM \"{}\" ", actual_stream_name);
 
     // check playload
     let mut filters = HashMap::new();

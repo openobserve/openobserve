@@ -108,12 +108,17 @@
     "darkMode": "Donkere modus",
     "manageTheme": "Thema beheren",
     "url": "URL",
-    "chunkLoadError": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
     "chunkLoadErrorMsg": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
     "id": "ID",
     "getStarted": "Ga aan de slag",
     "reset": "Resetten",
-    "retry": "Probeer het opnieuw"
+    "retry": "Probeer het opnieuw",
+    "set": "+ Set",
+    "copy": "Kopiëren",
+    "copySuccess": "Gekopieerd naar klembord",
+    "copyError": "Kopiëren naar klembord is mislukt",
+    "goBack": "Ga terug",
+    "stopGenerating": "Stop met genereren"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -126,7 +131,7 @@
     "source": "_bron",
     "noResult": "Geen resultaat",
     "syntaxGuide": "Handleiding voor syntaxis",
-    "recordsPerPage": "Records per pagina",
+    "rowsPerPage": "Records per pagina",
     "showing": "bewijs",
     "of": "van",
     "rowDetail": "Details van de bron",
@@ -233,8 +238,10 @@
     "patternColumnHeader": "Patroon",
     "occurrenceColumnHeader": "Voorkomen",
     "percentageColumnHeader": "Percentage",
+    "anomalyColumnHeader": "Anomalie",
     "actionsColumnHeader": "Acties",
     "anomalyLabel": "ANOMALIE",
+    "anomalyDetected": "Anomalie gedetecteerd",
     "includePatternInSearch": "Patroon opnemen in de zoekopdracht",
     "excludePatternFromSearch": "Patroon uitsluiten van de zoekopdracht",
     "showPatternDetails": "Details weergeven ({variabelen} variabelen, {voorbeelden} voorbeelden)",
@@ -308,7 +315,43 @@
     "show": "Laat zien",
     "editor": "Redacteur",
     "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder.",
-    "showHideColumns": "Kolommen tonen/verbergen"
+    "showHideColumns": "Kolommen tonen/verbergen",
+    "autoRefresh": "Automatisch verversen",
+    "createSavedView": "Opgeslagen weergave maken",
+    "listSavedViews": "Opgeslagen weergaven weergeven",
+    "buildQuery": "Bouwen",
+    "enableSqlModeForBuild": "Schakel de SQL-modus in en selecteer een enkele stream om de querybuilder te gebruiken",
+    "applyToSearch": "Toepassen om te zoeken",
+    "complexQueryDetected": "Complexe zoekopdracht gedetecteerd. Met behulp van de aangepaste modus.",
+    "nlpModeLabel": "Modus voor natuurlijke taal",
+    "generateSQL": "SQL genereren",
+    "generateQuery": "Query genereren",
+    "generateSQLTooltip": "Genereer een SQL-query uit natuurlijke taal (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Genereer een SQL-query op basis van natuurlijke taal",
+    "generating": "Genereren...",
+    "nlQueryGenerationFailed": "Het genereren van een query is mislukt. Probeer het opnieuw.",
+    "nlQueryGenerationSuccess": "Zoekopdracht succesvol gegenereerd!",
+    "nlpModeDisabledForVisualization": "De modus Natural Language kan niet worden uitgeschakeld tijdens visualisatie met meerdere streams",
+    "askAIPlaceholder": "Vraag AI om hulp bij je vraag...",
+    "aiBarSuccessPlaceholder": "Wat zou je hierna willen doen?",
+    "askAI": "Vraag het aan AI",
+    "askAITooltip": "Vraag AI om hulp bij je vraag",
+    "enterPrompt": "Voer een prompt in om een query te genereren",
+    "analyzingQuery": "Zoekopdracht analyseren...",
+    "generatingQuery": "Zoekopdracht genereren...",
+    "queryGeneratedSuccess": "Zoekopdracht succesvol gegenereerd!",
+    "queryGenerationStopped": "Het genereren van query's is gestopt.",
+    "queryGenerationFailed": "Het genereren van query's is mislukt.",
+    "fetchingResults": "Zoekresultaten ophalen...",
+    "noResultsFound": "Geen resultaten gevonden",
+    "errorFetchingResults": "Fout bij het ophalen van resultaten",
+    "somethingWentWrong": "Er is iets misgegaan",
+    "selectStreamForAI": "Selecteer eerst een stream om AI te gebruiken",
+    "collapseFields": "Velden samenvouwen",
+    "openFields": "Open velden",
+    "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
+    "enterFunctionPrompt": "Voer een prompt in om een functie te genereren",
+    "recordsPerPage": "Records per pagina"
   },
   "menu": {
     "home": "Home",
@@ -420,7 +463,6 @@
     "ingestion_type": "Soort inname",
     "ingestion_limit": "Inslimiet",
     "today_usage": "Het gebruik van vandaag",
-    "feature_comparision_lbl": "Vergelijking van functies",
     "feature_comparision_ent_msg": "U gebruikt OpenObserve Enterprise Edition met toegang tot alle geavanceerde functies die hieronder worden vermeld.",
     "feature_comparision_plan_detail": "Uw abonnement: Enterprise Edition is gratis voor maximaal 200 GB/dag (~6 TB per maand) aan gegevensinvoer.",
     "feature_comparision_os_msg": "U gebruikt momenteel OpenObserve Open Source Edition. Upgrade naar Enterprise Edition om geavanceerde functies te ontgrendelen die in de vergelijkingstabel hieronder worden vermeld.",
@@ -954,7 +996,10 @@
     "jsType": "JavaScript (ES2023)",
     "vrlfunction": "VRL-functie",
     "jsFunctionHint": "Gebruik het object `row` om logvelden te openen en te wijzigen. Voorbeeld: row.new_field = row.existing_field + 'processed';",
-    "vrlFunctionHint": "Gebruik de `.` om de huidige gebeurtenis weer te geven. Voorbeeld: .new_field = .existing_field + 'verwerkt'"
+    "vrlFunctionHint": "Gebruik de `.` om de huidige gebeurtenis weer te geven. Voorbeeld: .new_field = .existing_field + 'verwerkt'",
+    "jsErrorDetails": "Details van JavaScript-fouten",
+    "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
+    "enterFunctionPrompt": "Voer een prompt in om een functie te genereren"
   },
   "confirmDialog": {
     "cancel": "Annuleer",
@@ -1115,7 +1160,6 @@
     "unitLabel": "Eenheid",
     "basemapLabel": "Basiskaart",
     "customunitLabel": "Eenheid op maat",
-    "lattitudeLabel": "Breedtegraad",
     "longitudeLabel": "Lengtegraad",
     "zoomLabel": "inzoomen",
     "legendLabel": "Legenda",
@@ -1182,6 +1226,9 @@
     "wraptext": "Tabelcellen omwikkelen",
     "tableTranspose": "Transponeren",
     "tableDynamicColumns": "Dynamische kolommen toestaan",
+    "pagination": "Paginering",
+    "rowsPerPage": "Rijen per pagina",
+    "rowsPerPageTooltip": "Stel het standaardaantal records in dat per pagina wordt weergegeven",
     "showBorder": "Asrand weergeven",
     "currencyDollar": "Valuta - Dollar ($)",
     "currencyEuro": "Valuta - euro (€)",
@@ -1403,7 +1450,27 @@
     "noColumnsOrdered": "Geen kolommen besteld",
     "columnsDefaultOrder": "De kolommen worden in hun standaardvolgorde weergegeven",
     "moveUp": "Ga omhoog",
-    "moveDown": "Naar beneden gaan"
+    "moveDown": "Naar beneden gaan",
+    "toggleFunctionEditor": "Functie-editor in- en uitschakelen",
+    "useSavedFunction": "Gebruik de functie Opgeslagen",
+    "showQueryResults": "Resultaten van de zoekopdracht weergeven",
+    "hideQueryResults": "Resultaten van zoekopdrachten verbergen",
+    "vrlExtractionTooltip": "Om geëxtraheerde VRL-velden in het diagram te gebruiken, schrijft u een VRL-functie en klikt u op de knop Toepassen. De velden worden geëxtraheerd, zodat u ze kunt gebruiken om de grafiek samen te stellen.",
+    "errorFetchingFunctions": "Fout bij het ophalen van functies",
+    "functionAppliedSuccess": "De functie {name} is succesvol toegepast.",
+    "connectNullValuesTooltip": "Verbind datapunten over ontbrekende waarden met een lijn.",
+    "panelTimeSettings": "Instellingen voor paneeltijd",
+    "panelTimeEnabled": "Tijd op paneelniveau toestaan",
+    "useGlobalTime": "Gebruik wereldwijde tijd",
+    "useIndividualTime": "Gebruik individuele tijd",
+    "panelTimeGlobalHint": "Het paneel houdt de wereldwijde dashboardtijd bij. Wijzigingen in de globale tijd zullen dit paneel updaten.",
+    "panelTimeIndividualHint": "Panel zal zijn eigen tijdbereik gebruiken. Stel de tijd in met behulp van de datumkiezer hieronder. Wereldwijde tijdwijzigingen hebben geen invloed op dit paneel.",
+    "panelTimeRange": "Tijdbereik van het paneel",
+    "panelTimeRangeTooltip": "Dit tijdbereik is alleen van toepassing op dit paneel. Andere panels gebruiken hun eigen geconfigureerde tijden of de globale dashboardtijd.",
+    "panelTimeSettingsTooltip": "Configureer hoe dit paneel het tijdbereik bepaalt. U kunt het tijdbereik van het dashboard gebruiken of een aangepaste tijdsperiode instellen voor dit paneel.",
+    "panelTimeMode": "Bron voor tijdbereik (bij laden van het dashboard)",
+    "useDefaultTimeTooltip": "Indien ingeschakeld, gebruikt dit paneel de ingestelde standaardduur als tijdsbereik bij het laden van het dashboard, in plaats van de globale dashboardtijd.",
+    "defaultDuration": "Standaardduur"
   },
   "panel": {
     "header": "Paneel",
@@ -1426,7 +1493,6 @@
     "otherColumn": "Andere kolommen",
     "config": "Config",
     "filters": "Filters",
-    "customSql": "SQL op maat",
     "field": "Velden",
     "discard": "Weggooien",
     "edit": "Bewerken",
@@ -1435,7 +1501,6 @@
     "layout": "Indeling",
     "sql": "Zoekopdracht",
     "back": "<< Terug",
-    "auto": "Auto",
     "promQL": "ProMQL",
     "latitude": "Breedtegraad",
     "longitude": "Lengtegraad",
@@ -1468,9 +1533,6 @@
     "panelDuplicationFailed": "Het dupliceren van het paneel is mislukt",
     "mapname": "Naam",
     "mapvalue": "Waarde",
-    "customChartTypeSelector": "Aangepaste grafiektypekiezer",
-    "customChartTypeSelectorHint": "Selecteer een diagramtype uit de eCharts bibliotheek om aan de slag te gaan met een eenvoudige codestructuur",
-    "selectChartType": "Diagramtype selecteren",
     "joins": "Sluit zich aan",
     "addJoin": "Join toevoegen",
     "removeJoin": "Join verwijderen",
@@ -1487,14 +1549,15 @@
     "SQL": "SQL",
     "builder": "Bouwer",
     "custom": "Op maat",
-    "sqlBuilder": "SQL Builder"
+    "sqlBuilder": "SQL Builder",
+    "generatedSql": "Gegenereerde SQL",
+    "enterCustomSql": "Voer uw aangepaste SQL-query in...",
+    "customSql": "SQL op maat"
   },
   "home": {
     "streams": "Streams",
     "totalDataIngested": "Totaal aantal opgenomen gegevens",
     "view": "Bekijk meer >>",
-    "queryFunctions": "Query-functies",
-    "ingestFunctions": "Opnamefuncties",
     "scheduledAlert": "Geplande waarschuwingen",
     "rtAlert": "Waarschuwingen in realtime",
     "noData": "Geen gegevens opgenomen",
@@ -1588,15 +1651,12 @@
     "edit": "Bewerken",
     "search": "Zoekwaarschuwing",
     "name": "Naam",
-    "function": "Waarschuwingsgegevens",
     "save": "Opslaan",
     "sql": "Zoekopdracht",
     "realTime": "Realtime",
     "scheduled": "Gepland",
-    "duration": "Duur waarvoor de waarschuwing wordt geëvalueerd",
     "condition": "Conditie",
     "interval": "Frequentie waarmee de waarschuwing wordt geëvalueerd",
-    "delayNotificationUntil": "Melding uitstellen tot, na één melding",
     "destination": "Bestemming",
     "stream_name": "Naam van de stream",
     "actions": "Acties",
@@ -1606,7 +1666,6 @@
     "addTitle": "Waarschuwing toevoegen",
     "updateTitle": "Waarschuwing bijwerken",
     "delete": "Verwijderen",
-    "stream_type": "Streamtype",
     "clone": "Klonenwaarschuwing",
     "column": "Kolom",
     "alertType": "Soort waarschuwing",
@@ -1770,7 +1829,9 @@
       "analyzeRca": "Analyseren",
       "rcaInProgress": "De hoofdoorzaak analyseren...",
       "rcaCompleted": "Analyse van de hoofdoorzaak voltooid",
-      "noRcaYet": "Geen analyse van de hoofdoorzaak beschikbaar. Klik op 'Analyseren' om te beginnen."
+      "noRcaYet": "Geen analyse van de hoofdoorzaak beschikbaar. Klik op 'Analyseren' om te beginnen.",
+      "search": "Zoek incidenten...",
+      "sreChat": "Vraag de SRE-assistent"
     },
     "events": "Evenementen",
     "multiWindow": "Vergelijk met het verleden",
@@ -1813,7 +1874,12 @@
         "alertMeWhen": "Waarschuw me wanneer",
         "butNoMoreThan": ", maar niet meer dan eens per",
         "defaultConditions": "Waarschuw me wanneer aan de geconfigureerde voorwaarden is voldaan"
-      }
+      },
+      "title": "Samenvatting",
+      "alertName": "Waarschuwingsnaam",
+      "streamInfo": "Gegevensbron",
+      "alertType": "Waarschuwingstype",
+      "queryCondition": "Query-voorwaarde"
     },
     "correlation": {
       "title": "Correlatie tussen waarschuwingen",
@@ -1895,7 +1961,114 @@
     "msteams": "Microsoft Teams",
     "pagerduty": "PagerDuty",
     "opsgenie": "Opsgenie",
-    "servicenow": "ServiceNow"
+    "servicenow": "ServiceNow",
+    "saveAlert": "Waarschuwing opslaan",
+    "aggregation_threshold": "Waarschuwing als er groepen zijn",
+    "thresholdDynamic": {
+      "alertMeWhen": "Waarschuw me wanneer",
+      "metricTypes": {
+        "resultsPassedFilter": "resultaten geslaagd: filters",
+        "distinctGroupsAffected": "verschillende groepen worden getroffen",
+        "metricsMatchCriteria": "statistieken komen overeen met criteria",
+        "matchingLogsFound": "overeenkomende logboeken gevonden",
+        "groupsPassFilter": "groepen voldoen aan filtercriteria",
+        "distinctGroups": "verschillende groepen gevonden",
+        "resultRows": "resultaatrijen geretourneerd",
+        "timeSeries": "actieve tijdreeksen gevonden",
+        "matchingRecords": "overeenkomende records gevonden",
+        "groupsWithHaving": "wedstrijdvoorwaarden voor groepen",
+        "uniqueGroups": "unieke groepen",
+        "events": "wedstrijdvoorwaarden voor evenementen",
+        "aggregatedValue": "wedstrijdvoorwaarden"
+      },
+      "contextLabels": {
+        "groupedBy": "Gegroepeerd op:",
+        "havingConditions": "De voorwaarden met betrekking tot:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Naam van de waarschuwing",
+      "sqlQuery": "SQL-zoekopdracht",
+      "promqlQuery": "ProMQL-zoekopdracht",
+      "conditions": "Voorwaarden",
+      "copy": "Kopiëren",
+      "noCondition": "Geen voorwaarde",
+      "noDescription": "Geen beschrijving",
+      "evaluationHistory": "Geschiedenis van de evaluatie",
+      "loadingHistory": "Geschiedenis wordt geladen...",
+      "noHistoryAvailable": "Geen evaluatiegeschiedenis beschikbaar voor deze waarschuwing",
+      "results": "Resultaten"
+    },
+    "historyTable": {
+      "timestamp": "Tijdstempel",
+      "status": "Status",
+      "evaluationTime": "Evaluatie (s)",
+      "queryTime": "Zoekopdracht (ms)",
+      "error": "Fout"
+    },
+    "back": "Terug",
+    "continue": "Ga verder",
+    "wouldTrigger": "ZOU TRIGGEREN",
+    "wouldNotTrigger": "ZOU NIET ACTIVEREN",
+    "queryBuilder": "Bouwer",
+    "groupByHelp": {
+      "description": "Groepeer de geaggregeerde gegevens op specifieke velden om afzonderlijke waarschuwingen te creëren voor elke unieke waarde.",
+      "example": "Voorbeeld: groepeer op „hostnaam” om individuele meldingen per server te ontvangen, of op „status_code” om fouten afzonderlijk bij te houden."
+    },
+    "conditions": {
+      "condition": "Conditie",
+      "conditionGroup": "Conditiegroep",
+      "addConditionTooltip": "Een nieuwe voorwaarde aan deze groep toevoegen",
+      "addConditionGroupTooltip": "Een geneste conditiegroep toevoegen (maximale diepte: 2)",
+      "maxDepthReachedTooltip": "Maximale nestdiepte bereikt"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Waarschuwing ingesteld voor",
+      "currentWindow": "Huidig venster",
+      "cycle": "Cyclus",
+      "cycleTooltip": "Vergelijk de resultaten met dezelfde periode in de vorige cyclus.",
+      "runningFor": "Hardlopen gedurende {periode} in het interval van elke {frequentie}",
+      "currentWindowCannotBeDeleted": "Het huidige venster kan niet worden verwijderd",
+      "comparingWith": "Vergelijken met",
+      "referenceWindow": "Referentievenster",
+      "timeFrame": "Tijdsbestek",
+      "timeFrameTooltip": "Tijdbereik voor uw vraag.",
+      "comparingText": "Vergelijking van het huidige vensterqueryresultaat met het queryresultaat van de vorige {offset}.",
+      "addComparisonWindow": "Vergelijkingsvenster toevoegen",
+      "goToConditions": "Ga naar de voorwaarden",
+      "goToConditionsTooltip": "Klik op „Ga naar de voorwaarden” om de gebeurtenissen voor geselecteerde vergelijkingsvensters te verifiëren"
+    },
+    "alertSettings": {
+      "cronSchedule": "Cron-schema",
+      "addNewDestination": "Nieuwe bestemming toevoegen",
+      "cooldownTooltip": "Als de waarschuwing wordt geactiveerd, hoe lang moet het dan wachten voordat een nieuwe melding wordt verzonden. Als de waarschuwing bijvoorbeeld om 16.00 uur wordt geactiveerd en de stiltemelding is ingesteld op 10 minuten, dan wordt er pas om 16.10 uur nog een melding gestuurd, zelfs als de waarschuwing na 1 minuut nog steeds duurt. Dit is om te voorkomen dat de gebruiker wordt gespamd met meldingen.",
+      "thresholdTooltip": "Definieert wanneer de waarschuwing moet worden geactiveerd op basis van het aantal gebeurtenissen of de geaggregeerde waarde. Voorbeeld: Indien ingesteld op „> 100\", wordt de waarschuwing geactiveerd wanneer het aantal meer dan 100 gebeurtenissen bedraagt.",
+      "periodTooltip": "Periode gedurende welke de query moet worden uitgevoerd. Bijvoorbeeld 10 minuten betekent dat telkens wanneer de query wordt uitgevoerd, de laatste 10 minuten aan gegevens worden gebruikt.",
+      "frequencyTooltipMinutes": "Hoe vaak de taak moet worden uitgevoerd. bijv. elke 5 minuten.",
+      "frequencyTooltipCron": "Standaard UNIX cron-formaat met 5 velden gescheiden door spaties: [Minuut 0-59] [Uur 0-23] [Dag van maand 1-31] [Maand 1-12 of JAN-DEC] [Dag van week 0-7 of '1L-7L', 0 en 7 voor zondag].",
+      "timezoneWarning": "Waarschuwing: De weergegeven tijdzone is bij benadering. Controleer en selecteer handmatig de juiste tijdzone.",
+      "destinationsTooltip": "Selecteer een of meer bestemmingen om waarschuwingsmeldingen te verzenden.",
+      "templateTooltip": "Optioneel: Selecteer een sjabloon om te gebruiken voor alle bestemmingen in deze waarschuwing. Met sjablonen kunt u de indeling van waarschuwingsberichten aanpassen. Indien niet geselecteerd, zal elke bestemming zijn eigen geconfigureerde sjabloon gebruiken."
+    },
+    "advanced": {
+      "addVariable": "Variabele toevoegen",
+      "variablesTooltip": "Variabelen worden gebruikt om gegevens van de waarschuwing naar de bestemming door te geven.",
+      "rowTemplateTooltip": "Rijsjabloon wordt gebruikt om het waarschuwingsbericht op te maken.",
+      "templateType": "Sjabloontype:"
+    },
+    "addConditions": "Voorwaarden toevoegen",
+    "sqlEditor": "SQL-editor",
+    "promqlEditor": "ProMQL-editor",
+    "vrlEditor": "VRL-redacteur",
+    "generateVRL": "Genereer VRL",
+    "applyVRL": "VRL toepassen",
+    "runQuery": "Query uitvoeren",
+    "onStream": "op",
+    "streamLabel": "stroom",
+    "noStreamSelected": "Geen stream geselecteerd",
+    "resultsIncludeAllWindows": "De resultaten omvatten alle toevoegingen met meerdere vensters",
+    "runQueryForOutput": "Klik op Query uitvoeren om de uitvoer te zien",
+    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -1942,7 +2115,14 @@
     "preview": "voorsmaak",
     "test": "Test",
     "saved": "Bestemming succesvol opgeslagen",
-    "saveError": "Het opslaan van de bestemming is mislukt"
+    "saveError": "Het opslaan van de bestemming is mislukt",
+    "customWebhook": "Op maat (Webhook)",
+    "customEmail": "Aangepast (e-mail)",
+    "customAction": "Aangepast (actie)",
+    "custom": "Op maat",
+    "separator": "Separator",
+    "separator_placeholder": "Voer een scheidingsteken in (bijvoorbeeld |,\\n,\\ t, spatie)",
+    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)"
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",
@@ -2104,16 +2284,8 @@
       "howItWorksTitle": "Hoe Service Identity werkt",
       "howItWorksDescription": "(Fully Qualified Name) wordt berekend op basis van uw telemetriedimensies om services in verschillende gegevensbronnen op unieke wijze te identificeren en met elkaar te correleren.",
       "priorityOrderLabel": "Prioriteitsvolgorde:",
-      "priorityOrderDescription": "De afmetingen worden gecontroleerd in de onderstaande volgorde. De eerste dimensie met een waarde wordt de Service FQN.",
       "exampleLabel": "Voorbeeld:",
-      "exampleText1": "Als je beide hebt",
-      "exampleText2": "en",
-      "exampleText3": "de FQN zal zijn",
-      "exampleText4": "omdat",
-      "exampleText5": "heeft een hogere prioriteit.",
       "correlationDescription": "Services met dezelfde FQN zijn gecorreleerd, zelfs als ze verschillende",
-      "correlationDescriptionField": "service",
-      "correlationDescriptionEnd": "namen.",
       "fqnPriorityTitle": "Prioritaire dimensies van de FAQN",
       "fqnPriorityTooltip": "Definieert welke dimensies worden gebruikt om de Service FQN voor correlatie af te leiden. De eerste dimensie met een waarde wint. Herschik zodat deze past bij je infrastructuur.",
       "fqnPriorityDescription": "Sleep om de volgorde te wijzigen of gebruik de pijlknoppen. De eerste overeenkomende dimensie bepaalt de Service FQN.",
@@ -2134,20 +2306,40 @@
       "traces": "Sporen",
       "metrics": "Metrieken",
       "retry": "Probeer het opnieuw",
-      "k8sDeployment": "Naam van de Kubernetes-implementatie",
-      "k8sStatefulSet": "Kubernetes StatefulSet-naam",
-      "k8sDaemonSet": "De naam van Kubernetes DaemonSet",
-      "k8sJob": "Functienaam Kubernetes",
-      "k8sReplicaSet": "Kubernetes ReplicaSet-naam",
-      "k8sNamespace": "Kubernetes-naamruimte",
-      "awsEcsTask": "AWS ECS Task-familie",
-      "faasName": "Lambda, cloudfuncties, enz.",
-      "gcpCloudRun": "Google Cloud Run-service",
-      "azureCloudRole": "Naam van de rol van Azure Cloud",
-      "processName": "Naam van het proces voor blank metaal",
-      "serviceDim": "OpenTelemetry service.name",
-      "host": "Naam van host/node",
-      "environment": "Implementatieomgeving"
+      "serviceIdentityLabel": "Service-identiteit",
+      "compoundFqnLabel": "Identiteitsformaat:",
+      "compoundFqnDescription": "Scope-dimensies worden samengevoegd met '/', daarna wordt de eerste niet-null workload-dimensie toegevoegd.",
+      "exampleText": "Met {dim1} en {dim2} wordt de identiteit {value}.",
+      "correlationLabel": "Correlatie:",
+      "addDimensionHint": "Selecteer een semantische groep om toe te voegen aan de prioriteitslijst.",
+      "selectSemanticGroup": "Selecteer semantische groep",
+      "noSemanticGroupsAvailable": "Geen semantische groepen beschikbaar. Configureer eerst de veldtoewijzingen hieronder.",
+      "noSemanticGroupsConfigured": "Geen semantische groepen geconfigureerd. Voeg hieronder veldtoewijzingen toe om beschikbare dimensies te definiëren.",
+      "configureSemanticGroupsFirst": "Configureer hieronder semantische veldtoewijzingen om beschikbare dimensies voor identiteitsprioriteit te definiëren.",
+      "saveFqnPriority": "Identiteitsprioriteit opslaan",
+      "saveSemanticMappings": "Semantische toewijzingen opslaan",
+      "fqnPrioritySaved": "Identiteitsprioriteitsconfiguratie succesvol opgeslagen",
+      "semanticMappingsSaved": "Semantische veldtoewijzingen succesvol opgeslagen",
+      "filters": "Filters",
+      "availableDimensions": "Beschikbare dimensies",
+      "semanticFieldGroupsTitle": "Veldtoewijzingen",
+      "groupsLabel": "groepen",
+      "noMatchingGroups": "Geen overeenkomende groepen",
+      "fqnFormulaTitle": "Identiteitsformule",
+      "fqnFormulaTooltip": "Toont hoe de service-identiteit wordt berekend. Scope-dimensies (blauw) worden samengevoegd met '/'. De eerste niet-null workload-dimensie (groen) wordt de servicenaam.",
+      "scopeDimension": "Scope-dimensie",
+      "workloadDimension": "Workload-dimensie",
+      "noFormulaConfigured": "Geen identiteitsformule geconfigureerd. Voeg hierboven dimensies toe.",
+      "scopeLegend": "Scope (samengevoegd)",
+      "workloadLegend": "Workload (eerste niet-null)",
+      "firstNonNull": "eerste niet-null van",
+      "scopeTag": "Scope",
+      "workloadTag": "Workload",
+      "scopeOnly": "alleen scope",
+      "noMatchingDimensions": "Geen overeenkomende dimensies",
+      "otherGroup": "Overig",
+      "fallbackGroup": "Terugval",
+      "fallbackNote": "Terugvaldimensies (zoals 'service') zijn van toepassing op alle omgevingen wanneer geen omgevingsspecifieke workload overeenkomt."
     },
     "pageSubtitle": "Instellingen voor uw toepassing aanpassen",
     "platformSettings": "Platform-instellingen",
@@ -2291,7 +2483,11 @@
     "errorSavingPipeline": "Fout tijdens het opslaan van de pijplijn",
     "cancelChangesConfirm": "Weet je zeker dat je wijzigingen wilt annuleren?",
     "cancel": "Annuleer",
-    "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten"
+    "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten",
+    "promqlOnlyForMetrics": "ProMQL is alleen beschikbaar voor het streamtype voor statistieken",
+    "invalidCronExpression": "Ongeldige cron-expressie",
+    "thresholdShouldNotBeEmpty": "Drempelwaarde mag niet leeg zijn",
+    "errorGettingResults": "Fout bij het verkrijgen van resultaten"
   },
   "reports": {
     "header": "Rapporten",
@@ -2348,7 +2544,9 @@
     "collapseFields": "Velden samenvouwen",
     "openFields": "Open velden",
     "timeRangeUpdated": "Dit spoor is niet opgenomen in het geselecteerde tijdbereik. Het tijdbereik is bijgewerkt zodat het overeenkomt met de tijdstempel van de trace.",
-    "fetchingMoreTraces": "Nog meer sporen ophalen..."
+    "fetchingMoreTraces": "Nog meer sporen ophalen...",
+    "showErrorOnly": "Alleen fout weergeven",
+    "openInTraces": "Openen in Traces"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -2521,7 +2719,8 @@
     "sql_query": "SQL-zoekopdracht",
     "resuls": "Resultaten",
     "wrapText": "Tekst omwikkelen",
-    "delayMessage": "De zoekgeschiedenis kan worden vertraagd door"
+    "delayMessage": "De zoekgeschiedenis kan worden vertraagd door",
+    "results": "Resultaten"
   },
   "search_scheduler_job": {
     "title": "Zoek Job Scheduler",
@@ -2585,7 +2784,8 @@
     "showLegends": "Legendes weergeven"
   },
   "alert_list": {
-    "alert_details": "Details van de waarschuwing"
+    "alert_details": "Details van de waarschuwing",
+    "alert_history": "Waarschuwingsgeschiedenis"
   },
   "latencyInsights": {
     "title": "Inzichten",
@@ -2612,7 +2812,8 @@
     "analyzeButtonLabel": "Analyseren",
     "refreshTooltip": "Analyse vernieuwen met bijgewerkt percentiel",
     "customSQLFieldsDisabled": "Veldselectie is niet beschikbaar voor aangepaste SQL-query's. Dimensies worden geëxtraheerd uit de resultaten van uw zoekopdracht.",
-    "timeRangeSelected": "Tijdbereik geselecteerd"
+    "timeRangeSelected": "Tijdbereik geselecteerd",
+    "dimensionsSelected": "Geselecteerde afmetingen"
   },
   "volumeInsights": {
     "title": "Inzichten",
@@ -2621,7 +2822,9 @@
     "analyzeTooltip": "Analyseer traceersnelheidspatronen in verschillende dimensies",
     "analyzeTooltipLogs": "Analyseer de dimensieverdeling voor het huidige tijdbereik",
     "rateLabel": "Tarief:",
-    "timeRangeLabel": "Tijdbereik:"
+    "timeRangeLabel": "Tijdbereik:",
+    "analyzeTooltipTraces": "Analyseer de traceerdimensies voor snelheid, latentie en foutpatronen",
+    "insightsButtonLabel": "Inzichten"
   },
   "errorInsights": {
     "title": "Inzichten",
@@ -2733,7 +2936,15 @@
         "startBeforeEnd": "De starttijd moet vóór de eindtijd liggen",
         "endAfterStart": "De eindtijd moet na de starttijd liggen"
       }
-    }
+    },
+    "viewInTraces": "Bekijk in Traces",
+    "viewInTracesTooltip": "Open de pagina met sporen met het RED-metriekendashboard en alle gerelateerde sporen",
+    "exportToJson": "Exporteren naar JSON",
+    "noLogsDescription": "Er zijn geen logboeken gevonden voor deze correlatie in het geselecteerde tijdbereik.",
+    "tracesErrorDetails": "Er is een fout opgetreden tijdens het ophalen van traceergegevens. Probeer het nog eens.",
+    "metricsError": "Kan statistieken niet laden",
+    "metricsErrorDetails": "Er is een fout opgetreden tijdens het ophalen van metrische gegevens. Probeer het nog eens.",
+    "noMetricsDescription": "Er zijn geen statistieken gevonden voor deze correlatie in het geselecteerde tijdbereik."
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",
@@ -2782,5 +2993,10 @@
     "invalidFormat": "Ongeldig formaat",
     "mustBeGreaterThan": "Moet groter zijn dan {value}",
     "mustBeLessThan": "Moet kleiner zijn dan {value}"
+  },
+  "nlMode": {
+    "toggle": "Modus voor natuurlijke taal",
+    "noAdditionalOptions": "Geen aanvullende opties",
+    "generateVRL": "Genereer VRL"
   }
 }

@@ -29,7 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         leave-to-class="opacity-0 -translate-y-4 max-h-0"
       >
         <TracesMetricsDashboard
-          v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
+          v-if="
+            searchObj.data.stream.selectedStream.value &&
+            searchObj.searchApplied
+          "
           ref="metricsDashboardRef"
           :streamName="searchObj.data.stream.selectedStream.value"
           :timeRange="{
@@ -42,12 +45,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
           "
           @time-range-selected="onMetricsTimeRangeSelected"
+          @filters-updated="onMetricsFiltersUpdated"
         />
       </transition>
 
       <div
         data-test="traces-search-result-count"
-        class="text-subtitle1 text-bold q-pt-sm q-px-sm"
+        class="text-bold q-pt-sm tw:pb-[0.125rem]! tw:pl-[0.8rem]! tw:text-[0.85rem]"
         v-show="
           searchObj.data.stream.selectedStream.value &&
           !searchObj.data.errorMsg?.trim()?.length &&
@@ -81,8 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         class="text-center tw:mx-[10%] tw:my-[40px] tw:text-[20px]"
       >
-        <q-icon name="info"
-color="primary" size="md" /> No traces found. Please
+        <q-icon name="info" color="primary" size="md" /> No traces found. Please
         adjust the filters and try again.
       </div>
       <q-virtual-scroll
@@ -108,8 +111,7 @@ color="primary" size="md" /> No traces found. Please
         :virtual-scroll-slice-ratio-before="10"
         @virtual-scroll="onScroll"
       >
-        <q-item data-test="traces-search-result-item" :key="index"
-dense>
+        <q-item data-test="traces-search-result-item" :key="index" dense>
           <TraceBlock
             :item="item"
             :index="index"
@@ -147,6 +149,7 @@ export default defineComponent({
     "remove:searchTerm",
     "search:timeboxed",
     "get:traceDetails",
+    "metrics:filters-updated",
   ],
   methods: {
     closeColumn(col: any) {
@@ -238,6 +241,11 @@ export default defineComponent({
       });
     };
 
+    const onMetricsFiltersUpdated = (filters: string[]) => {
+      // Pass filters up to Index.vue to update Query Editor
+      emit("metrics:filters-updated", filters);
+    };
+
     const getDashboardData = () => {
       metricsDashboardRef?.value?.loadDashboard();
     };
@@ -257,6 +265,7 @@ export default defineComponent({
       getImageURL,
       getRowIndex,
       onMetricsTimeRangeSelected,
+      onMetricsFiltersUpdated,
       getDashboardData,
     };
   },

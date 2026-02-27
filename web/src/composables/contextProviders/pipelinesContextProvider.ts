@@ -22,29 +22,47 @@ import type { ContextProvider, PageContext } from './types';
 
 /**
  * Creates a pipelines context provider that extracts essential context from the pipeline editor state
- * 
+ *
  * @param pipelineObj - The pipeline object from useDragAndDrop composable
  * @param store - Vuex store instance (for organization info)
- * 
+ * @param streamName - Name of the stream being queried (optional, for query nodes)
+ * @param streamType - Type of stream: 'logs', 'metrics', or 'traces' (optional, for query nodes)
+ * @param queryType - Type of query: 'sql' or 'promql' (optional, for query nodes)
+ *
  * Example:
  * ```typescript
- * const provider = createPipelinesContextProvider(pipelineObj, store);
+ * const provider = createPipelinesContextProvider(pipelineObj, store, 'my-stream', 'logs', 'sql');
  * ```
  */
 export const createPipelinesContextProvider = (
   pipelineObj: any,
-  store: any
+  store: any,
+  streamName?: string,
+  streamType?: string,
+  queryType?: string
 ): ContextProvider => {
   return {
     getContext(): PageContext {
       const pipeline = pipelineObj?.currentSelectedPipeline;
-      
+      const isEditNode = pipelineObj?.isEditNode;
+
       return {
         currentPage: 'Pipelines',
-        pipelineId: pipeline?.id || '',
+        pipelineId: pipeline?.pipeline_id || '',
         pipelineName: pipeline?.name || '',
         organization_identifier: store?.state?.selectedOrganization?.identifier || '',
-        user_intent: pipelineObj?.isEditPipeline ? 'edit existing pipeline' : 'create new pipeline'
+        user_intent: isEditNode
+          ? 'edit existing pipeline query node'
+          : pipelineObj?.isEditPipeline
+            ? 'edit existing pipeline'
+            : 'create new pipeline query node',
+        // Current timestamp when request is fired (microseconds) for AI agent time calculations
+        request_timestamp: Date.now() * 1000,
+        // Stream context for query nodes
+        selectedStreams: streamName ? [streamName] : ['default'],
+        streamType: streamType || 'logs',
+        queryType: queryType || 'sql',
+        pipelineNodeType: 'query',
       };
     }
   };

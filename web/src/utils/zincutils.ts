@@ -17,17 +17,22 @@ import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
 import { v4 as uuidv4, v7 as uuidv7 } from "uuid";
-import { useQuasar, date } from "quasar";
+import { date } from "quasar";
 import { useStore } from "vuex";
-import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
+import organizationService from "@/services/organizations";
 import { DateTime as _DateTime } from "luxon";
 import CronExpressionParser from "cron-parser";
 
 let moment: any;
 let momentInitialized = false;
 const organizationDataLocal: any = ref({});
-export const trialPeriodAllowedPath = ["iam", "users", "organizations"];
+export const trialPeriodAllowedPath = [
+  "iam",
+  "users",
+  "organizations",
+  "invitations",
+];
 
 const importMoment = async () => {
   if (!momentInitialized) {
@@ -367,7 +372,9 @@ export const getPath = () => {
   const pos = window.location.pathname.indexOf("/web/");
   const path =
     window.location.origin == "http://localhost:8081"
-      ? pos > -1 ? "/web/" : "/"
+      ? pos > -1
+        ? "/web/"
+        : "/"
       : pos > -1
         ? window.location.pathname.slice(0, pos + 5)
         : "";
@@ -377,8 +384,6 @@ export const getPath = () => {
 
 export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
-  const q = useQuasar();
-  const { getStreams } = useStreams();
   if (config.isCloud) {
     if (
       store.state.organizationData?.organizationSettings?.free_trial_expiry !=
@@ -405,15 +410,24 @@ export const routeGuard = async (to: any, from: any, next: any) => {
     store.state.zoConfig.restricted_routes_on_empty_data == true &&
     store.state.organizationData.isDataIngested == false
   ) {
-    await getStreams("", false).then((response: any) => {
-      if (response.list.length == 0) {
+    try {
+      const response = await organizationService.get_organization_summary(
+        store.state.selectedOrganization.identifier,
+      );
+      if (!response.data?.streams?.num_streams) {
         store.dispatch("setIsDataIngested", false);
         next({ path: "/ingestion" });
       } else {
         store.dispatch("setIsDataIngested", true);
         next();
       }
-    });
+    } catch (error) {
+      // If the summary API call fails, allow navigation to proceed
+      // The page itself will handle the error state
+      console.warn("Failed to fetch organization summary:", error);
+      store.dispatch("setIsDataIngested", true);
+      next();
+    }
   } else {
     next();
   }
@@ -480,6 +494,10 @@ export const formatLargeNumber = (number: number) => {
 
 export const formatSizeFromMB = (sizeInMB: string) => {
   let size = parseFloat(sizeInMB);
+
+  if (isNaN(size)) {
+    return "0 MB";
+  }
 
   const units = ["KB", "MB", "GB", "TB", "PB"];
   let index = 1; // Start from MB
@@ -1269,8 +1287,10 @@ export const getDuration = (createdAt: number) => {
   };
 };
 
-
-export const mergeAndRemoveDuplicates = (arr1: string[], arr2: string[]): string[] => {
+export const mergeAndRemoveDuplicates = (
+  arr1: string[],
+  arr2: string[],
+): string[] => {
   // Merge both arrays, then remove duplicates using Set
   return [...new Set([...arr1, ...arr2])];
 };
@@ -1285,7 +1305,7 @@ export const mergeAndRemoveDuplicates = (arr1: string[], arr2: string[]): string
  */
 export const processQueryMetadataErrors = (
   metadata: any,
-  timezone: string = "UTC"
+  timezone: string = "UTC",
 ): string => {
   if (!metadata || metadata.length === 0) {
     return "";
@@ -1296,7 +1316,11 @@ export const processQueryMetadataErrors = (
   // Handle multi-query format (array of arrays)
   if (Array.isArray(metadata[0])) {
     metadata[0].forEach((query: any) => {
-      if (query?.function_error && query?.new_start_time && query?.new_end_time) {
+      if (
+        query?.function_error &&
+        query?.new_start_time &&
+        query?.new_end_time
+      ) {
         const combinedMessage = getFunctionErrorMessage(
           query.function_error,
           query.new_start_time,
@@ -1337,7 +1361,7 @@ export const processQueryMetadataErrors = (
  */
 export const calculateRelativeTimePeriod = (
   startTime: number,
-  endTime: number
+  endTime: number,
 ): string => {
   const diffInMicroseconds = endTime - startTime;
   const diffInSeconds = Math.floor(diffInMicroseconds / 1000000);
@@ -1345,11 +1369,11 @@ export const calculateRelativeTimePeriod = (
   // Define time units in seconds
   const units = [
     { label: "M", value: 2592000 }, // ~30 days
-    { label: "w", value: 604800 },  // 7 days
-    { label: "d", value: 86400 },   // 1 day
-    { label: "h", value: 3600 },    // 1 hour
-    { label: "m", value: 60 },      // 1 minute
-    { label: "s", value: 1 },       // 1 second
+    { label: "w", value: 604800 }, // 7 days
+    { label: "d", value: 86400 }, // 1 day
+    { label: "h", value: 3600 }, // 1 hour
+    { label: "m", value: 60 }, // 1 minute
+    { label: "s", value: 1 }, // 1 second
   ];
 
   // Find the best matching unit
@@ -1372,7 +1396,7 @@ export const calculateRelativeTimePeriod = (
  */
 export const calculateAbsoluteDateTime = (
   startTime: number,
-  endTime: number
+  endTime: number,
 ): {
   selectedDate: { from: string; to: string };
   selectedTime: { startTime: string; endTime: string };
@@ -1418,7 +1442,7 @@ export const calculateAbsoluteDateTime = (
 export const buildDateTimeObject = (
   startTime: number,
   endTime: number,
-  type: "relative" | "absolute"
+  type: "relative" | "absolute",
 ): any => {
   const baseObj: any = {
     startTime,
@@ -1428,7 +1452,10 @@ export const buildDateTimeObject = (
 
   if (type === "relative") {
     // For relative type, calculate relativeTimePeriod
-    baseObj.relativeTimePeriod = calculateRelativeTimePeriod(startTime, endTime);
+    baseObj.relativeTimePeriod = calculateRelativeTimePeriod(
+      startTime,
+      endTime,
+    );
   } else if (type === "absolute") {
     // For absolute type, calculate selectedDate and selectedTime
     const absoluteDateTime = calculateAbsoluteDateTime(startTime, endTime);

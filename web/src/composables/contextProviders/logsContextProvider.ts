@@ -154,18 +154,24 @@ export const createLogsContextProvider = (
   return {
     async getContext(): Promise<PageContext> {
       try {
-        // Extract streams and stream type based on current mode
-        const streams = searchObj.meta.logsVisualizeToggle === "logs"
-          ? searchObj.data.stream.selectedStream
-          : dashboardPanelData ? [
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream,
-            ] : [];
+        // Always use the selected stream - it's what the user explicitly chose
+        let actualStreams: string[] = [];
+
+        // Handle logs and patterns mode - always use selected stream
+        if (searchObj.meta.logsVisualizeToggle === "logs" || searchObj.meta.logsVisualizeToggle === "patterns") {
+          actualStreams = searchObj.data.stream.selectedStream || [];
+        } else {
+          // Dashboard/visualize mode
+          actualStreams = dashboardPanelData ? [
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream,
+          ] : [];
+        }
 
         const streamType = searchObj.meta.logsVisualizeToggle === "logs"
           ? searchObj.data.stream.streamType
-          : dashboardPanelData ? 
+          : dashboardPanelData ?
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.stream_type : null;
@@ -179,21 +185,23 @@ export const createLogsContextProvider = (
           currentVRLQuery: searchObj?.data?.tempFunctionContent || '',
 
           // Stream information
-          selectedStreams: streams || [],
+          selectedStreams: actualStreams || [],
           streamType: streamType,
-          
+
           // Interesting fields organized by stream name (using actual structure)
           interestingFields: extractInterestingFieldsByStream(
             searchObj?.data?.stream?.selectedInterestingStreamFields || []
           ),
-          
+
           // Time range (conditional based on type)
           timeRange: buildTimeRangeContext(searchObj.data.datetime),
-          
+
           // Current organization
           organization_identifier: store?.state?.selectedOrganization?.identifier || '',
           quickMode: searchObj?.meta?.quickMode || false,
-          
+
+          // Current timestamp when request is fired (microseconds) for AI agent time calculations
+          request_timestamp: Date.now() * 1000,
         };
       } catch (error) {
         console.error('Error generating logs context:', error);

@@ -31,6 +31,7 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_viewer_delete_dest_',
         'rbac_viewer_update_dest_',
         'incident_e2e_dest_',
+        'e2e_incid_',              // alerts-incident-correlation.spec.js (incident correlation tests)
         'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
         /^destination\d{1,3}$/     // destination4, destination44, destination444, etc.
       ],
@@ -50,10 +51,11 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_viewer_delete_tmpl_',
         'rbac_viewer_update_tmpl_',
         'incident_e2e_template_',
+        'e2e_incid_',              // alerts-incident-correlation.spec.js (incident correlation tests)
         'e2e_promql_'              // alerts-regression.spec.js (Bug #9967 PromQL tests)
       ],
       // Folder prefixes to clean up
-      ['auto_', 'incident_e2e_folder_']
+      ['auto_', 'incident_e2e_folder_', 'E2E Incidents ']
     );
 
     // Clean up all reports owned by automation user
@@ -124,7 +126,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^metrics-pipeline-/,           // metrics-pipeline-* (scheduled pipeline tests)
         /^traces-pipeline-/,            // traces-pipeline-* (scheduled pipeline tests)
         /^condition-pipeline-/,         // condition-pipeline-* (scheduled pipeline tests)
-        /^metrics-condition-pipeline-/  // metrics-condition-pipeline-* (scheduled pipeline tests)
+        /^metrics-condition-pipeline-/,  // metrics-condition-pipeline-* (scheduled pipeline tests)
+        /^e2e_backfill_test_\d+$/       // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
       ]
     );
 
@@ -259,6 +262,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_join_/,                  // e2e_join_* (UNION test streams)
         /^e2e_conditions_/,            // e2e_conditions_* (Pipeline conditions UI test streams)
         /^e2e_apostrophe_/,            // e2e_apostrophe_* (Bug #9475 apostrophe test streams from logs-regression.spec.js)
+        /^e2e_highlighting_test$/,     // e2e_highlighting_test (Bug #9754 logs highlighting test stream from logs-9754.spec.js)
         /^e2e_streamcreation_/,        // e2e_streamcreation_* (Stream creation UI test streams)
         /^e2e_MyUpperStream/i,         // e2e_MyUpperStream* (Stream name casing test streams)
         /^e2e_mylowerstream/i,         // e2e_mylowerstream* (Stream name casing test streams)
@@ -298,7 +302,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_traces_pipeline_test$/,                  // Pipeline test traces stream
         /^e2e_traces_\d+_[a-z0-9]+$/,                  // Dynamic traces streams (e2e_traces_<timestamp>_<suffix>)
         /^backfill_source_\d+$/,                       // Backfill source streams (backfill_source_<number>)
-        /^backfill_dest_\d+$/                          // Backfill dest streams (backfill_dest_<number>)
+        /^backfill_dest_\d+$/,                         // Backfill dest streams (backfill_dest_<number>)
+        /^e2e_backfill_dest_\d+$/                      // e2e_backfill_dest_<timestamp> (pipeline-backfill.spec.js)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
@@ -352,6 +357,14 @@ test.describe("Pre-Test Cleanup", () => {
     // Groups: k8s-cluster, k8s-namespace, k8s-deployment, service
     // These are created by ensureSemanticGroupsExist() in correlationSettingsPage.js
     await pm.apiCleanup.cleanupCorrelationSettings();
+
+    // Clean up service graph test screenshots
+    const path = require('path');
+    const screenshotDir = path.join(__dirname, '..', 'test-results', 'screenshots');
+    await pm.apiCleanup.cleanupScreenshots(
+      ['service-graph-', 'tree-view-', 'graph-view-', 'graph-debug'],
+      screenshotDir
+    );
 
     testLogger.info('Pre-test cleanup completed successfully');
   });

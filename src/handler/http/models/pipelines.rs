@@ -53,7 +53,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    fn from(
+    pub fn from(
         meta_pipeline: meta_pipeline,
         paused_at: Option<i64>,
         last_error: Option<PipelineErrorInfo>,

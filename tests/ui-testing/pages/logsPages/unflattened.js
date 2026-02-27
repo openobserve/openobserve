@@ -100,7 +100,7 @@ class UnflattenedPage {
     }
 
     get timestampDropdown() {
-        return this.page.getByText("arrow_drop_down_timestamp:");
+        return this.page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_timestamp"]');
     }
 
     async isStoreOriginalDataEnabled() {

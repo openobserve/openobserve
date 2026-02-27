@@ -153,6 +153,7 @@ size="lg" color="primary" />
               clickable
               v-close-popup
               v-if="
+                !hideSearchTermActions &&
                 searchObj.data.stream.selectedStreamFields.some((item: any) =>
                   item.name === key ? item.isSchemaField : '',
                 ) && multiStreamFields.includes(key)
@@ -180,6 +181,7 @@ size="lg" color="primary" />
               clickable
               v-close-popup
               v-if="
+                !hideSearchTermActions &&
                 searchObj.data.stream.selectedStreamFields.some((item: any) =>
                   item.name === key ? item.isSchemaField : '',
                 ) && multiStreamFields.includes(key)
@@ -291,8 +293,15 @@ size="lg" color="primary" />
           :data-test="`log-expand-detail-key-${key}`"
           :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
-          <LogsHighLighting
-            :data="{ [key]: value[key] }"
+          <span class="log-key">"{{ key }}"</span><span class="log-separator">: </span><ChunkedContent
+            v-if="getContentSize(value[key]) > 50000"
+            :data="value[key]"
+            :field-key="`json_preview_${key}`"
+            :query-string="highlightQuery"
+            :simple-mode="false"
+          /><LogsHighLighting
+            v-else
+            :data="value[key]"
             :show-braces="false"
             :query-string="highlightQuery"
           /><span v-if="index < Object.keys(value).length - 1">,</span>
@@ -405,6 +414,7 @@ import { defineAsyncComponent } from "vue";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
@@ -438,12 +448,17 @@ export default {
       type: Boolean,
       default: false,
     },
+    hideSearchTermActions: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     NotEqualIcon,
     EqualIcon,
     AppTabs,
     LogsHighLighting,
+    ChunkedContent,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -535,14 +550,11 @@ export default {
       try {
         // Gate correlation feature behind enterprise check to avoid 403 errors
         if (config.isEnterprise !== "true") {
-          console.log("[JsonPreview] Correlation feature requires enterprise license");
           showViewRelatedBtn.value = false;
           return;
         }
 
         const available = await isCorrelationAvailable();
-        console.log("[JsonPreview] Correlation feature available:", available, "Mode:", props.mode);
-
         // Show button if correlation is available AND we're in detail view (sidebar or expanded)
         // AND service_streams is enabled in config
         // AND hideViewRelated prop is not set (used by DetailTable drawer to hide the button)
@@ -550,8 +562,6 @@ export default {
         const isDetailView = props.mode === 'sidebar' || props.mode === 'expanded';
         const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
         showViewRelatedBtn.value = available && isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
-
-        console.log("[JsonPreview] showViewRelatedBtn set to:", showViewRelatedBtn.value, "isDetailView:", isDetailView, "serviceStreamsEnabled:", serviceStreamsEnabled, "hideViewRelated:", props.hideViewRelated);
       } catch (err) {
         console.error("[JsonPreview] Error checking correlation availability:", err);
         showViewRelatedBtn.value = false;
@@ -582,8 +592,12 @@ export default {
     };
 
     const setViewTraceBtn = () => {
+      // Hide view traces button when service_streams_enabled is true
+      const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false;
+
       showViewTraceBtn.value =
         !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
+        !serviceStreamsEnabled && // Hide when service streams is enabled
         props.value[
           store.state.organizationData?.organizationSettings
             ?.trace_id_field_name
@@ -755,10 +769,6 @@ export default {
     };
 
     const openCorrelation = () => {
-      console.log(
-        "[JsonPreview] openCorrelation clicked, emitting show-correlation event with value:",
-        props.value,
-      );
       emit("show-correlation", props.value);
     };
 
@@ -879,6 +889,19 @@ export default {
       }
     };
 
+    const getContentSize = (data: any): number => {
+      if (data === null || data === undefined) return 0;
+      if (typeof data === "string") return data.length;
+      if (typeof data === "object") {
+        try {
+          return JSON.stringify(data).length;
+        } catch {
+          return 0;
+        }
+      }
+      return String(data).length;
+    };
+
     return {
       t,
       copyLogToClipboard,
@@ -925,6 +948,7 @@ export default {
       typeOfRegexPattern,
       regexPatternType,
       confirmRegexPatternType,
+      getContentSize,
     };
   },
 };

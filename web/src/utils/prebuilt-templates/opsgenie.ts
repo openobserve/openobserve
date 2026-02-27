@@ -19,7 +19,7 @@ import { PrebuiltConfig } from './types';
  * Creates alerts via Opsgenie Alert API
  */
 export const opsgenieTemplate = {
-  name: 'system-prebuilt-opsgenie',
+  name: 'prebuilt_opsgenie',
   body: JSON.stringify({
     "message": "OpenObserve Alert: {alert_name}",
     "alias": "openobserve-{alert_name}",
@@ -45,7 +45,7 @@ export const opsgenieTemplate = {
 };
 
 export const opsgenieConfig: PrebuiltConfig = {
-  templateName: 'system-prebuilt-opsgenie',
+  templateName: 'prebuilt_opsgenie',
   templateBody: opsgenieTemplate.body,
   headers: {
     'Content-Type': 'application/json',

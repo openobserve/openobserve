@@ -577,8 +577,8 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
     if path_columns.len() < 2 {
         return Ok(());
     }
-    // node is a special prefix, it does not need to create org
-    if path_columns[0].eq("node") {
+    // node and profile are special prefixes, they do not need to create org
+    if path_columns[0].eq("node") || path_columns[0].eq("profile") {
         return Ok(());
     }
     // Hack for v2 apis
@@ -1198,10 +1198,8 @@ fn _handle_auth_failure_for_redirect(req: &Request, error: &AuthError) -> AuthEr
         .with_query_param("short_url", &full_url)
         .build();
     log::warn!(
-        "Authentication failed for path: {}, err: {:?}, {}",
+        "Authentication failed for path: {}, err: {error:?}, {redirect_http}",
         req.uri().path(),
-        error,
-        &redirect_http,
     );
     AuthError::Unauthorized(redirect_http.to_string())
 }

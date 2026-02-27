@@ -33,11 +33,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div v-if="beingUpdated" class="text-h6" data-test="add-alert-title">
-          {{ t("alerts.updateTitle") }}
-        </div>
-        <div v-else class="text-h6" data-test="add-alert-title">
-          {{ t("alerts.addTitle") }}
+        <div class="text-h6 tw:flex tw:items-center" data-test="add-alert-title">
+          <template v-if="beingUpdated">
+            {{ t("alerts.updateTitle") }}:
+            <span
+              :class="[
+                'tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block tw:ml-2',
+                store.state.theme === 'dark'
+                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                  : 'tw:text-blue-600 tw:bg-blue-50'
+              ]"
+            >
+              {{ formData.name }}
+              <q-tooltip v-if="formData?.name?.length > 25" class="tw:text-sm">
+                {{ formData.name }}
+              </q-tooltip>
+            </span>
+          </template>
+          <template v-else>
+            {{ t("alerts.addTitle") }}
+          </template>
         </div>
         </div>
         <div class="flex items-center tw:gap-2">
@@ -65,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         scroll-behavior: smooth;
       "
     >
-      <div class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2">
+      <div class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2" style="position: relative;">
         <!-- Stepper Header (Full Width) -->
         <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
         <q-stepper
@@ -97,11 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 1"
           :disable="1 > lastValidStep"
         >
-          <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (60%) -->
-            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
-              <div class="tw:flex-1" style="overflow: auto;">
+          <!-- Wrapper with flex container -->
+          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
+            <!-- Left Column Only: Step Content (60%) -->
+            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+              <div style="flex: 1; overflow: auto;">
                 <AlertSetup
                   ref="step1Ref"
                   :formData="formData"
@@ -118,23 +133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:active-folder-id="updateActiveFolderId"
                 />
               </div>
-
             </div>
-
-            <div class="tw:flex-1">
-              <AlertWizardRightColumn
-                ref="previewAlertRef"
-                :formData="formData"
-                :previewQuery="previewQuery"
-                :generatedSqlQuery="generatedSqlQuery"
-                :selectedTab="formData.query_condition.type || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-                :wizardStep="wizardStep"
-                :isUsingBackendSql="isUsingBackendSql"
-              />
-            </div>
+            <!-- Right column space (40%) - empty but reserves space -->
+            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
           </div>
         </q-step>
 
@@ -147,11 +148,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 2"
           :disable="2 > lastValidStep"
         >
-          <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (60%) -->
-            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
-              <div class="tw:flex-1" style="overflow: auto;">
+          <!-- Wrapper with flex container -->
+          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
+            <!-- Left Column Only: Step Content (60%) -->
+            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+              <div style="flex: 1; overflow: auto;">
                 <QueryConfig
                   ref="step2Ref"
                   :tab="formData.query_condition.type || 'custom'"
@@ -167,6 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :vrlFunction="decodedVrlFunction"
                   :streamName="formData.stream_name"
                   :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                  :isAggregationEnabled="isAggregationEnabled"
+                  :promqlCondition="formData.query_condition.promql_condition"
                   @update:tab="updateTab"
                   @update-group="updateGroup"
                   @remove-group="removeConditionGroup"
@@ -176,25 +179,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:vrlFunction="(value) => formData.query_condition.vrl_function = value"
                   @validate-sql="validateSqlQuery"
                   @clear-multi-windows="clearMultiWindows"
+                  @editor-closed="handleEditorClosed"
+                  @editor-state-changed="handleEditorStateChanged"
+                  @update:isAggregationEnabled="(value) => isAggregationEnabled = value"
+                  @update:aggregation="(value) => formData.query_condition.aggregation = value"
+                  @update:promqlCondition="(val) => formData.query_condition.promql_condition = val"
                 />
               </div>
-
             </div>
-
-            <div class="tw:flex-1">
-              <AlertWizardRightColumn
-                ref="previewAlertRef"
-                :formData="formData"
-                :previewQuery="previewQuery"
-                :generatedSqlQuery="generatedSqlQuery"
-                :selectedTab="formData.query_condition.type || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-                :wizardStep="wizardStep"
-                :isUsingBackendSql="isUsingBackendSql"
-              />
-            </div>
+            <!-- Right column space (40%) - empty but reserves space -->
+            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
           </div>
         </q-step>
 
@@ -208,11 +202,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 3"
           :disable="3 > lastValidStep"
         >
-          <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (60%) -->
-            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: 100%; overflow: hidden;">
-              <div class="tw:flex-1" style="overflow: auto;">
+          <!-- Wrapper with flex container -->
+          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
+            <!-- Left Column Only: Step Content (60%) -->
+            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+              <div style="flex: 1; overflow: auto;">
                 <CompareWithPast
                   ref="step3Ref"
                   :multiTimeRange="formData.query_condition.multi_time_range"
@@ -225,23 +219,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @goToSqlEditor="handleGoToSqlEditor"
                 />
               </div>
-
             </div>
-
-            <div class="tw:flex-1">
-              <AlertWizardRightColumn
-                ref="previewAlertRef"
-                :formData="formData"
-                :previewQuery="previewQuery"
-                :generatedSqlQuery="generatedSqlQuery"
-                :selectedTab="formData.query_condition.type || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-                :wizardStep="wizardStep"
-                :isUsingBackendSql="isUsingBackendSql"
-              />
-            </div>
+            <!-- Right column space (40%) - empty but reserves space -->
+            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
           </div>
         </q-step>
 
@@ -254,11 +234,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 4"
           :disable="4 > lastValidStep"
         >
-          <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (60%) -->
-            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
-              <div class="tw:flex-1" style="overflow: auto;">
+          <!-- Wrapper with flex container -->
+          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
+            <!-- Left Column Only: Step Content (60%) -->
+            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+              <div style="flex: 1; overflow: auto;">
                 <AlertSettings
                   ref="step4Ref"
                   :formData="formData"
@@ -279,23 +259,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @refresh:templates="refreshTemplates"
                 />
               </div>
-
             </div>
-
-            <div class="tw:flex-1">
-              <AlertWizardRightColumn
-                ref="previewAlertRef"
-                :formData="formData"
-                :previewQuery="previewQuery"
-                :generatedSqlQuery="generatedSqlQuery"
-                :selectedTab="formData.query_condition.type || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-                :wizardStep="wizardStep"
-                :isUsingBackendSql="isUsingBackendSql"
-              />
-            </div>
+            <!-- Right column space (40%) - empty but reserves space -->
+            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
           </div>
         </q-step>
 
@@ -309,34 +275,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 5"
           :disable="5 > lastValidStep"
         >
-          <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (60%) -->
-            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
-              <div class="tw:flex-1" style="overflow: auto;">
+          <!-- Wrapper with flex container -->
+          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
+            <!-- Left Column Only: Step Content (60%) -->
+            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+              <div style="flex: 1; overflow: auto;">
                 <Deduplication
                   :deduplication="formData.deduplication"
                   :columns="filteredColumns"
                   @update:deduplication="(val) => formData.deduplication = val"
                 />
               </div>
-
             </div>
-
-            <div class="tw:flex-1">
-              <AlertWizardRightColumn
-                ref="previewAlertRef"
-                :formData="formData"
-                :previewQuery="previewQuery"
-                :generatedSqlQuery="generatedSqlQuery"
-                :selectedTab="formData.query_condition.type || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-                :wizardStep="wizardStep"
-                :isUsingBackendSql="isUsingBackendSql"
-              />
-            </div>
+            <!-- Right column space (40%) - empty but reserves space -->
+            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
           </div>
         </q-step>
 
@@ -349,11 +301,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="false"
           :disable="6 > lastValidStep"
         >
-          <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (60%) -->
-            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: 100%; overflow: hidden;">
-              <div class="tw:flex-1" style="overflow: auto;">
+          <!-- Wrapper with flex container -->
+          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
+            <!-- Left Column Only: Step Content (60%) -->
+            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+              <div style="flex: 1; overflow: auto;">
                 <Advanced
                   :contextAttributes="formData.context_attributes"
                   :description="formData.description"
@@ -365,26 +317,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:rowTemplateType="(val) => formData.row_template_type = val"
                 />
               </div>
-
             </div>
-
-            <div class="tw:flex-1">
-              <AlertWizardRightColumn
-                ref="previewAlertRef"
-                :formData="formData"
-                :previewQuery="previewQuery"
-                :generatedSqlQuery="generatedSqlQuery"
-                :selectedTab="formData.query_condition.type || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-                :wizardStep="wizardStep"
-                :isUsingBackendSql="isUsingBackendSql"
-              />
-            </div>
+            <!-- Right column space (40%) - empty but reserves space -->
+            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
           </div>
         </q-step>
       </q-stepper>
+
+        <!-- Persistent Right Column (Outside Stepper) -->
+        <keep-alive>
+          <div
+            class="alert-wizard-right-column-persistent"
+            style="position: absolute; top: 86px; right: 4px; width: calc(39% - 1.5rem); height: calc(100vh - 302px); pointer-events: auto; z-index: 10;"
+          >
+            <AlertWizardRightColumn
+              ref="previewAlertRef"
+              :formData="formData"
+              :previewQuery="previewQuery"
+              :generatedSqlQuery="generatedSqlQuery"
+              :selectedTab="formData.query_condition.type || 'custom'"
+              :isAggregationEnabled="isAggregationEnabled"
+              :destinations="formData.destinations"
+              :focusManager="focusManager"
+              :wizardStep="wizardStep"
+              :isUsingBackendSql="isUsingBackendSql"
+              :isEditorOpen="isEditorOpen"
+            />
+          </div>
+        </keep-alive>
       </q-form>
       </div>
     </div>
@@ -398,8 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Wizard Navigation Buttons -->
           <q-btn
             flat
-            label="Back"
-            icon="arrow_back"
+            :label="t('alerts.back')"
             class="o2-secondary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             :disable="wizardStep === 1"
@@ -408,8 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             flat
-            label="Continue"
-            icon-right="arrow_forward"
+            :label="t('alerts.continue')"
             class="o2-secondary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             :disable="isLastStep"
@@ -436,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
             no-caps
             flat
-            :disable="!isLastStep"
+            :disable="!canSaveAlert"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             @click="onSubmit"
           />
@@ -657,6 +615,7 @@ export default defineComponent({
     const selectedDestinations = ref("slack");
     const originalStreamFields: any = ref([]);
     const isAggregationEnabled = ref(false);
+    const isEditorOpen = ref(false);
     const expandState = ref({
       alertSetup: true,
       queryMode: true,
@@ -814,8 +773,14 @@ export default defineComponent({
     const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
     onMounted(async () => {
-      // Set up alerts context provider
-      const alertsProvider = createAlertsContextProvider(formData, store, props.isUpdated);
+      // Set up alerts context provider with stream information
+      const alertsProvider = createAlertsContextProvider(
+        formData,
+        store,
+        props.isUpdated,
+        formData.value.stream_name,
+        formData.value.stream_type
+      );
       contextRegistry.register('alerts', alertsProvider);
       contextRegistry.setActive('alerts');
 
@@ -853,6 +818,23 @@ export default defineComponent({
       // are registered in their respective component watchers (step2Ref, step4Ref)
       // with proper field refs for highlighting
     });
+
+    // Watch for stream changes and update context provider
+    watch(
+      () => [formData.value.stream_name, formData.value.stream_type],
+      ([newStreamName, newStreamType]) => {
+        console.log('[AddAlert] Stream changed, updating context provider:', { newStreamName, newStreamType });
+        const alertsProvider = createAlertsContextProvider(
+          formData,
+          store,
+          props.isUpdated,
+          newStreamName,
+          newStreamType
+        );
+        contextRegistry.register('alerts', alertsProvider);
+        // Keep alerts context active (don't need to re-set active)
+      }
+    );
 
     // Watch for step4Ref (AlertSettings) to register wizard mode field refs
     watch(step4Ref, (newVal) => {
@@ -1123,7 +1105,7 @@ export default defineComponent({
 
       isFetchingStreams.value = true;
       return getStreams(formData.value.stream_type, false)
-        .then((res: any) => {
+        .then(async (res: any) => {
           streams.value[formData.value.stream_type] = res.list;
           schemaList.value = res.list;
           indexOptions.value = res.list.map((data: any) => {
@@ -1131,7 +1113,7 @@ export default defineComponent({
           });
 
           if (formData.value.stream_name)
-            updateStreamFields(formData.value.stream_name);
+            await updateStreamFields(formData.value.stream_name);
           return Promise.resolve();
         })
         .catch(() => Promise.reject())
@@ -1197,8 +1179,9 @@ export default defineComponent({
           };
         }
       } else if (newType === 'custom') {
-        // Start with local SQL, backend SQL will update it when ready
-        previewQuery.value = generateSqlQueryLocal();
+        // Clear preview query to avoid triggering search stream with old query
+        // The backend SQL generation will update it shortly
+        previewQuery.value = '';
         isUsingBackendSql.value = false;
         // Trigger backend SQL generation for preview
         debouncedGenerateSql();
@@ -1347,7 +1330,14 @@ export default defineComponent({
 
         // Only include aggregation if enabled
         if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
-          payload.query_condition.aggregation = formData.value.query_condition.aggregation;
+          // Filter out empty strings from group_by array
+          const groupBy = formData.value.query_condition.aggregation.group_by || [];
+          const filteredGroupBy = groupBy.filter((field: string) => field && field.trim() !== '');
+
+          payload.query_condition.aggregation = {
+            ...formData.value.query_condition.aggregation,
+            group_by: filteredGroupBy,
+          };
         }
 
         const response = await alertsService.generate_sql(
@@ -1361,6 +1351,10 @@ export default defineComponent({
           previewQuery.value = response.data.sql;
           // Set flag to indicate we're using backend-generated SQL
           isUsingBackendSql.value = true;
+
+          // Explicitly trigger preview refresh after SQL generation
+          await nextTick();
+          previewAlertRef.value?.refreshData();
         }
       } catch (error) {
         console.error('Error generating SQL from backend:', error);
@@ -1369,6 +1363,10 @@ export default defineComponent({
         generatedSqlQuery.value = localSql;
         previewQuery.value = localSql;
         isUsingBackendSql.value = false;
+
+        // Explicitly trigger preview refresh after fallback SQL generation
+        await nextTick();
+        previewAlertRef.value?.refreshData();
       }
     };
 
@@ -1585,7 +1583,6 @@ export default defineComponent({
 
     const handleAlertError = (err: any) => {
       if (err.response?.status !== HTTP_FORBIDDEN) {
-        console.log(err);
         q.notify({
           type: "negative",
           message: err.response?.data?.message || err.response?.data?.error || err.response?.data,
@@ -1621,6 +1618,18 @@ export default defineComponent({
     const clearMultiWindows = () => {
       formData.value.query_condition.multi_time_range = [];
     }
+
+    // Handle editor state change - track if editor is open
+    const handleEditorStateChanged = (isOpen: boolean) => {
+      isEditorOpen.value = isOpen;
+    };
+
+    // Handle editor closed event - refresh preview when SQL editor dialog closes
+    const handleEditorClosed = () => {
+      if (previewAlertRef.value && typeof previewAlertRef.value.refreshData === 'function') {
+        previewAlertRef.value.refreshData();
+      }
+    };
 
 
 // Method to handle the emitted changes and update the structure
@@ -1743,8 +1752,8 @@ export default defineComponent({
 
             if (query.fields?.stream) {
               formData.value.stream_name = query.fields.stream;
+              // updateStreams will automatically call updateStreamFields if stream_name is set
               await updateStreams(false);
-              await updateStreamFields(query.fields.stream);
             }
 
             // Set query type based on panel (SQL or PromQL)
@@ -1918,6 +1927,13 @@ export default defineComponent({
               formData.value.trigger_condition.threshold = 1;
               formData.value.trigger_condition.operator = '>=';
             }
+          }
+
+          // Trigger preview refresh after panel data is loaded
+          // Use nextTick to ensure DOM is updated before refreshing
+          await nextTick();
+          if (previewAlertRef.value?.refreshData) {
+            previewAlertRef.value.refreshData();
           }
         } catch (error) {
           console.error("Error loading panel data:", error);
@@ -2134,6 +2150,13 @@ export default defineComponent({
       }
     });
 
+    // Allow saving after completing all required steps (1, 2, 4)
+    const canSaveAlert = computed(() => {
+      // Required steps: 1 (Alert Setup), 2 (Conditions), 4 (Alert Settings)
+      // Optional steps: 3 (Compare Past), 5 (Deduplication), 6 (Advanced)
+      return wizardStep.value >= 4;
+    });
+
     return {
       t,
       q,
@@ -2240,6 +2263,7 @@ export default defineComponent({
       goToNextStep,
       goToPreviousStep,
       isLastStep,
+      canSaveAlert,
       step2Ref,
       step3Ref,
       step4Ref,
@@ -2247,6 +2271,9 @@ export default defineComponent({
       clearMultiWindows,
       validateStep,
       handleGoToSqlEditor,
+      handleEditorClosed,
+      handleEditorStateChanged,
+      isEditorOpen,
     };
   },
 

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,9 @@ use config::{
     utils::{
         async_file::{create_wal_dir_datetime_filter, scan_files_filtered},
         file::is_exists,
-        parquet::{parse_time_range_from_filename, read_metadata_from_file},
+        parquet::{
+            get_memtable_id_from_file_name, parse_time_range_from_filename, read_metadata_from_file,
+        },
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
         time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
@@ -42,9 +44,9 @@ use futures::StreamExt;
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::unwrap_partition_time_level,
+    schema::get_partition_time_level,
 };
-use ingester::{WAL_PARQUET_METADATA, get_memtable_id_from_file_name};
+use ingester::WAL_PARQUET_METADATA;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
@@ -81,8 +83,7 @@ pub async fn search_parquet(
         infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
             .await
             .unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
+    let partition_time_level = get_partition_time_level(query.stream_type);
     let files = get_file_list(
         query.clone(),
         &stream_settings.partition_keys,
@@ -120,9 +121,8 @@ pub async fn search_parquet(
                 return file;
             }
             drop(r);
-            let meta = read_metadata_from_file(&source_file.into())
-                .await
-                .unwrap_or_default();
+            let path = source_file.into();
+            let meta = read_metadata_from_file(&path).await.unwrap_or_default();
             file.meta = meta;
             file
         })
@@ -403,7 +403,7 @@ pub async fn search_memtable(
         let batch_num = record_batches.len();
         let mut merge_groupes = Vec::new();
         let mut current_group = Vec::new();
-        let group_limit = config::PARQUET_BATCH_SIZE;
+        let group_limit = config::get_batch_size();
         let mut group_size = 0;
         for batch in record_batches {
             if group_size > 0 && group_size + batch.num_rows() > group_limit {
@@ -526,12 +526,7 @@ async fn get_file_list(
             let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
             // Skip count is the number of segments in the cannonicalised path before
             // <YY>/<MM>/<DD>/<HH>/<file> appear
-            let filter = create_wal_dir_datetime_filter(
-                start_time,
-                end_time,
-                "parquet".to_string(),
-                skip_count + 1,
-            );
+            let filter = create_wal_dir_datetime_filter(start_time, end_time, skip_count + 1);
 
             scan_files_filtered(&pattern, filter, None).await?
         } else {

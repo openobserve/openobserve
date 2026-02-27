@@ -29,13 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width: 22px;
             height: 22px;
           "
-          title="Go Back"
+          :title="t('alerts.incidents.goBack')"
           @click="close"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
         <div class="text-h6">
-          Incident
+          {{ t('alerts.incidents.incident') }}
         </div>
         <!-- Incident name with colored indicator -->
         <input
@@ -124,14 +124,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="cancelTitleEdit"
           class="o2-secondary-button"
         >
-          <span>Cancel</span>
+          <span>{{ t('alerts.cancel') }}</span>
         </q-btn>
         <q-btn
           no-caps
           @click="saveTitleEdit"
           class="o2-primary-button"
         >
-          <span>Save</span>
+          <span>{{ t('alerts.save') }}</span>
         </q-btn>
       </div>
 
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button"
         >
           <span>{{ t("alerts.incidents.acknowledge") }}</span>
-          <q-tooltip :delay="500">Mark incident as acknowledged and being worked on</q-tooltip>
+          <q-tooltip :delay="500">{{ t("alerts.incidents.markAsAcknowledgedTooltip") }}</q-tooltip>
         </q-btn>
         <q-btn
           v-if="incidentDetails.status !== 'resolved'"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button"
         >
           <span>{{ t("alerts.incidents.resolve") }}</span>
-          <q-tooltip :delay="500">Mark incident as resolved and close it</q-tooltip>
+          <q-tooltip :delay="500">{{ t("alerts.incidents.markAsResolvedTooltip") }}</q-tooltip>
         </q-btn>
         <q-btn
           v-if="incidentDetails.status === 'resolved'"
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="refresh" size="16px" class="tw:mr-1" />
           <span>{{ t("alerts.incidents.reopen") }}</span>
-          <q-tooltip :delay="500">Reopen this resolved incident</q-tooltip>
+          <q-tooltip :delay="500">{{ t("alerts.incidents.reopenIncidentTooltip") }}</q-tooltip>
         </q-btn>
 
         <!-- Edit Title Button -->
@@ -188,8 +188,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="startTitleEdit"
           class="o2-secondary-button"
         >
-          <span>Edit</span>
-          <q-tooltip :delay="500">Edit incident title</q-tooltip>
+          <span>{{ t("alerts.edit") }}</span>
+          <q-tooltip :delay="500">{{ t("alerts.incidents.editIncidentTitleTooltip") }}</q-tooltip>
         </q-btn>
       </div>
     </div>
@@ -214,8 +214,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Overview"
           />
           <q-tab
+            name="activity"
+            label="Activity"
+          />
+          <q-tab
             name="incidentAnalysis"
-            label="Incident Analysis"
+            :label="t('alerts.incidents.incidentAnalysis')"
           />
           <q-tab
             name="serviceGraph"
@@ -226,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #default>
               <div class="tw:flex tw:items-center tw:gap-1.5">
-                <span>Alert Triggers</span>
+                <span>{{ t('alerts.incidents.alertTriggers') }}</span>
                 <span class="tw:text-sm tw:opacity-70">({{ triggers.length }})</span>
               </div>
             </template>
@@ -299,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Top: Title and Icon -->
               <div class="tw:flex tw:justify-between tw:items-start">
                 <div :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-medium">
-                  Unique Alerts
+                  {{ t('alerts.incidents.uniqueAlerts') }}
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-blue-500/10' : 'tw:bg-blue-50'">
                   <q-icon name="notifications_active" :class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'" style="font-size: 20px;" />
@@ -308,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Bottom: Large Number -->
               <div :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'" class="tw:text-3xl tw:font-semibold tw:leading-none">
-                {{ incidentDetails?.alerts?.length || 0 }}
+                {{ uniqueAlertsCount }}
               </div>
             </div>
 
@@ -391,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Header -->
                   <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3">
                     <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-semibold">
-                      Incident Timeline
+                      {{ t('alerts.incidents.incidentTimeline') }}
                     </div>
                     <div
                       class="tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-medium"
@@ -405,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Content with vertical timeline -->
-                  <div class="tw:flex tw:flex-col tw:gap-6 tw:p-4 tw:overflow-y-auto tw:relative">
+                  <div class="tw:flex tw:flex-col tw:gap-6 tw:px-4 tw:py-2 tw:overflow-y-auto tw:relative">
                     <!-- Vertical line -->
                     <div
                       class="tw:absolute tw:w-0.5"
@@ -432,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs">
                           {{ incidentDetails?.first_alert_at ? formatTimestampUTC(incidentDetails.first_alert_at) : 'N/A' }}
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:mx-1.5">|</span>
-                          <span>Initial trigger</span>
+                          <span>{{ t('alerts.incidents.initialTrigger') }}</span>
                         </div>
                       </div>
                     </div>
@@ -477,6 +481,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </div>
+
+                  <!-- Show Full Activity Button -->
+                  <div class="tw:border-t tw:border-gray-200 dark:tw:border-gray-700 tw:p-2 tw:flex tw:justify-end">
+                    <q-btn
+                      flat
+                      dense
+                      no-caps
+                      size="sm"
+                      color="primary"
+                      @click="activeTab = 'activity'"
+                      data-test="incident-timeline-show-full-activity"
+                    >
+                      <span class="tw:text-xs">Show Full Activity</span>
+                    </q-btn>
+                  </div>
                 </div>
                 <!-- Incident Details (66.67% width) -->
                 <div
@@ -488,7 +507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Header -->
                   <div class="tw:px-4 tw:pt-2 tw:pb-1">
                     <div :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:text-sm tw:font-semibold">
-                      Incident Details
+                      {{ t('alerts.incidents.incidentDetails') }}
                     </div>
                   </div>
 
@@ -497,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Incident ID -->
                     <div class="tw:grid tw:gap-2" style="grid-template-columns: 120px 1fr;">
                       <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs tw:font-medium">
-                        Incident ID
+                        {{ t('alerts.incidents.incidentId') }}
                       </div>
                       <div
                         class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1 tw:rounded tw:border tw:text-xs tw:font-mono tw:min-w-0"
@@ -521,7 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Incident Name -->
                     <div class="tw:grid tw:gap-2" style="grid-template-columns: 120px 1fr;">
                       <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs tw:font-medium">
-                        Incident Name
+                        {{ t('alerts.incidents.incidentName') }}
                       </div>
                       <div
                         class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1 tw:rounded tw:border tw:text-xs tw:min-w-0"
@@ -624,7 +643,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
-                  height: 'calc(40% - 6.4px)'
+                  height: 'calc(35% - 6.4px)'
                 }"
               >
                 <!-- Header -->
@@ -705,13 +724,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent) -->
+              <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent, or when no triggers) -->
               <div
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
-                  height: incidentDetails?.topology_context?.nodes?.length
+                  height: (sortedAlertsByTriggerCount?.length)
                     ? 'calc(35% - 5.6px)'
-                    : 'calc(60% - 8px)',
+                    : 'calc(65% - 2px)',
                   minHeight: 0,
                   flexShrink: 0
                 }"
@@ -760,7 +779,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
                     class="tw:text-sm tw:italic tw:text-center tw:py-4"
                   >
-                    No dimensions available
+                    {{ t('alerts.incidents.noDimensionsAvailable') }}
                   </div>
                 </div>
               </div>
@@ -770,7 +789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="sortedAlertsByTriggerCount?.length"
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
-                  height: 'calc(25% - 4px)'
+                  height: 'calc(30% - 4px)'
                 }"
               >
                 <!-- Header -->
@@ -779,7 +798,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
                     class="tw:text-sm tw:font-semibold"
                   >
-                    Related Alerts
+                    {{ t('alerts.incidents.relatedAlerts') }}
                   </div>
                 </div>
 
@@ -817,7 +836,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span
                             :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
                           >
-                            Fired {{ getTriggerCountForAlert(alert.id) }} time(s)
+                            {{ t('alerts.incidents.firedTimes', { count: alert.count }) }}
                           </span>
                         </div>
                       </div>
@@ -828,6 +847,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+
+        <!-- Activity Tab Content -->
+        <IncidentTimeline
+          v-if="activeTab === 'activity'"
+          :org-id="store.state.selectedOrganization.identifier"
+          :incident-id="incidentDetails?.id || ''"
+          :visible="activeTab === 'activity'"
+          :refresh-trigger="timelineRefreshTrigger"
+        />
 
         <!-- Incident Analysis Tab Content -->
         <IncidentRCAAnalysis
@@ -890,12 +918,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:p-3 tw:flex-1 tw:overflow-auto">
                 <!-- No alerts available -->
                 <div v-if="!alerts || alerts.length === 0" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm tw:italic">
-                  No alert details available
+                  {{ t('alerts.incidents.noAlertDetailsAvailable') }}
                 </div>
 
                 <!-- No trigger selected -->
                 <div v-else-if="selectedAlertIndex === -1" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm tw:italic tw:text-center tw:mt-8">
-                  Click on a trigger in the table to view details
+                  {{ t('alerts.incidents.clickOnTriggerToViewDetails') }}
                 </div>
 
                 <!-- Alert details -->
@@ -1010,80 +1038,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Logs Tab Content -->
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
-          <!-- Refresh Button (shown when data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-xs tw-text-gray-500">Showing correlated logs from incident timeframe</span>
-            <q-btn
-              flat
-              dense
-              size="sm"
-              icon="refresh"
-              color="primary"
-              @click="refreshCorrelation"
-              :disable="correlationLoading"
-            >
-              <q-tooltip>Refresh correlated data</q-tooltip>
-            </q-btn>
-          </div>
-
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
-            <div class="tw-text-base">Loading correlated logs...</div>
           </div>
 
-          <!-- Error State -->
-          <div v-else-if="correlationError" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="error_outline" size="3rem" color="negative" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-2">Failed to load correlated logs</div>
-            <div class="tw-text-sm tw-text-gray-500 tw-mb-4">{{ correlationError }}</div>
+          <!-- Error/No Data State -->
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+            <q-icon
+              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              size="4rem"
+            />
+            <div class="text-h6 q-mt-md">
+              {{ correlationError || 'No correlated logs found' }}
+            </div>
+            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            </div>
             <q-btn
+              v-if="correlationError && !correlationError.includes('FQN priority')"
               color="primary"
               outline
-              size="sm"
+              size="md"
               @click="refreshCorrelation"
               icon="refresh"
               label="Retry"
+              class="q-mt-md"
             />
           </div>
 
-          <!-- No Data State -->
-          <div v-else-if="!hasCorrelatedData || !hasAnyStreams" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="info_outline" size="3rem" color="grey-5" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-4">No correlated logs found</div>
-            <div v-if="incidentDetails" class="tw-text-sm tw-text-gray-500 tw-mb-4">
-              Try searching manually using these dimensions:
-            </div>
-            <div v-if="incidentDetails" class="info-box tw-rounded tw-p-3 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
-              <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
-                <span class="label-text">{{ key }}:</span>
-                <span class="tw-font-mono">{{ value }}</span>
-                <q-btn flat dense size="xs" icon="content_copy" @click="() => { navigator.clipboard.writeText(value); $q.notify({ message: 'Copied!', type: 'positive' }); }" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Success State - TelemetryCorrelationDashboard -->
+          <!-- Success State - CorrelatedLogsTable -->
           <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
-            <TelemetryCorrelationDashboard
-              mode="embedded-tabs"
-              :externalActiveTab="'logs'"
-              :serviceName="correlationData.serviceName"
-              :matchedDimensions="correlationData.matchedDimensions"
-              :additionalDimensions="correlationData.additionalDimensions"
-              :logStreams="correlationData.logStreams"
-              :metricStreams="correlationData.metricStreams"
-              :traceStreams="correlationData.traceStreams"
-              :timeRange="telemetryTimeRange"
+            <CorrelatedLogsTable
+              :service-name="correlationData.serviceName"
+              :matched-dimensions="actualMatchedDimensions"
+              :additional-dimensions="{}"
+              :log-streams="correlationData.logStreams"
+              :source-stream="'incidents'"
+              :source-type="'incidents'"
+              :available-dimensions="availableDimensions"
+              :fts-fields="ftsFields"
+              :time-range="telemetryTimeRange"
+              :hide-view-related-button="true"
+              :hide-search-term-actions="true"
+              :hide-dimension-filters="true"
+              :hide-reset-filters-button="true"
+              @sendToAiChat="handleSendToAiChat"
             />
           </div>
         </div>
 
         <!-- Metrics Tab Content -->
         <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
-          <!-- Refresh Button (shown when data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-xs tw-text-gray-500">Showing correlated metrics from incident timeframe</span>
+          <!-- Refresh Button (shown when metrics data is loaded) -->
+          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.metricStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
+            <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedMetrics') }}</span>
             <q-btn
               flat
               dense
@@ -1093,45 +1103,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshCorrelation"
               :disable="correlationLoading"
             >
-              <q-tooltip>Refresh correlated data</q-tooltip>
+              <q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip>
             </q-btn>
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated metrics...</div>
           </div>
 
-          <!-- Error State -->
-          <div v-else-if="correlationError" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="error_outline" size="3rem" color="negative" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-2">Failed to load correlated metrics</div>
-            <div class="tw-text-sm tw-text-gray-500 tw-mb-4">{{ correlationError }}</div>
+          <!-- Error/No Data State -->
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+            <q-icon
+              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              size="4rem"
+            />
+            <div class="text-h6 q-mt-md">
+              {{ correlationError || 'No correlated metrics found' }}
+            </div>
+            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            </div>
             <q-btn
+              v-if="correlationError && !correlationError.includes('FQN priority')"
               color="primary"
               outline
-              size="sm"
+              size="md"
               @click="refreshCorrelation"
               icon="refresh"
               label="Retry"
+              class="q-mt-md"
             />
-          </div>
-
-          <!-- No Data State -->
-          <div v-else-if="!hasCorrelatedData || !hasAnyStreams" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="info_outline" size="3rem" color="grey-5" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-4">No correlated metrics found</div>
-            <div v-if="incidentDetails" class="tw-text-sm tw-text-gray-500 tw-mb-4">
-              Try searching manually using these dimensions:
-            </div>
-            <div v-if="incidentDetails" class="info-box tw-rounded tw-p-3 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
-              <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
-                <span class="label-text">{{ key }}:</span>
-                <span class="tw-font-mono">{{ value }}</span>
-                <q-btn flat dense size="xs" icon="content_copy" @click="() => { navigator.clipboard.writeText(value); $q.notify({ message: 'Copied!', type: 'positive' }); }" />
-              </div>
-            </div>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1146,15 +1150,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :metricStreams="correlationData.metricStreams"
               :traceStreams="correlationData.traceStreams"
               :timeRange="telemetryTimeRange"
+              :hideDimensionFilters="true"
             />
           </div>
         </div>
 
         <!-- Traces Tab Content -->
         <div v-if="activeTab === 'traces'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
-          <!-- Refresh Button (shown when data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-xs tw-text-gray-500">Showing correlated traces from incident timeframe</span>
+          <!-- Refresh Button (shown when traces data is loaded) -->
+          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
+            <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedTraces') }}</span>
             <q-btn
               flat
               dense
@@ -1164,45 +1169,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshCorrelation"
               :disable="correlationLoading"
             >
-              <q-tooltip>Refresh correlated data</q-tooltip>
+              <q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip>
             </q-btn>
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated traces...</div>
           </div>
 
-          <!-- Error State -->
-          <div v-else-if="correlationError" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="error_outline" size="3rem" color="negative" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-2">Failed to load correlated traces</div>
-            <div class="tw-text-sm tw-text-gray-500 tw-mb-4">{{ correlationError }}</div>
+          <!-- Error/No Data State -->
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+            <q-icon
+              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              size="4rem"
+            />
+            <div class="text-h6 q-mt-md">
+              {{ correlationError || 'No correlated traces found' }}
+            </div>
+            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            </div>
             <q-btn
+              v-if="correlationError && !correlationError.includes('FQN priority')"
               color="primary"
               outline
-              size="sm"
+              size="md"
               @click="refreshCorrelation"
               icon="refresh"
               label="Retry"
+              class="q-mt-md"
             />
-          </div>
-
-          <!-- No Data State -->
-          <div v-else-if="!hasCorrelatedData || !hasAnyStreams" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
-            <q-icon name="info_outline" size="3rem" color="grey-5" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-4">No correlated traces found</div>
-            <div v-if="incidentDetails" class="tw-text-sm tw-text-gray-500 tw-mb-4">
-              Try searching manually using these dimensions:
-            </div>
-            <div v-if="incidentDetails" class="info-box tw-rounded tw-p-3 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
-              <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
-                <span class="label-text">{{ key }}:</span>
-                <span class="tw-font-mono">{{ value }}</span>
-                <q-btn flat dense size="xs" icon="content_copy" @click="() => { navigator.clipboard.writeText(value); $q.notify({ message: 'Copied!', type: 'positive' }); }" />
-              </div>
-            </div>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1217,6 +1216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :metricStreams="correlationData.metricStreams"
               :traceStreams="correlationData.traceStreams"
               :timeRange="telemetryTimeRange"
+              :hideDimensionFilters="true"
             />
           </div>
         </div>
@@ -1234,7 +1234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, computed, PropType, nextTick, onUnmounted } from "vue";
+import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -1246,14 +1246,19 @@ import incidentsService, {
   IncidentAlert,
   IncidentCorrelatedStreams,
 } from "@/services/incidents";
+import http from "@/services/http";
+import streamService from "@/services/stream";
+import serviceStreamsApi from "@/services/service_streams";
 import { getImageURL } from "@/utils/zincutils";
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
+import IncidentTimeline from "./IncidentTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { contextRegistry, createIncidentsContextProvider } from '@/composables/contextProviders';
@@ -1262,13 +1267,15 @@ export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
     TelemetryCorrelationDashboard,
+    CorrelatedLogsTable,
     IncidentServiceGraph,
     IncidentAlertTriggersTable,
     IncidentTableOfContents,
     IncidentRCAAnalysis,
+    IncidentTimeline,
     CustomChartRenderer,
   },
-  emits: ['close', 'status-updated'],
+  emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -1320,6 +1327,9 @@ export default defineComponent({
 
     // Tab management
     const activeTab = ref("overview");
+
+    // Counter to trigger timeline refresh (prop-based approach)
+    const timelineRefreshTrigger = ref(0);
 
     // Alert Triggers tab - selected alert for detail view
     const selectedAlertIndex = ref(-1);
@@ -1402,14 +1412,51 @@ export default defineComponent({
       return triggers.value.filter(t => t.alert_id === alertId).length;
     };
 
-    // Computed: Alerts sorted by trigger count (descending)
-    const sortedAlertsByTriggerCount = computed(() => {
-      if (!alerts.value || alerts.value.length === 0) return [];
-      return [...alerts.value].sort((a, b) => {
-        const countA = getTriggerCountForAlert(a.id);
-        const countB = getTriggerCountForAlert(b.id);
-        return countB - countA; // Descending order
+    // Computed property to extract unique alerts and their fire counts from triggers
+    const uniqueAlertsMap = computed(() => {
+      if (!triggers.value || triggers.value.length === 0) {
+        return new Map<string, number>();
+      }
+
+      const alertMap = new Map<string, number>();
+
+      triggers.value.forEach(trigger => {
+        const alertId = trigger.alert_id;
+        alertMap.set(alertId, (alertMap.get(alertId) || 0) + 1);
       });
+
+      return alertMap;
+    });
+
+    // Computed property for unique alerts count
+    const uniqueAlertsCount = computed(() => {
+      return uniqueAlertsMap.value.size;
+    });
+
+    // Computed: Alerts sorted by trigger count (descending) - derived from triggers
+    const sortedAlertsByTriggerCount = computed(() => {
+      if (!triggers.value || triggers.value.length === 0) return [];
+
+      // Group triggers by alert_id to get unique alerts with their counts
+      const alertsMap = new Map<string, { id: string; name: string; count: number }>();
+
+      triggers.value.forEach(trigger => {
+        const alertId = trigger.alert_id;
+        const alertName = trigger.alert_name || 'Unknown';
+
+        if (alertsMap.has(alertId)) {
+          alertsMap.get(alertId)!.count++;
+        } else {
+          alertsMap.set(alertId, {
+            id: alertId,
+            name: alertName,
+            count: 1
+          });
+        }
+      });
+
+      // Convert map to array and sort by count (descending)
+      return Array.from(alertsMap.values()).sort((a, b) => b.count - a.count);
     });
 
     // Peak Alert Rate - find the highest concentration of alerts
@@ -1518,14 +1565,156 @@ export default defineComponent({
           org,
           incidentDetails.value
         );
+
+        // Check if correlation failed (null response or no data)
+        if (!correlationData.value?.correlationData &&
+            (!correlationData.value?.logStreams?.length &&
+             !correlationData.value?.metricStreams?.length &&
+             !correlationData.value?.traceStreams?.length)) {
+          // Fetch FQN priority config to check if it was modified after incident creation
+          try {
+            const fqnConfigResponse = await http().get(
+              `/api/${org}/settings/v2/fqn_priority_dimensions`
+            );
+            const fqnConfig = fqnConfigResponse.data;
+
+            // Compare timestamps (both in microseconds)
+            if (fqnConfig.updated_at > incidentDetails.value.created_at) {
+              correlationError.value =
+                "FQN priority was modified since this incident was created, cannot correlate";
+              console.warn(
+                `[Incident Correlation] FQN config updated at ${fqnConfig.updated_at}, incident created at ${incidentDetails.value.created_at}`
+              );
+            } else {
+              // Not a config issue - try building fallback correlation
+              await buildFallbackCorrelation(org, incidentDetails.value);
+            }
+          } catch (configError) {
+            // If can't fetch config, try fallback anyway
+            console.error("Failed to fetch FQN config:", configError);
+            await buildFallbackCorrelation(org, incidentDetails.value);
+          }
+        }
       } catch (error: any) {
         console.error("Failed to load correlated streams:", error);
         correlationError.value =
           error?.response?.data?.message ||
           error?.message ||
-          "Failed to load correlated telemetry";
+          t("correlation.failedToLoad");
       } finally {
         correlationLoading.value = false;
+      }
+    };
+
+    // Build fallback correlation using first alert's stream schema
+    const buildFallbackCorrelation = async (org: string, incident: Incident) => {
+      try {
+        // Get first alert to determine source stream
+        const firstAlert = alerts.value?.[0];
+        if (!firstAlert) {
+          console.warn("[Fallback Correlation] No alerts found in incident");
+          return;
+        }
+
+        // Use actual stream type and name from the alert
+        const streamType = firstAlert.stream_type || "logs";
+        const streamName = firstAlert.stream_name || "default";
+
+        // Step 1: Get stream schema (like logs page does)
+        const schemaResponse = await streamService.schema(org, streamName, streamType);
+        const schema = schemaResponse.data;
+
+        // Step 2: Extract schema fields (like logs page does)
+        // CRITICAL FIX: Use uds_schema (user-defined schema) if available!
+        // The logs page shows uds_schema fields in the left pane, NOT all schema fields
+        // uds_schema is the curated list of fields the user cares about
+        const schemaFieldsArray = (schema.uds_schema && schema.uds_schema.length > 0)
+          ? schema.uds_schema
+          : (schema.schema || schema.fields || []);
+        const schemaFields = new Set(schemaFieldsArray.map((f: any) => f.name));
+
+        // Step 3: Get semantic groups to resolve dimension names to field patterns
+        const semanticGroupsResponse = await serviceStreamsApi.getSemanticGroups(org);
+        const semanticGroups = semanticGroupsResponse.data;
+
+        const filters: Record<string, string> = {};
+
+        // Step 4: For each dimension, find the matching schema field
+        for (const [dimId, dimValue] of Object.entries(incident.stable_dimensions)) {
+          let matchedField = null;
+
+          // Get semantic group
+          const group = semanticGroups.find((g: any) => g.id === dimId);
+
+          if (group && group.fields && group.fields.length > 0) {
+            // Check each field from semantic group
+            for (const fieldName of group.fields) {
+              const existsInSchema = schemaFields.has(fieldName);
+              if (existsInSchema && !matchedField) {
+                matchedField = fieldName;
+                // Don't break - keep logging all fields for debugging
+              }
+            }
+          } else {
+            console.warn(`[Fallback Correlation] No semantic group found for: ${dimId}`);
+          }
+
+          // Fallback: If semantic group didn't work, scan schema directly by pattern
+          if (!matchedField) {
+            console.warn(`[Fallback Correlation] Semantic group failed, scanning schema fields directly...`);
+            const dimParts = dimId.split('-');
+            
+            const schemaFieldsArray = Array.from(schemaFields).filter(f => !f.startsWith('_'));
+            for (const schemaField of schemaFieldsArray) {
+              const fieldLower = schemaField.toLowerCase();
+              const allPartsMatch = dimParts.every(part => fieldLower.includes(part.toLowerCase()));
+
+              if (allPartsMatch) {
+                matchedField = schemaField;
+                break;
+              }
+            }
+          }
+
+          if (matchedField) {
+            filters[matchedField] = dimValue;
+          }
+        }
+
+        if (Object.keys(filters).length === 0) {
+          console.warn("[Fallback Correlation] No dimensions could be mapped to stream fields");
+          return;
+        }
+        // Build StreamInfo object
+        const streamInfo = {
+          stream_name: streamName,
+          stream_type: streamType === 'logs' ? 'Logs' : streamType === 'metrics' ? 'Metrics' : 'Traces',
+          filters
+        };
+
+        // Build correlation response with only the source stream type
+        correlationData.value = {
+          serviceName: `dimension-match-${incident.stable_dimensions.service || 'unknown'}`,
+          matchedDimensions: incident.stable_dimensions,
+          additionalDimensions: {},
+          logStreams: streamType === 'logs' ? [streamInfo] : [],
+          metricStreams: streamType === 'metrics' ? [streamInfo] : [],
+          traceStreams: streamType === 'traces' ? [streamInfo] : [],
+          correlationData: {
+            service_name: `dimension-match-${incident.stable_dimensions.service || 'unknown'}`,
+            matched_dimensions: incident.stable_dimensions,
+            additional_dimensions: {},
+            related_streams: {
+              logs: streamType === 'logs' ? [streamInfo] : [],
+              metrics: streamType === 'metrics' ? [streamInfo] : [],
+              traces: streamType === 'traces' ? [streamInfo] : [],
+            },
+            correlation_method: "frontend-fallback"
+          }
+        };
+      } catch (fallbackError) {
+        console.error("[Fallback Correlation] Failed to build fallback:", fallbackError);
+        // Don't set error - let tabs show "No correlated X found"
       }
     };
 
@@ -1598,6 +1787,31 @@ export default defineComponent({
       );
     });
 
+    // Computed properties for CorrelatedLogsTable
+    // Extract actual field names from logStreams filters
+    // The filters contain the correct field name mappings (e.g., k8s_namespace_name)
+    // instead of semantic dimension names (e.g., k8s-namespace)
+    const actualMatchedDimensions = computed(() => {
+      if (!correlationData.value?.logStreams?.[0]?.filters) {
+        return correlationData.value?.matchedDimensions || {};
+      }
+      // Use the filters from the first log stream as they contain the actual field names
+      return correlationData.value.logStreams[0].filters;
+    });
+
+    const availableDimensions = computed(() => {
+      if (!correlationData.value?.logStreams?.[0]?.filters) {
+        return {};
+      }
+      // Use the filters from the first log stream as they contain the actual field names
+      return correlationData.value.logStreams[0].filters;
+    });
+
+    const ftsFields = computed(() => {
+      // FTS fields can be empty for now, as the log streams will determine this
+      return [];
+    });
+
     // Computed property for formatted RCA content
     const formattedRcaContent = computed(() => {
       const content = rcaLoading.value && rcaStreamContent.value
@@ -1617,7 +1831,7 @@ export default defineComponent({
         return {
           chartType: "custom_chart",
           title: {
-            text: t("incidents.noAlertActivityData"),
+            text: t("alerts.incidents.noAlertActivityData"),
             left: "center",
             top: "center",
             textStyle: {
@@ -1697,17 +1911,26 @@ export default defineComponent({
           }
         },
         legend: {
+          type: 'scroll',
+          orient: 'horizontal',
+          bottom: 0,
           data: Array.from(alertNames),
           textStyle: {
             color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
           },
-          top: 10
+          pageButtonItemGap: 5,
+          pageButtonGap: 20,
+          pageIconColor: store.state.theme === 'dark' ? '#DCDCDC' : '#232323',
+          pageIconInactiveColor: store.state.theme === 'dark' ? '#666666' : '#CCCCCC',
+          pageTextStyle: {
+            color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
+          }
         },
         grid: {
           left: '3%',
           right: '4%',
-          bottom: '3%',
-          top: '60',
+          bottom: '50',
+          top: '40',
           containLabel: true
         },
         xAxis: {
@@ -1838,6 +2061,36 @@ export default defineComponent({
       });
     };
 
+    // Handle ESC key to close incident detail
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        // Don't close if user is editing title
+        if (isEditingTitle.value) {
+          return;
+        }
+        // Don't close if there are any open dialogs/menus (they should handle ESC first)
+        const hasOpenDialog = document.querySelector('.q-dialog, .q-menu');
+        if (hasOpenDialog) {
+          return;
+        }
+        close();
+      }
+    };
+
+    // Add keyboard event listener on mount
+    onMounted(() => {
+      window.addEventListener('keydown', handleEscapeKey);
+    });
+
+    // Remove keyboard event listener on unmount
+    onBeforeUnmount(() => {
+      window.removeEventListener('keydown', handleEscapeKey);
+    });
+
+    const handleSendToAiChat = (value: any, append: boolean = true) => {
+      emit('sendToAiChat', value, append);
+    };
+
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
       if (!incidentDetails.value) return;
       updating.value = true;
@@ -1856,7 +2109,14 @@ export default defineComponent({
           type: "positive",
           message: t("alerts.incidents.statusUpdated"),
         });
+        // Mark data as stale so incident list will refresh when navigating back
+        store.dispatch('incidents/setShouldRefresh', true);
         emit("status-updated");
+
+        // Refresh events in timeline if Activity tab is active
+        if (activeTab.value === 'activity') {
+          timelineRefreshTrigger.value++;
+        }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
         $q.notify({
@@ -1915,9 +2175,16 @@ export default defineComponent({
 
         $q.notify({
           type: "positive",
-          message: "Incident title updated successfully",
+          message: t("alerts.incidents.incidentTitleUpdatedSuccess"),
           timeout: 2000,
         });
+        // Mark data as stale so incident list will refresh
+        store.dispatch('incidents/setShouldRefresh', true);
+
+        // Refresh events in timeline if Activity tab is active
+        if (activeTab.value === 'activity') {
+          timelineRefreshTrigger.value++;
+        }
       } catch (error: any) {
         console.error("Failed to update title:", error);
         $q.notify({
@@ -2076,6 +2343,13 @@ export default defineComponent({
           message: `Incident status updated to ${response.data.status}`,
           timeout: 2000,
         });
+        // Mark data as stale so incident list will refresh
+        store.dispatch('incidents/setShouldRefresh', true);
+
+        // Refresh events in timeline if Activity tab is active
+        if (activeTab.value === 'activity') {
+          timelineRefreshTrigger.value++;
+        }
       } catch (error: any) {
         console.error("Failed to update status:", error);
         $q.notify({
@@ -2120,6 +2394,8 @@ export default defineComponent({
           message: `Incident severity updated to ${response.data.severity}`,
           timeout: 2000,
         });
+        // Mark data as stale so incident list will refresh
+        store.dispatch('incidents/setShouldRefresh', true);
       } catch (error: any) {
         console.error("Failed to update severity:", error);
         $q.notify({
@@ -2536,6 +2812,7 @@ export default defineComponent({
       hasExistingRca,
       isDarkMode,
       activeTab,
+      timelineRefreshTrigger,
       tableOfContents,
       expandedSections,
       formattedRcaContent,
@@ -2545,10 +2822,15 @@ export default defineComponent({
       hasCorrelatedData,
       hasAnyStreams,
       telemetryTimeRange,
+      actualMatchedDimensions,
+      availableDimensions,
+      ftsFields,
       incidentContextData,
       affectedServicesCount,
       alertFrequency,
       getTriggerCountForAlert,
+      uniqueAlertsMap,
+      uniqueAlertsCount,
       sortedAlertsByTriggerCount,
       peakAlertRate,
       peakActivity,
@@ -2557,6 +2839,7 @@ export default defineComponent({
       alertActivityChartData,
       refreshCorrelation,
       close,
+      handleSendToAiChat,
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,

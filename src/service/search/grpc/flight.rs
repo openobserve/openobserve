@@ -33,7 +33,10 @@ use config::{
 };
 use datafusion::{
     common::TableReference,
-    physical_optimizer::{PhysicalOptimizerRule, filter_pushdown::FilterPushdown},
+    physical_optimizer::{
+        PhysicalOptimizerRule, filter_pushdown::FilterPushdown,
+        projection_pushdown::ProjectionPushdown,
+    },
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
@@ -196,7 +199,7 @@ pub async fn search(
     let query_params = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.clone(),
-        stream,
+        stream: stream.clone(),
         stream_type,
         stream_name: stream_name.to_string(),
         time_range: (req.search_info.start_time, req.search_info.end_time),
@@ -411,7 +414,7 @@ pub async fn search(
         // get the enrichment table from db
         let enrichment_table = EnrichTable::new(
             &org_id,
-            &stream_name,
+            &stream,
             empty_exec.full_schema().clone(),
             query_params.time_range,
         );
@@ -476,6 +479,9 @@ pub async fn search(
     if cfg.common.feature_pushdown_filter_enabled {
         let pushdown_filter = FilterPushdown::new();
         physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
+        let projection_pushdown = ProjectionPushdown::new();
+        physical_plan =
+            projection_pushdown.optimize(physical_plan, ctx.state().config_options())?;
     }
 
     if cfg.common.feature_dynamic_pushdown_filter_enabled {

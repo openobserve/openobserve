@@ -290,7 +290,8 @@ describe("AlertSettings.vue", () => {
       expect(wrapper.html()).toContain("Destination");
     });
 
-    it("should show aggregation toggle for custom query type", async () => {
+    // Note: Aggregation toggle moved to QueryConfig.vue during alert revamp
+    it.skip("should show aggregation toggle for custom query type", async () => {
       expect(wrapper.html()).toContain("Aggregation");
     });
 
@@ -307,7 +308,8 @@ describe("AlertSettings.vue", () => {
     });
   });
 
-  describe("Aggregation Toggle", () => {
+  // Note: Aggregation functionality moved to QueryConfig.vue during alert revamp
+  describe.skip("Aggregation Toggle", () => {
     it("should enable aggregation when toggled", async () => {
       wrapper.vm.localIsAggregationEnabled = true;
       await wrapper.vm.toggleAggregation();
@@ -365,7 +367,8 @@ describe("AlertSettings.vue", () => {
     });
   });
 
-  describe("Group By Fields Management", () => {
+  // Note: Group By functionality moved to QueryConfig.vue during alert revamp
+  describe.skip("Group By Fields Management", () => {
     beforeEach(async () => {
       await wrapper.setProps({ isAggregationEnabled: true });
       wrapper.props().formData.query_condition.aggregation = {
@@ -461,7 +464,8 @@ describe("AlertSettings.vue", () => {
     });
   });
 
-  describe("Threshold - With Aggregation", () => {
+  // Note: Aggregation threshold functionality moved to QueryConfig.vue during alert revamp
+  describe.skip("Threshold - With Aggregation", () => {
     beforeEach(async () => {
       await wrapper.setProps({ isAggregationEnabled: true });
       wrapper.props().formData.query_condition.aggregation = {
@@ -589,11 +593,14 @@ describe("AlertSettings.vue", () => {
     });
 
     it("should display cron input in cron mode", () => {
-      expect(wrapper.html()).toContain("Cron Schedule");
+      // Check that cron input field is rendered
+      const html = wrapper.html();
+      expect(html).toContain('placeholder="Cron Expression *"');
     });
 
     it("should display timezone selector in cron mode", () => {
-      expect(wrapper.html()).toContain("Timezone");
+      const html = wrapper.html();
+      expect(html).toContain('placeholder="Timezone *"');
     });
 
     it("should update cron expression", async () => {
@@ -858,7 +865,8 @@ describe("AlertSettings.vue", () => {
     });
   });
 
-  describe("Validation - With Aggregation", () => {
+  // Note: Aggregation validation moved to QueryConfig.vue during alert revamp
+  describe.skip("Validation - With Aggregation", () => {
     beforeEach(async () => {
       await wrapper.setProps({ isAggregationEnabled: true });
       wrapper.props().formData.query_condition.aggregation = {
@@ -939,7 +947,8 @@ describe("AlertSettings.vue", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should handle empty columns array", async () => {
+    // Note: Columns array functionality moved to QueryConfig.vue during alert revamp
+    it.skip("should handle empty columns array", async () => {
       const emptyWrapper = mount(AlertSettings, {
         global: {
           mocks: { $store: mockStore, $router: mockRouter },
@@ -1001,7 +1010,8 @@ describe("AlertSettings.vue", () => {
       expect(wrapper.props().formData.trigger_condition.cron).toContain("*/5");
     });
 
-    it("should handle null aggregation gracefully", async () => {
+    // Note: Aggregation functionality moved to QueryConfig.vue during alert revamp
+    it.skip("should handle null aggregation gracefully", async () => {
       wrapper.props().formData.query_condition.aggregation = null;
       await wrapper.vm.toggleAggregation();
       expect(wrapper.exists()).toBe(true);
@@ -1052,7 +1062,8 @@ describe("AlertSettings.vue", () => {
       expect(result.valid).toBe(false);
     });
 
-    it("should not switch to aggregation for non-custom query types", async () => {
+    // Note: Aggregation toggle functionality moved to QueryConfig.vue during alert revamp
+    it.skip("should not switch to aggregation for non-custom query types", async () => {
       wrapper.props().formData.query_condition.type = "sql";
       await nextTick();
       wrapper.vm.localIsAggregationEnabled = true;
@@ -1195,7 +1206,7 @@ describe("AlertSettings.vue", () => {
         },
       });
 
-      expect(darkWrapper.html()).toContain("bg-grey-10");
+      expect(darkWrapper.html()).toContain("bg-grey-9");
       darkWrapper.unmount();
     });
   });

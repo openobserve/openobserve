@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,21 +22,24 @@ use arrow::{
 use arrow_schema::Schema;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
-    PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
+    FileFormat, PARQUET_MAX_ROW_GROUP_SIZE,
     cluster::LOCAL_NODE,
-    get_config, get_parquet_compression,
+    get_batch_size, get_config, get_parquet_compression,
     meta::{
         cluster::Role,
         stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     },
-    utils::time::{BASE_TIME, get_ymdh_from_micros, hour_micros, now, now_micros},
+    utils::{
+        parquet::get_recordbatch_reader_from_bytes,
+        time::{BASE_TIME, get_ymdh_from_micros, hour_micros, now, now_micros},
+    },
 };
 use futures::StreamExt;
 use infra::{
     cluster::get_node_from_consistent_hash,
     errors, file_list as infra_file_list,
     file_list::FileRecord,
-    schema::{STREAM_SCHEMAS_LATEST, SchemaCache, get_settings, unwrap_partition_time_level},
+    schema::{STREAM_SCHEMAS_LATEST, SchemaCache, get_partition_time_level, get_settings},
 };
 use itertools::Itertools;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
@@ -89,8 +92,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
         let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        let partition_time_level = get_partition_time_level(stream_type);
         // to avoid compacting conflict with retention, need check the data retention time
         let stream_data_retention_end = if stream_settings.data_retention > 0 {
             now - Duration::try_days(stream_settings.data_retention).unwrap()
@@ -198,13 +200,8 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         job.offset
     );
 
-    let stream_settings = get_settings(&job.org_id, &job.stream_name, job.stream_type)
-        .await
-        .unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, job.stream_type);
-
     // check offset
+    let partition_time_level = get_partition_time_level(job.stream_type);
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(job.offset * 1000);
     let offset_hour = Utc
         .with_ymd_and_hms(
@@ -648,12 +645,12 @@ async fn generate_dump(
 
     let mut buf = Vec::new();
     let mut writer = get_writer(FILE_LIST_SCHEMA.clone(), &mut buf)?;
-    // we split the file list into vec of vecs, with each sub-vec having PARQUET_BATCH_SIZE elements
+    // we split the file list into vec of vecs, with each sub-vec having batch_size elements
     // at most (last may be shorter) doing this the following way means we don't have to clone
     // anything, we simply shift the ownership via iterator
     let chunks: Vec<Vec<_>> = files
         .into_iter()
-        .chunks(PARQUET_BATCH_SIZE)
+        .chunks(get_batch_size())
         .into_iter()
         .map(|c| c.collect())
         .collect();
@@ -751,10 +748,10 @@ async fn calculate_dump_file_stats(account: &str, file_key: &str) -> Result<Stre
         .map_err(|e| format!("failed to read dump file from storage: {e}"))?;
 
     // Parse the parquet file to get FileRecord list
-    let mut reader = config::utils::parquet::get_recordbatch_reader_from_bytes(&file_data)
+    let file_format = FileFormat::from_extension(file_key).unwrap_or(FileFormat::Parquet);
+    let (_, mut reader) = get_recordbatch_reader_from_bytes(file_format, &file_data)
         .await
-        .map_err(|e| format!("failed to parse dump file as parquet: {e}"))?
-        .1;
+        .map_err(|e| format!("failed to parse dump file as parquet: {e}"))?;
 
     // Calculate stats from all FileRecords in the dump file
     let mut stats = StreamStats {
@@ -804,7 +801,7 @@ fn get_writer(
 ) -> Result<AsyncArrowWriter<&mut Vec<u8>>, errors::Error> {
     let cfg = get_config();
     let writer_props = WriterProperties::builder()
-        .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
+        .set_write_batch_size(get_batch_size()) // in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
         .set_compression(get_parquet_compression(&cfg.common.parquet_compression));
 
@@ -834,7 +831,6 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
     let mut field_compressed_size = Int64Builder::with_capacity(batch_size);
     let mut field_index_size = Int64Builder::with_capacity(batch_size);
     let mut field_flattened = BooleanBuilder::with_capacity(batch_size);
-    let mut field_created_at = Int64Builder::with_capacity(batch_size);
     let mut field_updated_at = Int64Builder::with_capacity(batch_size);
 
     for file in files {
@@ -852,7 +848,6 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
         field_compressed_size.append_value(file.compressed_size);
         field_index_size.append_value(file.index_size);
         field_flattened.append_value(file.flattened);
-        field_created_at.append_value(file.created_at);
         field_updated_at.append_value(file.updated_at);
     }
 
@@ -873,7 +868,6 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
             Arc::new(field_original_size.finish()),
             Arc::new(field_compressed_size.finish()),
             Arc::new(field_index_size.finish()),
-            Arc::new(field_created_at.finish()),
             Arc::new(field_updated_at.finish()),
         ],
     )?;
@@ -929,7 +923,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 0);
-        assert_eq!(batch.num_columns(), 16);
+        assert_eq!(batch.num_columns(), 15);
     }
 
     #[test]
@@ -949,7 +943,6 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
-            created_at: 1000,
             updated_at: 1100,
         };
 
@@ -959,7 +952,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 16);
+        assert_eq!(batch.num_columns(), 15);
 
         // Verify column values
         let id_col = batch
@@ -1009,7 +1002,6 @@ mod tests {
                 original_size: 10000,
                 compressed_size: 5000,
                 index_size: 500,
-                created_at: 1000,
                 updated_at: 1100,
             },
             FileRecord {
@@ -1027,7 +1019,6 @@ mod tests {
                 original_size: 20000,
                 compressed_size: 10000,
                 index_size: 1000,
-                created_at: 2000,
                 updated_at: 2100,
             },
             FileRecord {
@@ -1045,7 +1036,6 @@ mod tests {
                 original_size: 30000,
                 compressed_size: 15000,
                 index_size: 1500,
-                created_at: 3000,
                 updated_at: 3100,
             },
         ];
@@ -1102,7 +1092,6 @@ mod tests {
             original_size: 500000,
             compressed_size: 250000,
             index_size: 25000,
-            created_at: 1234567000,
             updated_at: 1234568000,
         };
 
@@ -1144,7 +1133,6 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
-            created_at: 1000,
             updated_at: 1100,
         };
 
@@ -1170,7 +1158,6 @@ mod tests {
             "original_size",
             "compressed_size",
             "index_size",
-            "created_at",
             "updated_at",
         ];
 

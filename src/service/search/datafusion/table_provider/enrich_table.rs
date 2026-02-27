@@ -25,6 +25,7 @@ use datafusion::{
     logical_expr::TableProviderFilterPushDown,
     physical_plan::ExecutionPlan,
     prelude::Expr,
+    sql::TableReference,
 };
 
 use crate::service::search::datafusion::{
@@ -35,19 +36,31 @@ use crate::service::search::datafusion::{
 #[derive(Debug, Clone)]
 pub struct EnrichTable {
     org_id: String,
-    name: String,
+    stream: TableReference,
     schema: SchemaRef,
-    time_range: (i64, i64),
+    timestamp_filter: Option<(i64, i64)>,
 }
 
 impl EnrichTable {
     /// Initialize a new `EnrichTable` from a schema.
-    pub fn new(org_id: &str, name: &str, schema: SchemaRef, time_range: (i64, i64)) -> Self {
+    pub fn new(
+        org_id: &str,
+        stream: &TableReference,
+        schema: SchemaRef,
+        time_range: (i64, i64),
+    ) -> Self {
+        let timestamp_filter = if let Some(schema) = stream.schema()
+            && (schema == "enrich" || schema == "enrichment_tables")
+        {
+            None
+        } else {
+            Some(time_range)
+        };
         Self {
             org_id: org_id.to_string(),
-            name: name.to_string(),
+            stream: stream.clone(),
             schema,
-            time_range,
+            timestamp_filter,
         }
     }
 }
@@ -73,10 +86,13 @@ impl TableProvider for EnrichTable {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let (enrich_projection, filter_projection) = {
-            // add _timestamp column if timestamp_filter is present
+        let (enrich_projection, filter_projection) = if self.timestamp_filter.is_some() {
             let mut filter_projection = Vec::new();
-            if let Ok(timestamp_idx) = self.schema().index_of(TIMESTAMP_COL_NAME) {
+            // add _timestamp column if timestamp_filter is present
+            if self.timestamp_filter.is_some()
+                && let Ok(timestamp_idx) = self.schema().index_of(TIMESTAMP_COL_NAME)
+                && !filter_projection.contains(&timestamp_idx)
+            {
                 filter_projection.push(timestamp_idx);
             }
 
@@ -94,6 +110,8 @@ impl TableProvider for EnrichTable {
                     .collect::<Vec<_>>()
             });
             (Some(filter_projection), projection)
+        } else {
+            (projection.cloned(), None)
         };
 
         let enrich_projection = enrich_projection.as_ref();
@@ -101,12 +119,12 @@ impl TableProvider for EnrichTable {
 
         // Create the base execution plan
         let schema = project_schema(&self.schema, enrich_projection)?;
-        let enrich_exec = Arc::new(EnrichExec::new(&self.org_id, &self.name, schema));
+        let enrich_exec = Arc::new(EnrichExec::new(&self.org_id, self.stream.table(), schema));
 
         // Apply timestamp filter only (no index condition for enrich tables)
         let filter_exec = apply_combined_filter(
             None,
-            Some(self.time_range),
+            self.timestamp_filter,
             &enrich_exec.schema(),
             &[],
             enrich_exec,

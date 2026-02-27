@@ -680,12 +680,19 @@ async fn handle_alert_triggers(
                             _ => None,
                         };
 
+                    let semantic_groups =
+                        crate::service::db::system_settings::get_semantic_field_groups(
+                            &new_trigger.org,
+                        )
+                        .await;
+
                     if let Some(first_row) = data.first() {
                         crate::service::alerts::deduplication::calculate_fingerprint(
                             &alert,
                             first_row,
                             dedup_config,
                             org_config.as_ref(),
+                            &semantic_groups,
                         )
                     } else {
                         alert.get_unique_key()
@@ -849,19 +856,11 @@ async fn handle_alert_triggers(
                 .or_else(|| first_row.get("service_name"))
                 .and_then(json::Value::as_str);
 
-            // Extract trace_id for trace-based correlation
-            let trace_id = first_row
-                .get("trace_id")
-                .or_else(|| first_row.get("traceId"))
-                .or_else(|| first_row.get("TraceId"))
-                .and_then(json::Value::as_str);
-
             match crate::service::alerts::incidents::correlate_alert_to_incident(
                 &alert,
                 first_row,
                 triggered_at,
                 service_name,
-                trace_id,
             )
             .await
             {
@@ -2758,7 +2757,7 @@ async fn handle_backfill_triggers(
 
                 let error_msg = e.to_string();
                 // Store the ingestion error
-                ingestion_error = Some(error_msg.clone());
+                // ingestion_error = Some(error_msg.clone());
 
                 // Increment retries
                 let new_retries = trigger.retries + 1;

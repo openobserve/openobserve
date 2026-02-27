@@ -56,7 +56,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
       // Step 3: Verify function appears in list
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(1000);
       await pm.functionsPage.searchFunction(functionName);
       await pm.functionsPage.expectFunctionInList(functionName);
@@ -88,9 +88,9 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
       // Step 3: Navigate away and back, verify type persists
       await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       const functionType = await pm.functionsPage.openFunctionAndCheckType(functionName);
@@ -116,14 +116,14 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.selectJavaScriptType();
       await pm.functionsPage.enterFunctionCode(jsCode1);
 
-      const testEvent1 = '{"name": "test", "count": 5}';
-      const output = await pm.functionsPage.testFunctionExecution(testEvent1);
+      // Default events don't have 'count' — tests the || 5 fallback: (undefined || 5) + 1 = 6
+      const output = await pm.functionsPage.testFunctionExecution();
 
       // Assert output exists before checking content
       expect(output).toBeTruthy();
       testLogger.info(`Test output: ${output}`);
       await pm.functionsPage.expectTestOutputContains('count');
-      await pm.functionsPage.expectTestOutputContains('6'); // 5 + 1
+      await pm.functionsPage.expectTestOutputContains('6'); // (undefined || 5) + 1
       await pm.functionsPage.expectTestOutputContains('tested');
       testLogger.info('JS function executed successfully');
       await pm.functionsPage.clickCancelButton();
@@ -137,22 +137,18 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.selectJavaScriptType();
       await pm.functionsPage.enterFunctionCode(jsCode2);
 
-      const testEvent2 = '{"name": "test"}';
-      await pm.functionsPage.clickTestButton();
-      await pm.functionsPage.enterTestEvent(testEvent2);
+      // Trigger test execution using default events
+      const errorOutput = await pm.functionsPage.testFunctionExecution();
 
-      const runSuccess = await pm.functionsPage.clickRunTestButton();
-      if (runSuccess) {
-        const outputText = await pm.functionsPage.getTestOutput();
-        testLogger.info(`Error test output: ${outputText}`);
+      expect(errorOutput).toBeTruthy();
+      testLogger.info(`Error test output: ${errorOutput}`);
 
-        const hasError = outputText.toLowerCase().includes('error') ||
-                        outputText.toLowerCase().includes('undefined') ||
-                        outputText.toLowerCase().includes('failed');
+      // `row.field = undefinedVar` throws ReferenceError — message always contains 'error'
+      const hasError = errorOutput.toLowerCase().includes('error') ||
+                      errorOutput.toLowerCase().includes('failed');
 
-        expect(hasError).toBe(true);
-        testLogger.info('Error handling works - error message displayed');
-      }
+      expect(hasError).toBe(true);
+      testLogger.info('Error handling works - error message displayed');
       await pm.functionsPage.clickCancelButton();
     });
 
@@ -266,7 +262,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
       // Step 1: Default org - JS hidden, VRL visible
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=default`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       await pm.functionsPage.clickAddFunctionButton('default');
@@ -278,7 +274,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
       // Step 2: Switch to _meta org - JS visible, VRL visible
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       await pm.functionsPage.clickAddFunctionButton('_meta');
@@ -290,7 +286,7 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
 
       // Step 3: Switch back to default - JS hidden again, VRL still visible
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=default`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       await pm.functionsPage.clickAddFunctionButton('default');

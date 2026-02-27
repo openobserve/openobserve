@@ -38,7 +38,7 @@ class SchemaPage {
             saveStreamBtn: '[data-test="save-stream-btn"]',
             menuHomeItem: '[data-test="menu-link-\\/-item"]',
             menuLogsItem: '[data-test="menu-link-\\/logs-item"]',
-            fnEditor: '#fnEditor',
+            fnEditor: '[data-test="logs-vrl-function-editor"]',
             logSearchIndexSelectStream: '[data-test="log-search-index-list-select-stream"]',
             logStreamRefreshStatsBtn: '[data-test="log-stream-refresh-stats-btn"]',
             deleteButton: 'Delete',
@@ -57,7 +57,7 @@ class SchemaPage {
     async applyQuery() {
         testLogger.debug('Applying query with search response wait');
         const search = this.page.waitForResponse(logData.applyQuery);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.locator(this.schemaLocators.logsSearchBarRefreshBtn).click({ force: true });
         await expect.poll(async () => (await search).status()).toBe(200);
     }
@@ -79,7 +79,7 @@ class SchemaPage {
     // Open stream details
     async openStreamDetails() {
         testLogger.debug('Opening stream details');
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         const streamDetailButton = this.page.getByRole('button', { name: this.schemaLocators.streamDetailButton }).first();
         await streamDetailButton.waitFor({ state: 'visible', timeout: 15000 });
@@ -93,7 +93,7 @@ class SchemaPage {
         testLogger.debug('Configuring schema fields - removing kubernetes annotations if present');
         
         // Ensure we're in the right tab context
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Try to find and click kubernetes checkboxes (they may not always exist)
         try {
@@ -263,7 +263,7 @@ class SchemaPage {
             currentUrl.searchParams.set('vrl', 'true');
             
             await this.page.goto(currentUrl.toString());
-            await this.page.waitForLoadState('networkidle', { timeout: 15000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
             
             const fnEditorCountAfterReload = await this.page.locator(this.schemaLocators.fnEditor).count();
             
@@ -276,7 +276,7 @@ class SchemaPage {
                 await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).click();
                 await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).fill(toStream);
                 await this.page.getByText(toStream).click();
-                await this.page.waitForLoadState('networkidle');
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
                 await this.page.waitForSelector('text=Loading...', { state: 'hidden' });
                 return; // Exit early, skipping VRL editor interaction
             }
@@ -284,7 +284,7 @@ class SchemaPage {
 
         // Try clicking the monaco editor, with toggle fallback if click fails
         try {
-            await this.page.locator(this.schemaLocators.fnEditor).locator('.monaco-editor').click({ timeout: 3000 });
+            await this.page.locator(this.schemaLocators.fnEditor).first().locator('.monaco-editor').last().click({ timeout: 3000 });
         } catch (error) {
             testLogger.warn('Failed to click monaco editor, trying toggle button');
 
@@ -293,7 +293,7 @@ class SchemaPage {
             await this.page.waitForTimeout(1000);
 
             // Retry clicking monaco editor
-            await this.page.locator(this.schemaLocators.fnEditor).locator('.monaco-editor').click();
+            await this.page.locator(this.schemaLocators.fnEditor).first().locator('.monaco-editor').last().click();
         }
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).click();
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).fill(fromStream);
@@ -302,7 +302,7 @@ class SchemaPage {
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).click();
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).fill(toStream);
         await this.page.getByText(toStream).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForSelector('text=Loading...', { state: 'hidden' });
 
         // Close the dropdown by pressing Escape or clicking outside

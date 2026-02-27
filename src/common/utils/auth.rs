@@ -415,6 +415,26 @@ where
                     .map_or(path_columns[1], |model| model.key),
                 path_columns[2]
             )
+        }
+        // Special case: system prebuilt templates endpoint
+        // Path: /{org}/alerts/templates/system/prebuilt
+        else if url_len == 5
+            && path_columns[1].eq("alerts")
+            && path_columns[2].eq("templates")
+            && path_columns[3].eq("system")
+            && path_columns[4].eq("prebuilt")
+        {
+            if method.eq("GET") {
+                method = "LIST".to_string();
+            }
+            // Check template permissions for org
+            format!(
+                "{}:{}",
+                OFGA_MODELS
+                    .get("templates")
+                    .map_or("templates", |model| model.key),
+                path_columns[0]
+            )
         } else if url_len == 3 {
             // Handle /v2 alert apis
             if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
@@ -596,6 +616,14 @@ where
                             OFGA_MODELS.get("alert_folders").unwrap().key,
                             path_columns[1] // org_id
                         )
+                    } else if method.eq("POST") && path_columns[3].eq("generate_sql") {
+                        format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(path_columns[2])
+                                .map_or(path_columns[2], |model| model.key),
+                            path_columns[1]
+                        )
                     } else {
                         format!(
                             "{}:{}",
@@ -734,6 +762,15 @@ where
                     OFGA_MODELS
                         .get(path_columns[1])
                         .map_or(path_columns[1], |model| model.key),
+                    path_columns[0]
+                )
+            } else if method.eq("POST") && path.ends_with("alerts/destinations/test") {
+                // Test destination API RBAC control
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
                     path_columns[0]
                 )
             } else {
@@ -993,6 +1030,9 @@ where
             || path.contains("/format_query")
             || path.contains("/prometheus/api/v1/series")
             || path.contains("/traces/latest")
+            || path.contains("/traces/session")
+            || path.contains("/traces/user")
+            || (path.contains("/traces/") && path.ends_with("/dag"))
             || path.contains("clusters")
             || path.contains("query_manager")
             || path.contains("/short")

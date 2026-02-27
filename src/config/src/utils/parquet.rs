@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,12 +17,17 @@ use std::{
     cmp::{max, min},
     io::Cursor,
     path::PathBuf,
+    pin::Pin,
     sync::Arc,
 };
 
-use arrow::record_batch::RecordBatch;
+#[cfg(feature = "vortex")]
+use arrow::{array::StructArray, datatypes::DataType};
+use arrow::{error::ArrowError, record_batch::RecordBatch};
 use arrow_schema::Schema;
-use futures::TryStreamExt;
+#[cfg(feature = "vortex")]
+use futures::StreamExt;
+use futures::{Stream, TryStreamExt};
 use parquet::{
     arrow::{
         AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
@@ -32,8 +37,13 @@ use parquet::{
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
+#[cfg(feature = "vortex")]
+use vortex::{
+    VortexSessionDefault, array::arrow::IntoArrowArray, buffer::Buffer,
+    file::OpenOptionsSessionExt, io::session::RuntimeSessionExt, session::VortexSession,
+};
 
-use crate::{config::*, ider, meta::stream::FileMeta};
+use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
 
 pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
@@ -46,7 +56,7 @@ pub fn new_parquet_writer<'a>(
     let cfg = get_config();
     let compression = compression.unwrap_or(&cfg.common.parquet_compression);
     let mut writer_props = WriterProperties::builder()
-        .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
+        .set_write_batch_size(cfg.limit.batch_size) // in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
         .set_compression(get_parquet_compression(compression))
         .set_column_dictionary_enabled(
@@ -116,7 +126,7 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
     let columns = key.splitn(9, '/').collect::<Vec<&str>>();
     if columns.len() < 9 {
-        return Err(anyhow::anyhow!("[file_list] Invalid file path: {}", key));
+        return Err(anyhow::anyhow!("[file_list] Invalid file path: {key}"));
     }
     // let _ = columns[0].to_string(); // files/
     let stream_key = format!("{}/{}/{}", columns[1], columns[2], columns[3]);
@@ -128,6 +138,9 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     Ok((stream_key, date_key, file_name))
 }
 
+/// Unified stream type that supports both Vortex and Parquet formats
+pub type RecordBatchStream = Pin<Box<dyn Stream<Item = Result<RecordBatch, ArrowError>> + Send>>;
+
 /// A generic wrapper for getting a record batch stream from a reader.
 /// It can be used for both bytes and file.
 async fn get_recordbatch_reader<T>(
@@ -138,48 +151,127 @@ where
 {
     let arrow_reader = ParquetRecordBatchStreamBuilder::new(reader).await?;
     let schema = arrow_reader.schema().clone();
-    let reader = arrow_reader.with_batch_size(PARQUET_BATCH_SIZE).build()?;
+    let reader = arrow_reader.with_batch_size(get_batch_size()).build()?;
     Ok((schema, reader))
 }
 
 pub async fn get_recordbatch_reader_from_bytes(
+    file_format: FileFormat,
     data: &bytes::Bytes,
-) -> Result<(Arc<Schema>, ParquetRecordBatchStream<Cursor<bytes::Bytes>>), anyhow::Error> {
-    let schema_reader = Cursor::new(data.clone());
+) -> Result<(Arc<Schema>, RecordBatchStream), anyhow::Error> {
+    match file_format {
+        FileFormat::Parquet => {
+            let schema_reader = Cursor::new(data.clone());
+            let (schema, reader) = get_recordbatch_reader(schema_reader).await?;
+            let stream: RecordBatchStream = Box::pin(reader.map_err(ArrowError::from));
+            Ok((schema, stream))
+        }
+        #[cfg(feature = "vortex")]
+        FileFormat::Vortex => {
+            // Read vortex file from bytes and convert to record batches
+            let session = VortexSession::default().with_tokio();
+            let buf = Buffer::from(data.to_vec());
+            let vxf = session.open_options().open_buffer(buf)?;
+            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
 
-    let (schema, reader) = get_recordbatch_reader(schema_reader).await?;
+            // Create a stream that converts vortex arrays to record batches
+            let arrow_data_type = DataType::Struct(schema.fields().clone());
+            let vortex_stream = vxf.scan()?.into_array_stream()?;
 
-    Ok((schema, reader))
+            let stream = vortex_stream.then(move |result| {
+                let arrow_data_type = arrow_data_type.clone();
+                async move {
+                    match result {
+                        Ok(vortex_array) => {
+                            // Convert vortex array to arrow array
+                            let arrow_array = vortex_array
+                                .into_arrow(&arrow_data_type)
+                                .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
+
+                            // Convert to struct array and then to record batch
+                            let struct_array = arrow_array
+                                .as_any()
+                                .downcast_ref::<StructArray>()
+                                .ok_or_else(|| {
+                                ArrowError::InvalidArgumentError(
+                                    "Expected struct array from vortex".to_string(),
+                                )
+                            })?;
+
+                            Ok(RecordBatch::from(struct_array))
+                        }
+                        Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
+                    }
+                }
+            });
+
+            let stream: RecordBatchStream = Box::pin(stream);
+            Ok((schema, stream))
+        }
+        #[cfg(not(feature = "vortex"))]
+        FileFormat::Vortex => Err(anyhow::anyhow!(
+            "Vortex file format requires the vortex feature"
+        )),
+    }
 }
 
+// should not have such function in the config
 pub async fn read_recordbatch_from_bytes(
+    file_format: FileFormat,
     data: &bytes::Bytes,
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
-    let reader = Cursor::new(data.clone());
-    let (schema, reader) = get_recordbatch_reader(reader).await?;
-    let batches = reader.try_collect().await?;
-    Ok((schema, batches))
-}
-
-pub async fn read_recordbatch_from_file(
-    path: &PathBuf,
-) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
-    let file = tokio::fs::File::open(path).await?;
-    let (schema, reader) = get_recordbatch_reader(file).await?;
+    let (schema, reader) = get_recordbatch_reader_from_bytes(file_format, data).await?;
     let batches = reader.try_collect().await?;
     Ok((schema, batches))
 }
 
 pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow::Error> {
-    let mut file = tokio::fs::File::open(path).await?;
-    let arrow_reader = ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
-    Ok(arrow_reader.schema().clone())
+    // Detect file format from extension
+    let path_str = path.to_str().unwrap_or("");
+    let format = FileFormat::from_extension(path_str);
+
+    match format {
+        #[cfg(feature = "vortex")]
+        Some(FileFormat::Vortex) => {
+            // Read vortex file
+            let session = VortexSession::default().with_tokio();
+            let vxf = session.open_options().open_path(path.clone()).await?;
+            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
+            Ok(schema)
+        }
+        _ => {
+            // Default to parquet
+            let mut file = tokio::fs::File::open(path).await?;
+            let arrow_reader =
+                ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
+            Ok(arrow_reader.schema().clone())
+        }
+    }
 }
 
-pub async fn read_schema_from_bytes(data: &bytes::Bytes) -> Result<Arc<Schema>, anyhow::Error> {
-    let schema_reader = Cursor::new(data.clone());
-    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
-    Ok(arrow_reader.schema().clone())
+pub async fn read_schema_from_bytes(
+    file_format: FileFormat,
+    data: &bytes::Bytes,
+) -> Result<Arc<Schema>, anyhow::Error> {
+    match file_format {
+        FileFormat::Parquet => {
+            let schema_reader = Cursor::new(data.clone());
+            let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
+            Ok(arrow_reader.schema().clone())
+        }
+        #[cfg(feature = "vortex")]
+        FileFormat::Vortex => {
+            let session = VortexSession::default().with_tokio();
+            let buf = Buffer::from(data.to_vec());
+            let vxf = session.open_options().open_buffer(buf)?;
+            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
+            Ok(schema)
+        }
+        #[cfg(not(feature = "vortex"))]
+        FileFormat::Vortex => {
+            anyhow::bail!("Vortex file format requires the vortex feature to be enabled")
+        }
+    }
 }
 
 pub async fn read_metadata_from_bytes(data: &bytes::Bytes) -> Result<FileMeta, anyhow::Error> {
@@ -206,14 +298,29 @@ pub async fn read_metadata_from_file(path: &PathBuf) -> Result<FileMeta, anyhow:
     Ok(meta)
 }
 
-pub fn generate_filename_with_time_range(min_ts: i64, max_ts: i64) -> String {
+pub fn generate_filename_with_time_range(min_ts: i64, max_ts: i64, id: u64) -> String {
     format!(
-        "{}.{}.{}{}",
+        "{}.{}.{}_{}{}",
         min_ts,
         max_ts,
         ider::generate(),
+        id,
         FILE_EXT_PARQUET
     )
+}
+
+pub fn get_memtable_id_from_file_name(file_name: &str) -> u64 {
+    // Remove extension by finding the last dot and taking everything before it
+    // If no dot exists, use the entire filename
+    let stem = file_name
+        .rfind('.')
+        .map(|pos| &file_name[..pos])
+        .unwrap_or(file_name);
+    // Get the part after the last underscore
+    stem.rsplit('_')
+        .next()
+        .and_then(|id_str| id_str.parse::<u64>().ok())
+        .unwrap_or_default()
 }
 
 pub fn parse_time_range_from_filename(mut name: &str) -> (i64, i64) {
@@ -259,6 +366,91 @@ mod tests {
         (schema, batch)
     }
 
+    #[test]
+    fn test_get_memtable_id_simple() {
+        // Simple case with single underscore
+        let file_name = "file_1234567890.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 1234567890);
+    }
+
+    #[test]
+    fn test_get_memtable_id_multiple_underscores() {
+        // Multiple underscores - should get the last one
+        let file_name = "prefix_middle_suffix_9876543210.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 9876543210);
+    }
+
+    #[test]
+    fn test_get_memtable_id_complex_real_world() {
+        // Real-world complex case from the issue
+        let file_name =
+            "1765538190188506.1765538190416169.7405204004302487552_1765538214467130.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 1765538214467130);
+    }
+
+    #[test]
+    fn test_get_memtable_id_multiple_dots_and_underscores() {
+        // Multiple dots and underscores
+        let file_name = "a.b.c_d.e.f_12345.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 12345);
+    }
+
+    #[test]
+    fn test_get_memtable_id_no_extension() {
+        // No extension
+        let file_name = "file_555666777";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 555666777);
+    }
+
+    #[test]
+    fn test_get_memtable_id_no_underscore() {
+        // No underscore - should return 0
+        let file_name = "file.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 0);
+    }
+
+    #[test]
+    fn test_get_memtable_id_invalid_number() {
+        // Invalid number after underscore - should return 0
+        let file_name = "file_notanumber.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 0);
+    }
+
+    #[test]
+    fn test_get_memtable_id_empty_string() {
+        // Empty string
+        assert_eq!(get_memtable_id_from_file_name(""), 0);
+    }
+
+    #[test]
+    fn test_get_memtable_id_only_underscore() {
+        // Only underscore
+        let file_name = "_123456.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 123456);
+    }
+
+    #[test]
+    fn test_get_memtable_id_multiple_extensions() {
+        // Multiple extensions (e.g., .tar.gz style)
+        // Based on add_memtable_id_to_file_name, the ID is added before the extension
+        let file_name = "file.tar_999888777.gz";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 999888777);
+    }
+
+    #[test]
+    fn test_get_memtable_id_max_u64() {
+        // Test with max u64 value
+        let file_name = "file_18446744073709551615.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), u64::MAX);
+    }
+
+    #[test]
+    fn test_get_memtable_id_zero() {
+        // Test with zero
+        let file_name = "file_0.parquet";
+        assert_eq!(get_memtable_id_from_file_name(file_name), 0);
+    }
+
     #[tokio::test]
     async fn test_write_and_read_recordbatch() {
         let (schema, batch) = create_test_batch();
@@ -281,9 +473,10 @@ mod tests {
         .unwrap();
 
         // Read back
-        let (read_schema, read_batches) = read_recordbatch_from_bytes(&bytes::Bytes::from(data))
-            .await
-            .unwrap();
+        let (read_schema, read_batches) =
+            read_recordbatch_from_bytes(FileFormat::Parquet, &bytes::Bytes::from(data))
+                .await
+                .unwrap();
 
         let read_schema = read_schema
             .as_ref()
@@ -340,9 +533,10 @@ mod tests {
 
     #[test]
     fn test_generate_filename_with_time_range() {
-        let filename = generate_filename_with_time_range(1000, 2000);
+        let filename = generate_filename_with_time_range(1000, 2000, 1);
         assert!(filename.ends_with(FILE_EXT_PARQUET));
         assert!(filename.starts_with("1000.2000."));
+        assert!(filename.contains("_1.parquet"));
     }
 
     #[test]
@@ -367,5 +561,20 @@ mod tests {
         let (min_ts, max_ts) = parse_time_range_from_filename(filename);
         assert_eq!(min_ts, 0);
         assert_eq!(max_ts, 0);
+    }
+
+    #[test]
+    fn test_parse_time_range_backwards_compatible() {
+        // Test that parse_time_range_from_filename still works with new format
+        let new_format = "1000.2000.12345.abc123.parquet";
+        let (min_ts, max_ts) = parse_time_range_from_filename(new_format);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
+
+        // Test with old format
+        let old_format = "1000.2000.abc123.parquet";
+        let (min_ts, max_ts) = parse_time_range_from_filename(old_format);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
     }
 }

@@ -18,7 +18,7 @@ import { servicenowTemplate, servicenowConfig, servicenowDestinationType } from 
 describe('servicenow template', () => {
   describe('servicenowTemplate', () => {
     it('has correct name', () => {
-      expect(servicenowTemplate.name).toBe('system-prebuilt-servicenow');
+      expect(servicenowTemplate.name).toBe('prebuilt_servicenow');
     });
 
     it('has type as http', () => {
@@ -42,7 +42,7 @@ describe('servicenow template', () => {
 
   describe('servicenowConfig', () => {
     it('references correct template name', () => {
-      expect(servicenowConfig.templateName).toBe('system-prebuilt-servicenow');
+      expect(servicenowConfig.templateName).toBe('prebuilt_servicenow');
     });
 
     it('has correct headers', () => {

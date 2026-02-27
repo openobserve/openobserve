@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Header with Inline Filters -->
     <div
+      v-if="!props.hideDimensionFilters"
       class="correlation-controls tw:p-0 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)]"
     >
       <!-- Dimension Filters Bar with Pending/Apply Pattern -->
@@ -177,7 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @addSearchTerm="handleAddSearchTerm"
           @addFieldToTable="handleAddFieldToTable"
           @closeColumn="handleCloseColumn"
+          @update:columnOrder="handleColumnOrderChange"
           @expandRow="handleExpandRow"
+          @view-trace="handleViewTrace"
           @show-correlation="handleNestedCorrelation"
           data-test="logs-tenstack-table"
         />
@@ -185,37 +188,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Table Skeleton (initial load) -->
         <div
           v-else-if="isLoading && !hasError"
-          class="tw:p-4"
+          class="tw:h-full tw:flex tw:flex-col tw:items-center tw:justify-center"
           data-test="table-skeleton"
         >
-          <!-- Table Header Skeleton -->
+          <!-- Loading indicator -->
           <div
-            class="tw:flex tw:gap-4 tw:mb-4 tw:pb-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+            class="tw:flex tw:items-center tw:justify-center tw:gap-3"
           >
-            <q-skeleton type="text" width="12%" height="20px" />
-            <q-skeleton type="text" width="15%" height="20px" />
-            <q-skeleton type="text" width="40%" height="20px" />
-            <q-skeleton type="text" width="10%" height="20px" />
-            <q-skeleton type="text" width="10%" height="20px" />
-          </div>
-
-          <!-- Table Row Skeletons -->
-          <div v-for="i in 8" :key="i" class="tw:mb-3">
-            <div class="tw:flex tw:gap-4 tw:items-center">
-              <q-skeleton type="text" width="12%" height="16px" />
-              <q-skeleton type="text" width="15%" height="16px" />
-              <q-skeleton type="text" width="40%" height="16px" />
-              <q-skeleton type="text" width="10%" height="16px" />
-              <q-skeleton type="text" width="10%" height="16px" />
-            </div>
-          </div>
-
-          <!-- Loading indicator inside skeleton -->
-          <div
-            class="tw:flex tw:items-center tw:justify-center tw:mt-8 tw:gap-3"
-          >
-            <q-spinner color="primary" size="24px" />
-            <span class="tw:text-sm tw:text-gray-600">
+            <q-spinner color="primary" size="md" />
+            <span class="tw:text-sm tw:opacity-70">
               {{ t("correlation.logs.loading") }}
             </span>
           </div>
@@ -227,27 +208,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           data-test="error-state"
         >
-          <q-icon
-            name="error_outline"
-            size="3rem"
-            color="negative"
-            class="tw:mb-4"
-          />
-          <p class="tw:text-base tw:text-negative tw:font-medium tw:mb-2">
-            {{ t("correlation.logs.error") }}
-          </p>
           <p
-            class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:max-w-md tw:text-center"
+            class="tw:text-base tw:opacity-70 tw:max-w-md tw:text-center"
           >
-            {{ error }}
+            {{ error || t("correlation.logs.errorDetails") }}
           </p>
-          <q-btn
-            class="o2-secondary-button"
-            :label="t('common.retry')"
-            icon="refresh"
-            @click="handleRetry"
-            data-test="retry-btn"
-          />
         </div>
 
         <!-- Empty State -->
@@ -256,26 +221,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           data-test="empty-state"
         >
-          <q-icon
-            name="search_off"
-            size="3rem"
-            color="grey-6"
-            class="tw:mb-4"
-          />
-          <p class="tw:text-base tw:font-medium tw:text-gray-600 tw:mb-2">
+          <p class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
             {{ t("correlation.logs.noData") }}
           </p>
-          <p class="tw:text-sm tw:text-gray-500 tw:mb-4">
+          <p class="tw:text-sm tw:opacity-70 tw:mb-4">
             {{ t("correlation.logs.noDataDetails") }}
           </p>
-          <q-btn
-            class="o2-secondary-button"
-            :label="t('correlation.logs.resetFilters')"
-            outline
-            icon="restart_alt"
-            @click="handleResetFilters"
-            data-test="reset-filters-btn"
-          />
         </div>
       </div>
     </div>
@@ -286,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
@@ -294,6 +246,7 @@ import { date, copyToClipboard, useQuasar } from "quasar";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
+import { searchState } from "@/composables/useLogs/searchState";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -311,7 +264,9 @@ const emit = defineEmits<{
 // Composables
 const { t } = useI18n();
 const store = useStore();
+const router = useRouter();
 const $q = useQuasar();
+const { searchObj } = searchState();
 
 // Use correlated logs composable
 const {
@@ -343,6 +298,8 @@ const selectedFields = ref<any[]>([]);
 const visibleColumns = ref<Set<string>>(new Set());
 const columnOrder = ref<string[]>([]);
 const draggedIndex = ref<number | null>(null);
+let isSaving = false; // Prevent recursive saves
+let isUpdatingFromTable = false; // Prevent recursive updates from table
 
 // Storage keys for persisting state
 const STORAGE_KEY_COLUMNS = "correlatedLogs_visibleColumns";
@@ -389,7 +346,9 @@ onMounted(() => {
 watch(
   visibleColumns,
   () => {
-    saveColumnState();
+    if (!isSaving) {
+      saveColumnState();
+    }
   },
   { deep: true }
 );
@@ -397,7 +356,9 @@ watch(
 watch(
   columnOrder,
   () => {
-    saveColumnState();
+    if (!isSaving) {
+      saveColumnState();
+    }
   },
   { deep: true }
 );
@@ -771,26 +732,12 @@ const handleDimensionUpdate = ({
   value: string;
 }) => {
   pendingFilters.value[key] = value;
-  console.log("[CorrelatedLogsTable] Pending filter changed:", {
-    key,
-    value,
-    pending: pendingFilters.value,
-  });
 };
 
 // Apply pending filter changes
 const handleApplyFilters = () => {
-  console.log("[CorrelatedLogsTable] Applying filters:", pendingFilters.value);
   // Update all filters at once using batch update (triggers single API call)
   updateFilters(pendingFilters.value);
-};
-
-const handleRefresh = () => {
-  refresh();
-};
-
-const handleRetry = () => {
-  refresh();
 };
 
 const handleResetFilters = () => {
@@ -813,7 +760,6 @@ const handleCopy = (log: any, copyAsJson: boolean = true) => {
 };
 
 const handleSendToAiChat = (value: any) => {
-  console.log("[CorrelatedLogsTable] Send to AI chat:", value);
   emit("sendToAiChat", value);
 };
 
@@ -831,7 +777,6 @@ const handleAddSearchTerm = (
 };
 
 const handleAddFieldToTable = (field: string) => {
-  console.log("[CorrelatedLogsTable] Add field to table:", field);
 
   // Add the field to visible columns if it's not already visible
   if (!visibleColumns.value.has(field)) {
@@ -856,7 +801,6 @@ const handleAddFieldToTable = (field: string) => {
 };
 
 const handleCloseColumn = (columnDef: any) => {
-  console.log("[CorrelatedLogsTable] Close column:", columnDef);
   const columnId = columnDef.id || columnDef.name;
 
   // Remove from visible columns
@@ -895,7 +839,43 @@ const toggleSelectAll = () => {
   }
 };
 
-// Handle drag start for column reordering
+// Handle column order change from TenstackTable drag-and-drop
+const handleColumnOrderChange = (newOrder: string[]) => {
+  // Prevent recursive calls
+  if (isUpdatingFromTable) {
+    return;
+  }
+
+  // Check if order actually changed to prevent recursive updates
+  const currentOrder = JSON.stringify(columnOrder.value);
+  const newOrderStr = JSON.stringify(newOrder);
+
+  if (currentOrder === newOrderStr) {
+    console.log("[CorrelatedLogsTable] Order unchanged, skipping update");
+    return;
+  }
+
+  // Set flags to prevent recursive updates
+  isUpdatingFromTable = true;
+  isSaving = true;
+
+  try {
+    // Update columnOrder to match the new order from the table
+    columnOrder.value = [...newOrder];
+
+    // Manually save
+    saveColumnState();
+  } finally {
+    // Always reset flags even if error occurs
+    isSaving = false;
+    // Use nextTick to ensure all reactive updates complete before allowing new updates
+    setTimeout(() => {
+      isUpdatingFromTable = false;
+    }, 100);
+  }
+};
+
+// Handle drag start for column reordering (dropdown)
 const handleDragStart = (event: DragEvent, index: number) => {
   draggedIndex.value = index;
   if (event.dataTransfer) {
@@ -931,6 +911,37 @@ const handleExpandRow = (row: any) => {
   }
 };
 
+const handleViewTrace = (log: any) => {
+  // 15 mins +- from the log timestamp
+  const from = log[store.state.zoConfig.timestamp_column] - 900000000;
+  const to = log[store.state.zoConfig.timestamp_column] + 900000000;
+  const refresh = 0;
+
+  const query: any = {
+    name: "traceDetails",
+    query: {
+      stream: searchObj.meta.selectedTraceStream,
+      from,
+      to,
+      refresh,
+      org_identifier: store.state.selectedOrganization.identifier,
+      trace_id:
+        log[
+          store.state.organizationData.organizationSettings
+            .trace_id_field_name
+        ],
+      reload: "true",
+    },
+  };
+
+  query["span_id"] =
+    log[
+      store.state.organizationData.organizationSettings.span_id_field_name
+    ];
+
+  router.push(query);
+};
+
 const handleNestedCorrelation = (row: any) => {
   // Nested correlation is disabled (as per hideViewRelatedButton prop)
   console.log("[CorrelatedLogsTable] Nested correlation disabled");
@@ -938,17 +949,6 @@ const handleNestedCorrelation = (row: any) => {
 
 // Lifecycle
 onMounted(() => {
-  console.log("[CorrelatedLogsTable] Component mounted with props:", {
-    serviceName: props.serviceName,
-    matchedDimensions: props.matchedDimensions,
-    additionalDimensions: props.additionalDimensions,
-    logStreams: props.logStreams,
-    sourceStream: props.sourceStream,
-    sourceType: props.sourceType,
-    timeRange: props.timeRange,
-    primaryStream: primaryStream.value,
-  });
-
   // Fetch logs on mount
   fetchCorrelatedLogs();
 });
@@ -1079,6 +1079,6 @@ watch(
 
 <style lang="scss">
 .logs-table-container .container {
-  height: calc(100vh - 170px) !important;
+  height: calc(100vh - 115px) !important;
 }
 </style>

@@ -154,7 +154,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
-    if req.local_mode.unwrap_or_default() {
+    if is_local_mode {
         if LOCAL_NODE.is_querier() {
             nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
         } else {
@@ -375,7 +375,10 @@ pub async fn run_datafusion(
     register_table(&ctx, &sql).await?;
 
     // create physical plan
-    let physical_plan = create_physical_plan(&ctx, &sql.sql).await?;
+    let physical_plan = create_physical_plan(&ctx, &sql.sql).await.map_err(|e| {
+        log::error!("[trace_id {trace_id}] flight->search: create physical plan error: {e}");
+        e
+    })?;
 
     if cfg.common.print_key_sql {
         log::info!("[trace_id {trace_id}] leader physical plan");

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,7 @@ use super::bitvec::BitVec;
 use crate::{
     get_config,
     meta::self_reporting::usage::Stats,
+    stats::MemorySize,
     utils::{
         hash::{Sum64, gxhash},
         json::{self, Value},
@@ -210,13 +211,10 @@ pub struct StreamParams {
     pub stream_type: StreamType,
 }
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
-#[serde(default)]
-pub struct RemoteStreamParams {
-    #[schema(value_type = String)]
-    pub org_id: faststr::FastStr,
-    #[schema(value_type = String)]
-    pub destination_name: faststr::FastStr,
+impl MemorySize for StreamParams {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<StreamParams>() + self.org_id.mem_size() + self.stream_name.mem_size()
+    }
 }
 
 impl Default for StreamParams {
@@ -256,6 +254,23 @@ impl StreamParams {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListStreamParams {
     pub list: Vec<StreamParams>,
+}
+
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
+#[serde(default)]
+pub struct RemoteStreamParams {
+    #[schema(value_type = String)]
+    pub org_id: faststr::FastStr,
+    #[schema(value_type = String)]
+    pub destination_name: faststr::FastStr,
+}
+
+impl MemorySize for RemoteStreamParams {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<RemoteStreamParams>()
+            + self.org_id.mem_size()
+            + self.destination_name.mem_size()
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -310,6 +325,12 @@ pub struct FileMeta {
 impl FileMeta {
     pub fn is_empty(&self) -> bool {
         self.records == 0 && self.original_size == 0
+    }
+}
+
+impl MemorySize for FileMeta {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<FileMeta>()
     }
 }
 
@@ -559,6 +580,12 @@ impl std::ops::Add<&StreamStats> for &StreamStats {
     }
 }
 
+impl MemorySize for StreamStats {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<StreamStats>()
+    }
+}
+
 impl From<&FileMeta> for cluster_rpc::FileMeta {
     fn from(req: &FileMeta) -> Self {
         cluster_rpc::FileMeta {
@@ -681,8 +708,6 @@ pub struct StreamField {
 pub struct UpdateStreamSettings {
     #[serde(skip_serializing, default)]
     pub fields: UpdateSettingsWrapper<StreamField>,
-    #[serde(skip_serializing_if = "Option::None")]
-    pub partition_time_level: Option<PartitionTimeLevel>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub partition_keys: UpdateSettingsWrapper<StreamPartition>,
     #[serde(default)]
@@ -734,6 +759,12 @@ impl PartialEq for DistinctField {
 }
 impl Eq for DistinctField {}
 
+impl MemorySize for DistinctField {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<DistinctField>() + self.name.mem_size()
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TimeRange {
     /// Start timestamp in microseconds
@@ -749,6 +780,13 @@ impl Display for TimeRange {
         write!(f, "{time_range_start} to {time_range_end}")
     }
 }
+
+impl MemorySize for TimeRange {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<TimeRange>()
+    }
+}
+
 impl TimeRange {
     pub fn new(start: i64, end: i64) -> Self {
         Self { start, end }
@@ -814,8 +852,6 @@ impl TimeRange {
 #[derive(Clone, Debug, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
     #[serde(default)]
-    pub partition_time_level: Option<PartitionTimeLevel>,
-    #[serde(default)]
     pub partition_keys: Vec<StreamPartition>,
     #[serde(default)]
     pub full_text_search_keys: Vec<String>,
@@ -849,12 +885,13 @@ pub struct StreamSettings {
     pub enable_distinct_fields: bool,
     #[serde(default)]
     pub enable_log_patterns_extraction: bool,
+    #[serde(default)]
+    pub is_llm_stream: bool,
 }
 
 impl Default for StreamSettings {
     fn default() -> Self {
         Self {
-            partition_time_level: None,
             partition_keys: Vec::new(),
             full_text_search_keys: Vec::new(),
             index_fields: Vec::new(),
@@ -872,6 +909,7 @@ impl Default for StreamSettings {
             index_all_values: false,
             enable_distinct_fields: true,
             enable_log_patterns_extraction: false,
+            is_llm_stream: false,
         }
     }
 }
@@ -886,10 +924,6 @@ impl Serialize for StreamSettings {
         for (index, key) in self.partition_keys.iter().enumerate() {
             part_keys.insert(format!("L{index}"), key);
         }
-        state.serialize_field(
-            "partition_time_level",
-            &self.partition_time_level.unwrap_or_default(),
-        )?;
         state.serialize_field("partition_keys", &part_keys)?;
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("index_fields", &self.index_fields)?;
@@ -925,6 +959,7 @@ impl Serialize for StreamSettings {
                 state.skip_field("flatten_level")?;
             }
         }
+        state.serialize_field("is_llm_stream", &self.is_llm_stream)?;
         state.end()
     }
 }
@@ -950,11 +985,6 @@ impl From<&str> for StreamSettings {
                     _ => {}
                 }
             }
-        }
-
-        let mut partition_time_level = None;
-        if let Some(value) = settings.get("partition_time_level") {
-            partition_time_level = Some(PartitionTimeLevel::from(value.as_str().unwrap()));
         }
 
         let mut full_text_search_keys = Vec::new();
@@ -1070,8 +1100,11 @@ impl From<&str> for StreamSettings {
             .get("enable_log_patterns_extraction")
             .and_then(Value::as_bool)
             .unwrap_or_default();
+        let is_llm_stream = settings
+            .get("is_llm_stream")
+            .and_then(Value::as_bool)
+            .unwrap_or_default();
         Self {
-            partition_time_level,
             partition_keys,
             full_text_search_keys,
             index_fields,
@@ -1089,7 +1122,21 @@ impl From<&str> for StreamSettings {
             index_all_values,
             enable_distinct_fields,
             enable_log_patterns_extraction,
+            is_llm_stream,
         }
+    }
+}
+
+impl MemorySize for StreamSettings {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<StreamSettings>()
+            + self.partition_keys.mem_size()
+            + self.full_text_search_keys.mem_size()
+            + self.index_fields.mem_size()
+            + self.bloom_filter_fields.mem_size()
+            + self.defined_schema_fields.mem_size()
+            + self.distinct_value_fields.mem_size()
+            + self.extended_retention_days.mem_size()
     }
 }
 
@@ -1154,6 +1201,12 @@ impl StreamPartition {
     }
 }
 
+impl MemorySize for StreamPartition {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<StreamPartition>() + self.field.mem_size()
+    }
+}
+
 #[derive(Clone, Debug, Default, Hash, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum StreamPartitionType {
@@ -1171,13 +1224,6 @@ impl Display for StreamPartitionType {
             StreamPartitionType::Prefix => write!(f, "prefix"),
         }
     }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub struct PartitioningDetails {
-    pub partition_keys: Vec<StreamPartition>,
-    pub partition_time_level: Option<PartitionTimeLevel>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

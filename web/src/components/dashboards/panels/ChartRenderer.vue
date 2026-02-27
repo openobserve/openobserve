@@ -639,6 +639,7 @@ export default defineComponent({
         cleanupChart();
         chart = echarts.init(chartRef.value, theme, {
           renderer: props.renderType,
+          devicePixelRatio: window.devicePixelRatio || 1,
         });
         const options = props.data.options || {};
 
@@ -848,7 +849,14 @@ export default defineComponent({
       },
       { deep: true },
     );
-    return { chartRef, hoveredSeriesState, handleNativeContextMenu };
+    return {
+      chartRef,
+      hoveredSeriesState,
+      handleNativeContextMenu,
+      get chart() {
+        return chart;
+      }
+    };
   },
 });
 </script>

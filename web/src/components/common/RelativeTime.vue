@@ -26,7 +26,7 @@ import { useStore } from "vuex";
 export default {
   props: {
     timestamp: {
-      type: Number,
+      type: [Number, String, Date],
       required: false, // Make the timestamp prop optional
       default: null,
     },
@@ -42,6 +42,15 @@ export default {
     const relativeTime = ref("");
     let intervalId = null;
 
+    // Helper to convert timestamp to number
+    const getTimestampInMs = (timestamp) => {
+      if (!timestamp) return null;
+      if (typeof timestamp === "number") return timestamp;
+      if (typeof timestamp === "string") return new Date(timestamp).getTime();
+      if (timestamp instanceof Date) return timestamp.getTime();
+      return null;
+    };
+
     const getBestUnit = (diffInSeconds) => {
       if (diffInSeconds < 60) return { value: diffInSeconds, unit: "second" };
       if (diffInSeconds < 3600)
@@ -56,13 +65,14 @@ export default {
     };
 
     const updateRelativeTime = () => {
-      if (!props.timestamp) {
+      const timestampMs = getTimestampInMs(props.timestamp);
+      if (!timestampMs) {
         relativeTime.value = "";
         return;
       }
 
       const now = Date.now();
-      const diffInSeconds = Math.floor((now - props.timestamp) / 1000);
+      const diffInSeconds = Math.floor((now - timestampMs) / 1000);
 
       const rtf = new Intl.RelativeTimeFormat("en", {
         numeric: "auto",
@@ -74,10 +84,11 @@ export default {
     };
 
     const formattedExactTime = computed(() => {
-      if (!props.timestamp) return "";
+      const timestampMs = getTimestampInMs(props.timestamp);
+      if (!timestampMs) return "";
 
       return `${props.fullTimePrefix} ${timestampToTimezoneDate(
-        props.timestamp,
+        timestampMs,
         store.state.timezone,
         "yyyy-MM-dd HH:mm:ss.SSS"
       )} ${store.state.timezone}`;

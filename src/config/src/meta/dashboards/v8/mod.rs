@@ -160,8 +160,8 @@ pub struct PanelFields {
     pub stream_type: StreamType,
     pub x: Vec<AxisItem>,
     pub y: Vec<AxisItem>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub z: Option<Vec<AxisItem>>,
+    #[serde(default)]
+    pub z: Vec<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub breakdown: Option<Vec<AxisItem>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -438,6 +438,14 @@ pub struct PanelConfig {
     sticky_first_column: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     column_order: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_pagination: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_pagination_rows_per_page: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    panel_time_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    panel_time_range: Option<PanelTimeRange>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -640,6 +648,8 @@ pub struct DateTimeOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_time: Option<i64>,
 }
+
+pub type PanelTimeRange = DateTimeOptions;
 
 #[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(default)]

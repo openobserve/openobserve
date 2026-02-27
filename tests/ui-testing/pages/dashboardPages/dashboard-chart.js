@@ -6,14 +6,44 @@ const testLogger = require("../../playwright-tests/utils/test-logger.js");
 export default class ChartTypeSelector {
   constructor(page) {
     this.page = page;
+
+    // Raw query / DynamicFunctionPopUp selectors
+    this.rawQueryTextarea = page.locator('[data-test="dashboard-raw-query-textarea"]');
+    this.popupTabs = page.locator('[data-test="dynamic-function-popup-tabs"]');
+    this.buildTab = page.locator('[data-test="dynamic-function-popup-tab-build"]');
+    this.rawTab = page.locator('[data-test="dynamic-function-popup-tab-raw"]');
+
+    // Query type selectors
+    this.sqlQueryTypeBtn = page.locator('[data-test="dashboard-sql-query-type"]');
+    this.customQueryTypeBtn = page.locator('[data-test="dashboard-custom-query-type"]');
+    this.builderQueryTypeBtn = page.locator('[data-test="dashboard-builder-query-type"]');
+
+    // Custom query editor
+    this.queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
   }
 
   // Chart Type select
   async selectChartType(chartType) {
+    // Wait for panel editor to be ready - could be full page or dialog
+    // Look for either the Apply button or any chart type selector
+    const panelEditorIndicator = this.page.locator('[data-test="dashboard-apply"]').or(
+      this.page.locator('[data-test^="selected-chart-"]').first()
+    );
+
+    // Wait for panel editor to be visible with retry
+    try {
+      await panelEditorIndicator.first().waitFor({ state: "visible", timeout: 15000 });
+    } catch (e) {
+      // Panel editor may take extra time to load, wait for network idle and retry
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await panelEditorIndicator.first().waitFor({ state: "visible", timeout: 10000 });
+    }
+
     const chartOption = this.page.locator(
       `[data-test="selected-chart-${chartType}-item"]`
     );
-    await chartOption.waitFor({ state: "visible", timeout: 5000 });
+    await chartOption.waitFor({ state: "visible", timeout: 15000 });
+    await chartOption.scrollIntoViewIfNeeded();
     await chartOption.click();
   }
 
@@ -29,7 +59,7 @@ export default class ChartTypeSelector {
       .click();
 
     // CRITICAL: Wait for stream list API call to complete after changing type
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(1000);
   }
 
@@ -245,5 +275,115 @@ export default class ChartTypeSelector {
     await this.selectFunction(functionName);
     await this.page.keyboard.press("Escape");
     await this.page.waitForTimeout(500);
+  }
+
+  // ===== RAW QUERY CONFIGURATION METHODS =====
+
+  /**
+   * Switch to the Raw tab in the DynamicFunctionPopUp
+   * Requires the Y-axis popup to already be open (call openYAxisFunctionPopup first)
+   */
+  async switchToRawTab() {
+    await this.rawTab.waitFor({ state: "visible", timeout: 10000 });
+    await this.rawTab.click();
+    await this.rawQueryTextarea.waitFor({ state: "visible", timeout: 10000 });
+    testLogger.debug('Switched to Raw tab');
+  }
+
+  /**
+   * Switch to the Build tab in the DynamicFunctionPopUp
+   * Requires the Y-axis popup to already be open
+   */
+  async switchToBuildTab() {
+    await this.buildTab.waitFor({ state: "visible", timeout: 10000 });
+    await this.buildTab.click();
+    // Wait for Build tab content to render (function dropdown becomes visible)
+    await this.page.locator('[data-test="dashboard-function-dropdown"]').first().waitFor({ state: "visible", timeout: 10000 });
+    testLogger.debug('Switched to Build tab');
+  }
+
+  /**
+   * Enter a raw SQL query in the Raw tab textarea
+   * Requires the Raw tab to be active
+   * @param {string} query - The raw SQL query to enter
+   */
+  async enterRawQuery(query) {
+    await this.rawQueryTextarea.waitFor({ state: "visible", timeout: 10000 });
+    await this.rawQueryTextarea.click();
+    await this.rawQueryTextarea.fill(query);
+    testLogger.debug('Entered raw query', { query });
+  }
+
+  /**
+   * Get the current value of the raw query textarea
+   * Requires the Raw tab to be active
+   * @returns {Promise<string>} The raw query text
+   */
+  async getRawQueryValue() {
+    await this.rawQueryTextarea.waitFor({ state: "visible", timeout: 10000 });
+    return await this.rawQueryTextarea.inputValue();
+  }
+
+  /**
+   * Verify the raw query textarea is visible
+   * @param {Function} expect - Playwright expect function
+   */
+  async verifyRawTextareaVisible(expect) {
+    await expect(this.rawQueryTextarea).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Configure a Y-axis field with a raw query in one method
+   * Opens the popup, switches to Raw tab, enters query, and closes popup
+   * @param {string} alias - The Y-axis alias (e.g., "y_axis_1")
+   * @param {string} query - The raw SQL query to enter
+   */
+  async configureYAxisRawQuery(alias, query) {
+    await this.openYAxisFunctionPopup(alias);
+    await this.switchToRawTab();
+    await this.enterRawQuery(query);
+    await this.page.keyboard.press("Escape");
+    // Wait for popup to close
+    const menuLocator = this.page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`);
+    await menuLocator.waitFor({ state: "hidden", timeout: 10000 });
+    testLogger.info('Configured Y-axis raw query', { alias, query });
+  }
+
+  /**
+   * Verify the Build/Raw tabs are visible in the popup
+   * Requires the Y-axis popup to already be open
+   * @param {Function} expect - Playwright expect function
+   */
+  async verifyBuildRawTabsVisible(expect) {
+    await expect(this.popupTabs).toBeVisible({ timeout: 10000 });
+    await expect(this.buildTab).toBeVisible();
+    await expect(this.rawTab).toBeVisible();
+  }
+
+  /**
+   * Verify the Build/Raw tabs are NOT visible (e.g., in custom query mode)
+   * @param {Function} expect - Playwright expect function
+   */
+  async verifyBuildRawTabsNotVisible(expect) {
+    await expect(this.popupTabs).not.toBeVisible({ timeout: 5000 });
+  }
+
+  /**
+   * Switch to Custom query mode
+   */
+  async switchToCustomQueryMode() {
+    await this.customQueryTypeBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.customQueryTypeBtn.click();
+    testLogger.debug('Switched to custom query mode');
+  }
+
+  /**
+   * Enter a custom SQL query in the Monaco editor
+   * @param {string} query - The SQL query to enter
+   */
+  async enterCustomSQL(query) {
+    await this.queryEditor.getByRole('code').click();
+    await this.queryEditor.locator(".inputarea").fill(query);
+    testLogger.debug('Entered custom SQL query', { query });
   }
 }

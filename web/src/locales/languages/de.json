@@ -108,12 +108,17 @@
     "darkMode": "Dunkler Modus",
     "manageTheme": "Theme verwalten",
     "url": "URL",
-    "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
     "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
     "id": "ID",
     "getStarted": "Fangen Sie an",
     "reset": "Zurücksetzen",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "set": "+ Satz",
+    "copy": "Kopieren",
+    "copySuccess": "In die Zwischenablage kopiert",
+    "copyError": "Fehler beim Kopieren in die Zwischenablage",
+    "goBack": "Geh zurück",
+    "stopGenerating": "Generieren beenden"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -126,7 +131,7 @@
     "source": "_Quelle",
     "noResult": "Kein Ergebnis",
     "syntaxGuide": "Leitfaden zur Syntax",
-    "recordsPerPage": "Datensätze pro Seite",
+    "rowsPerPage": "Datensätze pro Seite",
     "showing": "Wird angezeigt",
     "of": "von",
     "rowDetail": "Angaben zur Quelle",
@@ -233,8 +238,10 @@
     "patternColumnHeader": "Muster",
     "occurrenceColumnHeader": "Vorkommen",
     "percentageColumnHeader": "Prozentsatz",
+    "anomalyColumnHeader": "Anomalie",
     "actionsColumnHeader": "Aktionen",
     "anomalyLabel": "ANOMALIE",
+    "anomalyDetected": "Anomalie erkannt",
     "includePatternInSearch": "Muster in die Suche einbeziehen",
     "excludePatternFromSearch": "Muster von der Suche ausschließen",
     "showPatternDetails": "Details anzeigen ({Variablen} Variablen, {Beispiele} Beispiele)",
@@ -308,7 +315,43 @@
     "show": "Zeige",
     "editor": "Redakteur",
     "webUrlNotConfigured": "URL teilen ist deaktiviert, bis ZO_WEB_URL von Ihrem Administrator konfiguriert wurde.",
-    "showHideColumns": "Spalten ein-/ausblenden"
+    "showHideColumns": "Spalten ein-/ausblenden",
+    "autoRefresh": "Automatische Aktualisierung",
+    "createSavedView": "Gespeicherte Ansicht erstellen",
+    "listSavedViews": "Gespeicherte Ansichten auflisten",
+    "buildQuery": "Bauen",
+    "enableSqlModeForBuild": "Bitte aktivieren Sie den SQL-Modus und wählen Sie einen einzelnen Stream aus, um den Query Builder zu verwenden",
+    "applyToSearch": "Für die Suche bewerben",
+    "complexQueryDetected": "Eine komplexe Abfrage wurde erkannt. Im benutzerdefinierten Modus.",
+    "nlpModeLabel": "Modus für natürliche Sprache",
+    "generateSQL": "Generieren Sie SQL",
+    "generateQuery": "Abfrage generieren",
+    "generateSQLTooltip": "Generieren Sie eine SQL-Abfrage aus natürlicher Sprache (Strg/Cmd + Enter)",
+    "generateQueryTooltip": "Generieren Sie eine SQL-Abfrage aus natürlicher Sprache",
+    "generating": "Generieren...",
+    "nlQueryGenerationFailed": "Die Abfrage konnte nicht generiert werden. Bitte versuchen Sie es erneut.",
+    "nlQueryGenerationSuccess": "Die Abfrage wurde erfolgreich generiert!",
+    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden",
+    "askAIPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Anfrage...",
+    "aiBarSuccessPlaceholder": "Was möchtest du als Nächstes tun?",
+    "askAI": "Frag KI",
+    "askAITooltip": "Bitten Sie KI um Hilfe bei Ihrer Anfrage",
+    "enterPrompt": "Geben Sie eine Aufforderung ein, um eine Abfrage zu generieren",
+    "analyzingQuery": "Abfrage wird analysiert...",
+    "generatingQuery": "Abfrage wird generiert...",
+    "queryGeneratedSuccess": "Die Abfrage wurde erfolgreich generiert!",
+    "queryGenerationStopped": "Die Generierung der Abfrage wurde gestoppt.",
+    "queryGenerationFailed": "Die Generierung der Abfrage ist fehlgeschlagen.",
+    "fetchingResults": "Suchergebnisse werden abgerufen...",
+    "noResultsFound": "Keine Ergebnisse gefunden",
+    "errorFetchingResults": "Fehler beim Abrufen der Ergebnisse",
+    "somethingWentWrong": "Etwas ist schief gelaufen",
+    "selectStreamForAI": "Wählen Sie zuerst einen Stream aus, um KI zu verwenden",
+    "collapseFields": "Felder ausblenden",
+    "openFields": "Felder öffnen",
+    "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
+    "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren",
+    "recordsPerPage": "Datensätze pro Seite"
   },
   "menu": {
     "home": "Startseite",
@@ -420,7 +463,6 @@
     "ingestion_type": "Art der Einnahme",
     "ingestion_limit": "Verschluckungslimit",
     "today_usage": "Heutige Nutzung",
-    "feature_comparision_lbl": "Vergleich der Funktionen",
     "feature_comparision_ent_msg": "Sie verwenden OpenObserve Enterprise Edition mit Zugriff auf alle unten aufgeführten erweiterten Funktionen.",
     "feature_comparision_plan_detail": "Ihr Plan: Die Enterprise Edition ist kostenlos für die Datenaufnahme von bis zu 200 GB/Tag (~6 TB/Monat).",
     "feature_comparision_os_msg": "Sie verwenden derzeit OpenObserve Open Source Edition. Führen Sie ein Upgrade auf die Enterprise Edition durch, um die in der folgenden Vergleichstabelle aufgeführten erweiterten Funktionen freizuschalten.",
@@ -954,7 +996,10 @@
     "jsType": "JavaScript (ES2023)",
     "vrlfunction": "VRL-Funktion",
     "jsFunctionHint": "Verwenden Sie das Objekt `row`, um auf Protokollfelder zuzugreifen und diese zu ändern. Beispiel: row.new_field = row.existing_field + 'verarbeitet';",
-    "vrlFunctionHint": "Verwenden Sie das `.`, um das aktuelle Ereignis darzustellen. Beispiel: .new_field = .existing_field + 'verarbeitet'"
+    "vrlFunctionHint": "Verwenden Sie das `.`, um das aktuelle Ereignis darzustellen. Beispiel: .new_field = .existing_field + 'verarbeitet'",
+    "jsErrorDetails": "JavaScript-Fehlerdetails",
+    "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
+    "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren"
   },
   "confirmDialog": {
     "cancel": "Abbrechen",
@@ -1115,7 +1160,6 @@
     "unitLabel": "Einheit",
     "basemapLabel": "Basiskarte",
     "customunitLabel": "Benutzerdefinierte Einheit",
-    "lattitudeLabel": "Breitengrad",
     "longitudeLabel": "Längengrad",
     "zoomLabel": "Zoomen",
     "legendLabel": "Legende",
@@ -1182,6 +1226,9 @@
     "wraptext": "Tabellenzellen umwickeln",
     "tableTranspose": "Transponieren",
     "tableDynamicColumns": "Dynamische Spalten zulassen",
+    "pagination": "Paginierung",
+    "rowsPerPage": "Zeilen pro Seite",
+    "rowsPerPageTooltip": "Legen Sie die Standardanzahl der pro Seite anzuzeigenden Datensätze fest",
     "showBorder": "Achsenrand anzeigen",
     "currencyDollar": "Währung — Dollar ($)",
     "currencyEuro": "Währung - Euro (€)",
@@ -1403,7 +1450,27 @@
     "noColumnsOrdered": "Keine Spalten angeordnet",
     "columnsDefaultOrder": "Die Spalten werden in ihrer Standardreihenfolge angezeigt",
     "moveUp": "Steigen Sie auf",
-    "moveDown": "Gehe nach unten"
+    "moveDown": "Gehe nach unten",
+    "toggleFunctionEditor": "Funktionseditor umschalten",
+    "useSavedFunction": "Verwenden Sie die Funktion Gespeichert",
+    "showQueryResults": "Abfrageergebnisse anzeigen",
+    "hideQueryResults": "Abfrageergebnisse ausblenden",
+    "vrlExtractionTooltip": "Um extrahierte VRL-Felder im Diagramm zu verwenden, schreiben Sie eine VRL-Funktion und klicken Sie auf die Schaltfläche Anwenden. Die Felder werden extrahiert, sodass Sie sie zum Erstellen des Diagramms verwenden können.",
+    "errorFetchingFunctions": "Fehler beim Abrufen von Funktionen",
+    "functionAppliedSuccess": "Die Funktion {name} wurde erfolgreich angewendet.",
+    "connectNullValuesTooltip": "Verbinde Datenpunkte über fehlende Werte mit einer Linie.",
+    "panelTimeSettings": "Zeiteinstellungen für das Panel",
+    "panelTimeEnabled": "Zeit auf Panelebene zulassen",
+    "useGlobalTime": "Globale Zeit verwenden",
+    "useIndividualTime": "Nutze individuelle Zeit",
+    "panelTimeGlobalHint": "Das Panel verfolgt die globale Dashboard-Zeit. Durch Änderungen der globalen Uhrzeit wird dieses Panel aktualisiert.",
+    "panelTimeIndividualHint": "Das Panel verwendet seinen eigenen Zeitbereich. Stellen Sie die Uhrzeit mit der Datumsauswahl unten ein. Globale Zeitänderungen wirken sich nicht auf dieses Panel aus.",
+    "panelTimeRange": "Zeitbereich des Panels",
+    "panelTimeRangeTooltip": "Dieser Zeitbereich gilt nur für dieses Panel. Andere Panels verwenden ihre eigenen konfigurierten Zeiten oder die globale Dashboard-Uhrzeit.",
+    "panelTimeSettingsTooltip": "Konfigurieren Sie, wie dieses Panel seinen Zeitbereich bestimmt. Sie können den Zeitraum des Dashboards verwenden oder einen benutzerdefinierten Zeitraum für diesen Bereich festlegen.",
+    "panelTimeMode": "Quelle für den Zeitbereich (beim Laden des Dashboards)",
+    "useDefaultTimeTooltip": "Wenn diese Option aktiviert ist, verwendet dieses Panel die konfigurierte Standarddauer als Zeitraum beim Laden des Dashboards und nicht die globale Dashboard-Zeit.",
+    "defaultDuration": "Standarddauer"
   },
   "panel": {
     "header": "Panel",
@@ -1426,7 +1493,6 @@
     "otherColumn": "Andere Spalte",
     "config": "Konfiguration",
     "filters": "Filter",
-    "customSql": "Benutzerdefiniertes SQL",
     "field": "Felder",
     "discard": "Verwerfen",
     "edit": "Bearbeiten",
@@ -1435,7 +1501,6 @@
     "layout": "Layout",
     "sql": "Anfrage",
     "back": "<< Zurück",
-    "auto": "Automatisch",
     "promQL": "proMQL",
     "latitude": "Breitengrad",
     "longitude": "Längengrad",
@@ -1468,9 +1533,6 @@
     "panelDuplicationFailed": "Fehler beim Duplizieren des Panels",
     "mapname": "Name",
     "mapvalue": "Wert",
-    "customChartTypeSelector": "Benutzerdefinierter Diagrammtyp-Selektor",
-    "customChartTypeSelectorHint": "Wählen Sie einen Diagrammtyp aus der eCharts-Bibliothek aus, um mit einer grundlegenden Codestruktur zu beginnen",
-    "selectChartType": "Wählen Sie den Diagrammtyp",
     "joins": "Tritt bei",
     "addJoin": "Join hinzufügen",
     "removeJoin": "Join entfernen",
@@ -1487,14 +1549,15 @@
     "SQL": "SQL",
     "builder": "Baumeister",
     "custom": "Benutzerdefiniert",
-    "sqlBuilder": "SQL-Generator"
+    "sqlBuilder": "SQL-Generator",
+    "generatedSql": "Generiertes SQL",
+    "enterCustomSql": "Geben Sie Ihre benutzerdefinierte SQL-Abfrage ein...",
+    "customSql": "Benutzerdefiniertes SQL"
   },
   "home": {
     "streams": "Streams",
     "totalDataIngested": "Gesamtzahl der eingelesenen Daten",
     "view": "Mehr ansehen >>",
-    "queryFunctions": "Funktionen abfragen",
-    "ingestFunctions": "Funktionen einlesen",
     "scheduledAlert": "Geplante Benachrichtigungen",
     "rtAlert": "Benachrichtigungen in Echtzeit",
     "noData": "Es wurden keine Daten aufgenommen",
@@ -1588,15 +1651,12 @@
     "edit": "Bearbeiten",
     "search": "Warnung suchen",
     "name": "Name",
-    "function": "Einzelheiten zur Warnung",
     "save": "Speichern",
     "sql": "Anfrage",
     "realTime": "Echtzeit",
     "scheduled": "Geplant",
-    "duration": "Dauer, für die die Warnung ausgewertet wird",
     "condition": "Zustand",
     "interval": "Häufigkeit, mit der die Warnung ausgewertet wird",
-    "delayNotificationUntil": "Benachrichtigung bis nach einer Benachrichtigung verzögern",
     "destination": "Ziel",
     "stream_name": "Name des Streams",
     "actions": "Aktionen",
@@ -1606,7 +1666,6 @@
     "addTitle": "Warnung hinzufügen",
     "updateTitle": "Warnung aktualisieren",
     "delete": "Löschen",
-    "stream_type": "Stream-Typ",
     "clone": "Warnung klonen",
     "column": "Spalte",
     "alertType": "Art der Warnung",
@@ -1770,7 +1829,9 @@
       "analyzeRca": "Analysieren",
       "rcaInProgress": "Die Grundursache wird analysiert...",
       "rcaCompleted": "Ursachenanalyse abgeschlossen",
-      "noRcaYet": "Keine Ursachenanalyse verfügbar. Klicken Sie auf „Analysieren“, um zu beginnen."
+      "noRcaYet": "Keine Ursachenanalyse verfügbar. Klicken Sie auf „Analysieren“, um zu beginnen.",
+      "search": "Vorfälle suchen...",
+      "sreChat": "SRE-Assistenten fragen"
     },
     "events": "Ereignisse",
     "multiWindow": "Mit der Vergangenheit vergleichen",
@@ -1813,7 +1874,12 @@
         "alertMeWhen": "Informiere mich, wenn",
         "butNoMoreThan": ", aber nicht mehr als einmal alle",
         "defaultConditions": "Mich benachrichtigen, wenn die konfigurierten Bedingungen erfüllt sind"
-      }
+      },
+      "title": "Zusammenfassung",
+      "alertName": "Alarmname",
+      "streamInfo": "Datenquelle",
+      "alertType": "Alarmtyp",
+      "queryCondition": "Abfragebedingung"
     },
     "correlation": {
       "title": "Korrelation von Warnmeldungen",
@@ -1895,7 +1961,114 @@
     "msteams": "Microsoft-Teams",
     "pagerduty": "Pager Duty",
     "opsgenie": "Opsgenie",
-    "servicenow": "Service jetzt"
+    "servicenow": "Service jetzt",
+    "saveAlert": "Warnung speichern",
+    "aggregation_threshold": "Bei Gruppen benachrichtigen",
+    "thresholdDynamic": {
+      "alertMeWhen": "Informiere mich, wenn",
+      "metricTypes": {
+        "resultsPassedFilter": "Ergebnisse haben Filter bestanden",
+        "distinctGroupsAffected": "verschiedene Gruppen sind betroffen",
+        "metricsMatchCriteria": "Metriken entsprechen den Kriterien",
+        "matchingLogsFound": "passende Logs gefunden",
+        "groupsPassFilter": "Gruppen erfüllen die Filterkriterien",
+        "distinctGroups": "verschiedene Gruppen gefunden",
+        "resultRows": "Ergebniszeilen zurückgegeben",
+        "timeSeries": "aktive Zeitreihe gefunden",
+        "matchingRecords": "passende Datensätze gefunden",
+        "groupsWithHaving": "Spielbedingungen für Gruppen",
+        "uniqueGroups": "einzigartige Gruppen",
+        "events": "Ereignisse entsprechen den Bedingungen",
+        "aggregatedValue": "Spielbedingungen"
+      },
+      "contextLabels": {
+        "groupedBy": "Gruppiert nach:",
+        "havingConditions": "UNTER FOLGENDEN BEDINGUNGEN:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Name der Warnung",
+      "sqlQuery": "SQL-Abfrage",
+      "promqlQuery": "PromQL-Abfrage",
+      "conditions": "Bedingungen",
+      "copy": "Kopieren",
+      "noCondition": "Keine Bedingung",
+      "noDescription": "Keine Beschreibung",
+      "evaluationHistory": "Verlauf der Evaluierung",
+      "loadingHistory": "Verlauf wird geladen...",
+      "noHistoryAvailable": "Für diese Warnung ist kein Bewertungsverlauf verfügbar",
+      "results": "Ergebnisse"
+    },
+    "historyTable": {
+      "timestamp": "Zeitstempel",
+      "status": "Status",
+      "evaluationTime": "Bewertung (en)",
+      "queryTime": "Anfrage (ms)",
+      "error": "Fehler"
+    },
+    "back": "Zurück",
+    "continue": "Weiter",
+    "wouldTrigger": "WÜRDE AUSLÖSEN",
+    "wouldNotTrigger": "WÜRDE NICHT AUSLÖSEN",
+    "queryBuilder": "Baumeister",
+    "groupByHelp": {
+      "description": "Gruppieren Sie die aggregierten Daten nach bestimmten Feldern, um separate Warnungen für jeden eindeutigen Wert zu erstellen.",
+      "example": "Beispiel: Gruppiere nach „Hostname“, um individuelle Benachrichtigungen pro Server zu erhalten, oder nach „status_code“, um Fehler separat zu verfolgen."
+    },
+    "conditions": {
+      "condition": "Zustand",
+      "conditionGroup": "Konditionsgruppe",
+      "addConditionTooltip": "Fügt dieser Gruppe eine neue Bedingung hinzu",
+      "addConditionGroupTooltip": "Fügen Sie eine verschachtelte Bedingungsgruppe hinzu (maximale Tiefe: 2)",
+      "maxDepthReachedTooltip": "Maximale Nisttiefe erreicht"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Warnung eingestellt für",
+      "currentWindow": "Aktuelles Fenster",
+      "cycle": "Zyklus",
+      "cycleTooltip": "Vergleichen Sie die Ergebnisse mit der gleichen Zeit im vorherigen Zyklus.",
+      "runningFor": "Läuft für {Zeitraum} im Intervall jeder {Frequenz}",
+      "currentWindowCannotBeDeleted": "Das aktuelle Fenster kann nicht gelöscht werden",
+      "comparingWith": "Im Vergleich zu",
+      "referenceWindow": "Referenzfenster",
+      "timeFrame": "Zeitrahmen",
+      "timeFrameTooltip": "Zeitraum für Ihre Anfrage.",
+      "comparingText": "Vergleich des aktuellen Fensterabfrageergebnisses mit dem Abfrageergebnis des vorherigen {offset}.",
+      "addComparisonWindow": "Vergleichsfenster hinzufügen",
+      "goToConditions": "Gehe zu den Bedingungen",
+      "goToConditionsTooltip": "Klicken Sie auf „Gehe zu den Bedingungen“, um die Ereignisse für ausgewählte Vergleichsfenster zu überprüfen"
+    },
+    "alertSettings": {
+      "cronSchedule": "Cron-Zeitplan",
+      "addNewDestination": "Neues Ziel hinzufügen",
+      "cooldownTooltip": "Wenn die Warnung ausgelöst wird, wie lange sollte dann gewartet werden, bevor eine weitere Benachrichtigung gesendet wird. Wenn z. B. die Warnung um 16:00 Uhr ausgelöst wird und die Stummmelbenachrichtigung auf 10 Minuten eingestellt ist, wird erst um 16:10 Uhr eine weitere Benachrichtigung gesendet, auch wenn die Warnung nach 1 Minute noch nicht abgeschlossen ist. Dies dient dazu, den Benutzer nicht mit Benachrichtigungen zu spammen.",
+      "thresholdTooltip": "Definiert, wann die Warnung auf der Grundlage der Anzahl der Ereignisse oder des aggregierten Werts ausgelöst werden soll. Beispiel: Wenn der Wert auf „> 100“ gesetzt ist, wird die Warnung ausgelöst, wenn die Anzahl 100 Ereignisse überschreitet.",
+      "periodTooltip": "Zeitraum, für den die Abfrage ausgeführt werden soll. Beispiel: 10 Minuten bedeuten, dass bei jeder Ausführung der Abfrage die Daten der letzten 10 Minuten verwendet werden.",
+      "frequencyTooltipMinutes": "Wie oft die Aufgabe ausgeführt werden soll. z.B. alle 5 Minuten.",
+      "frequencyTooltipCron": "Standard-UNIX-Cronformat mit 5 durch Leerzeichen getrennten Feldern: [Minute 0-59] [Stunde 0-23] [Tag des Monats 1-31] [Monat 1-12 oder JAN-DEC] [Wochentag 0-7 oder '1L-7L', 0 und 7 für Sonntag].",
+      "timezoneWarning": "Warnung: Die angezeigte Zeitzone ist eine ungefähre Angabe. Überprüfen Sie die richtige Zeitzone und wählen Sie sie manuell aus.",
+      "destinationsTooltip": "Wählen Sie ein oder mehrere Ziele aus, um Warnmeldungen zu senden.",
+      "templateTooltip": "Optional: Wählen Sie eine Vorlage aus, die für alle Ziele in dieser Warnung verwendet werden soll. Mithilfe von Vorlagen können Sie das Format von Warnmeldungen anpassen. Wenn nicht ausgewählt, verwendet jedes Ziel seine eigene konfigurierte Vorlage."
+    },
+    "advanced": {
+      "addVariable": "Variable hinzufügen",
+      "variablesTooltip": "Variablen werden verwendet, um Daten von der Warnung an das Ziel zu übergeben.",
+      "rowTemplateTooltip": "Die Zeilenvorlage wird verwendet, um die Warnmeldung zu formatieren.",
+      "templateType": "Vorlagentyp:"
+    },
+    "addConditions": "Bedingungen hinzufügen",
+    "sqlEditor": "SQL-Editor",
+    "promqlEditor": "PromQL Editor",
+    "vrlEditor": "VRL-Redakteur",
+    "generateVRL": "VRL generieren",
+    "applyVRL": "VRL anwenden",
+    "runQuery": "Abfrage ausführen",
+    "onStream": "auf",
+    "streamLabel": "fließen",
+    "noStreamSelected": "Kein Stream ausgewählt",
+    "resultsIncludeAllWindows": "Die Ergebnisse beinhalten alle Ergänzungen mit mehreren Fenstern",
+    "runQueryForOutput": "Bitte klicken Sie auf Abfrage ausführen, um die Ausgabe zu sehen",
+    "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen"
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -1942,7 +2115,14 @@
     "preview": "Vorschau",
     "test": "Testen",
     "saved": "Ziel wurde erfolgreich gespeichert",
-    "saveError": "Ziel konnte nicht gespeichert werden"
+    "saveError": "Ziel konnte nicht gespeichert werden",
+    "customWebhook": "Benutzerdefiniert (Webhook)",
+    "customEmail": "Benutzerdefiniert (E-Mail)",
+    "customAction": "Benutzerdefiniert (Aktion)",
+    "custom": "Benutzerdefiniert",
+    "separator": "Trennzeichen",
+    "separator_placeholder": "Geben Sie ein Trennzeichen ein (z. B. |,\\n,\\ t, Leerzeichen)",
+    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)"
   },
   "metrics": {
     "searchMetric": "Suchen Sie nach einer Metrik",
@@ -2104,16 +2284,8 @@
       "howItWorksTitle": "So funktioniert Service Identity",
       "howItWorksDescription": "(Vollständig qualifizierter Name) wird anhand Ihrer Telemetriedimensionen berechnet, um Dienste aus verschiedenen Datenquellen eindeutig zu identifizieren und zu korrelieren.",
       "priorityOrderLabel": "Prioritätsreihenfolge:",
-      "priorityOrderDescription": "Die Abmessungen werden in der unten aufgeführten Reihenfolge überprüft. Die erste Dimension mit einem Wert wird zur Service-FQN.",
       "exampleLabel": "Beispiel:",
-      "exampleText1": "Wenn du beides hast",
-      "exampleText2": "und",
-      "exampleText3": "das FQN wird",
-      "exampleText4": "da",
-      "exampleText5": "hat eine höhere Priorität.",
       "correlationDescription": "Dienste mit derselben FQN sind korreliert, auch wenn sie unterschiedliche",
-      "correlationDescriptionField": "Bedienung",
-      "correlationDescriptionEnd": "Namen.",
       "fqnPriorityTitle": "FQN-Prioritätsdimensionen",
       "fqnPriorityTooltip": "Definiert, welche Dimensionen verwendet werden, um den Service-FQN für die Korrelation abzuleiten. Die erste Dimension mit einem Wert gewinnt. Ordnen Sie die Bestellung entsprechend Ihrer Infrastruktur neu an.",
       "fqnPriorityDescription": "Ziehen Sie, um die Reihenfolge zu ändern, oder verwenden Sie die Pfeiltasten. Die erste übereinstimmende Dimension bestimmt die Service-FQN.",
@@ -2134,20 +2306,40 @@
       "traces": "Spuren",
       "metrics": "Metriken",
       "retry": "Erneut versuchen",
-      "k8sDeployment": "Name der Kubernetes-Bereitstellung",
-      "k8sStatefulSet": "Kubernetes StatefulSet-Name",
-      "k8sDaemonSet": "Kubernetes DaemonSet (Name)",
-      "k8sJob": "Kubernetes-Jobname",
-      "k8sReplicaSet": "Kubernetes ReplicaSet-Name",
-      "k8sNamespace": "Kubernetes-Namespace",
-      "awsEcsTask": "AWS ECS Task-Familie",
-      "faasName": "Lambda, Cloud-Funktionen usw.",
-      "gcpCloudRun": "Google Cloud Run-Dienst",
-      "azureCloudRole": "Azure Cloud-Rollenname",
-      "processName": "Name des Bare-Metal-Prozesses",
-      "serviceDim": "Telemetriedienst.name öffnen",
-      "host": "Host-/Knotenname",
-      "environment": "Bereitstellungsumgebung"
+      "serviceIdentityLabel": "Service-Identität",
+      "compoundFqnLabel": "Identitätsformat:",
+      "compoundFqnDescription": "Scope-Dimensionen werden mit '/' verkettet, dann wird die erste Nicht-Null-Workload-Dimension angehängt.",
+      "exampleText": "Mit {dim1} und {dim2} wird die Identität zu {value}.",
+      "correlationLabel": "Korrelation:",
+      "addDimensionHint": "Wählen Sie eine semantische Gruppe aus, um sie zur Prioritätsliste hinzuzufügen.",
+      "selectSemanticGroup": "Semantische Gruppe auswählen",
+      "noSemanticGroupsAvailable": "Keine semantischen Gruppen verfügbar. Konfigurieren Sie zuerst die Feldzuordnungen unten.",
+      "noSemanticGroupsConfigured": "Keine semantischen Gruppen konfiguriert. Fügen Sie unten Feldzuordnungen hinzu, um verfügbare Dimensionen zu definieren.",
+      "configureSemanticGroupsFirst": "Konfigurieren Sie zuerst die semantischen Feldzuordnungen unten, um verfügbare Dimensionen für die Identitätspriorität zu definieren.",
+      "saveFqnPriority": "Identitätspriorität speichern",
+      "saveSemanticMappings": "Semantische Zuordnungen speichern",
+      "fqnPrioritySaved": "Identitätsprioritätskonfiguration erfolgreich gespeichert",
+      "semanticMappingsSaved": "Semantische Feldzuordnungen erfolgreich gespeichert",
+      "filters": "Filter",
+      "availableDimensions": "Verfügbare Dimensionen",
+      "semanticFieldGroupsTitle": "Feldzuordnungen",
+      "groupsLabel": "Gruppen",
+      "noMatchingGroups": "Keine passenden Gruppen",
+      "fqnFormulaTitle": "Identitätsformel",
+      "fqnFormulaTooltip": "Zeigt, wie die Service-Identität berechnet wird. Scope-Dimensionen (blau) werden mit '/' verkettet. Die erste Nicht-Null-Workload-Dimension (grün) wird zum Servicenamen.",
+      "scopeDimension": "Scope-Dimension",
+      "workloadDimension": "Workload-Dimension",
+      "noFormulaConfigured": "Keine Identitätsformel konfiguriert. Fügen Sie oben Dimensionen hinzu.",
+      "scopeLegend": "Scope (verkettet)",
+      "workloadLegend": "Workload (erste Nicht-Null)",
+      "firstNonNull": "erste Nicht-Null von",
+      "scopeTag": "Scope",
+      "workloadTag": "Workload",
+      "scopeOnly": "nur Scope",
+      "noMatchingDimensions": "Keine passenden Dimensionen",
+      "otherGroup": "Sonstige",
+      "fallbackGroup": "Fallback",
+      "fallbackNote": "Fallback-Dimensionen (wie 'service') gelten umgebungsübergreifend, wenn keine umgebungsspezifische Workload übereinstimmt."
     },
     "pageSubtitle": "Passen Sie die Einstellungen für Ihre Anwendung an",
     "platformSettings": "Plattform-Einstellungen",
@@ -2291,7 +2483,11 @@
     "errorSavingPipeline": "Fehler beim Speichern der Pipeline",
     "cancelChangesConfirm": "Möchten Sie die Änderungen wirklich stornieren?",
     "cancel": "Stornieren",
-    "dragDropNodesHere": "Ziehen Sie Knoten hierher und legen Sie sie dort ab"
+    "dragDropNodesHere": "Ziehen Sie Knoten hierher und legen Sie sie dort ab",
+    "promqlOnlyForMetrics": "PromQL ist nur für den Metrik-Stream-Typ verfügbar",
+    "invalidCronExpression": "Ungültiger Cron-Ausdruck",
+    "thresholdShouldNotBeEmpty": "Der Schwellenwert sollte nicht leer sein",
+    "errorGettingResults": "Fehler beim Abrufen der Ergebnisse"
   },
   "reports": {
     "header": "Berichte",
@@ -2348,7 +2544,9 @@
     "collapseFields": "Felder ausblenden",
     "openFields": "Felder öffnen",
     "timeRangeUpdated": "Der gewählte Zeitraum enthielt diese Spur nicht. Der Zeitbereich wurde aktualisiert, sodass er dem Zeitstempel der Spur entspricht.",
-    "fetchingMoreTraces": "Weitere Spuren werden abgerufen..."
+    "fetchingMoreTraces": "Weitere Spuren werden abgerufen...",
+    "showErrorOnly": "Nur Fehler anzeigen",
+    "openInTraces": "In Traces öffnen"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -2521,7 +2719,8 @@
     "sql_query": "SQL-Abfrage",
     "resuls": "Ergebnisse",
     "wrapText": "Text umbrechen",
-    "delayMessage": "Der Suchverlauf könnte sich verzögern um"
+    "delayMessage": "Der Suchverlauf könnte sich verzögern um",
+    "results": "Ergebnisse"
   },
   "search_scheduler_job": {
     "title": "Job Scheduler durchsuchen",
@@ -2585,7 +2784,8 @@
     "showLegends": "Legends anzeigen"
   },
   "alert_list": {
-    "alert_details": "Details zur Warnung"
+    "alert_details": "Details zur Warnung",
+    "alert_history": "Verlauf der Warnmeldungen"
   },
   "latencyInsights": {
     "title": "Einblicke",
@@ -2612,7 +2812,8 @@
     "analyzeButtonLabel": "Analysieren",
     "refreshTooltip": "Analyse mit aktualisiertem Perzentil aktualisieren",
     "customSQLFieldsDisabled": "Die Feldauswahl ist für benutzerdefinierte SQL-Abfragen nicht verfügbar. Dimensionen werden aus Ihren Abfrageergebnissen extrahiert.",
-    "timeRangeSelected": "Ausgewählter Zeitbereich"
+    "timeRangeSelected": "Ausgewählter Zeitbereich",
+    "dimensionsSelected": "Ausgewählte Abmessungen"
   },
   "volumeInsights": {
     "title": "Einblicke",
@@ -2621,7 +2822,9 @@
     "analyzeTooltip": "Analysieren Sie Trace-Muster über Dimensionen hinweg",
     "analyzeTooltipLogs": "Analysieren Sie die Dimensionsverteilung für den aktuellen Zeitraum",
     "rateLabel": "Rate:",
-    "timeRangeLabel": "Zeitbereich:"
+    "timeRangeLabel": "Zeitbereich:",
+    "analyzeTooltipTraces": "Analysieren Sie die Trace-Dimensionen auf Rate, Latenz und Fehlermuster",
+    "insightsButtonLabel": "Einblicke"
   },
   "errorInsights": {
     "title": "Einblicke",
@@ -2733,7 +2936,15 @@
         "startBeforeEnd": "Die Startzeit muss vor der Endzeit liegen",
         "endAfterStart": "Die Endzeit muss nach der Startzeit liegen"
       }
-    }
+    },
+    "viewInTraces": "In Traces ansehen",
+    "viewInTracesTooltip": "Öffnen Sie die Traces-Seite mit dem RED-Metriken-Dashboard und allen korrelierten Traces",
+    "exportToJson": "Export nach JSON",
+    "noLogsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Protokolle gefunden.",
+    "tracesErrorDetails": "Beim Abrufen der Trace-Daten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+    "metricsError": "Metriken können nicht geladen werden",
+    "metricsErrorDetails": "Beim Abrufen der Metrikdaten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+    "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden."
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",
@@ -2782,5 +2993,10 @@
     "invalidFormat": "Ungültiges Format",
     "mustBeGreaterThan": "Muss größer als {value} sein",
     "mustBeLessThan": "Muss kleiner als {value} sein"
+  },
+  "nlMode": {
+    "toggle": "Modus für natürliche Sprache",
+    "noAdditionalOptions": "Keine zusätzlichen Optionen",
+    "generateVRL": "VRL generieren"
   }
 }

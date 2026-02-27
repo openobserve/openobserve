@@ -24,7 +24,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.incidents.title") }}
           </div>
 
-          <div class="tw:flex tw:items-center">
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <q-btn
+              flat
+              round
+              :loading="loading"
+              @click="refreshIncidents"
+              data-test="incident-refresh-btn"
+              class="o2-secondary-button"
+            >
+             Refresh
+            </q-btn>
             <q-input
               v-model="searchQuery"
               dense
@@ -77,21 +87,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ (pagination.page - 1) * pagination.rowsPerPage + props.pageIndex + 1 }}
               </template>
               <template v-else-if="col.name === 'status'">
-                <q-badge
-                  :color="getStatusColor(props.row.status)"
-                  :label="getStatusLabel(props.row.status)"
-                />
+                <span
+                  class="status-badge"
+                  :class="getStatusColorClass(props.row.status)"
+                >
+                  {{ getStatusLabel(props.row.status) }}
+                </span>
               </template>
               <template v-else-if="col.name === 'severity'">
-                <q-badge
-                  :color="getSeverityColor(props.row.severity)"
-                  :label="props.row.severity"
-                />
+                <span
+                  class="severity-badge"
+                  :class="getSeverityColorClass(props.row.severity)"
+                >
+                  {{ props.row.severity }}
+                </span>
               </template>
               <template v-else-if="col.name === 'title'">
                 <div class="tw:flex tw:items-center tw:gap-1">
                   <span class="tw:font-medium">
                     {{ props.row.title || formatDimensions(props.row.stable_dimensions) }}
+                  </span>
+                </div>
+              </template>
+              <template v-else-if="col.name === 'dimensions'">
+                <div class="tw:flex tw:flex-wrap tw:gap-1">
+                  <!-- Show first 2 dimensions -->
+                  <span
+                    v-for="[key, value] in getSortedDimensions(props.row.stable_dimensions).slice(0, 2)"
+                    :key="key"
+                    class="dimension-badge"
+                    :class="getDimensionColorClass(key)"
+                  >
+                    <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
+                    <q-tooltip :delay="300" class="tw:text-xs">
+                      {{ key }}={{ value }}
+                    </q-tooltip>
+                  </span>
+                  <!-- Show +X more badge if there are more than 2 dimensions -->
+                  <span
+                    v-if="getSortedDimensions(props.row.stable_dimensions).length > 2"
+                    class="dimension-badge badge-more"
+                  >
+                    +{{ getSortedDimensions(props.row.stable_dimensions).length - 2 }} more
+                    <q-tooltip :delay="300" class="tw:text-xs tw:max-w-md">
+                      <div class="tw:space-y-1">
+                        <div
+                          v-for="[key, value] in getSortedDimensions(props.row.stable_dimensions).slice(2)"
+                          :key="key"
+                        >
+                          <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
+                        </div>
+                      </div>
+                    </q-tooltip>
                   </span>
                 </div>
               </template>
@@ -102,14 +149,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatTimestamp(props.row.last_alert_at) }}
               </template>
               <template v-else-if="col.name === 'actions'">
-                <div class="tw:flex tw:justify-end">
+                <div class="action-buttons">
                   <q-btn
                     v-if="props.row.status === 'open'"
                     flat
                     dense
-                    round
-                    icon="check_circle_outline"
-                    color="warning"
+                    size="sm"
+                    icon="visibility"
+                    class="action-btn acknowledge-btn"
                     @click.stop="acknowledgeIncident(props.row)"
                     data-test="incident-ack-btn"
                   >
@@ -119,9 +166,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="props.row.status !== 'resolved'"
                     flat
                     dense
-                    round
-                    icon="done_all"
-                    color="positive"
+                    size="sm"
+                    icon="task_alt"
+                    class="action-btn resolve-btn"
                     @click.stop="resolveIncident(props.row)"
                     data-test="incident-resolve-btn"
                   >
@@ -131,9 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="props.row.status === 'resolved'"
                     flat
                     dense
-                    round
-                    icon="replay"
-                    color="negative"
+                    size="sm"
+                    icon="restart_alt"
+                    class="action-btn reopen-btn"
                     @click.stop="reopenIncident(props.row)"
                     data-test="incident-reopen-btn"
                   >
@@ -198,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, watch } from "vue";
+import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -227,6 +274,7 @@ export default defineComponent({
     const incidents = ref<Incident[]>([]);
     const allIncidents = ref<Incident[]>([]); // Store all incidents for FE filtering
     const searchQuery = ref("");
+    const isRestoringState = ref(false); // Simple flag to prevent watch from firing during restoration
 
     // Filter state for status and severity columns
     const statusFilter = ref<string[]>([]);
@@ -284,12 +332,10 @@ export default defineComponent({
         sortable: false,
       },
       {
-        name: "status",
-        label: t("alerts.incidents.status"),
-        field: "status",
+        name: "title",
+        label: t("alerts.incidents.title_field"),
+        field: "title",
         align: "left" as const,
-        style: "width: 120px",
-        sortable: false,
       },
       {
         name: "severity",
@@ -300,10 +346,20 @@ export default defineComponent({
         sortable: false,
       },
       {
-        name: "title",
-        label: t("alerts.incidents.title_field"),
-        field: "title",
+        name: "status",
+        label: t("alerts.incidents.status"),
+        field: "status",
         align: "left" as const,
+        style: "width: 120px",
+        sortable: false,
+      },
+
+      {
+        name: "dimensions",
+        label: "Dimensions",
+        field: "stable_dimensions",
+        align: "left" as const,
+        style: "width: 400px;",
       },
       {
         name: "alert_count",
@@ -392,6 +448,9 @@ export default defineComponent({
         // Store all incidents
         allIncidents.value = response.data.incidents;
 
+        // Cache data in store for when navigating back
+        store.dispatch('incidents/setCachedData', response.data.incidents);
+
         // Apply frontend search filter
         const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
 
@@ -423,9 +482,29 @@ export default defineComponent({
       const endIndex = startIndex + pagination.value.rowsPerPage;
       incidents.value = filteredIncidents.slice(startIndex, endIndex);
       pagination.value.rowsNumber = filteredIncidents.length;
+
+      // Save to store after pagination update (only search query, page, and rowsPerPage)
+      store.dispatch('incidents/setIncidents', {
+        searchQuery: searchQuery.value,
+        pagination: {
+          page: pagination.value.page,
+          rowsPerPage: pagination.value.rowsPerPage
+        },
+        organizationIdentifier: store.state.selectedOrganization.identifier
+      });
     };
 
     const viewIncident = (incident: Incident) => {
+      // Ensure state is saved before navigation (only search query, page, and rowsPerPage)
+      store.dispatch('incidents/setIncidents', {
+        searchQuery: searchQuery.value,
+        pagination: {
+          page: pagination.value.page,
+          rowsPerPage: pagination.value.rowsPerPage
+        },
+        organizationIdentifier: store.state.selectedOrganization.identifier
+      });
+
       // Navigate to incident detail page
       router.push({
         name: "incidentDetail",
@@ -446,7 +525,10 @@ export default defineComponent({
           type: "positive",
           message: t("alerts.incidents.statusUpdated"),
         });
+        // Reload the incidents list to show updated status
         loadIncidents();
+        // Also mark data as stale in store for when navigating back from other pages
+        store.dispatch('incidents/setShouldRefresh', true);
       } catch (error: any) {
         $q.notify({
           type: "negative",
@@ -469,16 +551,16 @@ export default defineComponent({
     };
 
 
-    const getStatusColor = (status: string) => {
+    const getStatusColorClass = (status: string) => {
       switch (status) {
         case "open":
-          return "negative";
+          return "status-open";
         case "acknowledged":
-          return "warning";
+          return "status-acknowledged";
         case "resolved":
-          return "positive";
+          return "status-resolved";
         default:
-          return "grey";
+          return "status-default";
       }
     };
 
@@ -495,18 +577,18 @@ export default defineComponent({
       }
     };
 
-    const getSeverityColor = (severity: string) => {
+    const getSeverityColorClass = (severity: string) => {
       switch (severity) {
         case "P1":
-          return "red-10";
+          return "severity-p1";
         case "P2":
-          return "orange-8";
+          return "severity-p2";
         case "P3":
-          return "amber-8";
+          return "severity-p3";
         case "P4":
-          return "grey-7";
+          return "severity-p4";
         default:
-          return "grey";
+          return "severity-default";
       }
     };
 
@@ -524,21 +606,263 @@ export default defineComponent({
         .join(", ");
     };
 
+    const getSortedDimensions = (dimensions: Record<string, string>) => {
+      if (!dimensions || Object.keys(dimensions).length === 0) {
+        return [];
+      }
+
+      // Sort keys alphabetically for consistency
+      return Object.keys(dimensions)
+        .sort()
+        .map(key => [key, dimensions[key]] as [string, string]);
+    };
+
+    const getDimensionColorClass = (key: string) => {
+      // Color palette using CSS classes matching schema.scss style
+      const colorMap: Record<string, string> = {
+        'k8s-deployment': 'badge-blue',
+        'k8s-namespace': 'badge-orange',
+        'deployment': 'badge-blue',
+        'namespace': 'badge-orange',
+        'env': 'badge-green',
+        'environment': 'badge-green',
+        'host': 'badge-purple',
+        'hostname': 'badge-purple',
+        'service': 'badge-cyan',
+        'service_name': 'badge-cyan',
+        'region': 'badge-pink',
+        'zone': 'badge-pink',
+        'cluster': 'badge-indigo',
+        'pod': 'badge-teal',
+        'container': 'badge-red',
+        'app': 'badge-yellow',
+        'application': 'badge-yellow',
+      };
+
+      // Check for exact match first
+      if (colorMap[key]) {
+        return colorMap[key];
+      }
+
+      // Check for partial matches
+      const lowerKey = key.toLowerCase();
+      for (const [pattern, className] of Object.entries(colorMap)) {
+        if (lowerKey.includes(pattern)) {
+          return className;
+        }
+      }
+
+      // Hash-based fallback for consistency
+      const classes = ['badge-gray', 'badge-amber', 'badge-violet', 'badge-rose'];
+      let hash = 0;
+      for (let i = 0; i < key.length; i++) {
+        hash = ((hash << 5) - hash) + key.charCodeAt(i);
+        hash = hash & hash;
+      }
+      return classes[Math.abs(hash) % classes.length];
+    };
+
+    /**
+     * Restores state from Vuex store or resets if organization changed
+     * @returns {boolean} True if state was restored, false if reset
+     */
+    const restoreStateFromStore = (): boolean => {
+      const savedState = store.state.incidents.incidents;
+      const cachedData = store.state.incidents.cachedData;
+      const isInitialized = store.state.incidents.isInitialized;
+      const currentOrg = store.state.selectedOrganization.identifier;
+
+      // Check if organization has changed - if so, reset the store
+      if (isInitialized && savedState && savedState.organizationIdentifier &&
+          savedState.organizationIdentifier !== currentOrg) {
+        // Organization changed - reset store to clear old org's state
+        store.dispatch('incidents/resetIncidents');
+
+        // Reset local state to defaults
+        searchQuery.value = "";
+        allIncidents.value = [];
+        pagination.value = {
+          sortBy: "last_alert_at",
+          descending: true,
+          page: 1,
+          rowsPerPage: 20,
+          rowsNumber: 0,
+        };
+        return false;
+      }
+      // Restore state if available and same organization
+      else if (isInitialized && savedState &&
+               savedState.organizationIdentifier === currentOrg) {
+
+        // Prevent watch from interfering during restoration
+        isRestoringState.value = true;
+
+        // Restore cached data
+        if (cachedData && cachedData.length > 0) {
+          allIncidents.value = cachedData;
+        }
+
+        // Restore pagination
+        if (savedState.pagination) {
+          pagination.value.page = savedState.pagination.page || 1;
+          pagination.value.rowsPerPage = savedState.pagination.rowsPerPage || 20;
+        }
+
+        // Restore search query
+        if (savedState.searchQuery !== undefined) {
+          searchQuery.value = savedState.searchQuery;
+        }
+
+        // Note: isRestoringState reset at end of onMounted after all async ops complete
+
+        return true;
+      }
+
+      return false;
+    };
+
+    /**
+     * Validates pagination after data load and auto-corrects if current page is out of bounds
+     * This handles edge cases like:
+     * - User had page=3 with 150 records, comes back to find only 10 records left
+     * - Search results have fewer items than expected
+     * - All data was deleted (totalRecords = 0)
+     * - Invalid rowsPerPage values (e.g., 0, negative, corrupt store data)
+     * - pageBeforeSearch out of bounds when clearing search
+     * @returns {boolean} True if pagination was corrected, false if valid
+     */
+    const validateAndCorrectPagination = (): boolean => {
+      const totalRecords = pagination.value.rowsNumber;
+      let currentPage = pagination.value.page;
+      let rowsPerPage = pagination.value.rowsPerPage;
+      let wasCorrected = false;
+
+      // Safety: Validate rowsPerPage (must be positive, default to 20)
+      if (!rowsPerPage || rowsPerPage <= 0) {
+        pagination.value.rowsPerPage = 20;
+        rowsPerPage = 20;
+        wasCorrected = true;
+      }
+
+      // Safety: Validate currentPage (must be positive, default to 1)
+      if (!currentPage || currentPage < 1) {
+        pagination.value.page = 1;
+        currentPage = 1;
+        wasCorrected = true;
+      }
+
+      // Calculate max valid page (at least 1)
+      const maxPage = Math.max(1, Math.ceil(totalRecords / rowsPerPage));
+
+      // Check if current page is out of bounds
+      if (currentPage > maxPage) {
+        pagination.value.page = maxPage;
+        wasCorrected = true;
+      }
+
+      // Re-apply pagination if any correction was made
+      if (wasCorrected) {
+        const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
+        const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+        const endIndex = startIndex + pagination.value.rowsPerPage;
+        incidents.value = filteredIncidents.slice(startIndex, endIndex);
+      }
+
+      return wasCorrected;
+    };
+
     onMounted(async () => {
-      await loadIncidents();
+      // Restore state from store (or reset if org changed)
+      const hasRestoredState = restoreStateFromStore();
+
+      // Check if data should be refreshed (e.g., after incident updates)
+      const shouldRefresh = store.state.incidents?.shouldRefresh || false;
+
+      // Load incidents if:
+      // 1. We don't have cached data, OR
+      // 2. shouldRefresh flag is set (indicates changes were made)
+      if (allIncidents.value.length === 0 || shouldRefresh) {
+        // Load incidents with restored or default state
+        await loadIncidents();
+        // Clear the shouldRefresh flag after loading
+        if (shouldRefresh) {
+          store.dispatch('incidents/setShouldRefresh', false);
+        }
+      } else {
+        // We have cached data and no refresh needed, just reapply filters and pagination
+        const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
+        const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+        const endIndex = startIndex + pagination.value.rowsPerPage;
+        incidents.value = filteredIncidents.slice(startIndex, endIndex);
+        pagination.value.rowsNumber = filteredIncidents.length;
+      }
+
+      // Validate pagination after loading data (edge case: restored page is out of bounds)
+      const wasCorrected = validateAndCorrectPagination();
+
+      // Mark as initialized after first load
+      if (!store.state.incidents.isInitialized) {
+        store.dispatch('incidents/setIsInitialized', true);
+      }
+
+      // Save the state to store (either restored or corrected)
+      if (hasRestoredState || wasCorrected) {
+        store.dispatch('incidents/setIncidents', {
+          searchQuery: searchQuery.value,
+          pagination: {
+            page: pagination.value.page,
+            rowsPerPage: pagination.value.rowsPerPage
+          },
+          organizationIdentifier: store.state.selectedOrganization.identifier
+        });
+      }
+
+      // Wait for next tick to ensure watches fire with isRestoringState=true
+      await nextTick();
+
+      // Clear restoration flag after all operations complete
+      isRestoringState.value = false;
     });
 
     // Watch for search query changes and apply FE filter
-    watch(() => searchQuery.value, () => {
-      // Reset to page 1 when search query changes
-      pagination.value.page = 1;
+    watch(() => searchQuery.value, (newValue, oldValue) => {
+      // Skip page manipulation during state restoration
+      if (!isRestoringState.value) {
+        // If starting a search (going from empty to something)
+        if (!oldValue && newValue) {
+          store.dispatch('incidents/setPageBeforeSearch', pagination.value.page);
+          pagination.value.page = 1;
+        }
+        // If clearing the search (going from something to empty)
+        else if (oldValue && !newValue) {
+          const pageBeforeSearch = store.state.incidents.pageBeforeSearch;
+          pagination.value.page = pageBeforeSearch || 1;
+        }
+        // If changing search query (both old and new have values)
+        else if (oldValue && newValue) {
+          pagination.value.page = 1;
+        }
+      }
 
       // Apply FE search filter without API call
       const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
-      const startIndex = 0; // Always start from first page
-      const endIndex = pagination.value.rowsPerPage;
+      const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+      const endIndex = startIndex + pagination.value.rowsPerPage;
       incidents.value = filteredIncidents.slice(startIndex, endIndex);
       pagination.value.rowsNumber = filteredIncidents.length;
+
+      // Validate pagination after applying search (handles edge case: pageBeforeSearch is out of bounds)
+      validateAndCorrectPagination();
+
+      // Save to store (only search query, page, and rowsPerPage - not sort settings)
+      store.dispatch('incidents/setIncidents', {
+        searchQuery: searchQuery.value,
+        pagination: {
+          page: pagination.value.page,
+          rowsPerPage: pagination.value.rowsPerPage
+        },
+        organizationIdentifier: store.state.selectedOrganization.identifier
+      });
     });
 
     // Filter toggle functions
@@ -580,6 +904,26 @@ export default defineComponent({
       qTableRef.value?.requestServerInteraction({
         pagination: pagination.value
       });
+
+      // Save to store (only search query, page, and rowsPerPage)
+      store.dispatch('incidents/setIncidents', {
+        searchQuery: searchQuery.value,
+        pagination: {
+          page: pagination.value.page,
+          rowsPerPage: pagination.value.rowsPerPage
+        },
+        organizationIdentifier: store.state.selectedOrganization.identifier
+      });
+    };
+
+    const refreshIncidents = async () => {
+      // Force reload from API
+      await loadIncidents();
+      $q.notify({
+        type: "positive",
+        message: "Incidents refreshed",
+        timeout: 1500,
+      });
     };
 
 
@@ -597,16 +941,19 @@ export default defineComponent({
       columns,
       searchQuery,
       loadIncidents,
+      refreshIncidents,
       onRequest,
       viewIncident,
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,
-      getStatusColor,
+      getStatusColorClass,
       getStatusLabel,
-      getSeverityColor,
+      getSeverityColorClass,
       formatTimestamp,
       formatDimensions,
+      getSortedDimensions,
+      getDimensionColorClass,
       toggleStatusFilter,
       toggleSeverityFilter,
       clearStatusFilter,
@@ -614,6 +961,8 @@ export default defineComponent({
       changePagination,
       perPageOptions,
       qTableRef,
+      validateAndCorrectPagination, // Expose for testing
+      store,
     };
   },
 });
@@ -629,5 +978,329 @@ export default defineComponent({
 
 .o2-search-input {
   width: 250px;
+}
+
+/* Status badge styling - matching schema.scss */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-open {
+  border: 1px solid #dc2626;
+}
+
+.status-acknowledged {
+  border: 1px solid #d97706;
+}
+
+.status-resolved {
+  border: 1px solid #065f46;
+}
+
+.status-default {
+  border: 1px solid #6b7280;
+}
+
+/* Severity badge styling - matching schema.scss */
+.severity-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.severity-p1 {
+  border: 1px solid #991b1b;
+}
+
+.severity-p2 {
+  border: 1px solid #c2410c;
+}
+
+.severity-p3 {
+  border: 1px solid #92400e;
+}
+
+.severity-p4 {
+  border: 1px solid #6b7280;
+}
+
+.severity-default {
+  border: 1px solid #6b7280;
+}
+
+/* Dark mode adjustments for status and severity badges - border only */
+body.body--dark {
+  .status-open {
+    border: 1px solid #fca5a5;
+  }
+
+  .status-acknowledged {
+    border: 1px solid #fbbf24;
+  }
+
+  .status-resolved {
+    border: 1px solid #6ee7b7;
+  }
+
+  .status-default {
+    border: 1px solid #d1d5db;
+  }
+
+  .severity-p1 {
+    border: 1px solid #fca5a5;
+  }
+
+  .severity-p2 {
+    border: 1px solid #fdba74;
+  }
+
+  .severity-p3 {
+    border: 1px solid #fcd34d;
+  }
+
+  .severity-p4 {
+    border: 1px solid #d1d5db;
+  }
+
+  .severity-default {
+    border: 1px solid #d1d5db;
+  }
+}
+
+/* Dimension badge base styling - matching schema.scss */
+.dimension-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  margin: 2px;
+  max-width: 180px;
+  overflow: hidden;
+
+  span {
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* "+X more" badge styling - with background */
+.badge-more {
+  background: #e5e7eb;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+body.body--dark .badge-more {
+  background: #4b5563;
+  color: #d1d5db;
+}
+
+/* Color scheme matching schema.scss type badges - border only */
+.badge-blue {
+  border: 1px solid #1d4ed8;
+}
+
+.badge-green {
+  border: 1px solid #065f46;
+}
+
+.badge-yellow {
+  border: 1px solid #92400e;
+}
+
+.badge-pink {
+  border: 1px solid #9f1239;
+}
+
+.badge-purple {
+  border: 1px solid #7c3aed;
+}
+
+.badge-orange {
+  border: 1px solid #c2410c;
+}
+
+.badge-cyan {
+  border: 1px solid #0e7490;
+}
+
+.badge-indigo {
+  border: 1px solid #4f46e5;
+}
+
+.badge-teal {
+  border: 1px solid #0f766e;
+}
+
+.badge-red {
+  border: 1px solid #dc2626;
+}
+
+.badge-gray {
+  border: 1px solid #4b5563;
+}
+
+.badge-amber {
+  border: 1px solid #d97706;
+}
+
+.badge-violet {
+  border: 1px solid #7c3aed;
+}
+
+.badge-rose {
+  border: 1px solid #e11d48;
+}
+
+/* Dark mode adjustments - border only with lighter colors */
+body.body--dark {
+  .badge-blue {
+    border: 1px solid #93c5fd;
+  }
+
+  .badge-green {
+    border: 1px solid #6ee7b7;
+  }
+
+  .badge-yellow {
+    border: 1px solid #fcd34d;
+  }
+
+  .badge-pink {
+    border: 1px solid #f9a8d4;
+  }
+
+  .badge-purple {
+    border: 1px solid #c4b5fd;
+  }
+
+  .badge-orange {
+    border: 1px solid #fdba74;
+  }
+
+  .badge-cyan {
+    border: 1px solid #67e8f9;
+  }
+
+  .badge-indigo {
+    border: 1px solid #a5b4fc;
+  }
+
+  .badge-teal {
+    border: 1px solid #5eead4;
+  }
+
+  .badge-red {
+    border: 1px solid #fca5a5;
+  }
+
+  .badge-gray {
+    border: 1px solid #d1d5db;
+  }
+
+  .badge-amber {
+    border: 1px solid #fbbf24;
+  }
+
+  .badge-violet {
+    border: 1px solid #c4b5fd;
+  }
+
+  .badge-rose {
+    border: 1px solid #fda4af;
+  }
+}
+
+/* Action buttons styling */
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Acknowledge button - eye/visibility icon */
+.acknowledge-btn {
+  color: #d97706;
+}
+
+.acknowledge-btn:hover {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Resolve button - checkmark icon */
+.resolve-btn {
+  color: #059669;
+}
+
+.resolve-btn:hover {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* Reopen button - refresh icon */
+.reopen-btn {
+  color: #ea580c;
+}
+
+.reopen-btn:hover {
+  background: #fed7aa;
+  color: #c2410c;
+}
+
+/* Dark mode adjustments for action buttons */
+body.body--dark {
+  .acknowledge-btn {
+    color: #fbbf24;
+  }
+
+  .acknowledge-btn:hover {
+    background: #78350f;
+    color: #fde68a;
+  }
+
+  .resolve-btn {
+    color: #34d399;
+  }
+
+  .resolve-btn:hover {
+    background: #065f46;
+    color: #6ee7b7;
+  }
+
+  .reopen-btn {
+    color: #fb923c;
+  }
+
+  .reopen-btn:hover {
+    background: #7c2d12;
+    color: #fdba74;
+  }
 }
 </style>
