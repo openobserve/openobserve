@@ -643,7 +643,8 @@ export default defineComponent({
       editorObj.addCommand(
         monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
         function () {
-          //this is because to not trigger the cmnd + enter and to avoid the blank space while cmd + enter
+          // Emit run-query event when Ctrl/Cmd+Enter is pressed
+          emit("run-query");
         },
         "ctrlenter",
       );

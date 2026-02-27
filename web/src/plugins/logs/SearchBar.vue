@@ -883,6 +883,7 @@ class="q-pr-sm q-pt-xs" />
                 @update:query="updateQueryValue"
                 @update:nlp-mode="(val) => searchObj.meta.nlpMode = val"
                 @run-query="handleRunQueryFn"
+                @keydown="handleKeyDown"
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
               />
