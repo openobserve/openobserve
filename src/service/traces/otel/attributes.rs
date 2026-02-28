@@ -13,59 +13,104 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub static O2_LLM_PREFIX: &str = "_o2_llm_";
-
 /// OpenObserve LLM Attributes
+/// Maps to OTEL semantic conventions where available, uses llm.* namespace for custom fields
 pub struct O2Attributes;
 
 impl O2Attributes {
-    /// Type of LLM observation (e.g., "generation", "chat", "embedding")
-    pub const OBSERVATION_TYPE: &'static str = "_o2_llm_observation_type";
+    // ===== Standard OTEL Gen-AI Attributes =====
 
-    /// Name of the LLM model used
-    pub const MODEL_NAME: &'static str = "_o2_llm_model_name";
+    /// Name of the LLM model used (OTEL: gen_ai.response.model)
+    pub const MODEL_NAME: &'static str = "gen_ai.response.model";
 
-    /// Input to the LLM (prompts, messages, tool arguments)
-    pub const INPUT: &'static str = "_o2_llm_input";
+    /// Name of the LLM provider (OTEL: gen_ai.system)
+    pub const PROVIDER_NAME: &'static str = "gen_ai.system";
 
-    /// Output from the LLM (responses, completions, tool results)
-    pub const OUTPUT: &'static str = "_o2_llm_output";
+    /// Name of the prompt template used (OTEL: gen_ai.prompt.name)
+    pub const PROMPT_NAME: &'static str = "gen_ai.prompt.name";
 
-    /// Model parameters used (temperature, max_tokens, etc.)
-    pub const MODEL_PARAMETERS: &'static str = "_o2_llm_model_parameters";
+    /// Name of the tool being called (OTEL: gen_ai.tool.name)
+    pub const TOOL_NAME: &'static str = "gen_ai.tool.name";
 
-    /// Token usage details (input, output, total counts)
-    pub const USAGE_DETAILS: &'static str = "_o2_llm_usage_details";
+    /// Identifier for the tool call (OTEL: gen_ai.tool.call.id)
+    pub const TOOL_CALL_ID: &'static str = "gen_ai.tool.call.id";
 
-    /// Cost details for the LLM call
-    pub const COST_DETAILS: &'static str = "_o2_llm_cost_details";
+    /// Arguments passed to the tool call (OTEL: gen_ai.tool.call.arguments)
+    pub const TOOL_CALL_ARGUMENTS: &'static str = "gen_ai.tool.call.arguments";
 
-    /// User identifier
-    pub const USER_ID: &'static str = "_o2_llm_user_id";
+    /// Result returned from the tool call (OTEL: gen_ai.tool.call.result)
+    pub const TOOL_CALL_RESULT: &'static str = "gen_ai.tool.call.result";
 
-    /// Session identifier
-    pub const SESSION_ID: &'static str = "_o2_llm_session_id";
+    /// User identifier (OTEL: user.id)
+    pub const USER_ID: &'static str = "user.id";
 
-    /// Name of the prompt template used
-    pub const PROMPT_NAME: &'static str = "_o2_llm_prompt_name";
+    /// Session identifier (OTEL: session.id)
+    pub const SESSION_ID: &'static str = "session.id";
 
-    /// Name of the LLM provider (e.g., "openai", "anthropic", "google")
-    pub const PROVIDER_NAME: &'static str = "_o2_llm_provider_name";
+    // ===== Custom LLM Namespace Attributes =====
 
-    /// Name of the tool being called
-    pub const TOOL_NAME: &'static str = "_o2_llm_tool_name";
+    /// Type of LLM observation (Custom: llm.observation.type)
+    /// Values: "generation", "chat", "embedding", "tool", "chain", "agent", etc.
+    pub const OBSERVATION_TYPE: &'static str = "llm.observation.type";
 
-    /// Identifier for the tool call
-    pub const TOOL_CALL_ID: &'static str = "_o2_llm_tool_call_id";
+    /// Simplified input text (Custom: llm.input)
+    /// Condensed from gen_ai.input.messages for easier UI display
+    pub const INPUT: &'static str = "llm.input";
 
-    /// Arguments passed to the tool call
-    pub const TOOL_CALL_ARGUMENTS: &'static str = "_o2_llm_tool_call_arguments";
+    /// Simplified output text (Custom: llm.output)
+    /// Condensed from gen_ai.output.messages for easier UI display
+    pub const OUTPUT: &'static str = "llm.output";
 
-    /// Result returned from the tool call
-    pub const TOOL_CALL_RESULT: &'static str = "_o2_llm_tool_call_result";
+    /// Model parameters as JSON (Custom: llm.request.parameters)
+    /// Aggregates individual gen_ai.request.* parameters for convenience
+    pub const MODEL_PARAMETERS: &'static str = "llm.request.parameters";
 
-    /// Completion start time in microseconds
-    pub const COMPLETION_START_TIME: &'static str = "_o2_llm_completion_start_time";
+    /// Token usage as JSON (Custom: llm.usage.tokens)
+    /// Contains: {input, output, total}
+    pub const USAGE_DETAILS: &'static str = "llm.usage.tokens";
+
+    /// Cost breakdown as JSON (Custom: llm.usage.cost)
+    /// Contains: {input, output, total}
+    pub const COST_DETAILS: &'static str = "llm.usage.cost";
+
+    /// Completion start time in microseconds (Custom: llm.completion.start_time)
+    /// Used to calculate TTFT (Time To First Token)
+    pub const COMPLETION_START_TIME: &'static str = "llm.completion.start_time";
+
+    // ===== Evaluation Attributes (Already OTEL-Compliant) =====
+
+    /// Aggregate quality score from evaluation (OTEL: llm.evaluation.quality_score)
+    pub const EVALUATION_QUALITY: &'static str = "llm.evaluation.quality_score";
+
+    /// Relevance evaluation score (OTEL: llm.evaluation.relevance)
+    pub const EVALUATION_RELEVANCE: &'static str = "llm.evaluation.relevance";
+
+    /// Completeness evaluation score (OTEL: llm.evaluation.completeness)
+    pub const EVALUATION_COMPLETENESS: &'static str = "llm.evaluation.completeness";
+
+    /// Tool effectiveness evaluation score (OTEL: llm.evaluation.tool_effectiveness)
+    pub const EVALUATION_TOOL_EFFECTIVENESS: &'static str = "llm.evaluation.tool_effectiveness";
+
+    /// Groundedness/faithfulness evaluation score (OTEL: llm.evaluation.groundedness)
+    pub const EVALUATION_GROUNDEDNESS: &'static str = "llm.evaluation.groundedness";
+
+    /// Safety evaluation score (OTEL: llm.evaluation.safety)
+    pub const EVALUATION_SAFETY: &'static str = "llm.evaluation.safety";
+
+    /// Evaluation duration in milliseconds (OTEL: llm.evaluation.duration_ms)
+    pub const EVALUATION_DURATION_MS: &'static str = "llm.evaluation.duration_ms";
+
+    /// Per-evaluator reasoning/commentary (OTEL: llm.evaluation.commentary)
+    pub const EVALUATION_COMMENTARY: &'static str = "llm.evaluation.commentary";
+
+    /// Evaluator name (OTEL: llm.evaluator.name)
+    pub const EVALUATOR_NAME: &'static str = "llm.evaluator.name";
+
+    /// Evaluator version (OTEL: llm.evaluator.version)
+    pub const EVALUATOR_VERSION: &'static str = "llm.evaluator.version";
+
+    /// Evaluator type: "human", "model", or "deterministic" (OTEL: llm.evaluator.type)
+    pub const EVALUATOR_TYPE: &'static str = "llm.evaluator.type";
 }
 
 /// Standard OpenTelemetry Gen-AI Semantic Conventions
@@ -280,6 +325,37 @@ impl FrameworkAttributes {
     pub const MODEL_CONFIG: &'static str = "model_config";
 }
 
+/// LLM Evaluation Attributes (emitted by evaluation frameworks)
+pub struct EvaluationAttributes;
+
+impl EvaluationAttributes {
+    // Aggregate quality score
+    pub const QUALITY_SCORE: &'static str = "llm.evaluation.quality_score";
+    pub const DURATION_MS: &'static str = "llm.evaluation.duration_ms";
+
+    // Per-evaluator scores
+    pub const RELEVANCE: &'static str = "llm.evaluation.relevance";
+    pub const COMPLETENESS: &'static str = "llm.evaluation.completeness";
+    pub const TOOL_EFFECTIVENESS: &'static str = "llm.evaluation.tool_effectiveness";
+    pub const GROUNDEDNESS: &'static str = "llm.evaluation.groundedness";
+    pub const SAFETY: &'static str = "llm.evaluation.safety";
+
+    // Commentary (aggregated reasoning from evaluators)
+    pub const COMMENTARY: &'static str = "llm.evaluation.commentary";
+
+    // Evaluator metadata
+    pub const EVALUATOR_NAME: &'static str = "llm.evaluator.name";
+    pub const EVALUATOR_VERSION: &'static str = "llm.evaluator.version";
+    pub const EVALUATOR_TYPE: &'static str = "llm.evaluator.type";
+
+    // Design-doc specified fields (alternative attribute names)
+    pub const EVAL_RELEVANCE: &'static str = "evaluation_relevance";
+    pub const EVAL_COMPLETENESS: &'static str = "evaluation_completeness";
+    pub const EVAL_TOOL_EFFECTIVENESS: &'static str = "evaluation_tool_effectiveness";
+    pub const EVAL_GROUNDEDNESS: &'static str = "evaluation_groundedness";
+    pub const EVAL_SAFETY: &'static str = "evaluation_safety";
+}
+
 /// Gen-AI Event Names
 pub struct GenAiEventNames;
 
@@ -298,24 +374,65 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_llm_enriched_attributes() {
-        assert_eq!(O2Attributes::OBSERVATION_TYPE, "_o2_llm_observation_type");
-        assert_eq!(O2Attributes::MODEL_NAME, "_o2_llm_model_name");
-        assert_eq!(O2Attributes::INPUT, "_o2_llm_input");
-        assert_eq!(O2Attributes::OUTPUT, "_o2_llm_output");
-        assert_eq!(O2Attributes::MODEL_PARAMETERS, "_o2_llm_model_parameters");
-        assert_eq!(O2Attributes::USAGE_DETAILS, "_o2_llm_usage_details");
-        assert_eq!(O2Attributes::COST_DETAILS, "_o2_llm_cost_details");
-        assert_eq!(O2Attributes::USER_ID, "_o2_llm_user_id");
-        assert_eq!(O2Attributes::SESSION_ID, "_o2_llm_session_id");
-        assert_eq!(O2Attributes::PROMPT_NAME, "_o2_llm_prompt_name");
-        assert_eq!(O2Attributes::PROVIDER_NAME, "_o2_llm_provider_name");
-        assert_eq!(O2Attributes::TOOL_NAME, "_o2_llm_tool_name");
-        assert_eq!(O2Attributes::TOOL_CALL_ID, "_o2_llm_tool_call_id");
+    fn test_llm_otel_compliant_attributes() {
+        // Standard OTEL Gen-AI attributes
+        assert_eq!(O2Attributes::MODEL_NAME, "gen_ai.response.model");
+        assert_eq!(O2Attributes::PROVIDER_NAME, "gen_ai.system");
+        assert_eq!(O2Attributes::PROMPT_NAME, "gen_ai.prompt.name");
+        assert_eq!(O2Attributes::TOOL_NAME, "gen_ai.tool.name");
+        assert_eq!(O2Attributes::TOOL_CALL_ID, "gen_ai.tool.call.id");
         assert_eq!(
             O2Attributes::TOOL_CALL_ARGUMENTS,
-            "_o2_llm_tool_call_arguments"
+            "gen_ai.tool.call.arguments"
         );
-        assert_eq!(O2Attributes::TOOL_CALL_RESULT, "_o2_llm_tool_call_result");
+        assert_eq!(O2Attributes::TOOL_CALL_RESULT, "gen_ai.tool.call.result");
+        assert_eq!(O2Attributes::USER_ID, "user.id");
+        assert_eq!(O2Attributes::SESSION_ID, "session.id");
+
+        // Custom llm.* namespace attributes
+        assert_eq!(O2Attributes::OBSERVATION_TYPE, "llm.observation.type");
+        assert_eq!(O2Attributes::INPUT, "llm.input");
+        assert_eq!(O2Attributes::OUTPUT, "llm.output");
+        assert_eq!(O2Attributes::MODEL_PARAMETERS, "llm.request.parameters");
+        assert_eq!(O2Attributes::USAGE_DETAILS, "llm.usage.tokens");
+        assert_eq!(O2Attributes::COST_DETAILS, "llm.usage.cost");
+        assert_eq!(
+            O2Attributes::COMPLETION_START_TIME,
+            "llm.completion.start_time"
+        );
+
+        // Evaluation attributes (OTEL-compliant llm.evaluation.* namespace)
+        assert_eq!(
+            O2Attributes::EVALUATION_QUALITY,
+            "llm.evaluation.quality_score"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_RELEVANCE,
+            "llm.evaluation.relevance"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_COMPLETENESS,
+            "llm.evaluation.completeness"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_TOOL_EFFECTIVENESS,
+            "llm.evaluation.tool_effectiveness"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_GROUNDEDNESS,
+            "llm.evaluation.groundedness"
+        );
+        assert_eq!(O2Attributes::EVALUATION_SAFETY, "llm.evaluation.safety");
+        assert_eq!(
+            O2Attributes::EVALUATION_DURATION_MS,
+            "llm.evaluation.duration_ms"
+        );
+        assert_eq!(
+            O2Attributes::EVALUATION_COMMENTARY,
+            "llm.evaluation.commentary"
+        );
+        assert_eq!(O2Attributes::EVALUATOR_NAME, "llm.evaluator.name");
+        assert_eq!(O2Attributes::EVALUATOR_VERSION, "llm.evaluator.version");
+        assert_eq!(O2Attributes::EVALUATOR_TYPE, "llm.evaluator.type");
     }
 }

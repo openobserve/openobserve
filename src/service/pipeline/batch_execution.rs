@@ -36,6 +36,7 @@ use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use once_cell::sync::Lazy;
+use proto::cluster_rpc;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 #[cfg(feature = "enterprise")]
 use tokio::{
@@ -290,7 +291,9 @@ impl ExecutablePipeline {
     ) -> Result<HashMap<StreamParams, Vec<(usize, Value)>>> {
         let batch_size = records.len();
         let pipeline_name = self.name.clone();
-        log::debug!("[Pipeline] {pipeline_name} : process batch of size {batch_size}");
+        // Unique invocation ID to correlate logs across concurrent pipeline runs
+        let inv_id = &format!("{:08x}", rand::random::<u32>());
+        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: process batch of size {batch_size}");
         if batch_size == 0 {
             return Ok(HashMap::default());
         }
@@ -361,6 +364,21 @@ impl ExecutablePipeline {
 
             // WARN: Do not change. Processing node can only be done in a task, as the internals of
             // remote wal writer depends on the task id.
+            let source_stream_type = source_stream_params.stream_type;
+            // For LLM eval nodes, resolve the destination stream params from child leaf node
+            let leaf_dest_stream = if matches!(&node.node_data, NodeData::LlmEvaluation(_)) {
+                node.children.iter().find_map(|child_id| {
+                    self.node_map.get(child_id).and_then(|child_node| {
+                        if let NodeData::Stream(sp) = &child_node.node_data {
+                            Some(sp.clone())
+                        } else {
+                            None
+                        }
+                    })
+                })
+            } else {
+                None
+            };
             let task = tokio::spawn(process_node(
                 pl_id_cp,
                 idx,
@@ -373,23 +391,37 @@ impl ExecutablePipeline {
                 error_sender_cp,
                 pipeline_name,
                 stream_name,
+                source_stream_type,
+                leaf_dest_stream,
             ));
             node_tasks.push(task);
         }
 
         // task to collect results
+        let pl_name_for_results = pipeline_name.clone();
+        let inv_id_for_results = inv_id.clone();
         let result_task = tokio::spawn(async move {
-            log::debug!("[Pipeline]: starts result collecting job");
+            log::info!(
+                "[Pipeline] {pl_name_for_results} [inv={inv_id_for_results}]: starts result collecting job"
+            );
             let mut count: usize = 0;
             let mut results = HashMap::new();
             while let Some((idx, stream_params, record)) = result_receiver.recv().await {
+                log::info!(
+                    "[Pipeline] {pl_name_for_results} [inv={inv_id_for_results}]: result collector got record for {}:{}",
+                    stream_params.stream_type,
+                    stream_params.stream_name,
+                );
                 results
                     .entry(stream_params)
                     .or_insert(Vec::new())
                     .push((idx, record));
                 count += 1;
             }
-            log::debug!("[Pipeline]: collected {count} records");
+            log::info!(
+                "[Pipeline] {pl_name_for_results} [inv={inv_id_for_results}]: collected {count} records total, {} streams",
+                results.len()
+            );
             results
         });
 
@@ -436,13 +468,22 @@ impl ExecutablePipeline {
         log::debug!("[Pipeline]: All records send into pipeline for processing");
 
         // Wait for all node tasks to complete
+        log::info!(
+            "[Pipeline] {pipeline_name} [inv={inv_id}]: waiting for all node tasks to complete"
+        );
         if let Err(e) = try_join_all(node_tasks).await {
-            log::error!("[Pipeline] node processing jobs failed: {e}");
+            log::error!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: node processing jobs failed: {e}"
+            );
         }
+        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: all node tasks completed");
 
         // Publish errors if received any
+        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting error task");
         if let Some(pipeline_errors) = error_task.await.map_err(|e| {
-            log::error!("[Pipeline] error collecting job failed: {e}");
+            log::error!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: error collecting job failed: {e}"
+            );
             anyhow!("[Pipeline] error collecting job failed: {}", e)
         })? {
             let stream_params = self.get_source_stream_params();
@@ -461,11 +502,20 @@ impl ExecutablePipeline {
             publish_error(error_data).await;
         }
 
+        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting result collector");
         let results = result_task.await.map_err(|e| {
-            log::error!("[Pipeline] result collecting job failed: {e}");
+            log::error!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: result collecting job failed: {e}"
+            );
             anyhow!("[Pipeline] result collecting job failed: {}", e)
         })?;
+        log::info!(
+            "[Pipeline] {pipeline_name} [inv={inv_id}]: result collector returned {} stream groups",
+            results.len()
+        );
 
+        // Cross-type leaf nodes ingest directly via ingestion_service inside process_node,
+        // so results here only contain same-type records for the caller to handle.
         Ok(results)
     }
 
@@ -525,6 +575,7 @@ impl std::fmt::Display for ExecutableNode {
             NodeData::Function(_) => write!(f, "function"),
             NodeData::Condition(_) => write!(f, "condition"),
             NodeData::RemoteStream(_) => write!(f, "remote_stream"),
+            NodeData::LlmEvaluation(_) => write!(f, "llm_evaluation"),
         }
     }
 }
@@ -580,16 +631,25 @@ async fn process_node(
     error_sender: Sender<(String, String, String, Option<String>)>,
     pipeline_name: String,
     stream_name: Option<String>,
+    source_stream_type: StreamType,
+    _leaf_dest_stream: Option<StreamParams>,
 ) -> Result<()> {
     let cfg = config::get_config();
     let mut count: usize = 0;
     match &node.node_data {
         NodeData::Stream(stream_params) => {
             if node.children.is_empty() {
-                log::debug!("[Pipeline] {pipeline_name} : Leaf node {node_idx} starts processing");
+                log::info!(
+                    "[Pipeline] {pipeline_name} : Leaf node {node_idx} starts processing (stream={}:{})",
+                    stream_params.stream_type,
+                    stream_params.stream_name,
+                );
                 // leaf node: `result_sender` guaranteed to be Some()
-                // send received results directly via `result_sender` for collection
                 let result_sender = result_sender.unwrap();
+                let is_cross_type = stream_params.stream_type != source_stream_type;
+                // For cross-type destinations, collect records to ingest directly
+                let mut cross_type_records: Vec<Value> = Vec::new();
+
                 while let Some(pipeline_item) = receiver.recv().await {
                     let PipelineItem {
                         idx,
@@ -653,17 +713,70 @@ async fn process_node(
                         }
                     }
 
-                    if let Err(send_err) =
-                        result_sender.send((idx, destination_stream, record)).await
-                    {
-                        log::error!(
-                            "[Pipeline] {pipeline_name} : LeafNode errors sending result for collection caused by: {send_err}"
-                        );
-                        break;
+                    if is_cross_type {
+                        // Cross-type: collect for direct ingestion
+                        cross_type_records.push(record);
+                    } else {
+                        // Same-type: send via result_sender for caller to handle
+                        if let Err(send_err) =
+                            result_sender.send((idx, destination_stream, record)).await
+                        {
+                            log::error!(
+                                "[Pipeline] {pipeline_name} : LeafNode errors sending result for collection caused by: {send_err}"
+                            );
+                            break;
+                        }
                     }
                     count += 1;
                 }
-                log::debug!("[Pipeline]: LeafNode {node_idx} done processing {count} records");
+
+                // For cross-type destinations, spawn ingestion as background task
+                // so it doesn't block the primary pipeline path
+                if is_cross_type && !cross_type_records.is_empty() {
+                    let record_count = cross_type_records.len();
+                    let dest_stream_type = stream_params.stream_type.to_string();
+                    let dest_stream_name = stream_params.stream_name.to_string();
+                    let org = org_id.to_string();
+                    let pl_name = pipeline_name.clone();
+                    log::info!(
+                        "[Pipeline] {pl_name} : LeafNode {node_idx} spawning background ingestion for {record_count} cross-type records to {dest_stream_type}:{dest_stream_name}",
+                    );
+                    tokio::spawn(async move {
+                        let req = cluster_rpc::IngestionRequest {
+                            org_id: org,
+                            stream_name: dest_stream_name.clone(),
+                            stream_type: dest_stream_type.clone(),
+                            data: Some(cluster_rpc::IngestionData::from(cross_type_records)),
+                            ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+                            metadata: None,
+                        };
+                        match crate::service::ingestion::ingestion_service::ingest(req).await {
+                            Ok(resp) if resp.status_code == 200 => {
+                                log::info!(
+                                    "[Pipeline] {pl_name} : cross-type ingestion successful to {dest_stream_type}:{dest_stream_name}, records: {record_count}",
+                                );
+                            }
+                            Ok(resp) => {
+                                log::error!(
+                                    "[Pipeline] {pl_name} : cross-type ingestion failed (status={}): {}",
+                                    resp.status_code,
+                                    resp.message,
+                                );
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "[Pipeline] {pl_name} : cross-type ingestion error: {e}"
+                                );
+                            }
+                        }
+                    });
+                }
+
+                log::info!(
+                    "[Pipeline] {pipeline_name} : LeafNode {node_idx} done processing {count} records (stream={}:{})",
+                    stream_params.stream_type,
+                    stream_params.stream_name
+                );
             } else {
                 log::debug!("[Pipeline]: source node {node_idx} starts processing");
                 // source stream node: send received record to all its children
@@ -677,8 +790,10 @@ async fn process_node(
             }
         }
         NodeData::Condition(condition_params) => {
-            log::debug!("[Pipeline]: cond node {node_idx} starts processing");
+            log::info!("[Pipeline]: cond node {node_idx} starts processing");
+            let mut total_received: usize = 0;
             while let Some(pipeline_item) = receiver.recv().await {
+                total_received += 1;
                 let PipelineItem {
                     idx,
                     mut record,
@@ -735,7 +850,9 @@ async fn process_node(
                     count += 1;
                 }
             }
-            log::debug!("[Pipeline]: cond node {node_idx} done processing {count} records");
+            log::info!(
+                "[Pipeline]: cond node {node_idx} done: received={total_received}, passed={count} records"
+            );
         }
         NodeData::Function(func_params) => {
             log::debug!("[Pipeline]: func node {node_idx} starts processing");
@@ -1200,9 +1317,117 @@ async fn process_node(
                 );
             }
         }
+        #[cfg(feature = "enterprise")]
+        NodeData::LlmEvaluation(params) => {
+            log::info!(
+                "[Pipeline]: LLM evaluation node {node_idx} starts processing (sampling_rate={})",
+                params.sampling_rate,
+            );
+
+            // Collect all records from receiver (fast — just drains the channel)
+            let mut all_records = Vec::new();
+            while let Some(pipeline_item) = receiver.recv().await {
+                all_records.push(pipeline_item.record);
+                count += 1;
+            }
+
+            log::debug!(
+                "[Pipeline]: LLM evaluation node {node_idx} received {count} records from condition node"
+            );
+
+            // Drop child_senders immediately — the eval background task will ingest
+            // results directly rather than sending through the leaf node. This allows
+            // the leaf node's channel to close and its task to return immediately.
+            drop(child_senders);
+
+            if !all_records.is_empty() {
+                // Spawn the LLM evaluation as a background task to avoid blocking
+                // the primary pipeline path (~10s for LLM judge).
+                //
+                // The eval node is retrieved from a global registry keyed by
+                // pipeline_id:node_id, so all pipeline executions share the same
+                // buffer task. This ensures spans from the same trace arriving in
+                // different ingestion batches are aggregated before evaluation.
+                let eval_config =
+                    o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationConfig {
+                        sampling_rate: params.sampling_rate,
+                        enable_llm_judge: true,
+                        llm_span_identifier: params.llm_span_identifier.clone(),
+                        ..Default::default()
+                    };
+                let params_name = params.name.clone();
+                let pl_name = pipeline_name.clone();
+                let org = org_id.clone();
+                let dest = _leaf_dest_stream
+                    .clone()
+                    .unwrap_or_else(|| StreamParams::new("", "llm_evaluations", StreamType::Logs));
+                let buffer_key = format!("{}:{}", pipeline_id, node.id);
+
+                // Build ingestion context for the buffer task to self-ingest
+                // deferred evaluation results.
+                let ingestion_ctx =
+                    o2_enterprise::enterprise::pipeline::llm_evaluation_node::IngestionContext {
+                        org_id: org.clone(),
+                        stream_name: dest.stream_name.to_string(),
+                        stream_type: dest.stream_type.to_string(),
+                        ingestion_fn: std::sync::Arc::new(|req| {
+                            Box::pin(async move {
+                                crate::service::ingestion::ingestion_service::ingest(req)
+                                    .await
+                                    .map_err(|e| anyhow::anyhow!(e.to_string()))
+                            })
+                        }),
+                    };
+
+                tokio::spawn(async move {
+                    match o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationNode::get_or_create(
+                        buffer_key,
+                        params_name,
+                        eval_config,
+                        ingestion_ctx,
+                    ).await {
+                        Ok(eval_node) => {
+                            use o2_enterprise::enterprise::pipeline::node::PipelineNode;
+                            if let Err(e) = eval_node.process(all_records).await {
+                                log::error!(
+                                    "[Pipeline] {pl_name}: LLM eval node {node_idx} processing failed: {e}"
+                                );
+                            }
+                            // The shared buffer task accumulates spans by trace_id and
+                            // self-ingests eval results after the grace period expires.
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[Pipeline] {pl_name}: Failed to get/create LLM eval node {node_idx}: {e}"
+                            );
+                        }
+                    }
+                });
+            }
+
+            log::debug!(
+                "[Pipeline]: LLM evaluation node {node_idx} task returning (eval runs in background)"
+            );
+        }
+        #[cfg(not(feature = "enterprise"))]
+        NodeData::LlmEvaluation(_) => {
+            // LLM evaluation is not supported in open source version, pass through
+            log::debug!("[Pipeline]: LLM evaluation node {node_idx} (passthrough in OSS)");
+            while let Some(pipeline_item) = receiver.recv().await {
+                send_to_children(&mut child_senders, pipeline_item, "LlmEvaluationNode").await;
+                count += 1;
+            }
+            log::debug!(
+                "[Pipeline]: LLM evaluation node {node_idx} done processing {count} records"
+            );
+        }
     }
 
     // all cloned senders dropped when function goes out of scope -> close the channel
+    log::info!(
+        "[Pipeline] {pipeline_name}: node {node_idx} ({:?}) task returning",
+        node.node_data
+    );
 
     Ok(())
 }

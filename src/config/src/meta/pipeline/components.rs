@@ -83,10 +83,10 @@ pub struct DerivedStream {
     /// The negative secs means the Western Hemisphere
     #[serde(default)]
     pub tz_offset: i32,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delay: Option<i32>,
     /// The datetime from when the pipeline should check for ingested data
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_at: Option<i64>,
 }
 
@@ -218,8 +218,7 @@ impl Edge {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "node_type")]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "node_type", rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
 pub enum NodeData {
     RemoteStream(RemoteStreamParams),
@@ -227,6 +226,7 @@ pub enum NodeData {
     Query(DerivedStream),
     Function(FunctionParams),
     Condition(ConditionParams),
+    LlmEvaluation(LlmEvaluationParams),
 }
 
 impl MemorySize for NodeData {
@@ -238,6 +238,7 @@ impl MemorySize for NodeData {
                 NodeData::Query(derived_stream) => derived_stream.mem_size(),
                 NodeData::Function(function_params) => function_params.mem_size(),
                 NodeData::Condition(condition_params) => condition_params.mem_size(),
+                NodeData::LlmEvaluation(llm_evaluation_params) => llm_evaluation_params.mem_size(),
             }
     }
 }
@@ -256,6 +257,82 @@ pub struct FunctionParams {
 impl MemorySize for FunctionParams {
     fn mem_size(&self) -> usize {
         std::mem::size_of::<FunctionParams>() + self.name.mem_size()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
+#[serde(default)]
+pub struct LlmEvaluationParams {
+    pub name: String,
+    /// Sampling rate (0.01-1.0 = head sampling rate, default 0.01 = 1%).
+    /// Uses hash-based sampling on trace_id for deterministic, consistent sampling.
+    #[serde(default = "default_sampling_rate", with = "sampling_rate_str")]
+    pub sampling_rate: f64,
+    /// Backward-compat: ignored, LLM judge is always enabled.
+    #[serde(default = "default_enable_llm_judge")]
+    pub enable_llm_judge: bool,
+    /// Field name used to identify LLM spans within a trace (e.g., "llm_input").
+    /// Only spans containing this field (with a non-empty value) are considered LLM spans.
+    #[serde(default = "default_llm_span_identifier")]
+    pub llm_span_identifier: String,
+}
+
+fn default_sampling_rate() -> f64 {
+    0.01
+}
+
+fn default_enable_llm_judge() -> bool {
+    true
+}
+
+fn default_llm_span_identifier() -> String {
+    "llm_input".to_string()
+}
+
+mod sampling_rate_str {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_f64(*value)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<f64, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Accept both string ("0.1") and number (0.1) formats
+        let value = serde_json::Value::deserialize(deserializer)?;
+        match &value {
+            serde_json::Value::String(s) => s.parse::<f64>().map_err(serde::de::Error::custom),
+            serde_json::Value::Number(n) => n
+                .as_f64()
+                .ok_or_else(|| serde::de::Error::custom("invalid number for sampling_rate")),
+            _ => Err(serde::de::Error::custom(
+                "sampling_rate must be a string or number",
+            )),
+        }
+    }
+}
+
+impl Default for LlmEvaluationParams {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            sampling_rate: default_sampling_rate(),
+            enable_llm_judge: default_enable_llm_judge(),
+            llm_span_identifier: default_llm_span_identifier(),
+        }
+    }
+}
+
+impl MemorySize for LlmEvaluationParams {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<LlmEvaluationParams>()
+            + self.name.mem_size()
+            + self.llm_span_identifier.mem_size()
     }
 }
 

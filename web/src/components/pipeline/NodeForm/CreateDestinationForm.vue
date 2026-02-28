@@ -439,6 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:hint> Hostname for Datadog logs </template>
               </q-input>
             </template>
+
           </div>
 
           <div class="q-gutter-sm">
@@ -1015,9 +1016,9 @@ watch(
   },
 );
 
-const isValidDestination = computed(
-  () => formData.value.name && formData.value.url && formData.value.method,
-);
+const isValidDestination = computed(() => {
+  return !!(formData.value.name && formData.value.url && formData.value.method);
+});
 
 // Default URL endpoints for different destination types (shown as hint)
 const defaultUrlEndpoint = computed(() => {
@@ -1260,7 +1261,7 @@ const createDestination = () => {
     if (header["key"] && header["value"]) headers[header.key] = header.value;
   });
 
-  // Merge URL + URL endpoint for all destination types
+  // Merge URL + URL endpoint
   const fullUrl = formData.value.url + (formData.value.url_endpoint || "");
 
   // Handle output format - for esbulk, format as JSON object with index

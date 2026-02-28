@@ -795,6 +795,105 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     }
 }
 
+/// Submit user feedback for an AI response.
+///
+/// Proxies feedback (thumbs up/down, rating) to the o2-sre-agent's /feedback endpoint.
+/// The agent stores this and emits it as OTEL spans for OpenObserve ingestion.
+pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
+    let (parts, body) = in_req.into_parts();
+
+    // Extract trace info from headers (user_id may not be present for feedback)
+    let traceparent = parts
+        .headers
+        .get("traceparent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    let trace_id = traceparent
+        .as_ref()
+        .and_then(|tp| tp.split('-').nth(1).map(|s| s.to_string()))
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let mut forward_headers = std::collections::HashMap::new();
+
+    // Forward session ID if present
+    if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
+        && let Ok(val) = session_id.to_str()
+        && val.len() == 36
+        && val.chars().filter(|&c| c == '-').count() == 4
+    {
+        forward_headers.insert(
+            X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+            val.to_string(),
+        );
+    }
+
+    // Parse JSON body
+    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Failed to read request body: {}", e));
+        }
+    };
+
+    let feedback_body: serde_json::Value = match serde_json::from_slice(&body_bytes) {
+        Ok(b) => b,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Invalid JSON body: {}", e));
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::alerts::rca_agent::get_agent_client;
+
+        let config = get_o2_config();
+
+        if !config.ai.enabled {
+            return MetaHttpResponse::bad_request("AI is not enabled");
+        }
+
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
+                return MetaHttpResponse::bad_request("Agent service not configured");
+            }
+        };
+
+        let headers_to_forward = if forward_headers.is_empty() {
+            None
+        } else {
+            Some(forward_headers)
+        };
+
+        match client
+            .post_feedback(feedback_body, headers_to_forward.as_ref())
+            .await
+        {
+            Ok(response) => {
+                log::info!(
+                    "[trace_id:{}] Feedback submitted for org={}",
+                    trace_id,
+                    org_id
+                );
+                Json(response).into_response()
+            }
+            Err(e) => {
+                log::error!("[trace_id:{}] Feedback submission failed: {}", trace_id, e);
+                MetaHttpResponse::internal_error(format!("Feedback submission failed: {}", e))
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
+        drop(trace_id);
+        drop(feedback_body);
+        MetaHttpResponse::bad_request("AI feedback is only available in enterprise version")
+    }
+}
+
 /// ConfirmAction - Proxy confirmation response to o2-sre-agent
 #[utoipa::path(
     post,

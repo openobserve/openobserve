@@ -357,17 +357,6 @@
                       <span class="tool-call-name">
                         {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
                       </span>
-                      <!-- Navigation icon -->
-                      <q-icon
-                        v-if="block.navigationAction && !block.pendingConfirmation"
-                        name="open_in_new"
-                        size="14px"
-                        color="primary"
-                        class="navigation-icon"
-                        @click.stop="handleNavigationAction(block.navigationAction)"
-                      >
-                        <q-tooltip>{{ block.navigationAction.label }}</q-tooltip>
-                      </q-icon>
                       <q-icon
                         v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
                         :name="isToolCallExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
@@ -599,23 +588,6 @@
                       This error may be temporary. You can try again.
                     </div>
                   </div>
-                  <!-- Navigation block - standalone navigation button -->
-                  <div
-                    v-else-if="block.type === 'navigation' && block.navigationAction"
-                    class="navigation-block"
-                    :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
-                  >
-                    <q-btn
-                      dense
-                      no-caps
-                      unelevated
-                      color="primary"
-                      :icon="'open_in_new'"
-                      :label="block.navigationAction.label"
-                      class="navigation-block-btn"
-                      @click="handleNavigationAction(block.navigationAction)"
-                    />
-                  </div>
                   <!-- Text block - render with markdown processing -->
                   <template v-else-if="block.type === 'text' && block.text">
                     <template v-for="(textBlock, tbIndex) in processTextBlock(block.text)" :key="'tb-' + blockIndex + '-' + tbIndex">
@@ -706,6 +678,29 @@
                     <div v-else class="text-block" v-html="processHtmlBlock(block.content)"></div>
                   </template>
                 </template>
+                <!-- Feedback buttons for assistant messages -->
+                <div v-if="message.role === 'assistant' && message.content && message.content.trim() !== ''" class="feedback-buttons">
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    size="xs"
+                    @click="likeCodeBlock(index)"
+                  >
+                    <q-icon :name="outlinedThumbUpOffAlt" size="14px" />
+                    <q-tooltip>Helpful</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    size="xs"
+                    @click="dislikeCodeBlock(index)"
+                  >
+                    <q-icon :name="outlinedThumbDownOffAlt" size="14px" />
+                    <q-tooltip>Not helpful</q-tooltip>
+                  </q-btn>
+                </div>
               </div>
             </div>
           </div>
@@ -925,6 +920,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, nextTick, watch, computed, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
 import 'highlight.js/styles/github-dark.css';
@@ -933,17 +929,16 @@ import { MarkedOptions } from 'marked';
 import DOMPurify from 'dompurify';
 import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
-import { useRouter } from 'vue-router';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
-import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, NavigationAction, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
+import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
 import { useChatHistory } from '@/composables/useChatHistory';
 
-const { fetchAiChat } = useAiChat();
+const { fetchAiChat, submitFeedback } = useAiChat();
 
 // Register VRL as a JavaScript alias (type assertion)
 hljs.registerLanguage('vrl', () => hljs.getLanguage('javascript') as any);
@@ -1002,6 +997,7 @@ export default defineComponent({
   },
   setup(props) {
     const $q = useQuasar();
+    const router = useRouter();
     const inputMessage = ref(props.aiChatInputContext ? props.aiChatInputContext : '');
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
@@ -1014,8 +1010,8 @@ export default defineComponent({
     const chatHistory = ref<ChatHistoryEntry[]>([]);
     const currentChatId = ref<number | null>(null);
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
+    const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore ();
-    const router = useRouter();
     const chatUpdated = computed(() => store.state.chatUpdated);
 
     // Chat history composable
@@ -1766,8 +1762,12 @@ export default defineComponent({
                     return;
                   }
 
-                  // Handle complete events - complete any active tool call and flush navigation
+                  // Handle complete events - complete any active tool call
                   if (data && data.type === 'complete') {
+                    // Capture trace_id for feedback correlation
+                    if (data.trace_id) {
+                      lastTraceId.value = data.trace_id;
+                    }
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
                         type: 'tool_call',
@@ -1784,8 +1784,6 @@ export default defineComponent({
                       }
                       activeToolCall.value = null;
                     }
-
-                    await scrollToBottom();
                     continue;
                   }
 
@@ -1801,16 +1799,6 @@ export default defineComponent({
                       response: data.response || undefined,
                     };
 
-                    // Generate navigation from tool result if applicable
-                    let navigationAction: NavigationAction | null = null;
-                    if (data.success !== false && data.call_args) {
-                      navigationAction = generateNavigationFromToolResult(
-                        data.tool,
-                        data.call_args,
-                        data
-                      );
-                    }
-
                     // If active tool call matches, complete it with result data
                     if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
                       const completedToolBlock: ContentBlock = {
@@ -1818,8 +1806,7 @@ export default defineComponent({
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context,
-                        ...resultData,
-                        ...(navigationAction && { navigationAction })
+                        ...resultData
                       };
                       let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
@@ -1837,9 +1824,6 @@ export default defineComponent({
                           const block = lastMessage.contentBlocks[i];
                           if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
                             Object.assign(block, resultData);
-                            if (navigationAction) {
-                              block.navigationAction = navigationAction;
-                            }
                             break;
                           }
                         }
@@ -2187,6 +2171,10 @@ export default defineComponent({
 
                 // Handle complete events - complete any active tool call
                 if (data && data.type === 'complete') {
+                  // Capture trace_id for feedback correlation
+                  if (data.trace_id) {
+                    lastTraceId.value = data.trace_id;
+                  }
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
                       type: 'tool_call',
@@ -2202,6 +2190,55 @@ export default defineComponent({
                       pendingToolCalls.value.push(completedToolBlock);
                     }
                     activeToolCall.value = null;
+                  }
+                  continue;
+                }
+
+                // Handle tool_result events - enrich tool call with result data
+                if (data && data.type === 'tool_result') {
+                  const resultData = {
+                    success: data.success !== false,
+                    resultMessage: data.message || '',
+                    summary: data.summary || undefined,
+                    errorType: data.error_type || undefined,
+                    suggestion: data.suggestion || undefined,
+                    details: data.details || undefined,
+                  };
+
+                  if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context,
+                      ...resultData
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                    activeToolCall.value = null;
+                  } else {
+                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.contentBlocks) {
+                      for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
+                        const block = lastMessage.contentBlocks[i];
+                        if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                          Object.assign(block, resultData);
+                          break;
+                        }
+                      }
+                    }
+                    for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
+                      const block = pendingToolCalls.value[i];
+                      if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                        Object.assign(block, resultData);
+                        break;
+                      }
+                    }
                   }
                   continue;
                 }
@@ -2430,6 +2467,7 @@ export default defineComponent({
       chatMessages.value = [];
       currentChatId.value = null;
       currentSessionId.value = null; // Will be generated on first save
+      lastTraceId.value = null; // Reset trace correlation for new chat
       showHistory.value = false;
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
@@ -4183,12 +4221,37 @@ export default defineComponent({
       return date.toLocaleString();
     };
 
-    const likeCodeBlock = (message: any) => {
-      // console.log('likeCodeBlock', message);
+    const likeCodeBlock = async (messageIndex: number) => {
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId) return;
+      // Each user+assistant pair = 1 query turn, so queryIndex = floor(index / 2)
+      const queryIndex = Math.floor(messageIndex / 2);
+      const success = await submitFeedback(
+        'thumbs_up',
+        orgId,
+        currentSessionId.value || undefined,
+        queryIndex,
+        lastTraceId.value || undefined,
+      );
+      if (success) {
+        $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
+      }
     };
 
-    const dislikeCodeBlock = (message: any) => {
-      // console.log('dislikeCodeBlock', message);
+    const dislikeCodeBlock = async (messageIndex: number) => {
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId) return;
+      const queryIndex = Math.floor(messageIndex / 2);
+      const success = await submitFeedback(
+        'thumbs_down',
+        orgId,
+        currentSessionId.value || undefined,
+        queryIndex,
+        lastTraceId.value || undefined,
+      );
+      if (success) {
+        $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
+      }
     };
     const o2AiTitleLogo = computed(() => {
       return store.state.theme == 'dark' ? getImageURL('images/common/o2_ai_logo_dark.svg') : getImageURL('images/common/o2_ai_logo.svg')
@@ -4202,7 +4265,7 @@ export default defineComponent({
         return chatHistory.value;
       }
       const searchTerm = historySearchTerm.value.toLowerCase();
-      return chatHistory.value.filter(chat => 
+      return chatHistory.value.filter(chat =>
         chat.title.toLowerCase().includes(searchTerm)
       );
     });
@@ -4306,27 +4369,10 @@ export default defineComponent({
       previewImage,
       openImagePreview,
       closeImagePreview,
-      // AI-generated title
-      aiGeneratedTitle,
-      displayedTitle,
-      isTypingTitle,
-      // Image handling
-      pendingImages,
-      imageInputRef,
-      triggerImageUpload,
-      handleImageSelect,
-      removeImage,
-      handleDragOver,
-      handleDrop,
-      handlePaste,
-      // Image preview
-      showImagePreview,
-      previewImage,
-      openImagePreview,
-      closeImagePreview,
       // Context references
       contextReferences,
       handleReferencesUpdate,
+      handleNavigationAction,
     }
   }
 });
@@ -4671,6 +4717,19 @@ export default defineComponent({
       overflow-x: auto;
       word-wrap: break-word;
       overflow-wrap: break-word;
+    }
+
+    .feedback-buttons {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      margin-top: 4px;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+
+      &:hover {
+        opacity: 1;
+      }
     }
 
     .text-block {
@@ -5475,35 +5534,6 @@ export default defineComponent({
         background: rgba(251, 191, 36, 0.15);
         border: 1px solid rgba(251, 191, 36, 0.3);
       }
-    }
-  }
-
-  .navigation-icon {
-    cursor: pointer;
-    margin-left: 4px;
-    transition: transform 0.2s;
-
-    &:hover {
-      transform: scale(1.15);
-    }
-  }
-
-  .navigation-block {
-    margin: 8px 0;
-    padding: 10px 12px;
-    border-radius: 4px;
-    display: inline-block;
-
-    &.light-mode {
-      background: rgba(25, 118, 210, 0.08);
-    }
-
-    &.dark-mode {
-      background: rgba(66, 165, 245, 0.12);
-    }
-
-    .navigation-block-btn {
-      font-size: 13px;
     }
   }
 

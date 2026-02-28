@@ -828,6 +828,94 @@ function getIcon(data, ioType) {
         </div>
       </div>
     </div>
+
+    <!-- LLM Evaluation Node -->
+    <div
+      v-if="data.node_type == 'llm_evaluation'"
+      class="q-pa-none btn-fixed-width"
+      :data-test="`pipeline-node-${io_type}-llm-evaluation-node`"
+      data-node-type="llm_evaluation"
+      style="
+        width: fit-content;
+        display: flex;
+        align-items: center;
+        border: none;
+        cursor: pointer;
+      "
+      @mouseenter="handleNodeHover(id, io_type)"
+      @mouseleave="handleNodeLeave(id)"
+      @click="editNode(id)"
+    >
+      <div class="icon-container" style="display: flex; align-items: center">
+        <!-- Icon -->
+        <q-icon
+          :name="getIcon(data, io_type)"
+          size="1.5em"
+          class="q-my-sm q-mr-sm"
+        />
+      </div>
+
+      <!-- Separator -->
+      <q-separator vertical class="q-mr-sm" />
+
+      <!-- Label -->
+      <div class="container">
+        <div
+          class="node-label-text"
+          style="
+            text-align: left;
+            text-wrap: wrap;
+            width: auto;
+            text-overflow: ellipsis;
+          "
+        >
+          <span>{{ data.name || 'LLM Evaluation' }}</span>
+          <span v-if="data.sampling_rate" style="font-size: 0.85em; color: #666; margin-left: 8px;">
+            ({{ (data.sampling_rate * 100).toFixed(0) }}%)
+          </span>
+          <q-tooltip
+            anchor="top middle"
+            self="bottom middle"
+            :offset="[0, 10]"
+            max-width="400px"
+          >
+            <div class="q-pa-sm">
+              <div class="text-bold q-mb-sm">{{ t("pipeline.llmEvaluationNodeTitle") }}</div>
+              <div><strong>{{ t("pipeline.nameLabel") }}:</strong> {{ data.name || 'evaluate' }}</div>
+              <div v-if="data.sampling_rate">
+                <strong>{{ t("pipeline.samplingLabel") }}:</strong> {{ (data.sampling_rate * 100).toFixed(1) }}% {{ t("pipeline.samplingOfTraces") }}
+              </div>
+              <div v-else>
+                <strong>{{ t("pipeline.samplingLabel") }}:</strong> {{ t("pipeline.samplingAllTraces") }}
+              </div>
+              <div class="q-mt-sm text-caption text-grey-5">
+                {{ t("pipeline.llmEvaluationDescription") }}
+              </div>
+            </div>
+          </q-tooltip>
+        </div>
+      </div>
+
+      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+        <q-btn
+          flat
+          round
+          dense
+          icon="delete"
+          size="0.6em"
+          @click.stop="deleteNode(id)"
+          class="node-action-btn delete-btn"
+          :data-test="`pipeline-node-${io_type}-delete-btn`"
+          @mouseenter="handleDeleteTooltipEnter"
+          @mouseleave="handleDeleteTooltipLeave"
+        />
+        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+          Delete Node
+          <div class="tooltip-arrow delete-arrow"></div>
+        </div>
+      </div>
+    </div>
+
     <Handle
       v-if="io_type === 'input' || io_type === 'default'"
       id="output"

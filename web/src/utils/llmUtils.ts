@@ -31,6 +31,24 @@ export interface CostDetails {
   total: number;
 }
 
+export interface EvaluatorInfo {
+  name: string | null;
+  version: string | null;
+  evaluatorType: 'human' | 'model' | 'deterministic';
+}
+
+export interface EvaluationScores {
+  qualityScore: number | null;
+  relevance: number | null;
+  completeness: number | null;
+  toolEffectiveness: number | null;
+  groundedness: number | null;
+  safety: number | null;
+  durationMs: number | null;
+  commentary: string | null;
+  evaluator: EvaluatorInfo | null;
+}
+
 export interface LLMData {
   provider: string;
   observationType: string;
@@ -44,6 +62,7 @@ export interface LLMData {
   sessionId: string | null;
   promptName: string | null;
   inputPreview: string;
+  evaluation: EvaluationScores | null;
 }
 
 /**
@@ -65,18 +84,30 @@ function hasValue(value: any): boolean {
 export function isLLMTrace(data: any): boolean {
   if (!data) return false;
 
-  // Check OpenObserve v2 fields
+  // Check OTEL Gen-AI fields (new)
+  if (hasValue(data['gen_ai.system'])) return true;
+  if (hasValue(data['gen_ai.response.model'])) return true;
+  if (hasValue(data['gen_ai.request.model'])) return true;
+
+  // Check custom llm.* fields (new)
+  if (hasValue(data['llm.input'])) return true;
+  if (hasValue(data['llm.output'])) return true;
+  if (hasValue(data['llm.observation.type'])) return true;
+
+  // Check usage fields (OTEL standard, new)
+  if (hasValue(data['gen_ai.usage.input_tokens'])) return true;
+  if (hasValue(data['gen_ai.usage.output_tokens'])) return true;
+
+  // Check custom usage fields (new)
+  if (hasValue(data['llm.usage.tokens'])) return true;
+
+  // Backward compatibility: Check legacy _o2_llm_* fields
   if (hasValue(data._o2_llm_provider_name)) return true;
   if (hasValue(data._o2_llm_input)) return true;
   if (hasValue(data._o2_llm_output)) return true;
-
-  // Check usage fields
   if (hasValue(data._o2_llm_usage_details_input)) return true;
   if (hasValue(data._o2_llm_usage_details_output)) return true;
   if (hasValue(data._o2_llm_usage_details_total)) return true;
-
-  // Check legacy fields
-  if (hasValue(data.llm_usage) && (hasValue(data.llm_usage['input']) || hasValue(data.llm_usage['output']) || hasValue(data.llm_usage['total']))) return true;
 
   return false;
 }
@@ -90,10 +121,24 @@ export function parseUsageDetails(value: any): UsageDetails {
     // Handle if already an object
     const data = typeof value === 'string' ? JSON.parse(value) : value || {};
 
+    // Try new OTEL-compliant names first, then legacy _o2_llm_* names
+    const input = data['gen_ai.usage.input_tokens']
+      || data.input
+      || data._o2_llm_usage_details_input
+      || 0;
+    const output = data['gen_ai.usage.output_tokens']
+      || data.output
+      || data._o2_llm_usage_details_output
+      || 0;
+    const total = data['gen_ai.usage.total_tokens']
+      || data.total
+      || data._o2_llm_usage_details_total
+      || input + output;
+
     return {
-      input: data._o2_llm_usage_details_input || 0,
-      output: data._o2_llm_usage_details_output || 0,
-      total: data._o2_llm_usage_details_total || (data._o2_llm_usage_details_input || 0) + (data._o2_llm_usage_details_output || 0),
+      input,
+      output,
+      total,
     };
   } catch (error) {
     console.warn('Failed to parse LLM usage details:', error);
@@ -113,10 +158,15 @@ export function parseCostDetails(value: any): CostDetails {
   try {
     const data = typeof value === 'string' ? JSON.parse(value) : value || {};
 
+    // Parse from llm.usage.cost bundle or legacy _o2_llm_cost_details_* fields
+    const input = data.input || data._o2_llm_cost_details_input || 0;
+    const output = data.output || data._o2_llm_cost_details_output || 0;
+    const total = data.total || data._o2_llm_cost_details_total || input + output;
+
     return {
-      input: data._o2_llm_cost_details_input || 0,
-      output: data._o2_llm_cost_details_output || 0,
-      total: data._o2_llm_cost_details_total || (data._o2_llm_cost_details_input || 0) + (data._o2_llm_cost_details_output || 0),
+      input,
+      output,
+      total,
     };
   } catch (error) {
     console.warn('Failed to parse LLM cost details:', error);
@@ -331,6 +381,75 @@ export function truncateLLMContent(
 }
 
 /**
+ * Parse evaluation scores from span attributes
+ */
+export function parseEvaluationScores(data: any): EvaluationScores | null {
+  // Use OTEL-compliant llm.evaluation.* attributes with fallback to legacy _o2_llm_* names
+  const quality = data['llm.evaluation.quality_score'] || data._o2_llm_evaluation_quality;
+  const relevance = data['llm.evaluation.relevance'] || data._o2_llm_evaluation_relevance;
+  const completeness = data['llm.evaluation.completeness'] || data._o2_llm_evaluation_completeness;
+  const toolEffectiveness = data['llm.evaluation.tool_effectiveness'] || data._o2_llm_evaluation_tool_effectiveness;
+  const groundedness = data['llm.evaluation.groundedness'] || data._o2_llm_evaluation_groundedness;
+  const safety = data['llm.evaluation.safety'] || data._o2_llm_evaluation_safety;
+  const durationMs = data['llm.evaluation.duration_ms'] || data._o2_llm_evaluation_duration_ms;
+  const commentary = data['llm.evaluation.commentary'] || data._o2_llm_evaluation_commentary;
+  const evaluatorName = data['llm.evaluator.name'] || data._o2_llm_evaluator_name;
+  const evaluatorVersion = data['llm.evaluator.version'] || data._o2_llm_evaluator_version;
+  const evaluatorType = data['llm.evaluator.type'] || data._o2_llm_evaluator_type;
+
+  // Return null if no evaluation data present
+  if (
+    quality == null &&
+    relevance == null &&
+    completeness == null &&
+    toolEffectiveness == null &&
+    groundedness == null &&
+    safety == null
+  ) {
+    return null;
+  }
+
+  const evaluator: EvaluatorInfo | null = evaluatorName || evaluatorVersion || evaluatorType
+    ? {
+        name: evaluatorName || null,
+        version: evaluatorVersion || null,
+        evaluatorType: evaluatorType || 'deterministic',
+      }
+    : null;
+
+  return {
+    qualityScore: quality != null ? Number(quality) : null,
+    relevance: relevance != null ? Number(relevance) : null,
+    completeness: completeness != null ? Number(completeness) : null,
+    toolEffectiveness: toolEffectiveness != null ? Number(toolEffectiveness) : null,
+    groundedness: groundedness != null ? Number(groundedness) : null,
+    safety: safety != null ? Number(safety) : null,
+    durationMs: durationMs != null ? Number(durationMs) : null,
+    commentary: commentary || null,
+    evaluator,
+  };
+}
+
+/**
+ * Format evaluation score as percentage for display
+ */
+export function formatScore(score: number | null): string {
+  if (score == null) return 'N/A';
+  return `${(score * 100).toFixed(0)}%`;
+}
+
+/**
+ * Get color for quality score badge
+ * Green for good (>= 0.7), yellow for medium (>= 0.4), red for poor
+ */
+export function getQualityScoreColor(score: number | null): string {
+  if (score == null) return 'grey';
+  if (score >= 0.7) return 'green';
+  if (score >= 0.4) return 'orange';
+  return 'red';
+}
+
+/**
  * Get color for observation type badge
  */
 export function getObservationTypeColor(type: string): string {
@@ -367,24 +486,36 @@ export function extractLLMData(span: any): LLMData | null {
     return null;
   }
 
-  // Detailed format for individual spans with split fields
-  const modelParams = parseModelParameters(span._o2_llm_model_parameters);
-  const usage = parseUsageDetails(span);
-  const cost = parseCostDetails(span);
+  // Parse using OTEL-compliant attribute names with legacy fallbacks
+  const modelParams = parseModelParameters(
+    span['llm.request.parameters'] || span._o2_llm_model_parameters
+  );
+  const usage = parseUsageDetails(span['llm.usage.tokens'] || span);
+  const cost = parseCostDetails(span['llm.usage.cost'] || {});
+  const evaluation = parseEvaluationScores(span);
 
   return {
-    provider: span._o2_llm_provider_name || 'unknown',
-    observationType: span._o2_llm_observation_type || 'SPAN',
-    modelName: span._o2_llm_model_name || 'unknown',
-    input: span._o2_llm_input,
-    output: span._o2_llm_output,
+    provider: span['gen_ai.system']
+      || span['gen_ai.provider.name']
+      || span._o2_llm_provider_name
+      || 'unknown',
+    observationType: span['llm.observation.type']
+      || span._o2_llm_observation_type
+      || 'SPAN',
+    modelName: span['gen_ai.response.model']
+      || span['gen_ai.request.model']
+      || span._o2_llm_model_name
+      || 'unknown',
+    input: span['llm.input'] || span._o2_llm_input,
+    output: span['llm.output'] || span._o2_llm_output,
     modelParameters: modelParams,
     usage,
     cost,
-    userId: span._o2_llm_user_id || null,
-    sessionId: span._o2_llm_session_id || null,
-    promptName: span._o2_llm_prompt_name || null,
-    inputPreview: truncateLLMContent(span._o2_llm_input, 100),
+    userId: span['user.id'] || span._o2_llm_user_id || null,
+    sessionId: span['session.id'] || span._o2_llm_session_id || null,
+    promptName: span['gen_ai.prompt.name'] || span._o2_llm_prompt_name || null,
+    inputPreview: truncateLLMContent(span['llm.input'] || span._o2_llm_input, 100),
+    evaluation,
   };
 }
 

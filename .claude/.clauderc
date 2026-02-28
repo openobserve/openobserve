@@ -1,14 +1,4 @@
-# OpenObserve Project Instructions
-
-## Build Configuration
-
-**IMPORTANT:** For this OpenObserve project:
-
-- **Always run non-release builds**: Use `cargo build` without the `--release` flag for all builds
-- **Never build the UI**: The UI is running in dev mode separately, so skip any `npm run build` or UI build steps
-- **Use debug profile**: When running cargo commands (build, test, run, etc.), always use the debug/non-release profile
-- **Always check env file for any environment variables**: .env (in project root)
-- **Always check format**: Use `cargo fmt && cargo clippy` to check code style before done
-- **Check license header year**: Check license header `Copyright 2025 OpenObserve Inc.` for all the changed file and update to `2026`.
-
-These instructions apply to all cargo operations unless explicitly told otherwise by the user.
+# OpenObserve Rules
+- Build: Always use `cargo build` (DEBUG only). Never use `--release`.
+- UI: Skip all `npm run build` or UI build steps.
+- Env: Always source/check `.env` in project root before running.
