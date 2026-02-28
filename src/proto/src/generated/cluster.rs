@@ -1151,6 +1151,20 @@ pub struct GetTableResponse {
     #[prost(bytes = "vec", tag = "1")]
     pub data: ::prost::alloc::vec::Vec<u8>,
 }
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct GetSourcemapFileRequest {
+    #[prost(string, tag = "1")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub original_name: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub path: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct GetSourcemapFileResponse {
+    #[prost(bytes = "vec", tag = "1")]
+    pub file_data: ::prost::alloc::vec::Vec<u8>,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum WorkGroup {
@@ -1469,6 +1483,30 @@ pub mod search_client {
             req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "GetTable"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn get_sourcemap_file(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetSourcemapFileRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetSourcemapFileResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/GetSourcemapFile",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.Search", "GetSourcemapFile"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -1539,6 +1577,13 @@ pub mod search_server {
             request: tonic::Request<super::GetTableRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetTableResponse>,
+            tonic::Status,
+        >;
+        async fn get_sourcemap_file(
+            &self,
+            request: tonic::Request<super::GetSourcemapFileRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetSourcemapFileResponse>,
             tonic::Status,
         >;
     }
@@ -2000,6 +2045,51 @@ pub mod search_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = GetTableSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/GetSourcemapFile" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetSourcemapFileSvc<T: Search>(pub Arc<T>);
+                    impl<
+                        T: Search,
+                    > tonic::server::UnaryService<super::GetSourcemapFileRequest>
+                    for GetSourcemapFileSvc<T> {
+                        type Response = super::GetSourcemapFileResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetSourcemapFileRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::get_sourcemap_file(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = GetSourcemapFileSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

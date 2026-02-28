@@ -73,6 +73,11 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
+pub const SOURCEMAP_ZIP_MAX_SIZE: usize = 1024 * 1024 * 100; // 100 MB
+// max file size for individual sourcemap. We temp cache these in mem,
+// so it will affect spikes in mem at resolving stacktrace
+pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 50; // 50 MB
+pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
 
 #[inline]
 pub fn get_batch_size() -> usize {

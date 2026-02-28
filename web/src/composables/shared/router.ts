@@ -53,6 +53,8 @@ const ErrorViewer = () => import("@/views/RUM/ErrorViewer.vue");
 const AppPerformance = () => import("@/views/RUM/AppPerformance.vue");
 const AppErrors = () => import("@/views/RUM/AppErrors.vue");
 const AppSessions = () => import("@/views/RUM/AppSessions.vue");
+const SourceMaps = () => import("@/views/RUM/SourceMaps.vue");
+const UploadSourceMaps = () => import("@/views/RUM/UploadSourceMaps.vue");
 
 const ReportList = () => import("@/components/reports/ReportList.vue");
 const CreateReport = () => import("@/components/reports/CreateReport.vue");
@@ -474,6 +476,28 @@ const useRoutes = () => {
           props: true,
           meta: {
             keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "source-maps",
+          name: "SourceMaps",
+          component: SourceMaps,
+          meta: {
+            keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "upload-source-maps",
+          name: "UploadSourceMaps",
+          component: UploadSourceMaps,
+          meta: {
+            keepAlive: false,
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
