@@ -315,6 +315,19 @@ export default defineComponent({
 
     const openedFilterFields = ref<string[]>([]);
 
+    // Stores the last fetch payloads per field so value-search can reuse them
+    const lastFieldFetchPayloads = ref<Record<string, any[]>>({});
+    // Caches the original (no-keyword) values so clearing the search box
+    // restores them instantly without a new API call.
+    const cachedFieldValues = ref<Record<string, { key: string; count: number }[]>>({});
+    // Caches the per-stream values alongside cachedFieldValues so "load more"
+    // appends correctly after a search is cleared.
+    const cachedStreamFieldValues = ref<Record<string, Record<string, { values: { key: string; count: number }[] }>>>({});
+    // Tracks the current `from` offset for each field's "load more" pagination.
+    const fieldValuesPage = ref<Record<string, number>>({});
+    // Tracks the active keyword search term per field so "load more" re-applies it.
+    const fieldSearchKeywords = ref<Record<string, string>>({});
+
     // New state to store field values with stream context
     const streamFieldValues: Ref<{
       [key: string]: {
@@ -641,6 +654,11 @@ export default defineComponent({
           values: [],
           errMsg: "",
         };
+        lastFieldFetchPayloads.value[name] = [];
+        delete cachedFieldValues.value[name];
+        delete cachedStreamFieldValues.value[name];
+        fieldValuesPage.value[name] = 0;
+        delete fieldSearchKeywords.value[name];
         let query_context = "";
         let query = searchObj.data.query;
         let whereClause = "";
@@ -864,14 +882,22 @@ export default defineComponent({
         fieldValues.value[fieldName].hasMore = false;
       }
 
+      const keyword = fieldSearchKeywords.value[fieldName];
       for (const payload of payloads) {
-        fetchValuesWithWebsocket({ ...payload, from: nextFrom, size: pageSize });
+        fetchValuesWithWebsocket({
+          ...payload,
+          from: nextFrom,
+          size: pageSize,
+          ...(keyword ? { keyword } : {}),
+        });
       }
     };
 
     const searchFieldValues = (fieldName: string, searchTerm: string) => {
       // Reset pagination whenever the search term changes.
       fieldValuesPage.value[fieldName] = 0;
+      // Track the active keyword so "load more" can re-apply it.
+      fieldSearchKeywords.value[fieldName] = searchTerm;
 
       // Restore from cache when the search term is cleared — no API call needed.
       if (!searchTerm && cachedFieldValues.value[fieldName]) {
