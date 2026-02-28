@@ -90,6 +90,7 @@ fn multi_stream_histogram_query(
             "No statements or stream names provided".to_string(),
         )));
     }
+    let where_clause = extract_where_clause(statements.first().unwrap())?;
 
     // Build individual histogram queries for each stream
     let mut histogram_queries = Vec::new();
@@ -97,6 +98,9 @@ fn multi_stream_histogram_query(
         let mut query = format!(
             "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{stream_name}\"",
         );
+        if !where_clause.is_empty() {
+            query.push_str(&format!(" WHERE {where_clause}"));
+        }
 
         query.push_str(" GROUP BY zo_sql_key");
         histogram_queries.push(query);
@@ -114,22 +118,38 @@ fn multi_stream_histogram_query(
 }
 
 /// Extract WHERE clause from SQL statement
+/// For UNION ALL queries, extracts the WHERE clause from the first SELECT
 fn extract_where_clause(statement: &Statement) -> Result<String, Error> {
     if let Statement::Query(query) = statement {
-        if let SetExpr::Select(select) = &*query.body {
-            // Extract WHERE clause
-            let where_clause = select
-                .selection
-                .as_ref()
-                .map(|clause| clause.to_string())
-                .unwrap_or_default();
-
-            Ok(where_clause)
-        } else {
-            let error = Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "Query is not a SELECT statement".to_string(),
-            ));
-            Err(error)
+        match &*query.body {
+            SetExpr::Select(select) => {
+                // Extract WHERE clause from simple SELECT
+                let where_clause = select
+                    .selection
+                    .as_ref()
+                    .map(|clause| clause.to_string())
+                    .unwrap_or_default();
+                Ok(where_clause)
+            }
+            SetExpr::SetOperation { left, .. } => {
+                // For UNION ALL, extract WHERE clause from the first (left) SELECT
+                if let SetExpr::Select(select) = &**left {
+                    let where_clause = select
+                        .selection
+                        .as_ref()
+                        .map(|clause| clause.to_string())
+                        .unwrap_or_default();
+                    Ok(where_clause)
+                } else {
+                    Ok(String::new())
+                }
+            }
+            _ => {
+                let error = Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    "Query is not a SELECT statement".to_string(),
+                ));
+                Err(error)
+            }
         }
     } else {
         let error = Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
@@ -190,6 +210,59 @@ mod tests {
         let result = convert_to_histogram_query(original_query, &stream_names, true).unwrap();
 
         let expected = "WITH multistream_histogram AS (SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"default\" GROUP BY zo_sql_key UNION ALL SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"default_enrich\" GROUP BY zo_sql_key) SELECT zo_sql_key, sum(zo_sql_num) AS zo_sql_num FROM multistream_histogram GROUP BY zo_sql_key ORDER BY zo_sql_key";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_issue_10531_multi_stream_histogram_with_where() {
+        let original_query = "SELECT * FROM stream1 WHERE status = 500 UNION ALL SELECT * FROM stream2 WHERE status = 500";
+        let stream_names = vec!["stream1".to_string(), "stream2".to_string()];
+        let result = convert_to_histogram_query(original_query, &stream_names, true).unwrap();
+
+        // Verify that WHERE clause is applied to both streams
+        assert!(
+            result.contains("WHERE status = 500"),
+            "WHERE clause should be applied"
+        );
+        assert!(
+            result.contains("FROM \"stream1\" WHERE status = 500"),
+            "First stream should have WHERE clause"
+        );
+        assert!(
+            result.contains("FROM \"stream2\" WHERE status = 500"),
+            "Second stream should have WHERE clause"
+        );
+
+        let expected = "WITH multistream_histogram AS (SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"stream1\" WHERE status = 500 GROUP BY zo_sql_key UNION ALL SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"stream2\" WHERE status = 500 GROUP BY zo_sql_key) SELECT zo_sql_key, sum(zo_sql_num) AS zo_sql_num FROM multistream_histogram GROUP BY zo_sql_key ORDER BY zo_sql_key";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_multi_stream_histogram_with_complex_where() {
+        // Test with complex WHERE clause
+        let original_query = "SELECT * FROM logs WHERE status >= 400 AND level = 'error' UNION ALL SELECT * FROM logs_archive WHERE status >= 400 AND level = 'error'";
+        let stream_names = vec!["logs".to_string(), "logs_archive".to_string()];
+        let result = convert_to_histogram_query(original_query, &stream_names, true).unwrap();
+
+        // Verify WHERE clause is in both stream queries
+        assert!(result.contains("FROM \"logs\" WHERE status >= 400 AND level = 'error'"));
+        assert!(result.contains("FROM \"logs_archive\" WHERE status >= 400 AND level = 'error'"));
+
+        let expected = "WITH multistream_histogram AS (SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"logs\" WHERE status >= 400 AND level = 'error' GROUP BY zo_sql_key UNION ALL SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"logs_archive\" WHERE status >= 400 AND level = 'error' GROUP BY zo_sql_key) SELECT zo_sql_key, sum(zo_sql_num) AS zo_sql_num FROM multistream_histogram GROUP BY zo_sql_key ORDER BY zo_sql_key";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_multi_stream_histogram_without_where() {
+        // Test that multi-stream works without WHERE clause too
+        let original_query = "SELECT * FROM stream1 UNION ALL SELECT * FROM stream2";
+        let stream_names = vec!["stream1".to_string(), "stream2".to_string()];
+        let result = convert_to_histogram_query(original_query, &stream_names, true).unwrap();
+
+        // Should not have WHERE clause
+        assert!(!result.contains("WHERE"));
+
+        let expected = "WITH multistream_histogram AS (SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"stream1\" GROUP BY zo_sql_key UNION ALL SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"stream2\" GROUP BY zo_sql_key) SELECT zo_sql_key, sum(zo_sql_num) AS zo_sql_num FROM multistream_histogram GROUP BY zo_sql_key ORDER BY zo_sql_key";
         assert_eq!(result, expected);
     }
 }
