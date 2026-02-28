@@ -108,18 +108,49 @@ const http = ({ headers } = {} as any) => {
               try {
                 const urlPath =
                   error.request?.responseURL || error.config?.url || "";
-                // URL structure: /api/{org}/{resource}/{id}/{sub-resource}/{id}/...
-                // Resource names sit at even positions after the org (index 2, 4, 6, ...)
-                // IDs (emails, UUIDs, names) sit at odd positions and should be skipped.
+                // Dynamically extract the most specific resource name from the URL.
+                //
+                // URL families handled:
+                //   Standard:  /api/{org}/{resource}/{id}/{sub-resource}/...
+                //   Versioned: /api/v2/{org}/{resource}/{id}/{sub-resource}/...
+                //   Meta:      /api/_meta/{module}/{action}  (no org segment)
+                //
+                // Algorithm:
+                //   1. Skip the leading "api" segment.
+                //   2. Skip an optional version prefix (v1, v2, …).
+                //   3. If the next segment begins with "_", it is a special namespace
+                //      (e.g. _meta) with no org — use the last remaining segment.
+                //   4. Otherwise the next segment is the org identifier — skip it,
+                //      then collect everything that does NOT look like an ID
+                //      (UUID, plain integer, or e-mail address) and use the last one.
                 const segments = new URL(urlPath).pathname
                   .split("/")
                   .filter(Boolean);
-                const pathFromResource = segments.slice(2); // drop "api" and org
-                const resourceNames = pathFromResource.filter(
-                  (_, i) => i % 2 === 0
-                );
-                if (resourceNames.length > 0) {
-                  resourceHint = ` on "${resourceNames[resourceNames.length - 1]}"`;
+                // segments[0] is always "api"
+                let idx = 1;
+
+                // Step 2: skip version prefix
+                if (/^v\d+$/.test(segments[idx] ?? "")) idx++;
+
+                const candidate = segments[idx];
+                if (candidate?.startsWith("_")) {
+                  // Step 3: special namespace (_meta, etc.) — no org segment
+                  const remaining = segments.slice(idx + 1);
+                  if (remaining.length > 0) {
+                    resourceHint = ` on "${remaining[remaining.length - 1]}"`;
+                  }
+                } else if (candidate) {
+                  // Step 4: skip the org identifier
+                  idx++;
+                  const resourcePath = segments.slice(idx);
+                  const uuidRe =
+                    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                  const isId = (s: string) =>
+                    s.includes("@") || /^\d+$/.test(s) || uuidRe.test(s);
+                  const resourceNames = resourcePath.filter((s) => !isId(s));
+                  if (resourceNames.length > 0) {
+                    resourceHint = ` on "${resourceNames[resourceNames.length - 1]}"`;
+                  }
                 }
               } catch {
                 // ignore URL parse errors
