@@ -69,8 +69,8 @@ use crate::{
                     "first_event": 1234567890,
                     "last_event": 1234567900,
                     "total_events": 16,
-                    "_o2_llm_usage_details_total": 885,
-                    "_o2_llm_cost_details_total": 105.30
+                    "llm_usage_tokens_total": 885,
+                    "llm_usage_cost_total": 105.30
                 }
             ]
         })),
@@ -312,8 +312,8 @@ pub async fn get_latest_users(
         "SELECT trace_id, \
         min(start_time) as trace_start_time, \
         max(end_time) as trace_end_time, \
-        sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
-        sum(_o2_llm_cost_details_total) as llm_cost_details_total \
+        sum(llm_usage_tokens_total) as llm_usage_details_total, \
+        sum(llm_usage_cost_total) as llm_cost_details_total \
         FROM \"{stream_name}\" \
         WHERE trace_id IN ('{trace_ids_sql}') \
         GROUP BY trace_id"
@@ -412,8 +412,8 @@ pub async fn get_latest_users(
             first_event,
             last_event,
             total_events: trace_ids.len() as u32,
-            _o2_llm_usage_details_total: usage_total,
-            _o2_llm_cost_details_total: cost_total,
+            llm_usage_tokens_total: usage_total,
+            llm_usage_cost_total: cost_total,
         });
     }
     users_data.sort_by(|a, b| b.last_event.cmp(&a.last_event));
@@ -466,6 +466,6 @@ struct UserResponseItem {
     first_event: i64,
     last_event: i64,
     total_events: u32,
-    _o2_llm_usage_details_total: i64,
-    _o2_llm_cost_details_total: f64,
+    llm_usage_tokens_total: i64,
+    llm_usage_cost_total: f64,
 }

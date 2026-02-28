@@ -340,11 +340,11 @@ pub async fn get_latest_traces(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
-            sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
-            sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
-            sum(_o2_llm_cost_details_total) as llm_cost_details_total, \
-            FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+            sum(llm_usage_tokens_input) as llm_usage_details_input, \
+            sum(llm_usage_tokens_output) as llm_usage_details_output, \
+            sum(llm_usage_tokens_total) as llm_usage_details_total, \
+            sum(llm_usage_cost_total) as llm_cost_details_total, \
+            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
             FROM \"{stream_name}\""
         )
     } else {
@@ -475,19 +475,19 @@ pub async fn get_latest_traces(
                 spans: [0, 0],
                 service_name: Vec::new(),
                 first_event: serde_json::Value::Null,
-                _o2_llm_usage_details_input: json::get_int_value(
+                llm_usage_tokens_input: json::get_int_value(
                     item.get("llm_usage_details_input").unwrap_or_default(),
                 ),
-                _o2_llm_usage_details_output: json::get_int_value(
+                llm_usage_tokens_output: json::get_int_value(
                     item.get("llm_usage_details_output").unwrap_or_default(),
                 ),
-                _o2_llm_usage_details_total: json::get_int_value(
+                llm_usage_tokens_total: json::get_int_value(
                     item.get("llm_usage_details_total").unwrap_or_default(),
                 ),
-                _o2_llm_cost_details_total: json::get_float_value(
+                llm_usage_cost_total: json::get_float_value(
                     item.get("llm_cost_details_total").unwrap_or_default(),
                 ),
-                _o2_llm_input: item.get("llm_input").cloned(),
+                llm_input: item.get("llm_input").cloned(),
             },
         );
     }
@@ -943,11 +943,11 @@ async fn process_latest_traces_stream(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
-            sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
-            sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
-            sum(_o2_llm_cost_details_total) as llm_cost_details_total, \
-            FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+            sum(llm_usage_tokens_input) as llm_usage_details_input, \
+            sum(llm_usage_tokens_output) as llm_usage_details_output, \
+            sum(llm_usage_tokens_total) as llm_usage_details_total, \
+            sum(llm_usage_cost_total) as llm_cost_details_total, \
+            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
             FROM \"{stream_name}\""
         )
     } else {
@@ -1212,19 +1212,19 @@ async fn process_latest_traces_stream(
                     spans: [0, 0],
                     service_name: Vec::new(),
                     first_event: serde_json::Value::Null,
-                    _o2_llm_usage_details_input: json::get_int_value(
+                    llm_usage_tokens_input: json::get_int_value(
                         item.get("llm_usage_details_input").unwrap_or_default(),
                     ),
-                    _o2_llm_usage_details_output: json::get_int_value(
+                    llm_usage_tokens_output: json::get_int_value(
                         item.get("llm_usage_details_output").unwrap_or_default(),
                     ),
-                    _o2_llm_usage_details_total: json::get_int_value(
+                    llm_usage_tokens_total: json::get_int_value(
                         item.get("llm_usage_details_total").unwrap_or_default(),
                     ),
-                    _o2_llm_cost_details_total: json::get_float_value(
+                    llm_usage_cost_total: json::get_float_value(
                         item.get("llm_cost_details_total").unwrap_or_default(),
                     ),
-                    _o2_llm_input: item.get("llm_input").cloned(),
+                    llm_input: item.get("llm_input").cloned(),
                 },
             );
         }
@@ -1407,11 +1407,11 @@ struct TraceResponseItem {
     spans: [u16; 2],
     service_name: Vec<TraceServiceNameItem>,
     first_event: serde_json::Value,
-    _o2_llm_usage_details_input: i64,
-    _o2_llm_usage_details_output: i64,
-    _o2_llm_usage_details_total: i64,
-    _o2_llm_cost_details_total: f64,
-    _o2_llm_input: Option<serde_json::Value>,
+    llm_usage_tokens_input: i64,
+    llm_usage_tokens_output: i64,
+    llm_usage_tokens_total: i64,
+    llm_usage_cost_total: f64,
+    llm_input: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Default, Serialize)]
