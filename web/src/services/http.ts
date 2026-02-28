@@ -103,7 +103,7 @@ const http = ({ headers } = {} as any) => {
             break;
           case 403:
             if (config.isEnterprise == "true" || config.isCloud == "true") {
-              const backendError = error.response.data["error"];
+              const backendError = error.response?.data?.["error"];
               let resourceHint = "";
               try {
                 const urlPath =
