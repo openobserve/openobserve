@@ -66,7 +66,7 @@ http-body.workspace = true
 http-body-util.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
-mime_guess = "2.0"
+mime_guess = "2.0.5"
 ahash.workspace = true
 anyhow.workspace = true
 argon2.workspace = true
@@ -74,22 +74,22 @@ async-trait.workspace = true
 async-recursion.workspace = true
 aws-sdk-sns.workspace = true
 base64.workspace = true
-bitflags = "2.9"
+bitflags = "2.11.0"
 bitvec.workspace = true
-blake3 = { version = "1.8", features = ["rayon"] }
+blake3 = { version = "1.8.3", features = ["rayon"] }
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
-clap = { version = "4.5", default-features = false, features = [
+clap = { version = "4.5.60", default-features = false, features = [
     "std",
     "help",
     "usage",
     "suggestions",
     "cargo",
 ] }
-cloudevents-sdk = { version = "0.9", features = ["axum"] }
+cloudevents-sdk = { version = "0.9.0", features = ["axum"] }
 cron.workspace = true
-csv = "1.3"
+csv = "1.4.0"
 dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
@@ -108,11 +108,11 @@ futures.workspace = true
 hashlink.workspace = true
 hashbrown.workspace = true
 hex.workspace = true
-http-auth-basic = "0.3"
+http-auth-basic = "0.3.7"
 itertools.workspace = true
-jsonwebtoken = { version = "10.3", features = ["aws_lc_rs"] }
+jsonwebtoken = { version = "10.3.0", features = ["aws_lc_rs"] }
 log.workspace = true
-maxminddb = "0.27"
+maxminddb = "0.27.3"
 md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.46", default-features = false, optional = true }
@@ -129,14 +129,14 @@ prost-wkt-types.workspace = true
 proto.workspace = true
 prettytable-rs = "0.10.0"
 pyroscope = { version = "0.5.8", optional = true }
-pyroscope_pprofrs = { version = "0.2.8", optional = true }
+pyroscope_pprofrs = { version = "0.2.10", optional = true }
 rand.workspace = true
 rayon.workspace = true
 regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
 rquickjs.workspace = true
-rust-embed-for-web = "11.3"
+rust-embed-for-web = "11.3.0"
 rustls.workspace = true
 rustls-pemfile.workspace = true
 rustls-native-certs.workspace = true
@@ -154,12 +154,12 @@ strum.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true
 time.workspace = true
-tikv-jemallocator = { version = "0.6", optional = true, features = [
+tikv-jemallocator = { version = "0.6.1", optional = true, features = [
     "profiling",
     "stats",
     "unprefixed_malloc_on_supported_platforms",
 ] }
-tikv-jemalloc-ctl = { version = "0.6", optional = true, features = [
+tikv-jemalloc-ctl = { version = "0.6.1", optional = true, features = [
     "use_std",
     "stats",
     "profiling",
@@ -167,18 +167,18 @@ tikv-jemalloc-ctl = { version = "0.6", optional = true, features = [
 tikv-jemalloc-sys = { version = "0.6", optional = true, features = [
     "profiling",
 ] }
-jemalloc_pprof = { version = "0.8", optional = true, features = [
+jemalloc_pprof = { version = "0.8.2", optional = true, features = [
     "symbolize",
     "flamegraph",
 ] }
-pprof = { version = "0.14", optional = true, features = [
+pprof = { version = "0.15.0", optional = true, features = [
     "flamegraph",
     "protobuf-codec",
 ] }
 tempfile.workspace = true
 tiktoken-rs.workspace = true
 tokio.workspace = true
-console-subscriber = { version = "0.4", optional = true }
+console-subscriber = { version = "0.5.0", optional = true }
 tonic.workspace = true
 tonic-prost.workspace = true
 tracing.workspace = true
@@ -190,9 +190,9 @@ url.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
 utoipa-swagger-ui.workspace = true
-version-compare = "0.2.0"
+version-compare = "0.2.1"
 vector-enrichment.workspace = true
-x509-parser = "0.18.0"
+x509-parser = "0.18.1"
 vrl.workspace = true
 zstd.workspace = true
 config.workspace = true
@@ -205,13 +205,13 @@ lettre.workspace = true
 tantivy.workspace = true
 tantivy-fst.workspace = true
 zip.workspace = true
-futures-util = "0.3.31"
+futures-util = "0.3.32"
 tokio-util.workspace = true
 tokio-stream.workspace = true
 mime = "0.3.17"
 pin-project-lite.workspace = true
-futures-core = "0.3.31"
-derive_more = { version = "2.0.2", features = ["full"] }
+futures-core = "0.3.32"
+derive_more = { version = "2.1.1", features = ["full"] }
 brotli = "8.0.2"
 tokio-rustls.workspace = true
 roaring.workspace = true
@@ -220,10 +220,10 @@ async-stream.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
-base64 = "0.22"
-float-cmp = "0.10"
-multer = "3.1"
-rcgen = "0.14.4"
+base64 = "0.22.1"
+float-cmp = "0.10.0"
+multer = "3.1.0"
+rcgen = "0.14.7"
 
 [workspace]
 members = [
@@ -251,17 +251,17 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 aes-siv = "0.7.0"
-ahash = { version = "0.8", features = ["serde"] }
-axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
-axum-extra = { version = "0.10", features = [
+ahash = { version = "0.8.12", features = ["serde"] }
+axum = { version = "0.8.8", features = ["macros", "multipart", "tracing"] }
+axum-extra = { version = "0.12.5", features = [
     "typed-header",
     "query",
     "cookie",
 ] }
-axum-server = { version = "0.7", features = ["tls-rustls"] }
-async-fs = "2.2"
-tower = { version = "0.5", features = ["full"] }
-tower-http = { version = "0.6", features = [
+axum-server = { version = "0.8.0", features = ["tls-rustls"] }
+async-fs = "2.2.0"
+tower = { version = "0.5.3", features = ["full"] }
+tower-http = { version = "0.6.8", features = [
     "cors",
     "compression-gzip",
     "compression-br",
@@ -274,20 +274,20 @@ tower-http = { version = "0.6", features = [
     "request-id",
     "util",
 ] }
-http = "1.4"
-http-body = "1.0"
-http-body-util = "0.1"
-hyper = { version = "1.6", features = ["full"] }
-hyper-util = { version = "0.1", features = [
+http = "1.4.0"
+http-body = "1.0.1"
+http-body-util = "0.1.3"
+hyper = { version = "1.8.1", features = ["full"] }
+hyper-util = { version = "0.1.20", features = [
     "tokio",
     "server",
     "http1",
     "http2",
 ] }
-anyhow = "1.0"
-arc-swap = "1.7.1"
-argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
-async-nats = "0.42"
+anyhow = "1.0.102"
+arc-swap = "1.8.2"
+argon2 = { version = "0.5.3", features = ["alloc", "password-hash"] }
+async-nats = "0.46.0"
 async-stream = "0.3.6"
 async-trait = "0.1"
 async-recursion = "1.0"
@@ -296,42 +296,42 @@ aws-sdk-sns = "1.61.0"
 base64 = "0.22"
 bitvec = "1.0"
 bytes = "1.11.1"
-byteorder = "1.5"
+byteorder = "1.5.0"
 chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
     "tokio-runtime",
     "_fetcher-rusttls-tokio",
 ], default-features = false, rev = "6f2392f78ae851e2acf33df8e9764cc299d837db" }
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
-chrono-tz = "0.10"
-cityhasher = { version = "0.1", default-features = false }
+chrono = { version = "0.4.43", default-features = false, features = ["clock"] }
+chrono-tz = "0.10.4"
+cityhasher = { version = "0.1.0", default-features = false }
 collapse = "0.1.2"
-cron = "0.15"
-dashmap = { version = "6.1", features = ["serde"] }
+cron = "0.15.0"
+dashmap = { version = "6.1.0", features = ["serde"] }
 datafusion = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
 datafusion-proto = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
 datafusion-functions-aggregate-common = { git = "https://github.com/openobserve/datafusion", rev = "a9b568263f6f24ab9bb711893dc23fd7960f94eb" }
 datafusion-functions-json = { git = "https://github.com/openobserve/datafusion-functions-json", rev = "f53f08cddf467d3d492425f0e50f98f6a300d2f5" }
-expect-test = "1.4"
-arrow = { version = "57.2.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "57.2.0"
-arrow-json = "57.2.0"
-arrow-schema = { version = "57.2.0", features = ["serde"] }
-parquet = { version = "57.2.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
+expect-test = "1.5.1"
+arrow = { version = "57.3.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "57.3.0"
+arrow-json = "57.3.0"
+arrow-schema = { version = "57.3.0", features = ["serde"] }
+parquet = { version = "57.3.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.12.5", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.3"
 dotenvy = "0.15.7"
-env_logger = "0.11.8"
-faststr = { version = "0.2", features = ["serde"] }
-flate2 = { version = "1.0", features = ["zlib"] }
-futures = "0.3"
-local-ip-address = "0.6"
-hashlink = "0.10"
-hashbrown = { version = "0.16.0", features = ["serde"] }
-hex = "0.4"
-indexmap = { version = "2.8", features = ["serde"] }
-itertools = "0.14"
-lettre = { version = "0.11", default-features = false, features = [
+env_logger = "0.11.9"
+faststr = { version = "0.2.34", features = ["serde"] }
+flate2 = { version = "1.1.9", features = ["zlib"] }
+futures = "0.3.32"
+local-ip-address = "0.6.10"
+hashlink = "0.11.0"
+hashbrown = { version = "0.16.1", features = ["serde"] }
+hex = "0.4.3"
+indexmap = { version = "2.13.0", features = ["serde"] }
+itertools = "0.14.0"
+lettre = { version = "0.11.19", default-features = false, features = [
     "builder",
     "hostname",
     "smtp-transport",
@@ -340,21 +340,21 @@ lettre = { version = "0.11", default-features = false, features = [
     "tokio1-rustls-tls",
     "aws-lc-rs",
 ] }
-log = "0.4"
+log = "0.4.29"
 md5 = "0.8.0"
-memchr = "2.7"
-murmur3 = "0.5"
-once_cell = "1.21"
-ordered-float = { version = "5.0.0", features = ["serde"] }
-opentelemetry = "0.31"
-opentelemetry_sdk = { version = "0.31", features = [
+memchr = "2.8.0"
+murmur3 = "0.5.2"
+once_cell = "1.21.3"
+ordered-float = { version = "5.1.0", features = ["serde"] }
+opentelemetry = "0.31.0"
+opentelemetry_sdk = { version = "0.31.0", features = [
     "experimental_trace_batch_span_processor_with_async_runtime",
     "rt-tokio",
     "trace",
     "metrics",
     "spec_unstable_metrics_views",
 ] }
-opentelemetry-otlp = { version = "0.31", features = [
+opentelemetry-otlp = { version = "0.31.0", features = [
     "http-proto",
     "serialize",
     "serde",
@@ -362,23 +362,23 @@ opentelemetry-otlp = { version = "0.31", features = [
     "reqwest-client",
     "grpc-tonic",
 ] }
-opentelemetry-proto = { version = "0.31", features = [
+opentelemetry-proto = { version = "0.31.0", features = [
     "gen-tonic",
     "with-serde",
     "logs",
     "metrics",
     "trace",
 ] }
-parking_lot = "0.12"
+parking_lot = "0.12.5"
 pin-project-lite = "0.2.16"
-prometheus = { version = "0.14", features = ["process"] }
-prost = "0.14"
-prost-wkt-types = "0.7"
-rand = "0.9.2"
-rayon = "1.10"
-regex = "1.11"
-regex-syntax = "0.8"
-reqwest = { version = "0.12", default-features = false, features = [
+prometheus = { version = "0.14.0", features = ["process"] }
+prost = "0.14.3"
+prost-wkt-types = "0.7.1"
+rand = "0.10.0"
+rayon = "1.11.0"
+regex = "1.12.3"
+regex-syntax = "0.8.9"
+reqwest = { version = "0.12.28", default-features = false, features = [
     "rustls-tls-native-roots",
     "stream",
     "gzip",
@@ -387,13 +387,13 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 roaring = "0.11.3"
 rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
-rustls-pemfile = "2"
-rustls = { version = "0.23.20", default-features = false, features = [
+rustls-pemfile = "2.2.0"
+rustls = { version = "0.23.36", default-features = false, features = [
     "std",
     "tls12",
 ] }
-rustls-native-certs = "0.8"
-webpki-roots = "0.26"
+rustls-native-certs = "0.8.3"
+webpki-roots = "1.0.6"
 sea-orm = { version = "1.1.19", features = [
     "sqlx-postgres",
     "sqlx-sqlite",
@@ -405,52 +405,52 @@ sea-orm-migration = { version = "1.1.19", features = [
     "sqlx-sqlite",
     "runtime-tokio-rustls",
 ] }
-segment = "~0.2.4"
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["arbitrary_precision"] }
+segment = "~0.2.6"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149", features = ["arbitrary_precision"] }
 sha1 = "0.10.6"
-sha256 = "1.6"
+sha256 = "1.6.0"
 snafu = "0.8.9"
-snap = "1"
+snap = "1.1.1"
 sqlx = { version = "0.8.6", features = [
     "runtime-tokio-rustls",
     "postgres",
     "sqlite",
     "chrono",
 ] }
-strum = { version = "0.27", features = ["derive"] }
-svix-ksuid = { version = "0.8", features = ["serde"] }
-sysinfo = "0.37"
-tantivy = { version = "0.25", features = ["quickwit"] }
-tantivy-fst = "0.5"
-tempfile = "3"
-thiserror = "2.0.17"
+strum = { version = "0.27.2", features = ["derive"] }
+svix-ksuid = { version = "0.8.0", features = ["serde"] }
+sysinfo = "0.38.2"
+tantivy = { version = "0.25.0", features = ["quickwit"] }
+tantivy-fst = "0.5.0"
+tempfile = "3.25.0"
+thiserror = "2.0.18"
 tiktoken-rs = "0.9.1"
-time = "0.3"
-tokio = { version = "1", features = ["full"] }
-tokio-rustls = { version = "0.26", default-features = false, features = [
+time = "0.3.47"
+tokio = { version = "1.49.0", features = ["full"] }
+tokio-rustls = { version = "0.26.4", default-features = false, features = [
     "logging",
     "tls12",
 ] }
-tokio-util = { version = "0.7", features = ["compat"] }
-tokio-stream = "0.1"
-tonic = { version = "0.14", features = ["gzip", "tls-webpki-roots"] }
-tonic-prost = "0.14"
+tokio-util = { version = "0.7.18", features = ["compat"] }
+tokio-stream = "0.1.18"
+tonic = { version = "0.14.5", features = ["gzip", "tls-webpki-roots"] }
+tonic-prost = "0.14.5"
 tracing = "0.1.44"
 tracing-appender = "0.2.4"
-tracing-log = "0.2"
-tracing-opentelemetry = "0.32"
+tracing-log = "0.2.0"
+tracing-opentelemetry = "0.32.1"
 tracing-subscriber = { version = "0.3.22", features = [
     "env-filter",
     "json",
     "registry",
 ] }
-url = "2.5"
-urlencoding = "2.1"
-utoipa = { version = "5.4", features = ["axum_extras", "openapi_extensions"] }
-utoipa-axum = "0.2"
-utoipa-swagger-ui = { version = "9", features = ["axum"] }
-uuid = { version = "1.20", features = ["v7"] }
+url = "2.5.8"
+urlencoding = "2.1.3"
+utoipa = { version = "5.4.0", features = ["axum_extras", "openapi_extensions"] }
+utoipa-axum = "0.2.0"
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
+uuid = { version = "1.21.0", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "v0.51" }
 vrl = { version = "0.28.1", features = [
     "arbitrary",
@@ -458,5 +458,5 @@ vrl = { version = "0.28.1", features = [
     "compiler",
     "test",
 ] }
-zip = "6.0.0"
-zstd = "0.13"
+zip = "8.1.0"
+zstd = "0.13.3"
