@@ -158,19 +158,19 @@ static LLM_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLock:
         Field::new("_o2_llm_observation_type", DataType::Utf8, true),
         Field::new("_o2_llm_model_name", DataType::Utf8, true),
         Field::new("_o2_llm_provider_name", DataType::Utf8, true),
-        Field::new("_o2_llm_input", DataType::Utf8, true),
+        Field::new("llm_input", DataType::Utf8, true),
         Field::new("_o2_llm_output", DataType::Utf8, true),
         Field::new("_o2_llm_user_id", DataType::Utf8, true),
         Field::new("_o2_llm_session_id", DataType::Utf8, true),
         // Integer fields
-        Field::new("_o2_llm_usage_details_input", DataType::Int64, true),
-        Field::new("_o2_llm_usage_details_output", DataType::Int64, true),
-        Field::new("_o2_llm_usage_details_total", DataType::Int64, true),
+        Field::new("llm_usage_tokens_input", DataType::Int64, true),
+        Field::new("llm_usage_tokens_output", DataType::Int64, true),
+        Field::new("llm_usage_tokens_total", DataType::Int64, true),
         Field::new("_o2_llm_completion_start_time", DataType::Int64, true),
         // Float fields
         Field::new("_o2_llm_cost_details_input", DataType::Float64, true),
         Field::new("_o2_llm_cost_details_output", DataType::Float64, true),
-        Field::new("_o2_llm_cost_details_total", DataType::Float64, true),
+        Field::new("llm_usage_cost_total", DataType::Float64, true),
     ]
 });
 
