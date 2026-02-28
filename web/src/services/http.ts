@@ -108,12 +108,18 @@ const http = ({ headers } = {} as any) => {
               try {
                 const urlPath =
                   error.request?.responseURL || error.config?.url || "";
-                // URL structure: /api/{org}/{resource}/...
+                // URL structure: /api/{org}/{resource}/{id}/{sub-resource}/{id}/...
+                // Resource names sit at even positions after the org (index 2, 4, 6, ...)
+                // IDs (emails, UUIDs, names) sit at odd positions and should be skipped.
                 const segments = new URL(urlPath).pathname
                   .split("/")
                   .filter(Boolean);
-                if (segments[2]) {
-                  resourceHint = ` on "${segments[2]}"`;
+                const pathFromResource = segments.slice(2); // drop "api" and org
+                const resourceNames = pathFromResource.filter(
+                  (_, i) => i % 2 === 0
+                );
+                if (resourceNames.length > 0) {
+                  resourceHint = ` on "${resourceNames[resourceNames.length - 1]}"`;
                 }
               } catch {
                 // ignore URL parse errors
