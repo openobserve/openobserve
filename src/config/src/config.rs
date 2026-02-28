@@ -2560,6 +2560,15 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
+    // check queue store
+    if cfg.common.queue_store.is_empty() {
+        cfg.common.queue_store = "nats".to_string();
+    }
+    cfg.common.queue_store = cfg.common.queue_store.to_lowercase();
+    if !cfg.common.queue_store.starts_with("nats") {
+        return Err(anyhow::anyhow!("Queue store only supports nats."));
+    }
+
     // format metadata storage
     if cfg.common.meta_store.is_empty() {
         if cfg.common.local_mode {
