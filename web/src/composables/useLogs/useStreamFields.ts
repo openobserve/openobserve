@@ -344,6 +344,8 @@ export const useStreamFields = () => {
             // create a schema field mapping based on field name to avoid iteration over object.
             // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
             let UDSFieldCount = 0;
+            // Build type map in a single pass over the schema array
+            const schemaTypeMap: Record<string, string> = {};
             const fields: [string] =
               stream.settings?.defined_schema_fields &&
               searchObj.meta.useUserDefinedSchemas === "user_defined_schema"
@@ -352,7 +354,19 @@ export const useStreamFields = () => {
                     ...stream.settings?.defined_schema_fields,
                     store.state.zoConfig?.all_fields_name,
                   ]
-                : stream.schema.map((obj: any) => obj.name);
+                : stream.schema.map((obj: any) => {
+                    schemaTypeMap[obj.name] = obj.type;
+                    return obj.name;
+                  });
+            // For UDS mode the fields list differs from schema; populate map separately
+            if (
+              stream.settings?.defined_schema_fields &&
+              searchObj.meta.useUserDefinedSchemas === "user_defined_schema"
+            ) {
+              stream.schema.forEach(
+                (obj: any) => (schemaTypeMap[obj.name] = obj.type),
+              );
+            }
             for (const field of fields) {
               fieldObj = {
                 name: field,
@@ -368,6 +382,7 @@ export const useStreamFields = () => {
                   searchObj.data.stream.interestingFieldList.includes(field)
                     ? true
                     : false,
+                dataType: schemaTypeMap[field] || "",
               };
 
               if (
