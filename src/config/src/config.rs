@@ -3387,6 +3387,11 @@ mod tests {
         assert_eq!(cfg.common.data_dir, "/abc/".to_string());
         assert_eq!(cfg.common.base_uri, "/abc".to_string());
 
+        cfg.common.base_uri = "/".to_string();
+        let ret = check_path_config(&mut cfg);
+        assert!(ret.is_ok());
+        assert_eq!(cfg.common.base_uri, "".to_string());
+
         // Test route dispatch strategies
         cfg.route.dispatch_strategy = RouteDispatchStrategy::Workload;
         assert!(check_route_config(&cfg).is_ok());
