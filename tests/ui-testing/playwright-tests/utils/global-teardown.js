@@ -13,10 +13,9 @@ async function globalTeardown() {
     // Clean up authentication files if needed
     const authFile = path.join(__dirname, 'auth', 'user.json');
     
-    if (fs.existsSync(authFile)) {
+    if (process.env.CI && fs.existsSync(authFile)) {
       testLogger.info('🗑️  Cleaning up authentication state');
-      // Optionally remove auth file - comment out if you want to keep it
-      // fs.unlinkSync(authFile);
+      fs.unlinkSync(authFile);
     }
     
     // Add any other cleanup tasks here
