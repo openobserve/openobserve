@@ -103,9 +103,63 @@ const http = ({ headers } = {} as any) => {
             break;
           case 403:
             if (config.isEnterprise == "true" || config.isCloud == "true") {
+              const backendError = error.response?.data?.["error"];
+              let resourceHint = "";
+              try {
+                const urlPath =
+                  error.request?.responseURL || error.config?.url || "";
+                // Dynamically extract the most specific resource name from the URL.
+                //
+                // URL families handled:
+                //   Standard:  /api/{org}/{resource}/{id}/{sub-resource}/...
+                //   Versioned: /api/v2/{org}/{resource}/{id}/{sub-resource}/...
+                //   Meta:      /api/_meta/{module}/{action}  (no org segment)
+                //
+                // Algorithm:
+                //   1. Skip the leading "api" segment.
+                //   2. Skip an optional version prefix (v1, v2, …).
+                //   3. If the next segment begins with "_", it is a special namespace
+                //      (e.g. _meta) with no org — use the last remaining segment.
+                //   4. Otherwise the next segment is the org identifier — skip it,
+                //      then collect everything that does NOT look like an ID
+                //      (UUID, plain integer, or e-mail address) and use the last one.
+                const segments = new URL(urlPath).pathname
+                  .split("/")
+                  .filter(Boolean);
+                // segments[0] is always "api"
+                let idx = 1;
+
+                // Step 2: skip version prefix
+                if (/^v\d+$/.test(segments[idx] ?? "")) idx++;
+
+                const candidate = segments[idx];
+                if (candidate?.startsWith("_")) {
+                  // Step 3: special namespace (_meta, etc.) — no org segment
+                  const remaining = segments.slice(idx + 1);
+                  if (remaining.length > 0) {
+                    resourceHint = ` on "${remaining[remaining.length - 1]}"`;
+                  }
+                } else if (candidate) {
+                  // Step 4: skip the org identifier
+                  idx++;
+                  const resourcePath = segments.slice(idx);
+                  const uuidRe =
+                    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                  const isId = (s: string) =>
+                    s.includes("@") || /^\d+$/.test(s) || uuidRe.test(s);
+                  const resourceNames = resourcePath.filter((s) => !isId(s));
+                  if (resourceNames.length > 0) {
+                    resourceHint = ` on "${resourceNames[resourceNames.length - 1]}"`;
+                  }
+                }
+              } catch {
+                // ignore URL parse errors
+              }
+              const notifyMessage = backendError
+                ? `Unauthorized Access: ${backendError}`
+                : `Unauthorized Access: You are not authorized to perform this operation${resourceHint}, please contact your administrator.`;
               Notify.create({
-                message:
-                  "Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.",
+                message: notifyMessage,
                 timeout: 0, // This ensures the notification does not close automatically
                 color: "negative", // Customize color as needed
                 position: "top",
