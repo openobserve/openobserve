@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, time::Duration};
+use std::time::Duration;
 
 use axum::{
     Router,
@@ -983,12 +983,7 @@ pub fn create_app_router() -> Router {
     // Add UI routes at app level (outside basic_routes to avoid any middleware conflicts)
     if cfg.common.ui_enabled {
         // Ensure redirect takes into account base_uri
-        let base_uri = cfg.common.base_uri.trim_matches('/');
-        let web_path = if base_uri.is_empty() {
-            Cow::Borrowed("/web/")
-        } else {
-            format!("/{}/web/", base_uri).into()
-        };
+        let web_path = format!("{}/web/", cfg.common.base_uri);
         app = app
             .route(
                 "/",
