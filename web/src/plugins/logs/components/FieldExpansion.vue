@@ -17,18 +17,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-expansion-item
     dense
-    switch-toggle-side
+    hide-expand-icon
+    v-model="isExpanded"
     :label="field.name"
-    expand-icon-class="field-expansion-icon"
-    expand-icon="expand_more"
-    expanded-icon="expand_less"
     class="hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
     @before-show="(event: any) => handleBeforeShow(event)"
     @before-hide="() => handleBeforeHide()"
   >
     <template v-slot:header>
       <div
-        class="flex content-center ellipsis full-width"
+        class="flex content-center ellipsis full-width field-expansion-header"
         :title="field.name"
         :data-test="`log-search-expand-${field.name}-field-btn`"
       >
@@ -40,6 +38,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ellipsis tw:max-w-[calc(100%-1.5rem)]!"
             style="display: inline-block"
           >
+            <span v-if="field.dataType" class="field-type-container" :title="field.dataType">
+              <span
+                class="field-type-badge"
+                :style="{ backgroundColor: fieldTypeInfo.color }"
+              >{{ fieldTypeInfo.label }}</span>
+              <q-icon
+                class="field-expand-icon"
+                :name="isExpanded ? 'expand_less' : 'expand_more'"
+                size="1rem"
+              />
+            </span>
             {{ field.name }}
           </div>
           <span class="float-right">
@@ -368,6 +377,7 @@ const emit = defineEmits<{
   "before-hide": [field: any];
 }>();
 
+const isExpanded = ref(false);
 const selectedValues = ref<string[]>([]);
 const valueSearchTerm = ref("");
 const cachedValues = ref<{ key: string; count: number }[]>([]);
@@ -405,6 +415,16 @@ const showValueSearch = computed(
 const isFieldSelected = computed(() =>
   props.selectedFields.includes(props.field.name),
 );
+
+const fieldTypeInfo = computed(() => {
+  const t = (props.field.dataType || "").toLowerCase();
+  if (t === "boolean") return { label: "B", color: "#e74c3c" };
+  if (t.includes("float")) return { label: "~", color: "#9b59b6" };
+  if (t.includes("int") || t.includes("uint")) return { label: "#", color: "#e67e22" };
+  if (t.includes("timestamp") || t === "date32" || t === "date64")
+    return { label: "T", color: "#3498db" };
+  return { label: "S", color: "#27ae60" };
+});
 
 watchDebounced(
   valueSearchTerm,
@@ -456,9 +476,49 @@ const handleApplyMultiSelect = (action: string) => {
   background: var(--q-dark);
 }
 
+.field-type-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.3rem;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.field-type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.2rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #fff;
+  transition: opacity 0.15s ease;
+}
+
+.field-expand-icon {
+  position: absolute;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.field-expansion-header:hover .field-type-badge {
+  opacity: 0;
+}
+
+.field-expansion-header:hover .field-expand-icon {
+  opacity: 1;
+}
+
 :deep(.q-expansion-item):hover .field_overlay {
   display: flex;
 }
+
 
 .value-search-container {
   border-bottom: 1px solid var(--o2-border-color);

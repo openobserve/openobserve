@@ -330,6 +330,8 @@ export default defineComponent({
     const cachedStreamFieldValues = ref<Record<string, Record<string, { values: { key: string; count: number }[] }>>>({});
     // Tracks the current `from` offset for each field's "load more" pagination.
     const fieldValuesPage = ref<Record<string, number>>({});
+    // Tracks the active keyword search term per field so "load more" re-applies it.
+    const fieldSearchKeywords = ref<Record<string, string>>({});
 
     // New state to store field values with stream context
     const streamFieldValues: Ref<{
@@ -661,6 +663,7 @@ export default defineComponent({
         delete cachedFieldValues.value[name];
         delete cachedStreamFieldValues.value[name];
         fieldValuesPage.value[name] = 0;
+        delete fieldSearchKeywords.value[name];
         let query_context = "";
         let query = searchObj.data.query;
         let whereClause = "";
@@ -886,24 +889,28 @@ export default defineComponent({
       const nextFrom = currentFrom + pageSize;
       fieldValuesPage.value[fieldName] = nextFrom;
 
-      // Backend expects: SQL LIMIT = size, DataFusion SKIP = from.
-      // Rows returned = size - from = pageSize, so size must equal from + pageSize.
-      const totalSize = nextFrom + pageSize;
-
       // Show loading without wiping existing values while the next page arrives.
       if (fieldValues.value[fieldName]) {
         fieldValues.value[fieldName].isLoading = true;
         fieldValues.value[fieldName].hasMore = false;
       }
 
+      const keyword = fieldSearchKeywords.value[fieldName];
       for (const payload of payloads) {
-        fetchValuesWithWebsocket({ ...payload, from: nextFrom, size: totalSize });
+        fetchValuesWithWebsocket({
+          ...payload,
+          from: nextFrom,
+          size: pageSize,
+          ...(keyword ? { keyword } : {}),
+        });
       }
     };
 
     const searchFieldValues = (fieldName: string, searchTerm: string) => {
       // Reset pagination whenever the search term changes.
       fieldValuesPage.value[fieldName] = 0;
+      // Track the active keyword so "load more" can re-apply it.
+      fieldSearchKeywords.value[fieldName] = searchTerm;
 
       // Restore from cache when the search term is cleared — no API call needed.
       if (!searchTerm && cachedFieldValues.value[fieldName]) {
