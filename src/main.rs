@@ -1482,7 +1482,6 @@ pub fn create_action_server_router() -> axum::Router {
     use openobserve::handler::http::{request::action_server, router::cors_layer};
 
     let cfg = get_config();
-    let base_uri = &cfg.common.base_uri;
 
     // Create action server routes with authentication
     // Routes match action_manager.rs expected URLs: /api/{org_id}/v1/job[/{id}]
@@ -1503,11 +1502,7 @@ pub fn create_action_server_router() -> axum::Router {
         .layer(cors_layer());
 
     // Nest under base URI and set request body size limit
-    let router = if base_uri.is_empty() || base_uri == "/" {
-        Router::new().nest("/api", api_routes)
-    } else {
-        Router::new().nest(&format!("{}/api", base_uri), api_routes)
-    };
+    let router = Router::new().nest(&format!("{}/api", cfg.common.base_uri), api_routes);
 
     // Set request body size limit (equivalent to actix-web's PayloadConfig)
     router.layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit))
