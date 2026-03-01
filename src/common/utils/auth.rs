@@ -255,13 +255,14 @@ where
 
     #[cfg(feature = "enterprise")]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        use config::{get_config, meta::stream::StreamType};
+        use config::meta::stream::StreamType;
         use hashbrown::HashMap;
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::utils::http::{get_folder, get_stream_type_from_request};
 
         let start = std::time::Instant::now();
+        let cfg = config::get_config();
 
         // Parse query string
         let query_string = parts.uri.query().unwrap_or("");
@@ -274,9 +275,7 @@ where
 
         let mut method = parts.method.to_string();
         let local_path = parts.uri.path().to_string();
-        let path = match local_path
-            .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
-        {
+        let path = match local_path.strip_prefix(format!("{}/api/", cfg.common.base_uri).as_str()) {
             Some(path) => path,
             None => local_path.strip_prefix("/").unwrap_or(&local_path),
         };
@@ -964,7 +963,7 @@ where
             && auth_header
                 .to_str()
                 .unwrap()
-                .eq(&get_config().grpc.internal_grpc_token)
+                .eq(&cfg.grpc.internal_grpc_token)
         {
             return Ok(AuthExtractor {
                 auth: auth_header.to_str().unwrap().to_string(),
