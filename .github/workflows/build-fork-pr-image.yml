@@ -72,9 +72,11 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
 
       - name: Build frontend code
-        run: cd web && npm install && npm run build
+        run: cd web && npm ci && npm run build
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg

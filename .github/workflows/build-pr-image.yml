@@ -16,8 +16,36 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
+  build_frontend:
+    name: build_frontend
+    runs-on: ubicloud-standard-8
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.branch }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend code
+        run: cd web && npm ci && npm run build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
+          retention-days: 1
+
   build_pr_image_amd64:
     name: build_pr_image_amd64
+    needs: [build_frontend]
     permissions:
       id-token: write
       contents: read
@@ -43,10 +71,12 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
       - uses: Swatinem/rust-cache@v2
         with:
+          shared-key: "openobserve-${{ runner.arch }}"
           cache-on-failure: true
-          prefix-key: amd64
 
       - name: Install mold and lld linkers
         run: sudo apt-get install -y mold clang lld
@@ -55,21 +85,26 @@ jobs:
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
+      - name: Download frontend dist
+        uses: actions/download-artifact@v5
         with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
+          name: frontend-dist
+          path: web/dist
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
 
       - name: Build and run binary
+        env:
+          RUSTC_WRAPPER: sccache
+          SCCACHE_GHA_ENABLED: "true"
         run: |
           cargo build --features mimalloc --profile release-profiling --target x86_64-unknown-linux-gnu
           mkdir -p bin
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
+
+      - name: Show sccache stats
+        run: sccache --show-stats
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -106,6 +141,7 @@ jobs:
 
   build_pr_image_arm64:
     name: build_pr_image_arm64
+    needs: [build_frontend]
     permissions:
       id-token: write
       contents: read
@@ -131,10 +167,12 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
       - uses: Swatinem/rust-cache@v2
         with:
+          shared-key: "openobserve-${{ runner.arch }}"
           cache-on-failure: true
-          prefix-key: arm64
 
       - name: Install mold and lld linkers
         run: sudo apt-get install -y mold clang lld
@@ -143,21 +181,26 @@ jobs:
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
+      - name: Download frontend dist
+        uses: actions/download-artifact@v5
         with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
+          name: frontend-dist
+          path: web/dist
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
 
       - name: Build and run binary
+        env:
+          RUSTC_WRAPPER: sccache
+          SCCACHE_GHA_ENABLED: "true"
         run: |
           cargo build --features mimalloc --profile release-profiling --target aarch64-unknown-linux-gnu
           mkdir -p bin
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
+
+      - name: Show sccache stats
+        run: sccache --show-stats
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -193,7 +236,7 @@ jobs:
           platforms: linux/arm64
 
   build:
-    needs: [build_pr_image_amd64, build_pr_image_arm64]
+    needs: [build_frontend, build_pr_image_amd64, build_pr_image_arm64]
     if: ${{ needs.build_pr_image_amd64.result == 'success' && needs.build_pr_image_arm64.result == 'success' }}
     runs-on: ubicloud-standard-16-arm
     permissions:
@@ -235,7 +278,7 @@ jobs:
   build_pr_image_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [build_pr_image_amd64, build_pr_image_arm64, build]
+    needs: [build_frontend, build_pr_image_amd64, build_pr_image_arm64, build]
     if: always()
     steps:
       - name: Check build results

@@ -4,17 +4,21 @@ on:
   push:
     branches:
       - "main"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "tests/api-testing/**"
+      - ".github/workflows/api-testing.yml"
   pull_request:
     branches:
       - "*"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "tests/api-testing/**"
+      - ".github/workflows/api-testing.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -85,10 +89,15 @@ jobs:
           version: "0.27.0"
 
       - name: Start OpenObserve
-        run: target/debug/openobserve &
+        run: target/debug/openobserve > o2_initial.log 2>&1 &
 
-      - name: Wait for start
-        run: sleep 15
+      - name: Wait for OpenObserve to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then echo "Ready after ${i}s"; exit 0; fi
+            sleep 1
+          done
+          echo "Timed out" && exit 1
 
       - name: Pin cpython
         run: rye pin cpython@3.11.6
@@ -100,63 +109,68 @@ jobs:
 
       - name: Run tests
         run: |
+          wait_for_o2() {
+            local pid=$1
+            for i in $(seq 1 30); do
+              if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then echo "Ready after ${i}s"; return 0; fi
+              sleep 1
+            done
+            echo "OpenObserve PID $pid failed to start" && return 1
+          }
+
           echo "=== Running regression tests with ZO_UTF8_VIEW_ENABLED=false ==="
           ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false target/debug/openobserve > o2_utf8_false.log 2>&1 &
           SERVER_PID_FALSE=$!
           echo "OpenObserve PID for UTF8_VIEW=false: $SERVER_PID_FALSE"
-          sleep 15
+          wait_for_o2 $SERVER_PID_FALSE
 
           # Run regression tests with UTF8_VIEW=false
           rye run pytest tests/test_subquery_join_match.py --force-sugar -v
 
           # Kill the server
           kill $SERVER_PID_FALSE || true
-          sleep 5
 
           echo "=== Running regression tests with ZO_UTF8_VIEW_ENABLED=true ==="
           ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true target/debug/openobserve > o2_utf8_true.log 2>&1 &
           SERVER_PID_TRUE=$!
           echo "OpenObserve PID for UTF8_VIEW=true: $SERVER_PID_TRUE"
-          sleep 15
+          wait_for_o2 $SERVER_PID_TRUE
 
           # Run regression tests with UTF8_VIEW=true
           rye run pytest tests/test_subquery_join_match.py --force-sugar -v
 
           # Kill the server
           kill $SERVER_PID_TRUE || true
-          sleep 5
 
           echo "=== Running logs-to-logs join tests with ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ==="
           ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true target/debug/openobserve > o2_join_match_one_true.log 2>&1 &
           SERVER_PID_JOIN_TRUE=$!
           echo "OpenObserve PID for JOIN_MATCH_ONE=true: $SERVER_PID_JOIN_TRUE"
-          sleep 15
+          wait_for_o2 $SERVER_PID_JOIN_TRUE
 
           # Run logs-to-logs join tests with JOIN_MATCH_ONE=true
           rye run pytest tests/test_logs_to_logs_join.py --force-sugar -v
 
           # Kill the server
           kill $SERVER_PID_JOIN_TRUE || true
-          sleep 5
 
           echo "=== Running logs-to-logs join tests with ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false ==="
           ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false target/debug/openobserve > o2_join_match_one_false.log 2>&1 &
           SERVER_PID_JOIN_FALSE=$!
           echo "OpenObserve PID for JOIN_MATCH_ONE=false: $SERVER_PID_JOIN_FALSE"
-          sleep 15
+          wait_for_o2 $SERVER_PID_JOIN_FALSE
 
           # Run logs-to-logs join tests with JOIN_MATCH_ONE=false
           rye run pytest tests/test_logs_to_logs_join.py --force-sugar -v
 
           # Kill the server
           kill $SERVER_PID_JOIN_FALSE || true
-          sleep 5
 
           echo "=== Running all other API tests with default settings ==="
           target/debug/openobserve > o2_default.log 2>&1 &
           SERVER_PID_DEFAULT=$!
           echo "OpenObserve PID for other tests: $SERVER_PID_DEFAULT"
-          sleep 15
+          wait_for_o2 $SERVER_PID_DEFAULT
 
           # Run all other tests (excluding regression and feature flag tests)
           rye run pytest --ignore=tests/test_subquery_join_match.py --ignore=tests/test_logs_to_logs_join.py --force-sugar

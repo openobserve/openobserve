@@ -4,17 +4,21 @@ on:
   push:
     branches:
       - "main"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "web/**"
+      - ".github/workflows/unit-tests.yml"
   pull_request:
     branches:
       - "*"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "web/**"
+      - ".github/workflows/unit-tests.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -25,6 +29,61 @@ env:
   ZO_RESULT_CACHE_ENABLED: true
 
 jobs:
+  backend_lint:
+    name: backend_lint
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check if API code has changes
+        id: check_changes
+        run: |
+          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Rust Toolchain
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-11-11
+          targets: x86_64-unknown-linux-gnu
+          components: rustfmt,clippy
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.check_changes.outputs.has_changes == 'true'
+        with:
+          cache-on-failure: true
+          prefix-key: lint
+
+      - name: Install mold and lld linkers
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: sudo apt-get install -y mold clang lld
+
+      - name: Install Protoc
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: bash ./.github/protoc.sh
+
+      - name: Simulate building frontend code
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: mkdir -p web/dist && touch web/dist/index.html
+
+      - name: Check code formatting
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
+
   backend_unit_tests:
     runs-on:
       labels: ubicloud-standard-8
@@ -91,14 +150,6 @@ jobs:
       - name: Print rustc cfg
         if: steps.check_changes.outputs.has_changes == 'true'
         run: rustc -C target-cpu=native --print cfg
-
-      - name: Check code formatting
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: cargo fmt --all -- --check
-
-      - name: Run clippy
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 
       - name: Wait for PostgreSQL to be ready
         if: steps.check_changes.outputs.has_changes == 'true'
@@ -180,11 +231,18 @@ jobs:
   unit_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [backend_unit_tests, ui_unit_tests]
+    needs: [backend_lint, backend_unit_tests, ui_unit_tests]
     if: always()
     steps:
       - name: Check test results
         run: |
+          if [ "${{ needs.backend_lint.result }}" == "success" ] || [ "${{ needs.backend_lint.result }}" == "skipped" ]; then
+            echo "Backend lint passed or skipped"
+          else
+            echo "Backend lint failed"
+            exit 1
+          fi
+
           if [ "${{ needs.backend_unit_tests.result }}" == "success" ] || [ "${{ needs.backend_unit_tests.result }}" == "skipped" ]; then
             echo "Backend tests passed or skipped"
           else

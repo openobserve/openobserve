@@ -4,17 +4,23 @@ on:
   push:
     branches:
       - "main"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "web/**"
+      - "tests/ui-testing/**"
+      - ".github/workflows/playwright.yml"
   pull_request:
     branches:
       - "*"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "web/**"
+      - "tests/ui-testing/**"
+      - ".github/workflows/playwright.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -334,11 +340,17 @@ jobs:
       - name: Start OpenObserve
         run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
 
-      - name: Wait for start
-        run: sleep 60
-
-      - name: Ensure we are getting a reply from the server
-        run: curl http://localhost:5080/web/login
+      - name: Wait for OpenObserve to be ready
+        run: |
+          echo "Waiting for OpenObserve to be ready..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "OpenObserve is ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "OpenObserve failed to start within 60s" && cat o2.log && exit 1
 
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output

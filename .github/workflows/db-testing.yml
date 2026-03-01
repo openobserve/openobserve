@@ -4,9 +4,21 @@ on:
   push:
     branches:
       - "main"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "tests/db-testing/**"
+      - ".github/workflows/db-testing.yml"
   pull_request:
     branches:
       - "*"
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "tests/db-testing/**"
+      - ".github/workflows/db-testing.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

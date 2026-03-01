@@ -6,8 +6,40 @@ name: Release
 env:
   RUST_TOOLCHAIN: nightly-2025-11-11
 jobs:
+  build_frontend:
+    name: Build frontend
+    runs-on: ubicloud-standard-8
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build UI
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: |
+          cd web/
+          npm ci
+          npm run build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
+          retention-days: 1
+
   build:
     name: Build binary
+    needs: [build_frontend]
     strategy:
       matrix:
         include:
@@ -58,19 +90,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Node
-        uses: actions/setup-node@v5
+      - name: Download frontend dist
+        uses: actions/download-artifact@v5
         with:
-          node-version: 22
-          cache: "npm"
-          cache-dependency-path: web/package-lock.json
-      - name: Build UI
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-        run: |
-          cd web/
-          npm install
-          npm run build
+          name: frontend-dist
+          path: web/dist
 
       - name: Install Protoc for linux
         if: contains(matrix.arch, 'x86_64-unknown-linux')
@@ -124,7 +148,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: release-${{ matrix.arch }}
+          prefix-key: release-${{ matrix.file_name }}
 
       - name: Output package versions
         run: protoc --version ; cargo version ; rustc --version ; gcc --version ; g++ --version
@@ -170,7 +194,7 @@ jobs:
           path: target/${{ matrix.arch }}/release-prod/${{ matrix.file_name }}${{ matrix.file_ext }}.sha256sum
   release:
     name: Release artifacts
-    needs: [build]
+    needs: [build_frontend, build]
     runs-on: repo-openobserve-standard-4
     permissions:
       id-token: write
