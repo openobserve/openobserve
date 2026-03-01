@@ -33,10 +33,21 @@ use {
         service::users::get_user,
     },
     config::meta::user::User,
-    o2_openfga::meta::mapping::OFGA_MODELS,
+    o2_openfga::{
+        config::get_config,
+        meta::mapping::{LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, OFGA_MODELS},
+    },
 };
 
 use crate::service::search::sql::Sql;
+
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Copy)]
+pub enum StreamPermissionResourceType {
+    Search,
+    PatternExtract,
+    Insights,
+}
 
 // Check permissions on stream
 #[cfg(feature = "enterprise")]
@@ -45,23 +56,43 @@ pub async fn check_stream_permissions(
     org_id: &str,
     user_id: &str,
     stream_type: &StreamType,
+    permission_resource_type: StreamPermissionResourceType,
 ) -> Option<Response> {
     if !is_root_user(user_id) {
         let user: User = get_user(Some(org_id), user_id).await.unwrap();
         let stream_type_str = stream_type.as_str();
+
+        let config = get_config();
+
+        let mut o2_model_type = "";
+        // If rbac for logs pattern and logs insights is enabled, use those resources for permission
+        // check
+        match permission_resource_type {
+            StreamPermissionResourceType::PatternExtract => {
+                if config.logs_pattern_rbac_enabled {
+                    o2_model_type = LOGS_PATTERN_KEY;
+                }
+            }
+            StreamPermissionResourceType::Insights => {
+                if config.logs_pattern_rbac_enabled {
+                    o2_model_type = LOGS_INSIGHTS_KEY;
+                }
+            }
+            _ => {}
+        };
+
+        if o2_model_type.is_empty() {
+            o2_model_type = OFGA_MODELS
+                .get(stream_type_str)
+                .map_or(stream_type_str, |model| model.key);
+        }
 
         if !crate::handler::http::auth::validator::check_permissions(
             user_id,
             AuthExtractor {
                 auth: "".to_string(),
                 method: "GET".to_string(),
-                o2_type: format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get(stream_type_str)
-                        .map_or(stream_type_str, |model| model.key),
-                    stream_name
-                ),
+                o2_type: format!("{o2_model_type}:{stream_name}"),
                 org_id: org_id.to_string(),
                 bypass_check: false,
                 parent_id: "".to_string(),

@@ -45,8 +45,11 @@ use tracing::Span;
 use crate::common::utils::http::get_extract_patterns_from_request;
 #[cfg(feature = "enterprise")]
 use crate::{
-    common::meta::search::AuditContext, common::utils::auth::check_permissions,
-    handler::http::request::search::utils::check_stream_permissions,
+    common::meta::search::AuditContext,
+    common::utils::auth::check_permissions,
+    handler::http::request::search::utils::{
+        StreamPermissionResourceType, check_stream_permissions,
+    },
     service::self_reporting::audit,
 };
 use crate::{
@@ -364,16 +367,28 @@ pub async fn search_http2_stream(
         }
     }
 
+    req.clear_cache = get_clear_cache_from_request(&query);
+
     // Check if user has edit permissions when clear_cache is requested
     #[cfg(feature = "enterprise")]
-    if get_clear_cache_from_request(&query) {
+    if req.clear_cache {
+        use o2_openfga::meta::mapping::{RESULT_LOGS_CACHE_KEY, is_cache_rbac_enabled};
+
+        // We only check DELETE cache rbac for logs stream type
+        let (permission_type, method) =
+            if stream_type.eq(&StreamType::Logs) && is_cache_rbac_enabled() {
+                // check if cache rbac is enabled
+                (RESULT_LOGS_CACHE_KEY, "DELETE")
+            } else {
+                (stream_type.as_str(), "PUT")
+            };
         for stream_name in stream_names.iter() {
             if !check_permissions(
                 stream_name,
                 &org_id,
                 &user_id,
-                stream_type.as_str(),
-                "PUT",
+                permission_type,
+                method,
                 None,
             )
             .await
@@ -403,7 +418,6 @@ pub async fn search_http2_stream(
     }
 
     // Set use_cache from query params
-    req.clear_cache = get_clear_cache_from_request(&query);
     req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
 
     // Set search type if not set
@@ -451,11 +465,25 @@ pub async fn search_http2_stream(
             .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
     }
 
+    #[cfg(feature = "enterprise")]
     // Check permissions for each stream
+    let permission_resource_type =
+        if req.search_type == Some(config::meta::search::SearchEventType::Insights) {
+            StreamPermissionResourceType::Insights
+        } else {
+            StreamPermissionResourceType::Search
+        };
+
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
-        if let Some(res) =
-            check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            stream_name,
+            &org_id,
+            &user_id,
+            &stream_type,
+            permission_resource_type,
+        )
+        .await
         {
             // Add audit before closing
             #[cfg(feature = "enterprise")]
@@ -843,8 +871,14 @@ pub async fn values_http2_stream(
     // Check permissions for each stream
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
-        if let Some(res) =
-            check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            stream_name,
+            &org_id,
+            &user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
         {
             // Add audit before closing
             #[cfg(feature = "enterprise")]

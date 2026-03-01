@@ -1042,6 +1042,7 @@ where
             // service_streams APIs are org-level, not stream-specific
             || path.contains("/service_streams/_analytics")
             || path.contains("/service_streams/_correlate")
+            || (url_len == 5 && path.ends_with("/patterns/extract"))
             {
                 return Ok(AuthExtractor {
                     auth: auth_str.to_owned(),

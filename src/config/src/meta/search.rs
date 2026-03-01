@@ -953,6 +953,7 @@ pub enum SearchEventType {
     DerivedStream,
     SearchJob,
     Download,
+    Insights,
 }
 
 impl<'de> Deserialize<'de> for SearchEventType {
@@ -994,6 +995,7 @@ impl std::fmt::Display for SearchEventType {
             Self::DerivedStream => write!(f, "derived_stream"),
             Self::SearchJob => write!(f, "search_job"),
             Self::Download => write!(f, "download"),
+            Self::Insights => write!(f, "insights"),
         }
     }
 }
@@ -1012,8 +1014,9 @@ impl TryFrom<&str> for SearchEventType {
             "derived_stream" | "derivedstream" => Ok(Self::DerivedStream),
             "search_job" | "searchjob" => Ok(Self::SearchJob),
             "download" => Ok(Self::Download),
+            "insights" => Ok(Self::Insights),
             _ => Err(format!(
-                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`"
+                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`, `insights`"
             )),
         }
     }
