@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
           <!-- Wrap Content Button -->
           <q-btn
-            v-if="searchObj.meta.logsVisualizeToggle === 'logs'"
+            v-if="searchObj.meta.logsVisualizeToggle === 'logs' || searchObj.meta.logsVisualizeToggle === 'patterns'"
             data-test="logs-search-result-wrap-table-content-btn"
             icon="wrap_text"
             flat
