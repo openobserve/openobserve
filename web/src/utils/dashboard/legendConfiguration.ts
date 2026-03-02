@@ -992,7 +992,7 @@ export const applyPieDonutLegendPositioning = (
  * @param {any[]} seriesData - Series data for legend calculations
  * @returns {object} Object containing grid properties and available dimensions
  */
-const calculatePieChartContainer = (
+export const calculatePieChartContainer = (
   panelSchema: any,
   chartWidth: number,
   chartHeight: number,
