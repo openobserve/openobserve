@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="traces-metrics-dashboard tw:w-full">
+  <div
+    class="traces-metrics-dashboard tw:w-full"
+    :class="searchObj.meta.showHistogram ? 'tw:h-[16rem]!' : 'tw:h-[2.5rem]!'"
+  >
     <!-- Collapsible Header -->
     <div
       v-if="show"
