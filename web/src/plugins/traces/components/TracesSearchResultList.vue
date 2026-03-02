@@ -50,13 +50,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="`${props.total != null ? props.total : hits.length} ${t('traces.tracesFound')}`"
           class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
         />
-        <q-badge
+        <div
           v-if="props.errorCount != null"
           data-test="traces-error-count-badge"
-          rounded
-          :label="`${props.errorCount} ${t('traces.errorsFound')}`"
-          class="text-caption tw:bg-[var(--q-negative)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-white! tw:mr-[0.85rem]"
-        />
+          class="tw:rounded-xl tw:py-[0.125rem] tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit tw:mr-[0.85rem]"
+          style="
+            background: rgba(244, 67, 54, 0.12);
+            color: var(--q-negative, #c62828);
+          "
+        >
+          <span class="tw:text-[0.75rem] tw:tracking-[0.03em] tw:font-bold">
+            {{ props.errorCount }} {{ t("traces.errorsFound") }}
+          </span>
+        </div>
 
         <q-space />
 
