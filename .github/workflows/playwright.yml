@@ -96,7 +96,7 @@ jobs:
         run: cargo build --release --target x86_64-unknown-linux-gnu
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-binary
           path: target/x86_64-unknown-linux-gnu/release/openobserve
@@ -686,7 +686,7 @@ jobs:
           echo "SANITIZED_FOLDERNAME=$SANITIZED_FOLDERNAME" >> $GITHUB_ENV
 
       - name: Upload Coverage Data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-coverage-${{ env.SANITIZED_FOLDERNAME }}-attempt-${{ github.run_attempt }}
           path: tests/ui-testing/.nyc_output
@@ -697,7 +697,7 @@ jobs:
 
       - name: Upload blob report to GitHub Actions Artifacts
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: blob-report-${{ matrix.testfolder }}-attempt-${{ github.run_attempt }}
           path: tests/ui-testing/blob-report
@@ -915,7 +915,7 @@ jobs:
         run: cd tests/ui-testing && npm ci && npx nyc report
 
       - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: steps.check_coverage.outputs.has_coverage == 'true' && hashFiles('tests/ui-testing/coverage-report/**') != ''
         with:
           name: coverage-report
