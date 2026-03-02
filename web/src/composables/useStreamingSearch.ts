@@ -248,9 +248,11 @@ const useHttpStreaming = () => {
       if (meta?.tab_name) url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
     } else if (type === "traces") {
       // Traces latest_stream endpoint — GET with query params
-      const { stream_name, filter, start_time, end_time, from, size, timeout } = queryReq;
+      const { stream_name, filter, start_time, end_time, from, size, timeout, sort_by, sort_order } = queryReq;
       url = `/${stream_name}/traces/latest_stream?filter=${encodeURIComponent(filter || "")}&start_time=${start_time}&end_time=${end_time}&from=${from ?? 0}&size=${size ?? 25}`;
       if (timeout) url += `&timeout=${timeout}`;
+      if (sort_by) url += `&sort_by=${encodeURIComponent(sort_by)}`;
+      if (sort_order) url += `&sort_order=${sort_order}`;
     }
 
     url = `${store.state.API_ENDPOINT}/api/${org_id}` + url;
