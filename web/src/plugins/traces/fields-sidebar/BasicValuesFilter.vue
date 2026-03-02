@@ -1,21 +1,26 @@
 <template>
   <q-expansion-item
-    class="field-expansion-item"
+    class="field-expansion-item hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
     dense
-    switch-toggle-side
-    :label="row.name"
-    expand-icon-class="field-expansion-icon"
-    expand-icon="expand_more"
+    hide-expand-icon
+    v-model="isExpanded"
     @before-show="(event: any) => openFilterCreator(event, row)"
   >
     <template v-slot:header>
-      <div class="flex content-center ellipsis full-width" :title="row.name">
+      <div class="flex content-center ellipsis full-width field-expansion-header" :title="row.name">
         <div
           class="field_label ellipsis tw:flex tw:items-center"
           style="width: calc(100% - 28px); font-size: 14px"
           :title="row.label || row.name"
         >
-          <FieldTypeBadge :dataType="row.dataType" />
+          <span v-if="row.dataType" class="field-type-container" :title="row.dataType">
+            <FieldTypeBadge :dataType="row.dataType" />
+            <q-icon
+              class="field-expand-icon"
+              :name="isExpanded ? 'expand_less' : 'expand_more'"
+              size="1rem"
+            />
+          </span>
           {{ row.label || row.name }}
         </div>
         <div class="field_overlay">
@@ -163,6 +168,7 @@ const props = defineProps({
   },
 });
 
+const isExpanded = ref(false);
 const fieldValues = ref<any>({});
 
 const store = useStore();
@@ -284,6 +290,32 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
 </script>
 
 <style lang="scss">
+.field-type-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.3rem;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.field-expand-icon {
+  position: absolute;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.field-expansion-header:hover .field-type-badge {
+  opacity: 0;
+}
+
+.field-expansion-header:hover .field-expand-icon {
+  opacity: 1;
+}
+
 .q-expansion-item {
   .field_overlay {
     visibility: hidden;
