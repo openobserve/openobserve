@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Occurrence Column -->
     <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:text-right">
       <span
-        class="text-weight-bold text-primary"
+        class="tw:text-[var(--o2-text-4)]"
         :data-test="`pattern-card-${index}-frequency`"
       >
         {{ pattern.frequency.toLocaleString() }}
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Percentage Column -->
     <div class="tw:w-14 tw:flex-shrink-0 tw:px-2 tw:text-right">
       <span
-        class="text-weight-bold text-primary"
+        class="tw:text-[var(--o2-text-4)]"
         :data-test="`pattern-card-${index}-percentage`"
         >{{ pattern.percentage.toFixed(2) }}%</span
       >
