@@ -1717,7 +1717,7 @@ async fn process_dest_template(
             .replace("{alert_promql_value}", &contidion.value.to_string());
     }
 
-    // Check if {rows} or {rows:N} is being used in a JSON context (quoted value position)
+    // Check if {rows}, {rows:N}, {...rows}, or {...rows:N} is in a JSON context
     let is_json_rows_context = check_json_context(&resp, "rows");
 
     if is_json_rows_context {
@@ -1725,34 +1725,73 @@ async fn process_dest_template(
         let all_json = rows_tpl_val.iter().all(|v| !v.is_string());
 
         if all_json {
-            // Determine the row limit from {rows:N} pattern, if present
-            let row_limit = extract_rows_limit(&resp);
-            let limited_rows = if let Some(n) = row_limit {
-                &rows_tpl_val[..n.min(rows_tpl_val.len())]
-            } else {
-                rows_tpl_val
-            };
+            // Handle "{rows}" and "{rows:N}" — standard (non-spread) replacement
+            if resp.contains("\"{rows}\"") || extract_rows_limit(&resp).is_some() {
+                let row_limit = extract_rows_limit(&resp);
+                let limited_rows = if let Some(n) = row_limit {
+                    &rows_tpl_val[..n.min(rows_tpl_val.len())]
+                } else {
+                    rows_tpl_val
+                };
 
-            // Create JSON array from the row template values as-is (each row produces
-            // one JSON value — object or array — and {rows} is the array of those values)
-            let json_array = Value::Array(limited_rows.to_vec());
-            let json_str = serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
+                let json_array = Value::Array(limited_rows.to_vec());
+                let json_str =
+                    serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
 
-            // Replace either "{rows}" or "{rows:N}" pattern.
-            // When a row_limit is present, replace "{rows:N}" with the limited array.
-            // Also replace any plain "{rows}" (no limit) that may coexist in the same template.
-            if let Some(n) = row_limit {
-                let pattern = format!("\"{{rows:{n}}}\"");
-                resp = resp.replace(&pattern, &json_str);
-                // Replace plain "{rows}" with an unlimited array if it also appears
-                if resp.contains("\"{rows}\"") {
-                    let all_rows_array = Value::Array(rows_tpl_val.to_vec());
-                    let all_rows_str =
-                        serde_json::to_string(&all_rows_array).unwrap_or_else(|_| "[]".to_string());
-                    resp = resp.replace("\"{rows}\"", &all_rows_str);
+                if let Some(n) = row_limit {
+                    let pattern = format!("\"{{rows:{n}}}\"");
+                    resp = resp.replace(&pattern, &json_str);
+                    // Also replace plain "{rows}" if it coexists
+                    if resp.contains("\"{rows}\"") {
+                        let all_rows_str = serde_json::to_string(&Value::Array(rows_tpl_val.to_vec()))
+                            .unwrap_or_else(|_| "[]".to_string());
+                        resp = resp.replace("\"{rows}\"", &all_rows_str);
+                    }
+                } else {
+                    resp = resp.replace("\"{rows}\"", &json_str);
                 }
-            } else {
-                resp = resp.replace("\"{rows}\"", &json_str);
+            }
+
+            // Handle "{...rows}" and "{...rows:N}" — spread/flatten replacement
+            if has_spread_rows(&resp) {
+                let spread_limit = extract_spread_rows_limit(&resp);
+                let spread_rows = if let Some(n) = spread_limit {
+                    &rows_tpl_val[..n.min(rows_tpl_val.len())]
+                } else {
+                    rows_tpl_val
+                };
+
+                // Flatten: if a row value is an array, spread its elements; otherwise include as-is
+                let flattened: Vec<Value> = spread_rows
+                    .iter()
+                    .flat_map(|v| match v {
+                        Value::Array(arr) => arr.clone(),
+                        other => vec![other.clone()],
+                    })
+                    .collect();
+
+                let json_str = serde_json::to_string(&Value::Array(flattened))
+                    .unwrap_or_else(|_| "[]".to_string());
+
+                if let Some(n) = spread_limit {
+                    let pattern = format!("\"{{...rows:{n}}}\"");
+                    resp = resp.replace(&pattern, &json_str);
+                    // Also replace plain "{...rows}" if it coexists
+                    if resp.contains("\"{...rows}\"") {
+                        let all_flattened: Vec<Value> = rows_tpl_val
+                            .iter()
+                            .flat_map(|v| match v {
+                                Value::Array(arr) => arr.clone(),
+                                other => vec![other.clone()],
+                            })
+                            .collect();
+                        let all_str = serde_json::to_string(&Value::Array(all_flattened))
+                            .unwrap_or_else(|_| "[]".to_string());
+                        resp = resp.replace("\"{...rows}\"", &all_str);
+                    }
+                } else {
+                    resp = resp.replace("\"{...rows}\"", &json_str);
+                }
             }
         } else {
             // Fallback to string behavior for non-JSON row values
@@ -1790,7 +1829,8 @@ async fn process_dest_template(
 
 /// Checks if a variable is being used in a JSON context (i.e., as a direct value in JSON)
 /// For example, {"key": "{var}"} returns true, but {"key": "text {var} text"} returns false.
-/// Also detects "{var:N}" patterns (e.g., "{rows:3}").
+/// Also detects "{var:N}" patterns (e.g., "{rows:3}") and spread patterns
+/// "{...var}" / "{...var:N}".
 fn check_json_context(tpl: &str, var_name: &str) -> bool {
     // Check for "{var}" pattern
     let pattern_with_quotes = format!("\"{{{var_name}}}\"");
@@ -1799,8 +1839,27 @@ fn check_json_context(tpl: &str, var_name: &str) -> bool {
     }
 
     // Check for "{var:N}" pattern (e.g., "{rows:3}")
-    let prefix = format!("\"{{{var_name}:");
-    if let Some(start) = tpl.find(&prefix) {
+    if check_json_context_with_prefix(tpl, &format!("\"{{{var_name}:")) {
+        return true;
+    }
+
+    // Check for "{...var}" spread pattern
+    let spread_pattern = format!("\"{{...{var_name}}}\"");
+    if is_json_value_position(tpl, &spread_pattern) {
+        return true;
+    }
+
+    // Check for "{...var:N}" spread pattern (e.g., "{...rows:3}")
+    if check_json_context_with_prefix(tpl, &format!("\"{{...{var_name}:")) {
+        return true;
+    }
+
+    false
+}
+
+/// Helper to check if a "{var:N}" or "{...var:N}" style pattern is in JSON value position.
+fn check_json_context_with_prefix(tpl: &str, prefix: &str) -> bool {
+    if let Some(start) = tpl.find(prefix) {
         let after_prefix = start + prefix.len();
         if let Some(end) = tpl[after_prefix..].find("}\"") {
             let num_str = &tpl[after_prefix..after_prefix + end];
@@ -1812,7 +1871,6 @@ fn check_json_context(tpl: &str, var_name: &str) -> bool {
             }
         }
     }
-
     false
 }
 
@@ -1837,7 +1895,21 @@ fn is_json_value_position(tpl: &str, pattern: &str) -> bool {
 /// Extracts the row limit N from a "{rows:N}" pattern in the template string.
 /// Returns None if only "{rows}" is present (no limit).
 fn extract_rows_limit(tpl: &str) -> Option<usize> {
-    let prefix = "\"{rows:";
+    extract_limit_with_prefix(tpl, "\"{rows:")
+}
+
+/// Extracts the row limit N from a "{...rows:N}" spread pattern in the template string.
+/// Returns None if only "{...rows}" is present (no limit).
+fn extract_spread_rows_limit(tpl: &str) -> Option<usize> {
+    extract_limit_with_prefix(tpl, "\"{...rows:")
+}
+
+/// Returns true if the template contains a spread rows pattern ("{...rows}" or "{...rows:N}").
+fn has_spread_rows(tpl: &str) -> bool {
+    tpl.contains("\"{...rows}\"") || extract_spread_rows_limit(tpl).is_some()
+}
+
+fn extract_limit_with_prefix(tpl: &str, prefix: &str) -> Option<usize> {
     if let Some(start) = tpl.find(prefix) {
         let after_prefix = start + prefix.len();
         if let Some(end) = tpl[after_prefix..].find("}\"") {
@@ -3127,5 +3199,178 @@ mod tests {
         assert!(result.contains("Alert 2: user Bob"));
         // Should NOT be a JSON array
         assert!(!result.contains("[\"Alert 1"));
+    }
+
+    #[test]
+    fn test_check_json_context_with_spread() {
+        // "{...rows}" in JSON value position
+        assert!(check_json_context(r#""fields": "{...rows}"}"#, "rows"));
+        assert!(check_json_context(r#""fields": "{...rows}","#, "rows"));
+
+        // "{...rows:N}" in JSON value position
+        assert!(check_json_context(r#""fields": "{...rows:3}"}"#, "rows"));
+        assert!(check_json_context(
+            r#"{"embeds": [{"fields": "{...rows:1}"}]}"#,
+            "rows"
+        ));
+
+        // Not in value position — should be false
+        assert!(!check_json_context(r#""{...rows}": "value""#, "rows"));
+        assert!(!check_json_context(
+            r#""data": "prefix {...rows}""#,
+            "rows"
+        ));
+    }
+
+    #[test]
+    fn test_extract_spread_rows_limit() {
+        assert_eq!(
+            extract_spread_rows_limit(r#""fields": "{...rows:1}""#),
+            Some(1)
+        );
+        assert_eq!(
+            extract_spread_rows_limit(r#""data": "{...rows:10}""#),
+            Some(10)
+        );
+        assert_eq!(
+            extract_spread_rows_limit(r#""data": "{...rows}""#),
+            None
+        );
+        assert_eq!(extract_spread_rows_limit(r#""data": "{rows:3}""#), None);
+    }
+
+    #[test]
+    fn test_has_spread_rows() {
+        assert!(has_spread_rows(r#""fields": "{...rows}""#));
+        assert!(has_spread_rows(r#""fields": "{...rows:2}""#));
+        assert!(!has_spread_rows(r#""fields": "{rows}""#));
+        assert!(!has_spread_rows(r#""fields": "{rows:2}""#));
+    }
+
+    #[tokio::test]
+    async fn test_process_dest_template_spread_rows_flattens_arrays() {
+        // "{...rows}" should flatten array row templates into a single array
+        let dest_tpl = r#"{"embeds": [{"fields": "{...rows}"}]}"#;
+        let rows_tpl_val = vec![
+            json!([
+                {"name": "URL", "value": "/api/test"},
+                {"name": "Method", "value": "GET"}
+            ]),
+            json!([
+                {"name": "URL", "value": "/api/other"},
+                {"name": "Method", "value": "POST"}
+            ]),
+        ];
+        let mut row1 = Map::new();
+        row1.insert("url".to_string(), json!("/api/test"));
+        let mut row2 = Map::new();
+        row2.insert("url".to_string(), json!("/api/other"));
+        let rows = vec![row1, row2];
+
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+        };
+
+        let result =
+            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
+                .await;
+
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        let fields = &parsed["embeds"][0]["fields"];
+        assert!(fields.is_array());
+        // Flattened: 2 rows x 2 objects each = 4 objects in a flat array
+        let arr = fields.as_array().unwrap();
+        assert_eq!(arr.len(), 4);
+        assert_eq!(arr[0]["name"], "URL");
+        assert_eq!(arr[0]["value"], "/api/test");
+        assert_eq!(arr[1]["name"], "Method");
+        assert_eq!(arr[1]["value"], "GET");
+        assert_eq!(arr[2]["name"], "URL");
+        assert_eq!(arr[2]["value"], "/api/other");
+        assert_eq!(arr[3]["name"], "Method");
+        assert_eq!(arr[3]["value"], "POST");
+    }
+
+    #[tokio::test]
+    async fn test_process_dest_template_spread_rows_with_limit() {
+        // "{...rows:1}" should limit to 1 row then flatten
+        let dest_tpl = r#"{"fields": "{...rows:1}"}"#;
+        let rows_tpl_val = vec![
+            json!([
+                {"name": "URL", "value": "/api/test"},
+                {"name": "Method", "value": "GET"}
+            ]),
+            json!([
+                {"name": "URL", "value": "/api/other"},
+                {"name": "Method", "value": "POST"}
+            ]),
+        ];
+        let mut row1 = Map::new();
+        row1.insert("url".to_string(), json!("/api/test"));
+        let mut row2 = Map::new();
+        row2.insert("url".to_string(), json!("/api/other"));
+        let rows = vec![row1, row2];
+
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+        };
+
+        let result =
+            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
+                .await;
+
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        let fields = &parsed["fields"];
+        assert!(fields.is_array());
+        // Only 1 row (with 2 objects) flattened
+        let arr = fields.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0]["name"], "URL");
+        assert_eq!(arr[0]["value"], "/api/test");
+        assert_eq!(arr[1]["name"], "Method");
+        assert_eq!(arr[1]["value"], "GET");
+    }
+
+    #[tokio::test]
+    async fn test_process_dest_template_spread_rows_single_objects() {
+        // "{...rows}" with single object rows (no arrays) — works like "{rows}"
+        let dest_tpl = r#"{"data": "{...rows}"}"#;
+        let rows_tpl_val = vec![
+            json!({"user": "Alice"}),
+            json!({"user": "Bob"}),
+        ];
+        let mut row1 = Map::new();
+        row1.insert("user".to_string(), json!("Alice"));
+        let mut row2 = Map::new();
+        row2.insert("user".to_string(), json!("Bob"));
+        let rows = vec![row1, row2];
+
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+        };
+
+        let result =
+            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
+                .await;
+
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        let data = &parsed["data"];
+        assert!(data.is_array());
+        let arr = data.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0]["user"], "Alice");
+        assert_eq!(arr[1]["user"], "Bob");
     }
 }
