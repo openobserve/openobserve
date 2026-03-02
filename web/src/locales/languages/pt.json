@@ -351,7 +351,8 @@
     "openFields": "Campos abertos",
     "askAIFunctionPlaceholder": "Peça ajuda à IA com sua função...",
     "enterFunctionPrompt": "Insira um prompt para gerar a função",
-    "recordsPerPage": "Registros por página"
+    "recordsPerPage": "Registros por página",
+    "searchDimension": "Dimensões de pesquisa"
   },
   "menu": {
     "home": "Início",
@@ -2546,7 +2547,18 @@
     "timeRangeUpdated": "O intervalo de tempo selecionado não incluiu esse rastreamento. O intervalo de tempo foi atualizado para corresponder ao timestamp do rastreamento.",
     "fetchingMoreTraces": "Buscando mais rastros...",
     "showErrorOnly": "Mostrar somente erro",
-    "openInTraces": "Abrir no Traces"
+    "openInTraces": "Abrir no Traces",
+    "errorRetrievingTraces": "Ocorreu um erro ao recuperar os traços.",
+    "fetchingTraces": "Aguente firme, estamos buscando seus rastros.",
+    "noTracesFoundAdjust": "Nenhum vestígio encontrado. Ajuste os filtros e tente novamente.",
+    "tracesTitle": "TRAÇOS",
+    "tracesFound": "Traços encontrados",
+    "error": "ERRO",
+    "errors": "ERROS",
+    "success": "SUCESSO",
+    "today": "Hoje",
+    "yesterday": "Ontem",
+    "spanColorPalettePreview": "Pré-visualização da paleta de cores Span"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -2944,7 +2956,8 @@
     "tracesErrorDetails": "Ocorreu um erro ao buscar dados de rastreamento. Por favor, tente novamente.",
     "metricsError": "Não é possível carregar métricas",
     "metricsErrorDetails": "Ocorreu um erro ao buscar dados de métricas. Por favor, tente novamente.",
-    "noMetricsDescription": "Nenhuma métrica encontrada para essa correlação no intervalo de tempo selecionado."
+    "noMetricsDescription": "Nenhuma métrica encontrada para essa correlação no intervalo de tempo selecionado.",
+    "errorRetrievingTraces": "Ocorreu um erro ao recuperar os traços."
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",

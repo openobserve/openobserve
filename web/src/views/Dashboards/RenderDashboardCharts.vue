@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="card-container"
     :class="store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto'"
   >
-    <div class="tw:px-[0.625rem]">
+    <div class="tw:px-[0.625rem] render-dashboard-charts-container">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
       <span
         v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"
@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :variablesManager="variablesManager"
         :selectedTimeDate="currentTimeObj['__global']"
         :initialVariableValues="initialVariableValues"
+        class="global-variables-selector"
         data-test="global-variables-selector"
       />
 
@@ -1401,7 +1402,10 @@ export default defineComponent({
             );
           }
 
-          if (pickerValue && !arePickerValuesEqual(panelTimeValues.value[panelId], pickerValue)) {
+          if (
+            pickerValue &&
+            !arePickerValuesEqual(panelTimeValues.value[panelId], pickerValue)
+          ) {
             panelTimeValues.value[panelId] = pickerValue;
           }
 
@@ -1496,11 +1500,9 @@ export default defineComponent({
 
       // CRITICAL: Only update URL if query has actually changed
       // This prevents unnecessary route updates when panel refreshes without time changes
-      const hasQueryChanged = Object.keys(query).some(
-        key => query[key] !== route.query[key]
-      ) || Object.keys(route.query).some(
-        key => !query.hasOwnProperty(key)
-      );
+      const hasQueryChanged =
+        Object.keys(query).some((key) => query[key] !== route.query[key]) ||
+        Object.keys(route.query).some((key) => !query.hasOwnProperty(key));
 
       if (hasQueryChanged) {
         await router.replace({ query });

@@ -45,7 +45,6 @@ exceptions = [
     { name = "error-code", allow = ["BSL-1.0"] },
     { name = "base16", allow = ["CC0-1.0"] },
     { name = "tiny-keccak", allow = ["CC0-1.0"] },
-    { name = "quoted_printable", allow = ["0BSD"] },
     { name = "ring", allow = ["BSD-4-Clause", "OpenSSL"] },
     { name = "inferno", allow = ["CDDL-1.0"] },
     { name = "libbz2-rs-sys", allow = ["bzip2-1.0.6"] },
@@ -62,7 +61,8 @@ allow = [
     "Unicode-3.0", # OSI
     "ISC", # OSI + fsf free
     "BSL-1.0",
-    "CC0-1.0"
+    "CC0-1.0",
+    "0BSD", # OSI approved - BSD Zero Clause License
 ]
 
 [[licenses.clarify]]

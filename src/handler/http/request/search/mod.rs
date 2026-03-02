@@ -41,7 +41,7 @@ use hashbrown::HashMap;
 use http::HeaderMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
-use utils::check_stream_permissions;
+use utils::{StreamPermissionResourceType, check_stream_permissions};
 
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
@@ -387,8 +387,14 @@ pub async fn search(
 
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
-        if let Some(res) =
-            check_stream_permissions(&stream_name, &org_id, user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            &stream_name,
+            &org_id,
+            user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
         {
             return res;
         }
@@ -1030,7 +1036,7 @@ pub async fn build_search_request_per_field(
         stream_type
     };
 
-    let size = req.query.size;
+    let size = req.query.size + req.query.from;
     let mut requests = Vec::new();
     for field in fields {
         let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
@@ -1884,8 +1890,14 @@ pub async fn result_schema(
 
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
-        if let Some(res) =
-            check_stream_permissions(&stream_name, &org_id, user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            &stream_name,
+            &org_id,
+            user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
         {
             return res;
         }

@@ -33,8 +33,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Activity Feed with Timeline -->
-    <div v-else class="tw:flex-1 tw:overflow-y-auto tw:px-3 tw:pt-2 tw:pb-4">
-      <div class="tw:relative">
+    <div v-else class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:relative">
+      <!-- Scroll buttons -->
+      <div class="tw:absolute tw:top-2 tw:right-3 tw:flex tw:flex-col tw:gap-1 tw:z-10">
+        <q-btn
+          round
+          unelevated
+          dense
+          size="xs"
+          icon="keyboard_arrow_up"
+          color="grey-6"
+          @click="scrollToTop"
+          data-test="incident-timeline-scroll-top"
+        >
+          <q-tooltip>Scroll to top</q-tooltip>
+        </q-btn>
+        <q-btn
+          round
+          unelevated
+          dense
+          size="xs"
+          icon="keyboard_arrow_down"
+          color="grey-6"
+          @click="scrollToBottom"
+          data-test="incident-timeline-scroll-bottom"
+        >
+          <q-tooltip>Scroll to bottom</q-tooltip>
+        </q-btn>
+      </div>
+
+      <div ref="timelineContainer" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-3 tw:pt-2 tw:pb-4">
+        <div class="tw:relative">
         <!-- Vertical Timeline Line -->
         <div
           class="tw:absolute tw:left-3 tw:top-0 tw:bottom-0 tw:w-0.5"
@@ -220,6 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+      </div>
     </div>
 
     <!-- Comment Input -->
@@ -251,8 +281,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             placeholder="Write a comment..."
             :rows="3"
             class="comment-input"
-            @keyup.ctrl.enter="submitComment"
-            @keyup.meta.enter="submitComment"
+            @keydown.ctrl.enter.prevent="submitComment"
+            @keydown.meta.enter.prevent="submitComment"
             data-test="incident-timeline-comment-input"
           />
 
@@ -280,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { date } from "quasar";
@@ -302,6 +332,16 @@ const events = ref<any[]>([]);
 const loading = ref(false);
 const commentText = ref("");
 const submitting = ref(false);
+const timelineContainer = ref<HTMLElement | null>(null);
+
+const scrollToTop = () => {
+  if (timelineContainer.value) timelineContainer.value.scrollTop = 0;
+};
+
+const scrollToBottom = () => {
+  if (timelineContainer.value)
+    timelineContainer.value.scrollTop = timelineContainer.value.scrollHeight;
+};
 
 const fetchEvents = async () => {
   if (!props.incidentId) return;
@@ -549,22 +589,28 @@ const formatRelativeTime = (timestamp: number): string => {
   return date.formatDate(timestamp / 1000, "MMM D, YYYY");
 };
 
-watch(() => props.visible, (visible) => {
+watch(() => props.visible, async (visible) => {
   if (visible && props.incidentId) {
-    fetchEvents();
+    await fetchEvents();
+    await nextTick();
+    scrollToBottom();
   }
 });
 
 // Watch for refresh trigger from parent component
-watch(() => props.refreshTrigger, (newVal, oldVal) => {
+watch(() => props.refreshTrigger, async (newVal, oldVal) => {
   if (newVal !== oldVal && props.visible && props.incidentId) {
-    fetchEvents();
+    await fetchEvents();
+    await nextTick();
+    scrollToBottom();
   }
 });
 
-onMounted(() => {
+onMounted(async () => {
   if (props.visible && props.incidentId) {
-    fetchEvents();
+    await fetchEvents();
+    await nextTick();
+    scrollToBottom();
   }
 });
 

@@ -34,7 +34,9 @@ use serde_json;
 use tracing::{Instrument, Span};
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::check_stream_permissions;
+use crate::handler::http::request::search::utils::{
+    StreamPermissionResourceType, check_stream_permissions,
+};
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
@@ -189,7 +191,14 @@ pub async fn get_search_profile(
 
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
-    if let Some(res) = check_stream_permissions(&stream_name, org_id, &user_id, &stream_type).await
+    if let Some(res) = check_stream_permissions(
+        &stream_name,
+        org_id,
+        &user_id,
+        &stream_type,
+        StreamPermissionResourceType::Search,
+    )
+    .await
     {
         return res;
     }

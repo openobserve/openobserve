@@ -506,7 +506,7 @@ pub async fn get_latest_traces(
     req.query.sql = query_sql.to_string();
     req.query.start_time = start_time;
     req.query.end_time = end_time;
-    let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
+    let mut traces_service_name: HashMap<String, HashMap<String, (u16, i64)>> = HashMap::new();
 
     loop {
         let search_res = SearchService::cache::search(
@@ -588,8 +588,9 @@ pub async fn get_latest_traces(
                 trace.end_time = trace_end_time;
             }
             let service_name_map = traces_service_name.entry(trace_id.clone()).or_default();
-            let count = service_name_map.entry(service_name.clone()).or_default();
-            *count += 1;
+            let entry = service_name_map.entry(service_name.clone()).or_default();
+            entry.0 += 1;
+            entry.1 += duration;
         }
         if resp_size < req.query.size {
             break;
@@ -600,10 +601,11 @@ pub async fn get_latest_traces(
     // apply service_name to traces_data
     for (trace_id, service_name_map) in traces_service_name {
         let trace = traces_data.get_mut(&trace_id).unwrap();
-        for (service_name, count) in service_name_map {
+        for (service_name, (count, duration)) in service_name_map {
             trace.service_name.push(TraceServiceNameItem {
                 service_name,
                 count,
+                duration,
             });
         }
     }
@@ -1240,7 +1242,7 @@ async fn process_latest_traces_stream(
             .collect();
         let trace_ids_str = sanitized_ids.join("','");
         let detail_sql = format!(
-            "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, span_status \
+            "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status \
              FROM \"{stream_name}\" WHERE trace_id IN ('{trace_ids_str}') ORDER BY {TIMESTAMP_COL_NAME} ASC"
         );
 
@@ -1250,7 +1252,7 @@ async fn process_latest_traces_stream(
         req2.query.size = get_config().limit.query_default_limit;
         req2.query.start_time = p_start_actual;
         req2.query.end_time = p_end_actual;
-        let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
+        let mut traces_service_name: HashMap<String, HashMap<String, (u16, i64)>> = HashMap::new();
 
         loop {
             if sender.is_closed() {
@@ -1319,7 +1321,9 @@ async fn process_latest_traces_stream(
                         trace.end_time = trace_end_time;
                     }
                     let svc_map = traces_service_name.entry(tid).or_default();
-                    *svc_map.entry(service_name).or_default() += 1;
+                    let entry = svc_map.entry(service_name).or_default();
+                    entry.0 += 1;
+                    entry.1 += duration;
                 }
             }
 
@@ -1332,10 +1336,11 @@ async fn process_latest_traces_stream(
         // Apply service_name aggregations
         for (tid, svc_map) in traces_service_name {
             if let Some(trace) = traces_data.get_mut(&tid) {
-                for (svc, count) in svc_map {
+                for (svc, (count, duration)) in svc_map {
                     trace.service_name.push(TraceServiceNameItem {
                         service_name: svc,
                         count,
+                        duration,
                     });
                 }
             }
@@ -1413,4 +1418,5 @@ struct TraceResponseItem {
 struct TraceServiceNameItem {
     service_name: String,
     count: u16,
+    duration: i64,
 }

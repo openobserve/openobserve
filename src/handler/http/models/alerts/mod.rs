@@ -384,6 +384,7 @@ pub enum SearchEventType {
     DerivedStream,
     SearchJob,
     Download,
+    Insights,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
@@ -568,6 +569,7 @@ impl From<meta_search::SearchEventType> for SearchEventType {
             meta_search::SearchEventType::DerivedStream => Self::DerivedStream,
             meta_search::SearchEventType::SearchJob => Self::SearchJob,
             meta_search::SearchEventType::Download => Self::Download,
+            meta_search::SearchEventType::Insights => Self::Insights,
         }
     }
 }
@@ -748,6 +750,7 @@ impl From<SearchEventType> for meta_search::SearchEventType {
             SearchEventType::DerivedStream => Self::DerivedStream,
             SearchEventType::SearchJob => Self::SearchJob,
             SearchEventType::Download => Self::Download,
+            SearchEventType::Insights => Self::Insights,
         }
     }
 }

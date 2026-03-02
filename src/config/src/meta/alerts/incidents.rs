@@ -669,6 +669,11 @@ impl IncidentEvent {
         false
     }
 
+    /// Check if this event is any Alert event (regardless of alert_id)
+    pub fn is_alert(&self) -> bool {
+        matches!(&self.event_type, IncidentEventType::Alert { .. })
+    }
+
     /// Check if this event is an Alert for the given alert_id
     pub fn is_alert_for(&self, alert_id: &str) -> bool {
         matches!(
