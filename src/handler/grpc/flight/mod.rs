@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -141,6 +141,7 @@ impl FlightService for FlightServiceImpl {
                     _start.elapsed().as_millis(),
                 ),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight::do_get get_ctx_and_physical_plan".to_string())
                     .search_role("follower".to_string())

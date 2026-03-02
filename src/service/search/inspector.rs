@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,32 @@
 use config::{cluster::LOCAL_NODE, get_config, meta::cluster::NodeInfo};
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchInspectorEvent {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inspector: Option<SearchInspectorFields>,
+    pub _timestamp: i64,
+    pub code_namespace: Option<String>,
+    pub target: Option<String>,
+    pub code_filepath: Option<String>,
+    pub code_lineno: Option<String>,
+    pub level: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchInspector {
+    pub sql: String,
+    pub start_time: String,
+    pub end_time: String,
+    pub total_duration: usize,
+    pub events: Vec<SearchInspectorFields>,
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SearchInspectorFields {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -38,6 +62,8 @@ pub struct SearchInspectorFields {
     pub region: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cluster: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub events: Option<Vec<SearchInspectorFields>>,
 }
 
 impl SearchInspectorFields {
@@ -65,6 +91,11 @@ impl SearchInspectorFieldsBuilder {
                 ..Default::default()
             },
         }
+    }
+
+    pub fn trace_id(mut self, trace_id: String) -> Self {
+        self.fields.trace_id = Some(trace_id);
+        self
     }
 
     pub fn node_name(mut self, value: String) -> Self {
@@ -158,12 +189,14 @@ mod tests {
     fn test_search_inspector_fields() {
         let msg = "test message".to_string();
         let fields = SearchInspectorFieldsBuilder::new()
+            .trace_id("abc123".to_string())
             .duration(100)
             .component("search".to_string())
             .build();
 
         let result = search_inspector_fields_inner(msg.clone(), fields);
         assert!(result.contains("test message"));
+        assert!(result.contains("\"trace_id\":\"abc123\""));
         assert!(result.contains("\"duration\":100"));
         assert!(result.contains("\"component\":\"search\""));
     }
