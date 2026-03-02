@@ -35,6 +35,9 @@ pub struct SearchInspector {
     pub start_time: String,
     pub end_time: String,
     pub total_duration: usize,
+    pub scan_size: usize,
+    pub scan_records: usize,
+    pub data_records: usize,
     pub events: Vec<SearchInspectorFields>,
 }
 
@@ -58,6 +61,12 @@ pub struct SearchInspectorFields {
     pub sql: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_range: Option<(String, String)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan_size: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan_records: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_records: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -130,6 +139,21 @@ impl SearchInspectorFieldsBuilder {
 
     pub fn time_range(mut self, value: (String, String)) -> Self {
         self.fields.time_range = Some(value);
+        self
+    }
+
+    pub fn scan_size(mut self, value: usize) -> Self {
+        self.fields.scan_size = Some(value);
+        self
+    }
+
+    pub fn scan_records(mut self, value: usize) -> Self {
+        self.fields.scan_records = Some(value);
+        self
+    }
+
+    pub fn data_records(mut self, value: usize) -> Self {
+        self.fields.data_records = Some(value);
         self
     }
 

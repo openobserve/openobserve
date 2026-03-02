@@ -309,6 +309,9 @@ pub async fn search(
                     req.query.start_time.to_string(),
                     req.query.end_time.to_string()
                 ))
+                .scan_size(res.scan_size as usize)
+                .scan_records(res.scan_records as usize)
+                .data_records(res.hits.len())
                 .duration(start.elapsed().as_millis() as usize)
                 .build()
         )

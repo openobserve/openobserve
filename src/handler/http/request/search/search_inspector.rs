@@ -291,6 +291,9 @@ pub async fn get_search_profile(
                 start_time: "".to_string(),
                 end_time: "".to_string(),
                 total_duration: 0,
+                scan_size: 0,
+                scan_records: 0,
+                data_records: 0,
                 events: vec![],
             };
 
@@ -313,6 +316,9 @@ pub async fn get_search_profile(
                                     si.start_time = time_range.0;
                                     si.end_time = time_range.1;
                                     si.total_duration = fields.duration.unwrap_or_default();
+                                    si.scan_size = fields.scan_size.unwrap_or_default();
+                                    si.scan_records = fields.scan_records.unwrap_or_default();
+                                    si.data_records = fields.data_records.unwrap_or_default();
                                 } else {
                                     fields.timestamp = Some(event._timestamp.to_string());
                                     inspectors.push(fields);
