@@ -234,6 +234,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- FR-5: DB / External HTTP prominent attributes -->
+    <div
+      v-if="spanCategory !== 'default' && Object.keys(prominentAttributes).length > 0"
+      class="tw:mx-3 tw:my-2 tw:rounded tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+      data-test="trace-details-sidebar-span-category-section"
+    >
+      <div
+        class="tw:flex tw:items-center tw:space-x-1 tw:px-3 tw:py-1 tw:text-[11px] tw:font-semibold tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+      >
+        <q-icon
+          :name="{ db: 'storage', external_http: 'cloud', external_rpc: 'settings_ethernet', messaging: 'swap_horiz' }[spanCategory]"
+          size="13px"
+        />
+        <span>{{ spanCategoryLabel }}</span>
+      </div>
+      <div class="tw:px-3 tw:py-2">
+        <div
+          v-for="(value, key) in prominentAttributes"
+          :key="key"
+          class="tw:flex tw:text-[11px] tw:py-[2px]"
+        >
+          <span class="tw:text-[var(--o2-text-secondary)] tw:min-w-[9rem] tw:mr-2 tw:shrink-0">{{ key }}</span>
+          <epoch-tooltip :value="value" :field-key="key">
+            <span class="tw:font-mono tw:break-all tw:text-[var(--o2-text-primary)]">{{ value }}</span>
+          </epoch-tooltip>
+        </div>
+      </div>
+    </div>
+
     <q-tabs
       v-model="activeTab"
       dense
@@ -452,14 +481,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="cell-content">
                 <span
-                  v-if="props.col.name === 'value'"
                   v-html="
                     highlightTextMatch(props.row[props.col.name], searchQuery)
                   "
                 />
-                <span v-else>
-                  {{ props.row[props.col.name] }}
-                </span>
               </div>
             </q-td>
           </template>
@@ -951,6 +976,13 @@ import {
 } from "@/utils/llmUtils";
 import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
+import {
+  classifySpan,
+  extractDbAttributes,
+  extractHttpAttributes,
+  getSpanCategoryLabel,
+} from "@/utils/traces/spanClassifier";
+import { tryDecodeEpoch, decodeEpochMs } from "@/utils/epochUtils";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1161,10 +1193,14 @@ export default defineComponent({
     ];
 
     const getTagRows = computed(() => {
-      return Object.entries(tags.value).map(([key, value]) => ({
-        field: key,
-        value: typeof value === "string" ? value : JSON.stringify(value),
-      }));
+      return Object.entries(tags.value).map(([key, value]) => {
+        const raw = typeof value === "string" ? value : JSON.stringify(value);
+        const epoch = getInlineEpoch(value, key);
+        return {
+          field: key,
+          value: epoch ? `${raw} (${epoch})` : raw,
+        };
+      });
     });
 
     const processColumns = [
@@ -1322,6 +1358,18 @@ export default defineComponent({
           ),
           "MMM DD, YYYY HH:mm:ss.SSS Z",
         );
+      if (spanDetails.attrs.start_time) {
+        spanDetails.attrs.start_time = date.formatDate(
+          Math.floor(spanDetails.attrs.start_time / 1_000_000),
+          "MMM DD, YYYY HH:mm:ss.SSS Z",
+        );
+      }
+      if (spanDetails.attrs.end_time) {
+        spanDetails.attrs.end_time = date.formatDate(
+          Math.floor(spanDetails.attrs.end_time / 1_000_000),
+          "MMM DD, YYYY HH:mm:ss.SSS Z",
+        );
+      }
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       try {
@@ -1341,8 +1389,6 @@ export default defineComponent({
       "trace_id",
       "operation_name",
       store.state.zoConfig.timestamp_column,
-      "start_time",
-      "end_time",
       "duration",
       "busy_ns",
       "idle_ns",
@@ -1947,6 +1993,34 @@ export default defineComponent({
       return formatModelParameters(params);
     };
 
+    // FR-5: Span category for DB/HTTP highlighting
+    const spanCategory = computed(() => {
+      const attrs = props.span?.attributes
+        ? typeof props.span.attributes === "string"
+          ? JSON.parse(props.span.attributes)
+          : props.span.attributes
+        : {};
+      return classifySpan({
+        spanKind: props.span?.span_kind,
+        attributes: attrs,
+      });
+    });
+
+    const spanCategoryLabel = computed(() =>
+      getSpanCategoryLabel(spanCategory.value),
+    );
+
+    const prominentAttributes = computed(() => {
+      const attrs = props.span?.attributes
+        ? typeof props.span.attributes === "string"
+          ? JSON.parse(props.span.attributes)
+          : props.span.attributes
+        : {};
+      if (spanCategory.value === "db") return extractDbAttributes(attrs);
+      if (spanCategory.value === "external_http") return extractHttpAttributes(attrs);
+      return {};
+    });
+
     return {
       t,
       activeTab,
@@ -1997,7 +2071,17 @@ export default defineComponent({
       toggleFullscreen,
       isDarkMode,
       DOMPurify,
+      spanCategory,
+      spanCategoryLabel,
+      prominentAttributes,
+      getInlineEpoch,
     };
+
+    function getInlineEpoch(value: any, fieldKey?: string): string | null {
+      const result = tryDecodeEpoch(value, fieldKey);
+      if (!result) return null;
+      return `${result.decoded} / ${decodeEpochMs(result.ms)}`;
+    }
   },
 });
 </script>

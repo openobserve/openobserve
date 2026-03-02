@@ -116,6 +116,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     title="Error Span"
                     :data-test="`trace-tree-span-error-icon-${span.spanId}`"
                   />
+                  <q-icon
+                    v-if="span.spanKind && span.spanKind !== 'Unspecified' && span.spanKind !== 'Unknown'"
+                    :name="getSpanKindIcon(span.spanKind)"
+                    :style="{ color: getSpanKindColor(span.spanKind) }"
+                    size="13px"
+                    class="q-mr-xs"
+                    :title="`${span.spanKind} span`"
+                    :data-test="`trace-tree-span-kind-icon-${span.spanId}`"
+                  />
+                  <q-icon
+                    v-if="span.spanCategory && span.spanCategory !== 'default' && getSpanCategoryIcon(span.spanCategory)"
+                    :name="getSpanCategoryIcon(span.spanCategory)"
+                    :style="{ color: getSpanCategoryColor(span.spanCategory) }"
+                    size="13px"
+                    class="q-mr-xs"
+                    :title="getSpanCategoryLabel(span.spanCategory)"
+                    :data-test="`trace-tree-span-category-icon-${span.spanId}`"
+                  />
+                  <q-badge
+                    v-if="span.isRoot"
+                    label="root"
+                    color="primary"
+                    class="q-mr-xs tw:text-[10px]"
+                    :data-test="`trace-tree-span-root-badge-${span.spanId}`"
+                  />
                   <span
                     class="text-subtitle2 text-bold q-mr-sm"
                     :class="{
@@ -254,6 +279,12 @@ import SpanBlock from "./SpanBlock.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
+import { spanKindColors } from "@/utils/traces/traceColors";
+import {
+  getSpanCategoryIcon,
+  getSpanCategoryColor,
+  getSpanCategoryLabel,
+} from "@/utils/traces/spanClassifier";
 
 export default defineComponent({
   name: "TraceTree",
@@ -598,7 +629,28 @@ export default defineComponent({
       formatTokens,
       formatCost,
       isLLMTrace,
+      getSpanKindIcon,
+      getSpanKindColor,
+      getSpanCategoryIcon,
+      getSpanCategoryColor,
+      getSpanCategoryLabel,
     };
+
+    function getSpanKindIcon(spanKind: string): string {
+      const icons: Record<string, string> = {
+        Client: "call_made",
+        Server: "call_received",
+        Producer: "send",
+        Consumer: "inbox",
+        Internal: "settings",
+      };
+      return icons[spanKind] || "help_outline";
+    }
+
+    function getSpanKindColor(spanKind: string): string {
+      const key = spanKind.toLowerCase() as keyof typeof spanKindColors;
+      return spanKindColors[key] || spanKindColors.unspecified;
+    }
   },
   components: { SpanBlock },
 });

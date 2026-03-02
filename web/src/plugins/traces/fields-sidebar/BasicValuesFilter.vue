@@ -69,7 +69,7 @@
                     class="ellipsis q-pr-xs"
                     style="width: calc(100% - 3.125rem)"
                   >
-                    {{ value.key }}
+                    {{ formatFieldValue(row.name, value.key) }}
                   </div>
                   <div
                     :title="value.count"
@@ -141,6 +141,17 @@
 
 <script lang="ts" setup>
 import { ref } from "vue";
+
+const SPAN_KIND_LABELS: Record<string, string> = {
+  "0": "Unspecified",
+  "1": "Client",
+  "2": "Server",
+  "3": "Producer",
+  "4": "Consumer",
+  "5": "Internal",
+};
+const formatFieldValue = (fieldName: string, value: string) =>
+  fieldName === "span_kind" ? (SPAN_KIND_LABELS[value] ?? value) : value;
 import useTraces from "@/composables/useTraces";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import streamService from "@/services/stream";

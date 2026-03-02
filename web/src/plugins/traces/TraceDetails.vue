@@ -51,9 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 data-test="trace-details-operation-name"
                 class="tw:text-base tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)]"
-                :title="traceTree[0]?.operationName"
+                :title="traceRootSpan?.operationName"
               >
-                {{ traceTree[0]?.operationName || "Loading..." }}
+                {{ traceRootSpan?.operationName || "Loading..." }}
               </div>
 
               <!-- Service, Timestamp, and Trace ID -->
@@ -131,6 +131,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :color="errorSpansCount > 0 ? 'negative' : undefined"
               />
               <span>{{ errorSpansCount }} errors</span>
+            </div>
+
+            <!-- SpanKind Legend -->
+            <div
+              class="tw:flex tw:items-center tw:space-x-2 tw:px-3 tw:py-1 tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:bg-[var(--o2-card-bg)]!"
+              data-test="trace-details-span-kind-legend"
+            >
+              <span
+                v-for="(color, kind) in spanKindColors"
+                :key="kind"
+                v-show="kind !== 'unspecified'"
+                class="tw:flex tw:items-center tw:space-x-1"
+                :title="`${kind.charAt(0).toUpperCase() + kind.slice(1)} span`"
+              >
+                <q-icon
+                  :name="{ client: 'call_made', server: 'call_received', producer: 'send', consumer: 'inbox', internal: 'settings' }[kind]"
+                  :style="{ color }"
+                  size="12px"
+                />
+              </span>
+              <q-tooltip anchor="bottom middle" self="top middle">
+                <div class="tw:flex tw:flex-col tw:space-y-1 tw:text-xs">
+                  <div v-for="(color, kind) in spanKindColors" :key="kind" v-show="kind !== 'unspecified'" class="tw:flex tw:items-center tw:space-x-1">
+                    <q-icon :name="{ client: 'call_made', server: 'call_received', producer: 'send', consumer: 'inbox', internal: 'settings' }[kind]" :style="{ color }" size="12px" />
+                    <span>{{ kind.charAt(0).toUpperCase() + kind.slice(1) }}</span>
+                  </div>
+                </div>
+              </q-tooltip>
             </div>
 
             <!-- Expand button (embedded mode) -->
@@ -380,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :baseTracePosition="baseTracePosition"
                   :splitterWidth="leftWidth"
                   :isSidebarOpen="
-                    isSidebarOpen && (selectedSpanId || showTraceDetails)
+                    !!(isSidebarOpen && (selectedSpanId || showTraceDetails))
                   "
                   @resize-start="startResize"
                 />
@@ -390,6 +418,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
                   }"
                 >
+                  <!-- FR-10: Partial trace banner — only shown when no span has an empty parentId (genuine root missing) -->
+                  <div
+                    v-if="!traceRootSpan"
+                    class="tw:flex tw:items-center tw:space-x-2 tw:px-3 tw:py-1 tw:text-[11px] tw:bg-amber-50 tw:border-b tw:border-amber-200 tw:text-amber-800"
+                    data-test="trace-details-partial-trace-banner"
+                  >
+                    <q-icon name="info_outline" size="13px" />
+                    <span>Partial trace — root span not available.</span>
+                  </div>
+
                   <div
                     class="trace-tree-container tw:bg-[var(--o2-card-bg)]!"
                     data-test="trace-details-tree-container"
@@ -648,7 +686,8 @@ import {
   convertTimelineData,
   convertTraceServiceMapData,
 } from "@/utils/traces/convertTraceData";
-import { getAllSpanColors } from "@/utils/traces/traceColors";
+import { getAllSpanColors, spanKindColors } from "@/utils/traces/traceColors";
+import { classifySpan } from "@/utils/traces/spanClassifier";
 import { throttle } from "lodash-es";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -1000,10 +1039,7 @@ export default defineComponent({
     });
 
     const rootServiceName = computed(() => {
-      if (traceTree.value.length > 0) {
-        return traceTree.value[0]?.serviceName || "unknown";
-      }
-      return "unknown";
+      return traceRootSpan.value?.serviceName || "unknown";
     });
 
     const traceStartTime = computed(() => {
@@ -1609,7 +1645,7 @@ export default defineComponent({
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
       baseTracePosition.value["startTimeUs"] =
-        traceTree.value[0].startTimeUs + timeRange.value.start * 1000;
+        (traceRootSpan.value?.startTimeUs ?? traceTree.value[0]?.startTimeUs ?? 0) + timeRange.value.start * 1000;
       const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
       let time = timeRange.value.start;
       for (let i = 0; i <= 4; i++) {
@@ -1689,13 +1725,34 @@ export default defineComponent({
         }
       }
 
+      // FR-10: Identify the true root span.
+      // A span is the genuine root if it has no parentId (empty string).
+      // Spans pushed to traceTree because their parent is absent are NOT necessarily root.
+      // Fall back to earliest startTimeUs among top-level spans if no true root found.
+      traceRootSpan.value = null;
+      if (traceTree.value.length > 0) {
+        // First pass: look for a span with empty parentId
+        let rootSpan = traceTree.value.find((s: any) => !s.parentId) ?? null;
+        // Second pass: if not found, pick the earliest start time among top-level spans
+        if (!rootSpan) {
+          rootSpan = traceTree.value[0];
+          for (let i = 1; i < traceTree.value.length; i++) {
+            if (traceTree.value[i].startTimeUs < rootSpan.startTimeUs) {
+              rootSpan = traceTree.value[i];
+            }
+          }
+        }
+        rootSpan.isRoot = true;
+        traceRootSpan.value = rootSpan;
+      }
+
       // Purposely converting to microseconds to avoid floating point precision issues
       // In updateChart method, we are using start and end time to set the time range of trace
-      traceTree.value[0].lowestStartTime =
+      traceRootSpan.value.lowestStartTime =
         convertTimeFromNsToUs(lowestStartTime);
-      traceTree.value[0].highestEndTime = convertTimeFromNsToUs(highestEndTime);
-      traceTree.value[0].style.color =
-        searchObj.meta.serviceColors[traceTree.value[0].serviceName];
+      traceRootSpan.value.highestEndTime = convertTimeFromNsToUs(highestEndTime);
+      traceRootSpan.value.style.color =
+        searchObj.meta.serviceColors[traceRootSpan.value.serviceName];
 
       traceTree.value.forEach((span: any) => {
         addSpansPositions(span, 0);
@@ -1866,13 +1923,27 @@ export default defineComponent({
         serviceName: span.service_name || "Unknown Service",
         spanStatus: span.span_status || "UNSET",
         spanKind: getSpanKind(span.span_kind),
+        spanCategory: classifySpan({
+          spanKind: getSpanKind(span.span_kind),
+          attributes: (() => {
+            try {
+              return span.attributes
+                ? typeof span.attributes === "string"
+                  ? JSON.parse(span.attributes)
+                  : span.attributes
+                : {};
+            } catch {
+              return {};
+            }
+          })(),
+        }),
         parentId: span.reference_parent_span_id || "",
         spans: [],
         index: 0,
         style: {
           color: "",
         },
-        links: JSON.parse(span.links || "[]"),
+        links: (() => { try { return JSON.parse(span.links || "[]"); } catch { return []; } })(),
         llm_usage: usage,
         llm_cost: cost,
       };
@@ -1932,7 +2003,7 @@ export default defineComponent({
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
           spanPositionList.value[i].startTimeUs -
-          convertTimeFromNsToUs(traceTree.value[0].lowestStartTime * 1000);
+          convertTimeFromNsToUs((traceRootSpan.value?.lowestStartTime ?? traceTree.value[0]?.lowestStartTime ?? 0) * 1000);
 
         const x1 = Number(
           (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(4),
@@ -1960,15 +2031,14 @@ export default defineComponent({
       if (typeof data.start !== "number" || typeof data.end !== "number") {
         newStart = 0;
         // Safety check to ensure trace chart data exists
+        const rootSpanRef = traceRootSpan.value ?? traceTree.value[0];
         if (
-          traceTree.value[0].highestEndTime > 0 &&
-          traceTree.value[0].lowestStartTime > 0 &&
-          traceTree.value[0].highestEndTime > traceTree.value[0].lowestStartTime
+          rootSpanRef?.highestEndTime > 0 &&
+          rootSpanRef?.lowestStartTime > 0 &&
+          rootSpanRef?.highestEndTime > rootSpanRef?.lowestStartTime
         ) {
           newEnd =
-            (traceTree.value[0].highestEndTime -
-              traceTree.value[0].lowestStartTime) /
-            1000;
+            (rootSpanRef.highestEndTime - rootSpanRef.lowestStartTime) / 1000;
         } else {
           newEnd = 0;
         }
@@ -2333,6 +2403,7 @@ export default defineComponent({
       // FlameGraph data
       flatSpans,
       traceMetadata,
+      spanKindColors,
     };
   },
 });

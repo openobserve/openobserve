@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               height: '100%',
               borderRadius: '2px',
               backgroundColor: span.style?.color || '#58508d',
+              borderLeft: getSpanKindBorder(span.spanKind),
             }"
           />
         </div>
@@ -103,6 +104,7 @@ import {
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { spanKindColors } from "@/utils/traces/traceColors";
 import { useI18n } from "vue-i18n";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -279,6 +281,15 @@ export default defineComponent({
       emit("hover");
     };
 
+    const getSpanKindBorder = (spanKind: string | undefined): string => {
+      if (!spanKind || spanKind === "Unspecified" || spanKind === "Unknown") {
+        return "none";
+      }
+      const key = spanKind.toLowerCase() as keyof typeof spanKindColors;
+      const color = spanKindColors[key] || spanKindColors.unspecified;
+      return `3px solid ${color}`;
+    };
+
     return {
       t,
       formatTimeWithSuffix,
@@ -295,6 +306,7 @@ export default defineComponent({
       store,
       onSpanHover,
       durationStyle,
+      getSpanKindBorder,
       searchObj,
     };
   },
