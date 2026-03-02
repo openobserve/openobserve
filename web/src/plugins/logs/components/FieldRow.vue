@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="field.ftsKey || !field.isSchemaField || !field.showValues"
     class="field-container flex content-center ellipsis full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
-    :class="field.name !== timestampColumn ? 'q-pl-lg' : ''"
+
     :title="field.name"
   >
     <div
