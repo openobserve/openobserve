@@ -882,15 +882,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @change="formDirtyFlag = true"
                 />
 
-                <q-separator class="tw:my-4" />
-
-                <!-- Organization-level cross-links (read-only) -->
-                <CrossLinkManager
-                  :modelValue="orgCrossLinks"
-                  title="Organization-Level Links (Read-Only)"
-                  subtitle="These links are defined at the organization level. Go to Organization Parameters to modify them."
-                  readonly
-                />
+                <!-- Organization-level cross-links (read-only, hidden when empty) -->
+                <template v-if="orgCrossLinks.length > 0">
+                  <q-separator class="tw:my-4" />
+                  <CrossLinkManager
+                    :modelValue="orgCrossLinks"
+                    title="Organization-Level Links (Read-Only)"
+                    subtitle="These links are defined at the organization level. Go to Organization Parameters to modify them."
+                    readonly
+                  />
+                </template>
               </div>
             </div>
 
