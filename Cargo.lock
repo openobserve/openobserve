@@ -613,19 +613,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-compat"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1ba85bc55464dcbf728b56d97e119d673f4cf9062be330a9a26f3acf504a590"
-dependencies = [
- "futures-core",
- "futures-io",
- "once_cell",
- "pin-project-lite",
- "tokio",
-]
-
-[[package]]
 name = "async-compression"
 version = "0.4.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1450,9 +1437,9 @@ dependencies = [
 
 [[package]]
 name = "better_io"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92fde17f91e7ba10b2a07f8dff29530b77144894bc6ae850fbc66e1276af0d28"
+checksum = "ef0a3155e943e341e557863e69a708999c94ede624e37865c8e2a91b94efa78f"
 
 [[package]]
 name = "bigdecimal"
@@ -2350,18 +2337,6 @@ dependencies = [
  "uuid",
  "vortex",
  "vrl",
-]
-
-[[package]]
-name = "console"
-version = "0.15.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "054ccb5b10f9f2cbf51eb355ca1d05c2d279ce1804688d0db74b4733a5aeafd8"
-dependencies = [
- "encode_unicode",
- "libc",
- "once_cell",
- "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3842,9 +3817,9 @@ checksum = "ea8a8b81cacc08888170eef4d13b775126db426d0b348bee9d18c2c1eaf123cf"
 
 [[package]]
 name = "dtype_dispatch"
-version = "0.1.1"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3a5ccdfd6c5e7e2fea9c5cf256f2a08216047fab19c621c3da64e9ae4a1462d"
+checksum = "ab23e69df104e2fd85ee63a533a22d2132ef5975dc6b36f9f3e5a7305e4a8ed7"
 
 [[package]]
 name = "dunce"
@@ -4559,9 +4534,9 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 
 [[package]]
 name = "glob"
-version = "0.3.1"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
+checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "globset"
@@ -4574,18 +4549,6 @@ dependencies = [
  "log",
  "regex-automata",
  "regex-syntax",
-]
-
-[[package]]
-name = "goldenfile"
-version = "1.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ef8d7e733be5a2b7b473a8bf6865d6dda7911ca010241f459439bac27df0013"
-dependencies = [
- "scopeguard",
- "similar-asserts",
- "tempfile",
- "yansi",
 ]
 
 [[package]]
@@ -7387,9 +7350,9 @@ dependencies = [
 
 [[package]]
 name = "pco"
-version = "0.4.7"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "daea1197f2969fab4d5c6620eade5d46c98a8e9b04ad2bc3725fc5dfc4eb8a49"
+checksum = "e89d71ab3c07ed898defa4915bdc2a963131d811a1eab0eeacfac65c94cdeae8"
 dependencies = [
  "better_io",
  "dtype_dispatch",
@@ -8688,12 +8651,6 @@ checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
 
 [[package]]
 name = "relative-path"
-version = "1.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
-
-[[package]]
-name = "relative-path"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bca40a312222d8ba74837cb474edef44b37f561da5f773981007a10bbaa992b0"
@@ -8946,7 +8903,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8bf7840285c321c3ab20e752a9afb95548c75cd7f4632a0627cea3507e310c1"
 dependencies = [
  "hashbrown 0.16.1",
- "relative-path 2.0.1",
+ "relative-path",
  "rquickjs-sys",
 ]
 
@@ -8977,46 +8934,6 @@ dependencies = [
  "spki",
  "subtle",
  "zeroize",
-]
-
-[[package]]
-name = "rstest"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
-dependencies = [
- "futures-timer",
- "futures-util",
- "rstest_macros",
-]
-
-[[package]]
-name = "rstest_macros"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c845311f0ff7951c5506121a9ad75aec44d083c31583b2ea5a30bcb0b0abba0"
-dependencies = [
- "cfg-if",
- "glob",
- "proc-macro-crate 3.2.0",
- "proc-macro2",
- "quote",
- "regex",
- "relative-path 1.9.3",
- "rustc_version",
- "syn 2.0.114",
- "unicode-ident",
-]
-
-[[package]]
-name = "rstest_reuse"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3a8fb4672e840a587a66fc577a5491375df51ddb88f2a2c2a792598c326fe14"
-dependencies = [
- "quote",
- "rand 0.8.5",
- "syn 2.0.114",
 ]
 
 [[package]]
@@ -9847,26 +9764,6 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
-
-[[package]]
-name = "similar"
-version = "2.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
-dependencies = [
- "bstr",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "similar-asserts"
-version = "1.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5b441962c817e33508847a22bd82f03a30cff43642dc2fae8b050566121eb9a"
-dependencies = [
- "console",
- "similar",
-]
 
 [[package]]
 name = "simple_asn1"
@@ -11703,18 +11600,15 @@ dependencies = [
 [[package]]
 name = "vortex"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "vortex-alp",
  "vortex-array",
  "vortex-btrblocks",
  "vortex-buffer",
  "vortex-bytebool",
- "vortex-compute",
- "vortex-cuda-macros",
  "vortex-datetime-parts",
  "vortex-decimal-byte-parts",
- "vortex-dtype",
  "vortex-error",
  "vortex-fastlanes",
  "vortex-file",
@@ -11728,7 +11622,6 @@ dependencies = [
  "vortex-pco",
  "vortex-proto",
  "vortex-runend",
- "vortex-scalar",
  "vortex-scan",
  "vortex-sequence",
  "vortex-session",
@@ -11741,7 +11634,7 @@ dependencies = [
 [[package]]
 name = "vortex-alp"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "itertools 0.14.0",
  "num-traits",
@@ -11749,11 +11642,9 @@ dependencies = [
  "rustc-hash 2.1.0",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-fastlanes",
  "vortex-mask",
- "vortex-scalar",
  "vortex-session",
  "vortex-utils",
 ]
@@ -11761,7 +11652,7 @@ dependencies = [
 [[package]]
 name = "vortex-array"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "arcref",
  "arrow-arith",
@@ -11773,15 +11664,18 @@ dependencies = [
  "arrow-schema",
  "arrow-select",
  "arrow-string",
+ "async-lock",
+ "bytes",
  "cfg-if",
  "enum-iterator",
  "flatbuffers",
  "futures",
  "getrandom 0.3.4",
- "goldenfile",
+ "half",
  "humansize",
  "inventory",
  "itertools 0.14.0",
+ "jiff",
  "multiversion",
  "num-traits",
  "num_enum 0.7.5",
@@ -11790,29 +11684,24 @@ dependencies = [
  "pin-project-lite",
  "prost 0.14.1",
  "rand 0.9.2",
- "rstest",
- "rstest_reuse",
  "rustc-hash 2.1.0",
  "simdutf8",
+ "static_assertions",
  "termtree",
  "tracing",
  "vortex-buffer",
- "vortex-compute",
- "vortex-dtype",
  "vortex-error",
  "vortex-flatbuffers",
  "vortex-mask",
  "vortex-proto",
- "vortex-scalar",
  "vortex-session",
  "vortex-utils",
- "vortex-vector",
 ]
 
 [[package]]
 name = "vortex-btrblocks"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "enum-iterator",
  "getrandom 0.3.4",
@@ -11827,14 +11716,12 @@ dependencies = [
  "vortex-buffer",
  "vortex-datetime-parts",
  "vortex-decimal-byte-parts",
- "vortex-dtype",
  "vortex-error",
  "vortex-fastlanes",
  "vortex-fsst",
  "vortex-mask",
  "vortex-pco",
  "vortex-runend",
- "vortex-scalar",
  "vortex-sequence",
  "vortex-sparse",
  "vortex-utils",
@@ -11845,7 +11732,7 @@ dependencies = [
 [[package]]
 name = "vortex-buffer"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "arrow-buffer",
  "bitvec",
@@ -11858,124 +11745,59 @@ dependencies = [
 [[package]]
 name = "vortex-bytebool"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "num-traits",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
- "vortex-mask",
- "vortex-scalar",
  "vortex-session",
-]
-
-[[package]]
-name = "vortex-compute"
-version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
-dependencies = [
- "arrow-array",
- "arrow-buffer",
- "arrow-schema",
- "half",
- "itertools 0.14.0",
- "multiversion",
- "num-traits",
- "paste",
- "tracing",
- "vortex-buffer",
- "vortex-dtype",
- "vortex-error",
- "vortex-mask",
- "vortex-vector",
-]
-
-[[package]]
-name = "vortex-cuda-macros"
-version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.114",
 ]
 
 [[package]]
 name = "vortex-datetime-parts"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "num-traits",
  "prost 0.14.1",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-mask",
- "vortex-scalar",
  "vortex-session",
 ]
 
 [[package]]
 name = "vortex-decimal-byte-parts"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "num-traits",
  "prost 0.14.1",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-mask",
- "vortex-scalar",
  "vortex-session",
-]
-
-[[package]]
-name = "vortex-dtype"
-version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
-dependencies = [
- "arcref",
- "arrow-buffer",
- "arrow-schema",
- "flatbuffers",
- "half",
- "itertools 0.14.0",
- "jiff",
- "num-traits",
- "num_enum 0.7.5",
- "paste",
- "prost 0.14.1",
- "serde",
- "static_assertions",
- "vortex-buffer",
- "vortex-error",
- "vortex-flatbuffers",
- "vortex-proto",
- "vortex-session",
- "vortex-utils",
 ]
 
 [[package]]
 name = "vortex-error"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "arrow-schema",
  "flatbuffers",
  "jiff",
  "prost 0.14.1",
  "tokio",
- "url",
 ]
 
 [[package]]
 name = "vortex-fastlanes"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "arrayref",
  "fastlanes",
@@ -11985,18 +11807,15 @@ dependencies = [
  "prost 0.14.1",
  "vortex-array",
  "vortex-buffer",
- "vortex-compute",
- "vortex-dtype",
  "vortex-error",
  "vortex-mask",
- "vortex-scalar",
  "vortex-session",
 ]
 
 [[package]]
 name = "vortex-file"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "async-trait",
  "bytes",
@@ -12005,6 +11824,7 @@ dependencies = [
  "getrandom 0.3.4",
  "itertools 0.14.0",
  "kanal",
+ "moka",
  "oneshot",
  "parking_lot 0.12.5",
  "pin-project-lite",
@@ -12018,17 +11838,16 @@ dependencies = [
  "vortex-bytebool",
  "vortex-datetime-parts",
  "vortex-decimal-byte-parts",
- "vortex-dtype",
  "vortex-error",
  "vortex-fastlanes",
  "vortex-flatbuffers",
  "vortex-fsst",
  "vortex-io",
  "vortex-layout",
+ "vortex-mask",
  "vortex-metrics",
  "vortex-pco",
  "vortex-runend",
- "vortex-scalar",
  "vortex-scan",
  "vortex-sequence",
  "vortex-session",
@@ -12041,7 +11860,7 @@ dependencies = [
 [[package]]
 name = "vortex-flatbuffers"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "flatbuffers",
  "vortex-buffer",
@@ -12051,26 +11870,22 @@ dependencies = [
 [[package]]
 name = "vortex-fsst"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "fsst-rs",
- "num-traits",
  "prost 0.14.1",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-mask",
- "vortex-scalar",
  "vortex-session",
 ]
 
 [[package]]
 name = "vortex-io"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
- "async-compat",
  "async-fs",
  "async-stream",
  "async-trait",
@@ -12078,6 +11893,7 @@ dependencies = [
  "custom-labels",
  "futures",
  "getrandom 0.3.4",
+ "glob",
  "handle",
  "kanal",
  "oneshot",
@@ -12097,7 +11913,7 @@ dependencies = [
 [[package]]
 name = "vortex-ipc"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "bytes",
  "flatbuffers",
@@ -12106,7 +11922,6 @@ dependencies = [
  "pin-project-lite",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-flatbuffers",
  "vortex-session",
@@ -12115,7 +11930,7 @@ dependencies = [
 [[package]]
 name = "vortex-layout"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "arcref",
  "async-stream",
@@ -12139,14 +11954,11 @@ dependencies = [
  "vortex-array",
  "vortex-btrblocks",
  "vortex-buffer",
- "vortex-decimal-byte-parts",
- "vortex-dtype",
  "vortex-error",
  "vortex-flatbuffers",
  "vortex-io",
  "vortex-mask",
  "vortex-metrics",
- "vortex-scalar",
  "vortex-sequence",
  "vortex-session",
  "vortex-utils",
@@ -12155,9 +11967,8 @@ dependencies = [
 [[package]]
 name = "vortex-mask"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
- "arrow-buffer",
  "itertools 0.14.0",
  "vortex-buffer",
  "vortex-error",
@@ -12166,34 +11977,31 @@ dependencies = [
 [[package]]
 name = "vortex-metrics"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "getrandom 0.3.4",
  "parking_lot 0.12.5",
  "sketches-ddsketch",
- "vortex-session",
 ]
 
 [[package]]
 name = "vortex-pco"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "pco",
  "prost 0.14.1",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-mask",
- "vortex-scalar",
  "vortex-session",
 ]
 
 [[package]]
 name = "vortex-proto"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "prost 0.14.1",
  "prost-types 0.14.1",
@@ -12202,7 +12010,7 @@ dependencies = [
 [[package]]
 name = "vortex-runend"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "arrow-array",
  "itertools 0.14.0",
@@ -12210,37 +12018,15 @@ dependencies = [
  "prost 0.14.1",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-mask",
- "vortex-scalar",
  "vortex-session",
-]
-
-[[package]]
-name = "vortex-scalar"
-version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
-dependencies = [
- "arrow-array",
- "bytes",
- "itertools 0.14.0",
- "num-traits",
- "paste",
- "prost 0.14.1",
- "vortex-buffer",
- "vortex-dtype",
- "vortex-error",
- "vortex-mask",
- "vortex-proto",
- "vortex-session",
- "vortex-utils",
 ]
 
 [[package]]
 name = "vortex-scan"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -12249,11 +12035,11 @@ dependencies = [
  "futures",
  "itertools 0.14.0",
  "parking_lot 0.12.5",
+ "roaring",
  "sketches-ddsketch",
  "tracing",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-io",
  "vortex-layout",
@@ -12265,25 +12051,22 @@ dependencies = [
 [[package]]
 name = "vortex-sequence"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "num-traits",
  "prost 0.14.1",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-mask",
  "vortex-proto",
- "vortex-runend",
- "vortex-scalar",
  "vortex-session",
 ]
 
 [[package]]
 name = "vortex-session"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "arcref",
  "dashmap",
@@ -12295,24 +12078,22 @@ dependencies = [
 [[package]]
 name = "vortex-sparse"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "itertools 0.14.0",
  "num-traits",
  "prost 0.14.1",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-mask",
- "vortex-scalar",
  "vortex-session",
 ]
 
 [[package]]
 name = "vortex-utils"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "dashmap",
  "hashbrown 0.16.1",
@@ -12320,30 +12101,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "vortex-vector"
-version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
-dependencies = [
- "num-traits",
- "paste",
- "static_assertions",
- "vortex-buffer",
- "vortex-dtype",
- "vortex-error",
- "vortex-mask",
-]
-
-[[package]]
 name = "vortex-zigzag"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-mask",
- "vortex-scalar",
  "vortex-session",
  "zigzag",
 ]
@@ -12351,16 +12116,14 @@ dependencies = [
 [[package]]
 name = "vortex-zstd"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?rev=7f3491d604b1e298b9162e174a20a15cf863ff83#7f3491d604b1e298b9162e174a20a15cf863ff83"
+source = "git+https://github.com/openobserve/vortex?rev=1ca97ea3fadd049ff09561430de9480f74c6c46e#1ca97ea3fadd049ff09561430de9480f74c6c46e"
 dependencies = [
  "itertools 0.14.0",
  "prost 0.14.1",
  "vortex-array",
  "vortex-buffer",
- "vortex-dtype",
  "vortex-error",
  "vortex-mask",
- "vortex-scalar",
  "vortex-session",
  "zstd",
 ]
