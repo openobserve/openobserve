@@ -933,6 +933,9 @@ async function extractFields() {
 
       // Ignoring timestamp as start time is present
       let fields: any = {};
+      const schemaTypeMap = new Map(
+        schema.map((row: any) => [row.name, row.field_type]),
+      );
       Object.keys(importantFields).forEach((rowName) => {
         if (fields[rowName] == undefined) {
           fields[rowName] = {};
@@ -941,6 +944,7 @@ async function extractFields() {
             ftsKey: ftsKeys.has(rowName),
             showValues: !idFields[rowName],
             label: rowName === "duration" ? "duration (µs)" : rowName,
+            dataType: schemaTypeMap.get(rowName),
           });
         }
       });
@@ -955,6 +959,7 @@ async function extractFields() {
               name: row.name,
               ftsKey: ftsKeys.has(row.name),
               showValues: !idFields[row.name],
+              dataType: row.field_type,
             });
           }
         }

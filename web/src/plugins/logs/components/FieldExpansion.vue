@@ -39,15 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="display: inline-block"
           >
             <span v-if="field.dataType" class="field-type-container" :title="field.dataType">
-              <span
-                class="field-type-badge"
-                :style="{
-                  backgroundColor: fieldTypeInfo.color,
-                  color: fieldTypeInfo.textColor,
-                }"
-              >
-                {{ fieldTypeInfo.label }}
-              </span>
+              <FieldTypeBadge :dataType="field.dataType" />
               <q-icon
                 class="field-expand-icon"
                 :name="isExpanded ? 'expand_less' : 'expand_more'"
@@ -348,6 +340,7 @@ import {
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber } from "@/utils/zincutils";
+import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 
 interface Props {
   field: any;
@@ -421,39 +414,6 @@ const isFieldSelected = computed(() =>
   props.selectedFields.includes(props.field.name),
 );
 
-const fieldTypeInfo = computed(() => {
-  const t = (props.field.dataType || "").toLowerCase();
-  if (t === "boolean")
-    return {
-      label: "B",
-      color: "var(--o2-field-type-boolean-bg)",
-      textColor: "var(--o2-field-type-boolean-text)",
-    };
-  if (t.includes("float"))
-    return {
-      label: "~",
-      color: "var(--o2-field-type-float-bg)",
-      textColor: "var(--o2-field-type-float-text)",
-    };
-  if (t.includes("int") || t.includes("uint"))
-    return {
-      label: "#",
-      color: "var(--o2-field-type-number-bg)",
-      textColor: "var(--o2-field-type-number-text)",
-    };
-  if (t.includes("timestamp") || t === "date32" || t === "date64")
-    return {
-      label: "T",
-      color: "var(--o2-field-type-timestamp-bg)",
-      textColor: "var(--o2-field-type-timestamp-text)",
-    };
-  return {
-    label: "S",
-    color: "var(--o2-field-type-string-bg)",
-    textColor: "var(--o2-field-type-string-text)",
-  };
-});
-
 watchDebounced(
   valueSearchTerm,
   (term) => {
@@ -494,6 +454,11 @@ const handleApplyMultiSelect = (action: string) => {
 </script>
 
 <style scoped lang="scss">
+:deep(.q-expansion-item__container .q-item) {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
 .field_overlay {
   position: absolute;
   right: 0;
@@ -512,21 +477,9 @@ const handleApplyMultiSelect = (action: string) => {
   width: 1rem;
   height: 1rem;
   margin-right: 0.3rem;
+  margin-left: 0.1rem;
   flex-shrink: 0;
   vertical-align: middle;
-}
-
-.field-type-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 0.2rem;
-  font-size: 0.6rem;
-  font-weight: 800;
-  color: #fff;
-  transition: opacity 0.15s ease;
 }
 
 .field-expand-icon {
@@ -541,6 +494,7 @@ const handleApplyMultiSelect = (action: string) => {
 
 .field-expansion-header:hover .field-expand-icon {
   opacity: 1;
+  left: -2px;
 }
 
 :deep(.q-expansion-item):hover .field_overlay {
