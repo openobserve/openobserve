@@ -432,6 +432,50 @@ pub enum NotificationStrategy {
     None,
 }
 
+/// Outcome of correlating an alert to an incident.
+///
+/// Used by the scheduler to decide whether and how to send a notification
+/// when an alert with `creates_incident=true` fires.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IncidentCorrelationOutcome {
+    /// A brand new incident was created for this alert firing.
+    /// Notification should be sent.
+    NewIncidentCreated {
+        incident_id: String,
+        service_name: String,
+    },
+    /// This alert type appeared in an existing incident for the first time.
+    /// Notification should be sent.
+    NewAlertTypeJoined {
+        incident_id: String,
+        service_name: String,
+    },
+    /// This alert type already existed in the incident — repeated firing.
+    /// Notification should be suppressed.
+    ExistingAlertRepeated {
+        incident_id: String,
+        service_name: String,
+    },
+}
+
+impl IncidentCorrelationOutcome {
+    pub fn incident_id(&self) -> &str {
+        match self {
+            Self::NewIncidentCreated { incident_id, .. }
+            | Self::NewAlertTypeJoined { incident_id, .. }
+            | Self::ExistingAlertRepeated { incident_id, .. } => incident_id,
+        }
+    }
+
+    pub fn service_name(&self) -> &str {
+        match self {
+            Self::NewIncidentCreated { service_name, .. }
+            | Self::NewAlertTypeJoined { service_name, .. }
+            | Self::ExistingAlertRepeated { service_name, .. } => service_name,
+        }
+    }
+}
+
 fn default_time_window() -> u64 {
     60
 }

@@ -60,6 +60,7 @@ export interface Alert {
       group_wait_seconds: number;
     };
   };
+  creates_incident?: boolean;
 }
 
 // Alert object which is modified in frontend to display in table and form

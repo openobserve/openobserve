@@ -837,9 +837,10 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     let (success_message, err_message) = alert.send_notification(&[], now, None, now).await?;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .incidents
-        .enabled
+    if alert.creates_incident
+        && o2_enterprise::enterprise::common::config::get_config()
+            .incidents
+            .enabled
     {
         // Create synthetic result row with alert metadata
         let synthetic_row = config::utils::json::json!({
@@ -854,18 +855,18 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         match crate::service::alerts::incidents::correlate_alert_to_incident(
             &alert,
             synthetic_row,
+            &[], // manual trigger: notification already sent above, don't double-send
             now,
-            None,
         )
         .await
         {
-            Ok(Some((incident_id, service_name))) => {
+            Ok(Some(outcome)) => {
                 log::info!(
                     "Manual trigger for alert {}/{} correlated to incident {} (service: {})",
                     org_id,
                     &alert.name,
-                    incident_id,
-                    service_name
+                    outcome.incident_id(),
+                    outcome.service_name(),
                 );
             }
             Ok(None) => {
@@ -902,9 +903,10 @@ pub async fn trigger_by_name(
 
     // [ENTERPRISE] Create incident for manual trigger
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .incidents
-        .enabled
+    if alert.creates_incident
+        && o2_enterprise::enterprise::common::config::get_config()
+            .incidents
+            .enabled
     {
         // Create synthetic result row with alert metadata
         let synthetic_row = config::utils::json::json!({
@@ -918,18 +920,18 @@ pub async fn trigger_by_name(
         match crate::service::alerts::incidents::correlate_alert_to_incident(
             &alert,
             synthetic_row,
+            &[], // manual trigger: notification already sent above, don't double-send
             now,
-            None,
         )
         .await
         {
-            Ok(Some((incident_id, service_name))) => {
+            Ok(Some(outcome)) => {
                 log::info!(
                     "Manual trigger for alert {}/{} correlated to incident {} (service: {})",
                     org_id,
                     &alert.name,
-                    incident_id,
-                    service_name
+                    outcome.incident_id(),
+                    outcome.service_name(),
                 );
             }
             Ok(None) => {
@@ -1101,6 +1103,22 @@ impl AlertExt for Alert {
         } else {
             Ok((success_message, err_message))
         }
+    }
+}
+
+/// Send a pre-built message string to a single destination type.
+///
+/// Used by incident notifications, which build their own payload rather than
+/// going through the alert template system.
+pub(crate) async fn dispatch_notification(
+    dest_type: &DestinationType,
+    subject: &str,
+    msg: String,
+) -> Result<String, anyhow::Error> {
+    match dest_type {
+        DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
+        DestinationType::Email(email) => send_email_notification(subject, email, msg).await,
+        DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
     }
 }
 
