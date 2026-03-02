@@ -69,6 +69,7 @@ const defaultObject = {
       wrapCells: false,
       manualRemoveFields: false,
       rowsPerPage: 25,
+      showPagination: false,
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {

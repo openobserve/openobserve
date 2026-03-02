@@ -304,6 +304,8 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
 // Track the current search stream so we can cancel it when a new search starts
 let currentSearchTraceId: string | null = null;
+// The processed WHERE clause from the last buildSearch() call — used for the count query
+let builtWhereClause = "";
 
 searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
 
@@ -592,11 +594,13 @@ function buildSearch() {
         .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
         .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
 
+      builtWhereClause = whereClause;
       req.query.sql = req.query.sql.replace(
         "[WHERE_CLAUSE]",
         " WHERE " + whereClause,
       );
     } else {
+      builtWhereClause = "";
       req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
     }
 
@@ -622,6 +626,50 @@ function buildSearch() {
   }
 }
 
+function fetchTracesCount() {
+  const queryReq = searchObj.data.queryPayload;
+  if (!queryReq || !selectedStreamName.value) return;
+
+  const streamName = selectedStreamName.value;
+  const countSql = `select approx_distinct(trace_id) as trace_count FROM "${streamName}"${builtWhereClause ? " WHERE " + builtWhereClause : ""}`;
+  const countTraceId = getUUID().replace(/-/g, "");
+
+  fetchQueryDataWithHttpStream(
+    {
+      queryReq: {
+        query: {
+          sql: b64EncodeUnicode(countSql),
+          start_time: queryReq.query.start_time,
+          end_time: queryReq.query.end_time,
+          from: 0,
+          size: 1,
+        },
+        encoding: "base64",
+      },
+      type: "search",
+      pageType: "traces",
+      searchType: "ui",
+      traceId: countTraceId,
+      org_id: searchObj.organizationIdentifier,
+    },
+    {
+      data: (_payload: any, response: any) => {
+        const hits: any[] = response.content?.results?.hits || [];
+        if (hits.length > 0) {
+          const count = hits[0]?.trace_count ?? 0;
+          searchObj.data.queryResults.total = count;
+          searchObj.meta.resultGrid.showPagination = count > 0;
+        }
+      },
+      error: (_payload: any, _err: any) => {
+        console.error("Failed to fetch traces count");
+      },
+      complete: (_payload: any) => {},
+      reset: (_payload: any) => {},
+    },
+  );
+}
+
 const showTraceDetailsError = () => {
   showErrorNotification(
     `Trace ${router.currentRoute.value.query.trace_id} not found`,
@@ -635,20 +683,6 @@ const showTraceDetailsError = () => {
     },
   });
   return;
-};
-
-const buildTraceSearchQuery = (trace: string) => {
-  const req = getDefaultRequest();
-  req.query.from = 0;
-  req.query.size = 1000;
-  req.query.start_time = trace.trace_start_time - 30000000;
-  req.query.end_time = trace.trace_end_time + 30000000;
-
-  req.query.sql = b64EncodeUnicode(
-    `SELECT * FROM "${selectedStreamName.value}" WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
-  );
-
-  return req;
 };
 
 const updateFieldValues = (data) => {
@@ -680,10 +714,9 @@ async function getQueryData() {
     searchObj.data.errorDetail = "";
 
     searchObj.searchApplied = true;
+    searchObj.loading = true;
 
     if (searchObj.data.resultGrid.currentPage == 0) {
-      searchObj.loading = true;
-      searchObj.data.queryResults = {};
       searchObj.data.sortedQueryResults = [];
       searchObj.data.histogram = {
         layout: {},
@@ -709,23 +742,6 @@ async function getQueryData() {
       searchObj.data.resultGrid.currentPage *
       searchObj.meta.resultGrid.rowsPerPage;
 
-    let dismiss = null;
-    if (searchObj.data.resultGrid.currentPage) {
-      dismiss = $q.notify({
-        type: "positive",
-        message: t("traces.fetchingMoreTraces"),
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      });
-    }
-
     // Filters are already in editorValue (set by metrics dashboard brush selections)
     const filter = searchObj.data.editorValue.trim();
     const combinedFilter = filter;
@@ -745,16 +761,15 @@ async function getQueryData() {
     const searchTraceId = getUUID().replace(/-/g, "");
     currentSearchTraceId = searchTraceId;
 
-    // Initialise results container on the first page
-    if (queryReq.query.from === 0) {
-      searchObj.data.queryResults = {
-        hits: [],
-        total: 0,
-        from: 0,
-        size: queryReq.query.size,
-        took: 0,
-      };
-    }
+    // Reset hits for every page; preserve total (set by count query) on page > 0
+    searchObj.data.queryResults = {
+      hits: [],
+      total:
+        queryReq.query.from > 0 ? (searchObj.data.queryResults.total ?? 0) : 0,
+      from: queryReq.query.from,
+      size: queryReq.query.size,
+      took: 0,
+    };
 
     fetchQueryDataWithHttpStream(
       {
@@ -800,26 +815,8 @@ async function getQueryData() {
             }
 
             const formattedHits = formatTracesMetaData(rawHits);
-            if (!searchObj.data.queryResults.hits) {
-              searchObj.data.queryResults = {
-                hits: [],
-                total: 0,
-                from: queryReq.query.from,
-                size: queryReq.query.size,
-                took: 0,
-              };
-            }
             searchObj.data.queryResults.hits.push(...formattedHits);
-            // Keep queryResults.from in sync so SearchResult.vue's onScroll gate
-            // (currentPage <= queryResults.from / rowsPerPage) allows further pages.
             searchObj.data.queryResults.from = queryReq.query.from;
-            // Use backend total when available (cumulative across partitions);
-            // fall back to hits.length only if not provided.
-            const backendTotal = response.content?.results?.total;
-            searchObj.data.queryResults.total =
-              backendTotal != null
-                ? backendTotal
-                : searchObj.data.queryResults.hits.length;
 
             updateFieldValues(rawHits);
             updateGridColumns();
@@ -827,7 +824,6 @@ async function getQueryData() {
         },
         error: (_payload: any, err: any) => {
           searchObj.loading = false;
-          if (dismiss) dismiss();
 
           const errData = err?.content || err;
           const { message, trace_id, code, error_detail } = errData ?? {};
@@ -847,8 +843,10 @@ async function getQueryData() {
         },
         complete: (_payload: any) => {
           searchObj.loading = false;
-          if (dismiss) dismiss();
           currentSearchTraceId = null;
+          if (queryReq.query.from === 0) {
+            fetchTracesCount();
+          }
         },
         reset: (_payload: any) => {
           searchObj.data.queryResults = {};

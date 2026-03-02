@@ -69,8 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.searchApplied
           )
         "
+        :current-page="searchObj.data.resultGrid.currentPage + 1"
+        :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
+        :show-pagination="searchObj.meta.resultGrid.showPagination"
         @row-click="expandRowDetail"
-        @load-more="loadMore"
+        @page-change="changePage"
+        @rows-per-page-change="changeRowsPerPage"
       />
     </div>
   </div>
@@ -165,7 +169,7 @@ export default defineComponent({
     };
 
     // -----------------------------------------------------------------------
-    // Infinite scroll
+    // Pagination
     // -----------------------------------------------------------------------
     const hits = computed<any[]>(() => searchObj.data.queryResults?.hits ?? []);
 
@@ -176,16 +180,17 @@ export default defineComponent({
       ),
     );
 
-    function loadMore() {
-      if (
-        searchObj.loading == false &&
-        searchObj.data.resultGrid.currentPage *
-          searchObj.meta.resultGrid.rowsPerPage <
-          searchObj.data.queryResults.total
-      ) {
-        searchObj.data.resultGrid.currentPage += 1;
-        emit("update:scroll");
-      }
+    function changePage(page: number) {
+      if (searchObj.loading) return;
+      searchObj.data.resultGrid.currentPage = page - 1;
+      emit("update:scroll");
+    }
+
+    function changeRowsPerPage(val: number) {
+      if (searchObj.loading) return;
+      searchObj.meta.resultGrid.rowsPerPage = val;
+      searchObj.data.resultGrid.currentPage = 0;
+      emit("update:scroll");
     }
 
     return {
@@ -200,7 +205,8 @@ export default defineComponent({
       getDashboardData,
       hits,
       searchPerformed,
-      loadMore,
+      changePage,
+      changeRowsPerPage,
     };
   },
 });
