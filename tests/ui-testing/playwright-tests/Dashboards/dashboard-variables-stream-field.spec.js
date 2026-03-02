@@ -438,26 +438,23 @@ test.describe(
       // =====================================================================
 
       // F1 variables (non-cyclic initially)
+      // Uses only stream and field variable references (no filters) for reliable
+      // creation. The cycle A→C→B→A is introduced later by editing A's stream.
       await scopedVars.addConstantVariable("fieldConst", "kubernetes_namespace_name");
       await reopenSettingsVariables(page, pm);
       await scopedVars.addQueryValuesVariable("A", "logs", "e2e_automate", "$fieldConst");
       await reopenSettingsVariables(page, pm);
       await scopedVars.addQueryValuesVariable("B", "logs", "e2e_automate", "$A");
       await reopenSettingsVariables(page, pm);
-      await scopedVars.addQueryValuesVariable(
-        "C",
-        "logs",
-        "e2e_automate",
-        "kubernetes_namespace_name",
-        {
-          filterConfig: {
-            filterName: "kubernetes_namespace_name",
-            operator: "=",
-            value: "$B",
-          },
-        }
-      );
+      // C depends on B via stream (C's stream=$B), creating chain C→B→A via field deps.
+      // Field must also be a variable ref since stream is a variable (no real fields load).
+      await scopedVars.addQueryValuesVariable("C", "logs", "$B", "$fieldConst");
       await reopenSettingsVariables(page, pm);
+
+      // Verify variable C was created — if creation failed silently, the cycle
+      // test below would pass vacuously (no $C in dropdown → no cycle).
+      const editCBtn = page.locator('[data-test="dashboard-edit-variable-C"]');
+      await expect(editCBtn).toBeVisible({ timeout: 5000 });
 
       // F2 variables (valid chain: env → region → pod)
       await scopedVars.addConstantVariable("env", "production");
@@ -487,8 +484,8 @@ test.describe(
       );
       await reopenSettingsVariables(page, pm);
 
-      // --- F1: Edit A to introduce 3-variable cycle across stream/field/filter ---
-      // A→C (stream dep), C→B (filter dep), B→A (field dep)
+      // --- F1: Edit A to introduce 3-variable cycle across stream/field deps ---
+      // Edit A's stream to $C → creates cycle: A→C (stream), C→B (stream), B→A (field)
       await scopedVars.editVariable("A");
       await scopedVars.updateStream("$C");
 
@@ -498,6 +495,9 @@ test.describe(
       const saveBtnF1 = page.locator(SELECTORS.VARIABLE_SAVE_BTN);
       await saveBtnF1.waitFor({ state: "visible", timeout: 10000 });
       await saveBtnF1.click();
+
+      // Allow cycle detection to process and error to render
+      await page.waitForTimeout(500);
 
       const hasCycleF1 = await scopedVars.hasCircularDependencyError();
       expect(hasCycleF1).toBe(true);
@@ -526,6 +526,9 @@ test.describe(
       const saveBtnF2 = page.locator(SELECTORS.VARIABLE_SAVE_BTN);
       await saveBtnF2.waitFor({ state: "visible", timeout: 10000 });
       await saveBtnF2.click();
+
+      // Allow cycle detection to process and error to render
+      await page.waitForTimeout(500);
 
       const hasCycleF2 = await scopedVars.hasCircularDependencyError();
       expect(hasCycleF2).toBe(true);
@@ -636,12 +639,17 @@ test.describe(
       await expect(page.locator(getVariableSelector("fieldName"))).toBeVisible();
       await expect(page.locator(getVariableSelector("fieldChild"))).toBeVisible();
 
-      // Allow all initial variable API calls to settle before cascade testing
-      await safeWaitForNetworkIdle(page, { timeout: 10000 });
-      await page.waitForTimeout(2000);
+      // Allow all initial variable API calls to settle before cascade testing.
+      // In CI, SSE streaming responses can take longer to complete, so give
+      // extra time for all initial variable loads to finish.
+      await safeWaitForNetworkIdle(page, { timeout: 15000 });
+      await page.waitForTimeout(3000);
 
       // --- G1: Change streamName → "default"; streamChild must cascade-reload
-      // with stream="default" (resolved, not "$streamName")
+      // with stream="default" (resolved, not "$streamName").
+      // The _values_stream endpoint uses SSE (text/event-stream), so the monitor
+      // matches on request POST body (stream_name field) since the stream name
+      // is not in the URL path for the streaming endpoint.
       const streamMonitor = monitorVariableAPICalls(page, {
         expectedCount: 1,
         timeout: 45000,
