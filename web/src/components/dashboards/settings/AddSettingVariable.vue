@@ -1811,4 +1811,34 @@ export default defineComponent({
   border-top: 1px solid #eee;
   box-shadow: rgb(240, 240, 240) 0px -4px 7px 0px;
 }
+
+.theme-dark {
+  .sticky-footer {
+    border-top: 1px solid #333;
+    box-shadow: rgb(20, 20, 20) 0px -4px 7px 0px;
+  }
+
+  .multi-select-default-value-toggle {
+    .button {
+      background-color: rgba(255, 255, 255, 0.08);
+      color: #e0e0e0;
+    }
+
+    .button-left,
+    .button-right {
+      color: #e0e0e0;
+    }
+  }
+
+  .multi-select-default-value {
+    color: #999;
+  }
+
+  .scrollable-content {
+    &::-webkit-scrollbar-thumb {
+      background: #4b5563;
+    }
+    scrollbar-color: #4b5563 transparent;
+  }
+}
 </style>

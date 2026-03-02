@@ -766,6 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="isAddVariableOpen"
       class="add-variable-drawer-overlay"
+      :class="store.state.theme === 'dark' ? 'theme-dark' : 'theme-light'"
       @click.self="handleCloseAddVariable"
     >
       <div class="add-variable-drawer-panel tw:px-4 tw:pt-4">
