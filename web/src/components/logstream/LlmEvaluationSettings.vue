@@ -413,7 +413,7 @@ export default defineComponent({
           {
             id: inputNodeId,
             io_type: "input",
-            position: { x: 25, y: 3.125 },
+            position: { x: 300, y: 50 },
             data: {
               node_type: "stream",
               org_id: orgId,
@@ -424,7 +424,7 @@ export default defineComponent({
           {
             id: evalNodeId,
             io_type: "default",
-            position: { x: 37.5, y: 13.75 },
+            position: { x: 500, y: 250 },
             data: {
               node_type: "llm_evaluation",
               name: "evaluate",
@@ -436,7 +436,7 @@ export default defineComponent({
           {
             id: passthroughOutputId,
             io_type: "output",
-            position: { x: 12.5, y: 23.75 },
+            position: { x: 100, y: 450 },
             data: {
               node_type: "stream",
               org_id: orgId,
@@ -447,7 +447,7 @@ export default defineComponent({
           {
             id: evalOutputId,
             io_type: "output",
-            position: { x: 43.75, y: 23.75 },
+            position: { x: 500, y: 450 },
             data: {
               node_type: "stream",
               org_id: orgId,

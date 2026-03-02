@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="llm-evaluation-node-section"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-    class="llm-evaluation-section"
+    style="width: 100%; height: 100%"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between">
       {{ t("pipeline.llmEvaluation") }}
@@ -28,10 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-separator />
 
-    <div class="stream-routing-container full-width q-pt-md q-pb-md q-px-md">
+    <div class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md">
       <q-form @submit="saveLlmEvaluationNode">
         <!-- Node Name -->
-        <div class="o2-input full-width q-mb-md">
+        <div class="o2-input full-width q-py-sm">
           <q-input
             v-model="nodeName"
             :label="t('pipeline.nodeName') + ' *'"
@@ -48,102 +48,110 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- LLM Span Identifier -->
-        <div class="q-mb-md">
-          <div class="text-subtitle1 q-mb-sm">{{ t("pipeline.llmSpanIdentifier") }}</div>
-          <div class="o2-input full-width">
-            <q-select
-              v-model="llmSpanIdentifier"
-              :options="filteredStreamFields"
-              :label="t('pipeline.llmSpanIdentifierLabel')"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              use-input
-              input-debounce="300"
-              emit-value
-              map-options
-              :loading="loadingFields"
-              @filter="filterStreamFields"
-              data-test="llm-evaluation-span-identifier-select"
-            >
-              <template v-slot:no-option>
-                <q-item>
-                  <q-item-section class="text-grey">
-                    {{ t("pipeline.noFieldsFound") }}
-                  </q-item-section>
-                </q-item>
-              </template>
-            </q-select>
-          </div>
-          <div class="text-caption text-grey-7 q-mt-xs">
-            {{ t("pipeline.llmSpanIdentifierHelp") }}
-          </div>
+        <div class="o2-input full-width q-py-sm">
+          <q-select
+            v-model="llmSpanIdentifier"
+            :options="filteredStreamFields"
+            :label="t('pipeline.llmSpanIdentifierLabel')"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm showLabelOnTop no-case"
+            stack-label
+            outlined
+            filled
+            dense
+            use-input
+            input-debounce="300"
+            emit-value
+            map-options
+            :loading="loadingFields"
+            @filter="filterStreamFields"
+            data-test="llm-evaluation-span-identifier-select"
+          >
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  {{ t("pipeline.noFieldsFound") }}
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
         </div>
 
-        <!-- Sampling Section -->
-        <div class="q-mb-md">
-          <div class="text-subtitle1 q-mb-sm">{{ t("pipeline.samplingConfig") }}</div>
+        <!-- Enable Sampling Toggle -->
+        <q-toggle
+          v-model="enableSampling"
+          :label="t('pipeline.enableSampling')"
+          class="q-mb-sm tw:h-[36px] o2-toggle-button-lg -tw:ml-4"
+          size="lg"
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+          data-test="llm-evaluation-enable-sampling-toggle"
+        />
 
-          <!-- Enable Sampling Toggle -->
-          <q-toggle
-            v-model="enableSampling"
-            :label="t('pipeline.enableSampling')"
-            class="q-mb-md tw:h-[36px] o2-toggle-button-lg -tw:ml-4"
-            size="lg"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-            data-test="llm-evaluation-enable-sampling-toggle"
-          />
-
-          <!-- Sampling Rate -->
-          <div v-if="enableSampling" class="q-mb-md">
-            <div class="text-body2 q-mb-sm">
-              {{ t("pipeline.samplingRate") }}: {{ (samplingRate * 100).toFixed(0) }}%
-            </div>
-            <q-slider
-              v-model="samplingRate"
-              :min="0"
-              :max="1"
-              :step="0.01"
-              color="primary"
-              label
-              :label-value="(samplingRate * 100).toFixed(0) + '%'"
-              data-test="llm-evaluation-sampling-rate-slider"
-            />
-            <div class="text-caption text-grey-7">
-              {{ t("pipeline.samplingRateHelp") }}
-            </div>
+        <!-- Sampling Rate -->
+        <div v-if="enableSampling" class="q-px-xs q-mb-sm">
+          <div class="text-body2 q-mb-sm">
+            {{ t("pipeline.samplingRate") }}: {{ (samplingRate * 100).toFixed(0) }}%
           </div>
+          <q-slider
+            v-model="samplingRate"
+            :min="0"
+            :max="1"
+            :step="0.01"
+            color="primary"
+            label
+            :label-value="(samplingRate * 100).toFixed(0) + '%'"
+            data-test="llm-evaluation-sampling-rate-slider"
+          />
         </div>
 
         <!-- Action Buttons -->
-        <div class="flex justify-center q-mt-lg">
+        <div
+          class="flex justify-start full-width q-mt-sm"
+          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        >
           <q-btn
-            v-close-popup="true"
-            class="text-bold"
-            :label="t('pipeline.cancel')"
-            text-color="light-text"
-            padding="sm md"
+            v-if="pipelineObj.isEditNode"
+            data-test="llm-evaluation-delete-btn"
+            class="o2-secondary-button tw:h-[36px] q-mr-md"
+            color="negative"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
-            @click="$emit('cancel:hideform')"
+            @click="openDeleteDialog"
+          >
+            <q-icon name="delete" class="q-mr-xs" />
+            {{ t('pipeline.deleteNode') }}
+          </q-btn>
+          <q-btn
             data-test="llm-evaluation-cancel-btn"
+            class="o2-secondary-button tw:h-[36px]"
+            :label="t('alerts.cancel')"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            @click="openCancelDialog"
           />
           <q-btn
             data-test="llm-evaluation-save-btn"
-            :label="t('pipeline.save')"
-            class="text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            type="submit"
+            :label="t('alerts.save')"
+            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
             no-caps
+            type="submit"
           />
         </div>
       </q-form>
     </div>
   </div>
+  <confirm-dialog
+    v-model="dialog.show"
+    :title="dialog.title"
+    :message="dialog.message"
+    @update:ok="dialog.okCallback"
+    @update:cancel="dialog.show = false"
+  />
 </template>
 
 <script lang="ts">
@@ -153,15 +161,17 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 export default defineComponent({
   name: "LlmEvaluation",
+  components: { ConfirmDialog },
   emits: ["cancel:hideform"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
     const q = useQuasar();
-    const { addNode, pipelineObj } = useDragAndDrop();
+    const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
     const { getStream } = useStreams();
 
     const nodeName = ref("");
@@ -171,6 +181,13 @@ export default defineComponent({
     const streamFields = ref<{ label: string; value: string }[]>([]);
     const filteredStreamFields = ref<{ label: string; value: string }[]>([]);
     const loadingFields = ref(false);
+
+    const dialog = ref({
+      show: false,
+      title: "",
+      message: "",
+      okCallback: () => {},
+    });
 
     const fetchSourceStreamFields = async () => {
       loadingFields.value = true;
@@ -215,7 +232,9 @@ export default defineComponent({
     };
 
     onMounted(async () => {
-      // If editing existing node, populate form
+      if (pipelineObj.userSelectedNode) {
+        pipelineObj.userSelectedNode = {};
+      }
       if (pipelineObj.isEditNode && pipelineObj.currentSelectedNodeData) {
         const data = pipelineObj.currentSelectedNodeData.data;
         nodeName.value = data.name || "";
@@ -224,18 +243,38 @@ export default defineComponent({
         if (data.sampling_rate !== undefined && data.sampling_rate !== null && data.sampling_rate > 0) {
           enableSampling.value = true;
           samplingRate.value = data.sampling_rate;
+        } else {
+          enableSampling.value = false;
         }
       } else {
-        // Default name for new node
         nodeName.value = "evaluate";
       }
 
-      // Fetch source stream fields for the dropdown
       await fetchSourceStreamFields();
     });
 
+    const openCancelDialog = () => {
+      dialog.value.show = true;
+      dialog.value.title = t("pipeline.discardChangesTitle");
+      dialog.value.message = t("pipeline.cancelChangesConfirm");
+      dialog.value.okCallback = () => emit("cancel:hideform");
+      pipelineObj.userClickedNode = {};
+      pipelineObj.userSelectedNode = {};
+    };
+
+    const openDeleteDialog = () => {
+      dialog.value.show = true;
+      dialog.value.title = t("pipeline.deleteNodeTitle");
+      dialog.value.message = t("pipeline.deleteNodeLlmEvalConfirm");
+      dialog.value.okCallback = deleteNode;
+    };
+
+    const deleteNode = () => {
+      deletePipelineNode(pipelineObj.currentSelectedNodeID);
+      emit("cancel:hideform");
+    };
+
     const saveLlmEvaluationNode = () => {
-      // Validate node name
       if (!nodeName.value || nodeName.value.trim() === "") {
         q.notify({
           type: "negative",
@@ -245,7 +284,6 @@ export default defineComponent({
         return;
       }
 
-      // Prepare node data
       const nodeData: any = {
         name: nodeName.value.trim(),
         node_type: "llm_evaluation",
@@ -254,7 +292,6 @@ export default defineComponent({
         sampling_rate: enableSampling.value ? samplingRate.value : 0.0,
       };
 
-      // Add node to canvas (works for both new and edit)
       addNode(nodeData);
 
       q.notify({
@@ -277,27 +314,19 @@ export default defineComponent({
       loadingFields,
       filterStreamFields,
       saveLlmEvaluationNode,
+      openCancelDialog,
+      openDeleteDialog,
+      deleteNode,
+      dialog,
       pipelineObj,
     };
   },
 });
 </script>
 
-<style lang="scss" scoped>
-.llm-evaluation-section {
-  width: 31.25rem;
-  max-height: 90vh;
-  overflow: auto;
-}
-
+<style lang="scss">
 .stream-routing-title {
-  font-size: 1rem;
-  font-weight: 600;
-  padding: 1rem 0;
-}
-
-.stream-routing-container {
-  max-height: calc(90vh - 6.25rem);
-  overflow-y: auto;
+  font-size: 18px;
+  padding-top: 16px;
 }
 </style>
