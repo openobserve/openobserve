@@ -36,14 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   Events:
     row-click   — emitted when the user clicks a row
-    load-more   — emitted when the user scrolls within 300px of the bottom
-                  (use this to trigger server-side fetching of more pages)
 -->
 <template>
   <div
     ref="scrollerRef"
     class="tw:flex tw:flex-col tw:h-full tw:overflow-y-auto tw:overflow-x-auto"
-    @scroll.passive="handleScroll"
   >
     <!-- ── Sticky header ─────────────────────────────────────────────────── -->
     <div
@@ -136,7 +133,6 @@ import {
   type Column,
 } from "@tanstack/vue-table";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import { debounce } from "quasar";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Props & emits
@@ -162,8 +158,6 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   "row-click": [row: T];
-  /** Fired when the user scrolls within 300px of the bottom. */
-  "load-more": [];
 }>();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -197,13 +191,6 @@ const rowVirtualizer = useVirtualizer(
   })),
 );
 
-const handleScroll = debounce(function () {
-  const el = scrollerRef.value;
-  if (!el) return;
-  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 300) {
-    emit("load-more");
-  }
-}, 300);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column sizing helpers

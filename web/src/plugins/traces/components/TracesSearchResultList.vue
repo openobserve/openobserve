@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:mx-auto tw:block"
         />
         <span class="text-center">
-          {{ t('traces.fetchingTraces') }}
+          {{ t("traces.fetchingTraces") }}
         </span>
       </div>
     </div>
@@ -38,7 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="noResults"
       class="text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
     >
-      <q-icon name="info" color="primary" size="md" /> {{ t('traces.noTracesFoundAdjust') }}
+      <q-icon name="info" color="primary" size="md" />
+      {{ t("traces.noTracesFoundAdjust") }}
     </div>
 
     <!-- ════════════════════ Traces List Section ════════════════════ -->
@@ -48,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="traces-table-wrapper"
       class="column tw:h-full tw:flex-1 tw:min-h-0"
     >
-      <!-- Section header: title + count badge -->
+      <!-- Section header: title + count badge + pagination -->
       <div
         v-if="showHeader"
         data-test="traces-section-header"
@@ -58,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-section-title"
           class="tw:text-[0.75rem] tw:font-bold tw:tracking-[0.0625rem]! tw:text-[var(--o2-text-1)]! tw:mr-[0.85rem]"
         >
-          {{ t('traces.tracesTitle') }}
+          {{ t("traces.tracesTitle") }}
         </span>
         <q-badge
           data-test="traces-count-badge"
@@ -66,6 +67,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="`${props.total != null ? props.total : hits.length} ${t('traces.tracesFound')}`"
           class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
         />
+
+        <q-space />
+
+        <!-- Pagination -->
+        <template v-if="showPagination">
+          <q-select
+            :model-value="rowsPerPage"
+            :options="rowsPerPageOptions"
+            class="select-pagination tw:mr-[0.25rem] tw:border-0!"
+            size="sm"
+            dense
+            borderless
+            data-test="traces-search-result-records-per-page"
+            @update:model-value="emit('rows-per-page-change', $event)"
+          />
+          <q-pagination
+            :disable="loading"
+            :model-value="currentPage"
+            :max="totalPages"
+            :input="false"
+            direction-links
+            :boundary-numbers="false"
+            :max-pages="5"
+            :ellipses="false"
+            icon-first="skip_previous"
+            icon-last="skip_next"
+            icon-prev="fast_rewind"
+            icon-next="fast_forward"
+            class="float-right paginator-section"
+            data-test="traces-search-result-pagination"
+            @update:model-value="emit('page-change', $event)"
+          />
+        </template>
       </div>
 
       <!-- Table scroll area -->
@@ -78,7 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows="hits"
           :row-class="traceRowClass"
           @row-click="(row: any) => emit('row-click', row)"
-          @load-more="emit('load-more')"
         >
           <template #cell-timestamp="{ item }">
             <TraceTimestampCell :item="item" />
@@ -148,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import TracesTable from "@/components/traces/TracesTable.vue";
 import { useTracesTableColumns } from "../composables/useTracesTableColumns";
@@ -171,8 +204,14 @@ interface Props {
   searchPerformed?: boolean;
   /** Show the "TRACES X Traces Found" section header. Default: true */
   showHeader?: boolean;
-  /** Server-side total record count. When provided, the badge shows this instead of hits.length. */
+  /** Server-side total record count (distinct trace_ids from count query). */
   total?: number;
+  /** Current page number (1-indexed). */
+  currentPage?: number;
+  /** Rows displayed per page. */
+  rowsPerPage?: number;
+  /** Whether to show the pagination controls. */
+  showPagination?: boolean;
 }
 
 const { t } = useI18n();
@@ -181,12 +220,18 @@ const props = withDefaults(defineProps<Props>(), {
   searchPerformed: true,
   showHeader: true,
   total: undefined,
+  currentPage: 1,
+  rowsPerPage: 25,
+  showPagination: false,
 });
 
 const emit = defineEmits<{
   "row-click": [row: any];
-  "load-more": [];
+  "page-change": [page: number];
+  "rows-per-page-change": [rowsPerPage: number];
 }>();
+
+const rowsPerPageOptions = [10, 25, 50, 100];
 
 const hasLlmTraces = computed(() =>
   props.hits.some((hit: any) => isLLMTrace(hit)),
@@ -204,4 +249,14 @@ const noResults = computed(
 const hasResults = computed(
   () => props.searchPerformed && props.hits.length > 0,
 );
+
+const totalPages = computed(() =>
+  props.total && props.rowsPerPage
+    ? Math.max(1, Math.ceil(props.total / props.rowsPerPage))
+    : 1,
+);
 </script>
+
+<style lang="scss" scoped>
+@import "@/styles/pagination.scss";
+</style>
