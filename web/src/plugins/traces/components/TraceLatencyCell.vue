@@ -34,7 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="tw:text-[var(--o2-text-1)]! tw:font-semibold tw:mb-[0.35rem] tw:tracking-[0.03rem] tw:opacity-100 tw:text-[0.75rem]"
         >
-          {{ item.spans }} spans across {{ serviceEntries.length }} services
+          {{ item.spans ?? 0 }} spans across
+          {{ serviceEntries.length }} services
         </div>
         <div
           v-for="[s, sv] in serviceEntries"
