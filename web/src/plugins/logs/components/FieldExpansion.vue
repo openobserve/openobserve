@@ -41,8 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-if="field.dataType" class="field-type-container" :title="field.dataType">
               <span
                 class="field-type-badge"
-                :style="{ backgroundColor: fieldTypeInfo.color }"
-              >{{ fieldTypeInfo.label }}</span>
+                :style="{
+                  backgroundColor: fieldTypeInfo.color,
+                  color: fieldTypeInfo.textColor,
+                }"
+              >
+                {{ fieldTypeInfo.label }}
+              </span>
               <q-icon
                 class="field-expand-icon"
                 :name="isExpanded ? 'expand_less' : 'expand_more'"
@@ -418,12 +423,35 @@ const isFieldSelected = computed(() =>
 
 const fieldTypeInfo = computed(() => {
   const t = (props.field.dataType || "").toLowerCase();
-  if (t === "boolean") return { label: "B", color: "#e74c3c" };
-  if (t.includes("float")) return { label: "~", color: "#9b59b6" };
-  if (t.includes("int") || t.includes("uint")) return { label: "#", color: "#e67e22" };
+  if (t === "boolean")
+    return {
+      label: "B",
+      color: "var(--o2-field-type-boolean-bg)",
+      textColor: "var(--o2-field-type-boolean-text)",
+    };
+  if (t.includes("float"))
+    return {
+      label: "~",
+      color: "var(--o2-field-type-float-bg)",
+      textColor: "var(--o2-field-type-float-text)",
+    };
+  if (t.includes("int") || t.includes("uint"))
+    return {
+      label: "#",
+      color: "var(--o2-field-type-number-bg)",
+      textColor: "var(--o2-field-type-number-text)",
+    };
   if (t.includes("timestamp") || t === "date32" || t === "date64")
-    return { label: "T", color: "#3498db" };
-  return { label: "S", color: "#27ae60" };
+    return {
+      label: "T",
+      color: "var(--o2-field-type-timestamp-bg)",
+      textColor: "var(--o2-field-type-timestamp-text)",
+    };
+  return {
+    label: "S",
+    color: "var(--o2-field-type-string-bg)",
+    textColor: "var(--o2-field-type-string-text)",
+  };
 });
 
 watchDebounced(
@@ -496,7 +524,7 @@ const handleApplyMultiSelect = (action: string) => {
   height: 1rem;
   border-radius: 0.2rem;
   font-size: 0.6rem;
-  font-weight: 700;
+  font-weight: 800;
   color: #fff;
   transition: opacity 0.15s ease;
 }

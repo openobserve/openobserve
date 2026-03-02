@@ -462,6 +462,20 @@ export default defineComponent({
       variableObject.isVariableLoadingPending = false;
       resetVariableState(variableObject);
       removeTraceId(variableObject.name, request.traceId);
+
+      // Mark as done on error so manager's isLoading resolves and panels are not blocked
+      if (!variableObject.isVariablePartialLoaded) {
+        variableObject.isVariablePartialLoaded = true;
+        if (useManager && manager) {
+          const variableKey = getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          );
+          manager.onVariablePartiallyLoaded(variableKey);
+        }
+      }
     };
 
     const handleSearchReset = (data: any) => {
