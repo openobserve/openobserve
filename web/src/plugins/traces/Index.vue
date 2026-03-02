@@ -306,6 +306,16 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
 let currentSearchTraceId: string | null = null;
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
+/**
+ * Tracks per-request streaming partition state.
+ * Each backend partition emits a search_response_metadata event; each chunk
+ * within that partition emits a search_response_hits event.
+ * We decide replace vs append using the same pattern as useSearchResponseHandler.
+ */
+const tracesPartitionMap: Record<
+  string,
+  { partition: number; chunks: Record<number, number> }
+> = {};
 
 searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
 
@@ -705,7 +715,7 @@ const updateFieldValues = (data) => {
   });
 };
 
-async function getQueryData() {
+async function getQueryData(isPagination: boolean = false) {
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
@@ -716,7 +726,7 @@ async function getQueryData() {
     searchObj.searchApplied = true;
     searchObj.loading = true;
 
-    if (searchObj.data.resultGrid.currentPage == 0) {
+    if (!isPagination) {
       searchObj.data.sortedQueryResults = [];
       searchObj.data.histogram = {
         layout: {},
@@ -726,9 +736,17 @@ async function getQueryData() {
 
     let queryReq;
 
-    if (!searchObj.data.resultGrid.currentPage) {
+    if (!isPagination) {
       queryReq = buildSearch();
       searchObj.data.queryPayload = queryReq;
+      // Reset hits for a fresh search
+      searchObj.data.queryResults = {
+        hits: [],
+        total: 0,
+        from: 0,
+        size: queryReq.query.size,
+        took: 0,
+      };
     } else {
       queryReq = searchObj.data.queryPayload;
     }
@@ -746,7 +764,7 @@ async function getQueryData() {
     const filter = searchObj.data.editorValue.trim();
     const combinedFilter = filter;
 
-    if (queryReq.query.from === 0) searchResultRef?.value?.getDashboardData();
+    if (!isPagination) searchResultRef?.value?.getDashboardData();
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {
@@ -760,16 +778,7 @@ async function getQueryData() {
     // Generate a unique ID for this search request
     const searchTraceId = getUUID().replace(/-/g, "");
     currentSearchTraceId = searchTraceId;
-
-    // Reset hits for every page; preserve total (set by count query) on page > 0
-    searchObj.data.queryResults = {
-      hits: [],
-      total:
-        queryReq.query.from > 0 ? (searchObj.data.queryResults.total ?? 0) : 0,
-      from: queryReq.query.from,
-      size: queryReq.query.size,
-      took: 0,
-    };
+    tracesPartitionMap[searchTraceId] = { partition: 0, chunks: {} };
 
     fetchQueryDataWithHttpStream(
       {
@@ -787,10 +796,22 @@ async function getQueryData() {
       },
       {
         data: (_payload: any, response: any) => {
+          // Each metadata event signals a new backend partition — advance the counter
+          if (response.type === "search_response_metadata") {
+            tracesPartitionMap[searchTraceId].partition++;
+          }
+
           if (
             response.type === "search_response_metadata" ||
             response.type === "search_response_hits"
           ) {
+            // Track individual hit chunks within the current partition
+            if (response.type === "search_response_hits") {
+              const p = tracesPartitionMap[searchTraceId].partition;
+              tracesPartitionMap[searchTraceId].chunks[p] =
+                (tracesPartitionMap[searchTraceId].chunks[p] ?? 0) + 1;
+            }
+
             const rawHits: any[] = response.content?.results?.hits || [];
             if (rawHits.length === 0) return;
 
@@ -814,8 +835,22 @@ async function getQueryData() {
               }
             }
 
+            const partition = tracesPartitionMap[searchTraceId]?.partition ?? 1;
+            const chunkCount =
+              tracesPartitionMap[searchTraceId]?.chunks[partition] ?? 0;
+            const isChunkedHits = chunkCount > 1;
+            // appendResult: true when on a later partition or a later chunk within
+            // the current partition (mirrors useSearchResponseHandler logic)
+            const appendResult = partition > 1 || isChunkedHits;
+
             const formattedHits = formatTracesMetaData(rawHits);
-            searchObj.data.queryResults.hits.push(...formattedHits);
+            // Replace hits on the first partition of a pagination fetch (clears the
+            // previous page) or on the very first data chunk of a fresh search
+            if ((isPagination && partition === 1) || !appendResult) {
+              searchObj.data.queryResults.hits = formattedHits;
+            } else {
+              searchObj.data.queryResults.hits.push(...formattedHits);
+            }
             searchObj.data.queryResults.from = queryReq.query.from;
 
             updateFieldValues(rawHits);
@@ -840,11 +875,13 @@ async function getQueryData() {
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
           currentSearchTraceId = null;
+          delete tracesPartitionMap[searchTraceId];
         },
         complete: (_payload: any) => {
           searchObj.loading = false;
           currentSearchTraceId = null;
-          if (queryReq.query.from === 0) {
+          delete tracesPartitionMap[searchTraceId];
+          if (!isPagination) {
             fetchTracesCount();
           }
         },
@@ -1360,7 +1397,7 @@ const searchData = () => {
 
 const getMoreData = () => {
   if (searchObj.meta.refreshInterval == 0) {
-    getQueryData();
+    getQueryData(true);
 
     if (config.isCloud == "true") {
       segment.track("Button Click", {
