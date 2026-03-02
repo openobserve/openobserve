@@ -15,6 +15,7 @@ if (envResult.error) {
 // Check alpha1-specific environment variables
 if (!process.env.ZO_BASE_URL) {
   testLogger.warn('ZO_BASE_URL not set. Must be provided for alpha1 cloud tests.');
+  throw new Error('ZO_BASE_URL must be set to run alpha1 tests');
 }
 if (!process.env.ALPHA1_USER_EMAIL || !process.env.ALPHA1_USER_PASSWORD) {
   testLogger.warn('ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set for Dex email login');

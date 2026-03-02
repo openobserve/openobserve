@@ -84,10 +84,12 @@ async function globalSetup() {
 
     await submitButton.first().waitFor({ state: 'visible', timeout: 10000 });
     await submitButton.first().click();
-    await page.waitForURL(
-      /web\/|dex\/approval|dex\/auth.*error/,
-      { timeout: 15000 }
-    );
+    await Promise.race([
+      page.waitForURL(/web\/|dex\/approval|dex\/auth.*error/, { timeout: 15000 }),
+      page.locator('.flash-error, .alert, [class*="error"]').first()
+        .waitFor({ state: 'visible', timeout: 15000 })
+        .then(() => { throw new Error('Dex login error: invalid credentials or server error'); }),
+    ]);
 
     // Check if login failed (Dex error page)
     if (/dex\/.*error/.test(page.url())) {

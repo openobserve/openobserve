@@ -50,6 +50,9 @@ test.describe("Alpha1 Cloud Login & Sanity", () => {
       testLogger.step("Verify URL contains /logs");
       await cloudLoginPage.expectOnLogsPage();
 
+      testLogger.step("Verify no auth error redirects");
+      await cloudLoginPage.expectNotOnAuthPages();
+
       testLogger.info("Logs page loaded successfully");
     }
   );
