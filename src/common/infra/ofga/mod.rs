@@ -31,7 +31,10 @@ use o2_openfga::{
         add_tuple_for_pipeline, get_add_user_to_org_tuples, get_org_creation_tuples,
         get_ownership_all_org_tuple, get_ownership_tuple, update_tuples,
     },
-    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS, OFGAModel},
+    meta::mapping::{
+        LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, NON_OWNING_ORG, OFGA_MODELS, OFGAModel,
+        RESULT_LOGS_CACHE_KEY,
+    },
 };
 
 use crate::{
@@ -62,6 +65,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_ai_chat_permissions_migration = false;
     let mut need_re_pattern_permission_migration = false;
     let mut need_license_permission_migration = false;
+    let mut need_logs_pattern_insights_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
@@ -236,6 +240,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_18 = version_compare::Version::from("0.0.18").unwrap();
                 let v0_0_20 = version_compare::Version::from("0.0.20").unwrap();
                 let v0_0_21 = version_compare::Version::from("0.0.21").unwrap();
+                let v0_0_25 = version_compare::Version::from("0.0.25").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -268,6 +273,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 if existing_model_version < v0_0_21 {
                     log::info!("[OFGA:Local] license permissions migration needed");
                     need_license_permission_migration = true;
+                }
+
+                if existing_model_version < v0_0_25 {
+                    log::info!(
+                        "[OFGA:Local] logs patterns, insights, cache delete permissions migration needed"
+                    );
+                    need_logs_pattern_insights_migration = true;
                 }
             }
 
@@ -367,6 +379,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_license_permission_migration {
                         get_ownership_all_org_tuple(org_name, "license", &mut tuples);
+                    }
+                    if need_logs_pattern_insights_migration {
+                        get_ownership_all_org_tuple(org_name, LOGS_INSIGHTS_KEY, &mut tuples);
+                        get_ownership_all_org_tuple(org_name, LOGS_PATTERN_KEY, &mut tuples);
+                        get_ownership_all_org_tuple(org_name, RESULT_LOGS_CACHE_KEY, &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {
