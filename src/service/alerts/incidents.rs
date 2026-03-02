@@ -24,7 +24,7 @@ use config::{
         alert::Alert,
         incidents::{
             AlertEdge, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
-            IncidentTopology, IncidentWithAlerts,
+            IncidentCorrelationOutcome, IncidentTopology, IncidentWithAlerts,
         },
     },
     utils::json::{Map, Value},
@@ -60,22 +60,243 @@ fn extract_service_name_from_dimensions(
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-/// Correlate an alert to an incident
+/// Collect the union of notification destinations from all alerts correlated to an incident.
+///
+/// `base_destinations` (the current alert's destinations) are always included.
+/// Any additional destinations from other alerts in the incident are appended,
+/// deduplicated by name.
+#[cfg(feature = "enterprise")]
+async fn collect_incident_destinations(
+    org_id: &str,
+    incident_id: &str,
+    base_destinations: &[String],
+) -> Vec<String> {
+    let mut seen: std::collections::HashSet<String> = base_destinations.iter().cloned().collect();
+    let mut destinations: Vec<String> = base_destinations.to_vec();
+
+    let incident_alerts = match infra::table::alert_incidents::get_incident_alerts(incident_id)
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::warn!(
+                "[incidents] Failed to fetch alert list for destination merge (incident {incident_id}): {e}"
+            );
+            return destinations;
+        }
+    };
+
+    for ia in &incident_alerts {
+        if let Some((_folder, other_alert)) =
+            crate::service::db::alerts::alert::get_alert_from_cache(org_id, &ia.alert_id).await
+        {
+            for dest in &other_alert.destinations {
+                if seen.insert(dest.clone()) {
+                    destinations.push(dest.clone());
+                }
+            }
+        }
+    }
+
+    destinations
+}
+
+/// Build an incident-specific notification payload and send to all given destinations.
+///
+/// Loads severity, title, and service from the incident record. Constructs an
+/// incident-centric JSON body (not the alert row template) and dispatches to each
+/// destination using the raw transport (HTTP/email/SNS).
+#[cfg(feature = "enterprise")]
+async fn send_incident_notifications(
+    alert: &Alert,
+    incident_id: &str,
+    event: &str,
+    triggered_at: i64,
+    dest_names: &[String],
+) {
+    if dest_names.is_empty() {
+        return;
+    }
+
+    let org_id = alert.org_id.as_str();
+
+    // Load incident to get severity, title and service_name.
+    let (severity, title, service_name) =
+        match infra::table::alert_incidents::get(org_id, incident_id).await {
+            Ok(Some(model)) => {
+                let dims: std::collections::HashMap<String, String> =
+                    serde_json::from_value(model.stable_dimensions).unwrap_or_default();
+                let svc = dims
+                    .get("service_name")
+                    .or_else(|| dims.get("service"))
+                    .cloned()
+                    .unwrap_or_default();
+                let title_str = model.title.unwrap_or_default();
+                (model.severity, title_str, svc)
+            }
+            _ => ("P3".to_string(), String::new(), String::new()),
+        };
+
+    let cfg = config::get_config();
+    let incident_url = format!(
+        "{}/web/alerts/incidents/{incident_id}?org_identifier={org_id}",
+        cfg.common.web_url
+    );
+    let time_str = chrono::DateTime::from_timestamp_micros(triggered_at)
+        .map(|dt: chrono::DateTime<chrono::Utc>| dt.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
+        .unwrap_or_default();
+
+    let payload = config::utils::json::json!({
+        "incident": {
+            "id": incident_id,
+            "title": title,
+            "event": event,
+            "service": service_name,
+            "severity": severity,
+            "alert": {
+                "name": alert.name,
+                "stream": {
+                    "name": alert.stream_name,
+                    "type": alert.stream_type.to_string(),
+                }
+            },
+            "time": time_str,
+            "url": incident_url,
+        }
+    });
+    let msg = match serde_json::to_string(&payload) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!(
+                "[incidents] Failed to serialize notification payload for {incident_id}: {e}"
+            );
+            return;
+        }
+    };
+
+    let subject = format!("[{event}] {title}");
+    let mut success_parts: Vec<String> = Vec::new();
+    let mut err_parts: Vec<String> = Vec::new();
+
+    for dest_name in dest_names {
+        match crate::service::db::alerts::destinations::get(org_id, dest_name).await {
+            Ok(dest) => {
+                use config::meta::destinations::Module;
+                let Module::Alert {
+                    destination_type, ..
+                } = dest.module
+                else {
+                    err_parts.push(format!("{dest_name}: not an alert destination"));
+                    continue;
+                };
+                match crate::service::alerts::alert::dispatch_notification(
+                    &destination_type,
+                    &subject,
+                    msg.clone(),
+                )
+                .await
+                {
+                    Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
+                    Err(e) => {
+                        log::error!(
+                            "[incidents] Failed to notify {dest_name} for incident {incident_id}: {e}"
+                        );
+                        err_parts.push(format!("{dest_name}: {e}"));
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[incidents] Destination {dest_name} not found for incident {incident_id}: {e}"
+                );
+                err_parts.push(format!("{dest_name}: {e}"));
+            }
+        }
+    }
+
+    if err_parts.is_empty() {
+        log::info!(
+            "[incidents] Notification sent for incident {incident_id} ({event}): {}",
+            success_parts.join("; ")
+        );
+    } else {
+        log::error!(
+            "[incidents] Notification partially failed for incident {incident_id} ({event}): {}",
+            err_parts.join("; ")
+        );
+    }
+}
+
+/// Send a notification for an incident severity change to all correlated alert destinations.
+#[cfg(feature = "enterprise")]
+async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
+    let incident_alerts = match infra::table::alert_incidents::get_incident_alerts(incident_id)
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::warn!(
+                "[incidents] Failed to load alerts for severity notification (incident {incident_id}): {e}"
+            );
+            return;
+        }
+    };
+
+    let first_alert_id = match incident_alerts.first() {
+        Some(ia) => ia.alert_id.as_str(),
+        None => {
+            log::debug!(
+                "[incidents] No alerts in incident {incident_id}, skipping severity notification"
+            );
+            return;
+        }
+    };
+
+    let Some((_folder, first_alert)) =
+        crate::service::db::alerts::alert::get_alert_from_cache(org_id, first_alert_id).await
+    else {
+        log::debug!(
+            "[incidents] Alert {first_alert_id} not in cache, skipping severity notification for {incident_id}"
+        );
+        return;
+    };
+
+    let merged_destinations =
+        collect_incident_destinations(org_id, incident_id, &first_alert.destinations).await;
+
+    send_incident_notifications(
+        &first_alert,
+        incident_id,
+        "severity_changed",
+        chrono::Utc::now().timestamp_micros(),
+        &merged_destinations,
+    )
+    .await;
+}
+
+/// Correlate an alert to an incident, and send a notification if appropriate.
 ///
 /// This is the main entry point for incident correlation in the alert execution flow.
-/// Called after deduplication, before notification.
+/// Called after deduplication, instead of direct notification for `creates_incident=true` alerts.
+///
+/// Notification behaviour:
+/// - `NewIncidentCreated` → sends incident notification to merged destinations of all correlated
+///   alerts.
+/// - `NewAlertTypeJoined` → same as above (new alert type joining is an escalation signal).
+/// - `ExistingAlertRepeated` → notification suppressed (same alert type already in incident).
+///
+/// When `notify_rows` is empty the function still correlates but sends no notification.
+/// Pass an empty slice from manual test-trigger paths that send their own notification.
 ///
 /// Correlation priority:
 /// 1. Service Discovery hash - uses pre-computed correlation_key from service_streams table
 /// 2. Manual extraction - computes blake3 hash from stable dimensions
-///
-/// Returns the incident ID if the alert was correlated to an existing or new incident.
 pub async fn correlate_alert_to_incident(
     alert: &Alert,
     result_row: &Map<String, Value>,
+    notify_rows: &[Map<String, Value>],
     triggered_at: i64,
-    _service_name_hint: Option<&str>,
-) -> Result<Option<(String, String)>, anyhow::Error> {
+) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
     // Semantic groups from system_settings — the single source of truth,
     // configured via /settings/v2/semantic_field_groups API.
     let semantic_groups =
@@ -191,7 +412,7 @@ pub async fn correlate_alert_to_incident(
     );
 
     // Find or create incident
-    let incident_id = find_or_create_incident(
+    let outcome = find_or_create_incident(
         &alert.org_id,
         &correlation_result.correlation_key,
         &correlation_result.stable_dimensions,
@@ -203,7 +424,37 @@ pub async fn correlate_alert_to_incident(
     )
     .await?;
 
-    Ok(Some((incident_id, service_name)))
+    // Send incident notification unless rows are empty (manual trigger path)
+    // or the outcome is a repeated alert (suppressed by design).
+    if !notify_rows.is_empty() {
+        match &outcome {
+            IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
+            | IncidentCorrelationOutcome::NewAlertTypeJoined { incident_id, .. } => {
+                let event = match &outcome {
+                    IncidentCorrelationOutcome::NewIncidentCreated { .. } => "new_incident_created",
+                    _ => "new_alert_correlated",
+                };
+                let merged_destinations =
+                    collect_incident_destinations(&alert.org_id, incident_id, &alert.destinations)
+                        .await;
+                send_incident_notifications(
+                    alert,
+                    incident_id,
+                    event,
+                    triggered_at,
+                    &merged_destinations,
+                )
+                .await;
+            }
+            IncidentCorrelationOutcome::ExistingAlertRepeated { incident_id, .. } => {
+                log::debug!(
+                    "[incidents] Suppressing notification for repeated alert type in incident {incident_id}"
+                );
+            }
+        }
+    }
+
+    Ok(Some(outcome))
 }
 
 /// Query Service Discovery for correlation_key using the correlation API
@@ -393,7 +644,7 @@ async fn find_or_create_incident(
     correlation_reason: &str,
     service_name: &str,
     upgrade_window_minutes: u64,
-) -> Result<String, anyhow::Error> {
+) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
     // STEP 1: Exact match
@@ -406,7 +657,10 @@ async fn find_or_create_incident(
         let dimensions_changed =
             merge_dimensions(&mut current_dims, stable_dimensions, &existing.id);
 
-        infra::table::alert_incidents::add_alert_to_incident(
+        // add_alert_to_incident checks whether this alert_id is new to the
+        // incident and inserts the row atomically in the same transaction,
+        // avoiding the read-then-write race of a separate check.
+        let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
             &existing.id,
             &alert.get_unique_key(),
             &alert.name,
@@ -490,7 +744,17 @@ async fn find_or_create_incident(
             });
         }
 
-        return Ok(existing.id);
+        if is_new_alert_type {
+            return Ok(IncidentCorrelationOutcome::NewAlertTypeJoined {
+                incident_id: existing.id,
+                service_name: service_name.to_string(),
+            });
+        } else {
+            return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
+                incident_id: existing.id,
+                service_name: service_name.to_string(),
+            });
+        }
     }
 
     // STEP 2: Try hierarchical upgrade with Venn diagram matching
@@ -582,7 +846,10 @@ async fn find_or_create_incident(
                 triggered_at,
             );
 
-            return Ok(upgradeable_incident.id);
+            return Ok(IncidentCorrelationOutcome::NewAlertTypeJoined {
+                incident_id: upgradeable_incident.id,
+                service_name: service_name.to_string(),
+            });
         }
     } else {
         log::debug!(
@@ -696,7 +963,10 @@ async fn find_or_create_incident(
         });
     }
 
-    Ok(incident.id)
+    Ok(IncidentCorrelationOutcome::NewIncidentCreated {
+        incident_id: incident.id,
+        service_name: service_name.to_string(),
+    })
 }
 
 /// Get incident with its alerts for detail view
@@ -1230,9 +1500,9 @@ pub async fn update_severity(
     let updated =
         infra::table::alert_incidents::update_severity(org_id, incident_id, severity).await?;
 
-    // Emit severity override event only when the severity actually changed
-    if from_severity != to_severity
-        && let Err(e) = infra::table::incident_events::append(
+    // Emit severity override event and notify only when the severity actually changed
+    if from_severity != to_severity {
+        if let Err(e) = infra::table::incident_events::append(
             org_id,
             incident_id,
             config::meta::alerts::incidents::IncidentEvent::severity_override(
@@ -1242,8 +1512,10 @@ pub async fn update_severity(
             ),
         )
         .await
-    {
-        log::error!("[Incidents] Failed to record severity event: {e}");
+        {
+            log::error!("[Incidents] Failed to record severity event: {e}");
+        }
+        send_incident_severity_notification(org_id, incident_id).await;
     }
 
     model_to_incident(updated).await
