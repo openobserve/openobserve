@@ -2526,7 +2526,10 @@
     "promqlOnlyForMetrics": "O ProMQL só está disponível para o tipo de fluxo de métricas",
     "invalidCronExpression": "Expressão cron inválida",
     "thresholdShouldNotBeEmpty": "O limite não deve estar vazio",
-    "errorGettingResults": "Erro ao obter resultados"
+    "errorGettingResults": "Erro ao obter resultados",
+    "discardChangesTitle": "Descartar alterações",
+    "deleteNodeTitle": "Excluir Node",
+    "deleteNodeLlmEvalConfirm": "Tem certeza de que deseja excluir esse nó de avaliação do LLM?"
   },
   "reports": {
     "header": "Relatórios",

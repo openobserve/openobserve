@@ -2531,7 +2531,10 @@
     "promqlOnlyForMetrics": "PromQL 仅适用于指标流类型",
     "invalidCronExpression": "无效的 cron 表达式",
     "thresholdShouldNotBeEmpty": "阈值不应为空",
-    "errorGettingResults": "获取结果时出错"
+    "errorGettingResults": "获取结果时出错",
+    "discardChangesTitle": "放弃更改",
+    "deleteNodeTitle": "删除节点",
+    "deleteNodeLlmEvalConfirm": "您确定要删除此 LLM 评估节点吗？"
   },
   "reports": {
     "header": "报表",

@@ -2526,7 +2526,10 @@
     "promqlOnlyForMetrics": "PromQL yalnızca metrik akış türü için kullanılabilir",
     "invalidCronExpression": "Geçersiz cron ifadesi",
     "thresholdShouldNotBeEmpty": "Eşik boş olmamalıdır",
-    "errorGettingResults": "Sonuç alınırken hata oluştu"
+    "errorGettingResults": "Sonuç alınırken hata oluştu",
+    "discardChangesTitle": "Değişiklikleri Atma",
+    "deleteNodeTitle": "Düğümü Sil",
+    "deleteNodeLlmEvalConfirm": "Bu LLM değerlendirme düğümünü silmek istediğinizden emin misiniz?"
   },
   "reports": {
     "header": "Raporlar",

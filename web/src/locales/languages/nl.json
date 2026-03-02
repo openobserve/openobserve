@@ -2526,7 +2526,10 @@
     "promqlOnlyForMetrics": "ProMQL is alleen beschikbaar voor het streamtype voor statistieken",
     "invalidCronExpression": "Ongeldige cron-expressie",
     "thresholdShouldNotBeEmpty": "Drempelwaarde mag niet leeg zijn",
-    "errorGettingResults": "Fout bij het verkrijgen van resultaten"
+    "errorGettingResults": "Fout bij het verkrijgen van resultaten",
+    "discardChangesTitle": "Wijzigingen negeren",
+    "deleteNodeTitle": "Knooppunt verwijderen",
+    "deleteNodeLlmEvalConfirm": "Weet u zeker dat u dit LLM-evaluatieknooppunt wilt verwijderen?"
   },
   "reports": {
     "header": "Rapporten",

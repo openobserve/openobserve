@@ -2547,7 +2547,10 @@
     "promqlOnlyForMetrics": "PromQL はメトリクスストリームタイプでのみ使用できます",
     "invalidCronExpression": "cron 表現が無効です",
     "thresholdShouldNotBeEmpty": "敷居は空であってはなりません",
-    "errorGettingResults": "結果を取得中にエラーが発生しました"
+    "errorGettingResults": "結果を取得中にエラーが発生しました",
+    "discardChangesTitle": "変更を破棄",
+    "deleteNodeTitle": "ノードを削除",
+    "deleteNodeLlmEvalConfirm": "この LLM 評価ノードを削除してよろしいですか?"
   },
   "reports": {
     "header": "レポート",

@@ -2526,7 +2526,10 @@
     "promqlOnlyForMetrics": "ProMQL n'est disponible que pour le type de flux de métriques",
     "invalidCronExpression": "Expression cron non valide",
     "thresholdShouldNotBeEmpty": "Le seuil ne doit pas être vide",
-    "errorGettingResults": "Erreur lors de l'obtention des résultats"
+    "errorGettingResults": "Erreur lors de l'obtention des résultats",
+    "discardChangesTitle": "Ignorer les modifications",
+    "deleteNodeTitle": "Supprimer le nœud",
+    "deleteNodeLlmEvalConfirm": "Êtes-vous sûr de vouloir supprimer ce nœud d'évaluation LLM ?"
   },
   "reports": {
     "header": "Rapports",

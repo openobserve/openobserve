@@ -2526,7 +2526,10 @@
     "promqlOnlyForMetrics": "PromQL은 메트릭 스트림 유형에만 사용할 수 있습니다.",
     "invalidCronExpression": "잘못된 크론 표현식",
     "thresholdShouldNotBeEmpty": "임계값은 비어 있으면 안 됩니다.",
-    "errorGettingResults": "결과를 가져오는 중 오류가 발생했습니다."
+    "errorGettingResults": "결과를 가져오는 중 오류가 발생했습니다.",
+    "discardChangesTitle": "변경 내용 취소",
+    "deleteNodeTitle": "노드 삭제",
+    "deleteNodeLlmEvalConfirm": "이 LLM 평가 노드를 정말로 삭제하시겠습니까?"
   },
   "reports": {
     "header": "보고서",

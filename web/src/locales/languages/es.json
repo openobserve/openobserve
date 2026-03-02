@@ -2524,7 +2524,10 @@
     "promqlOnlyForMetrics": "PromQL solo está disponible para el tipo de flujo de métricas",
     "invalidCronExpression": "Expresión cron no válida",
     "thresholdShouldNotBeEmpty": "El umbral no debe estar vacío",
-    "errorGettingResults": "Error al obtener los resultados"
+    "errorGettingResults": "Error al obtener los resultados",
+    "discardChangesTitle": "Descartar cambios",
+    "deleteNodeTitle": "Eliminar nodo",
+    "deleteNodeLlmEvalConfirm": "¿Está seguro de que desea eliminar este nodo de evaluación de LLM?"
   },
   "reports": {
     "header": "Informes",

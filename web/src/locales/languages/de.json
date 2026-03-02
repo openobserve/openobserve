@@ -2526,7 +2526,10 @@
     "promqlOnlyForMetrics": "PromQL ist nur für den Metrik-Stream-Typ verfügbar",
     "invalidCronExpression": "Ungültiger Cron-Ausdruck",
     "thresholdShouldNotBeEmpty": "Der Schwellenwert sollte nicht leer sein",
-    "errorGettingResults": "Fehler beim Abrufen der Ergebnisse"
+    "errorGettingResults": "Fehler beim Abrufen der Ergebnisse",
+    "discardChangesTitle": "Änderungen verwerfen",
+    "deleteNodeTitle": "Knoten löschen",
+    "deleteNodeLlmEvalConfirm": "Möchten Sie diesen LLM-Evaluierungsknoten wirklich löschen?"
   },
   "reports": {
     "header": "Berichte",
