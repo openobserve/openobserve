@@ -934,7 +934,7 @@ async function extractFields() {
       // Ignoring timestamp as start time is present
       let fields: any = {};
       const schemaTypeMap = new Map(
-        schema.map((row: any) => [row.name, row.field_type]),
+        schema.map((row: any) => [row.name, row.type]),
       );
       Object.keys(importantFields).forEach((rowName) => {
         if (fields[rowName] == undefined) {
@@ -959,7 +959,7 @@ async function extractFields() {
               name: row.name,
               ftsKey: ftsKeys.has(row.name),
               showValues: !idFields[row.name],
-              dataType: row.field_type,
+              dataType: row.type,
             });
           }
         }

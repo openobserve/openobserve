@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
-                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm hover:tw:bg-[var(--o2-hover-accent)]!"
+                class="field-container flex content-center ellipsis hover:tw:bg-[var(--o2-hover-accent)]!"
                 :title="props.row.label || props.row.name"
               >
                 <div class="field_label ellipsis tw:flex tw:items-center" style="font-size: 14px">
