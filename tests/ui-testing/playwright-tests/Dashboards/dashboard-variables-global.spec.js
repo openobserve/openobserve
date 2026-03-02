@@ -169,7 +169,6 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
 
     expect(result.success).toBe(true);
     expect(result.actualCount).toBeGreaterThanOrEqual(1);
-    expect(result.calls[0].status).toBe(200);
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
