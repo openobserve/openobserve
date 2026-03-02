@@ -305,15 +305,23 @@ mod sampling_rate_str {
     {
         // Accept both string ("0.1") and number (0.1) formats
         let value = serde_json::Value::deserialize(deserializer)?;
-        match &value {
-            serde_json::Value::String(s) => s.parse::<f64>().map_err(serde::de::Error::custom),
+        let rate = match &value {
+            serde_json::Value::String(s) => s.parse::<f64>().map_err(serde::de::Error::custom)?,
             serde_json::Value::Number(n) => n
                 .as_f64()
-                .ok_or_else(|| serde::de::Error::custom("invalid number for sampling_rate")),
-            _ => Err(serde::de::Error::custom(
-                "sampling_rate must be a string or number",
-            )),
+                .ok_or_else(|| serde::de::Error::custom("invalid number for sampling_rate"))?,
+            _ => {
+                return Err(serde::de::Error::custom(
+                    "sampling_rate must be a string or number",
+                ));
+            }
+        };
+        if !(0.0..=1.0).contains(&rate) || rate.is_nan() {
+            return Err(serde::de::Error::custom(
+                "sampling_rate must be between 0.0 and 1.0",
+            ));
         }
+        Ok(rate)
     }
 }
 

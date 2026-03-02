@@ -366,7 +366,7 @@ impl ExecutablePipeline {
             // remote wal writer depends on the task id.
             let source_stream_type = source_stream_params.stream_type;
             // For LLM eval nodes, resolve the destination stream params from child leaf node
-            let leaf_dest_stream = if matches!(&node.node_data, NodeData::LlmEvaluation(_)) {
+            let _leaf_dest_stream = if matches!(&node.node_data, NodeData::LlmEvaluation(_)) {
                 node.children.iter().find_map(|child_id| {
                     self.node_map.get(child_id).and_then(|child_node| {
                         if let NodeData::Stream(sp) = &child_node.node_data {
@@ -392,7 +392,7 @@ impl ExecutablePipeline {
                 pipeline_name,
                 stream_name,
                 source_stream_type,
-                leaf_dest_stream,
+                _leaf_dest_stream,
             ));
             node_tasks.push(task);
         }
@@ -407,8 +407,8 @@ impl ExecutablePipeline {
             let mut results = HashMap::new();
             while let Some((idx, stream_params, record)) = result_receiver.recv().await {
                 if stream_params.stream_type != StreamType::Traces {
-                    log::info!("record: {:?}", record);
-                    log::info!(
+                    log::debug!("record: {:?}", record);
+                    log::debug!(
                         "[Pipeline] {pl_name_for_results} [inv={inv_id_for_results}]: result collector got record for {}:{}",
                         stream_params.stream_type,
                         stream_params.stream_name,

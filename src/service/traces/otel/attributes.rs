@@ -325,37 +325,6 @@ impl FrameworkAttributes {
     pub const MODEL_CONFIG: &'static str = "model_config";
 }
 
-/// LLM Evaluation Attributes (emitted by evaluation frameworks)
-pub struct EvaluationAttributes;
-
-impl EvaluationAttributes {
-    // Aggregate quality score
-    pub const QUALITY_SCORE: &'static str = "llm.evaluation.quality_score";
-    pub const DURATION_MS: &'static str = "llm.evaluation.duration_ms";
-
-    // Per-evaluator scores
-    pub const RELEVANCE: &'static str = "llm.evaluation.relevance";
-    pub const COMPLETENESS: &'static str = "llm.evaluation.completeness";
-    pub const TOOL_EFFECTIVENESS: &'static str = "llm.evaluation.tool_effectiveness";
-    pub const GROUNDEDNESS: &'static str = "llm.evaluation.groundedness";
-    pub const SAFETY: &'static str = "llm.evaluation.safety";
-
-    // Commentary (aggregated reasoning from evaluators)
-    pub const COMMENTARY: &'static str = "llm.evaluation.commentary";
-
-    // Evaluator metadata
-    pub const EVALUATOR_NAME: &'static str = "llm.evaluator.name";
-    pub const EVALUATOR_VERSION: &'static str = "llm.evaluator.version";
-    pub const EVALUATOR_TYPE: &'static str = "llm.evaluator.type";
-
-    // Design-doc specified fields (alternative attribute names)
-    pub const EVAL_RELEVANCE: &'static str = "evaluation_relevance";
-    pub const EVAL_COMPLETENESS: &'static str = "evaluation_completeness";
-    pub const EVAL_TOOL_EFFECTIVENESS: &'static str = "evaluation_tool_effectiveness";
-    pub const EVAL_GROUNDEDNESS: &'static str = "evaluation_groundedness";
-    pub const EVAL_SAFETY: &'static str = "evaluation_safety";
-}
-
 /// Gen-AI Event Names
 pub struct GenAiEventNames;
 

@@ -27,7 +27,7 @@ use std::collections::HashMap;
 use config::utils::json;
 
 use super::utils::extract_f64;
-use crate::service::traces::otel::attributes::EvaluationAttributes;
+use crate::service::traces::otel::attributes::O2Attributes;
 
 /// Evaluator type classification
 #[derive(Debug, Clone, PartialEq)]
@@ -113,7 +113,7 @@ impl EvaluationExtractor {
     pub fn extract(&self, attributes: &HashMap<String, json::Value>) -> Evaluation {
         let scores = self.extract_scores(attributes);
         let commentary = self
-            .extract_string(attributes, EvaluationAttributes::COMMENTARY)
+            .extract_string(attributes, O2Attributes::EVALUATION_COMMENTARY)
             .or_else(|| self.extract_string(attributes, "llm_evaluation_commentary"));
         let evaluator = self.extract_evaluator_info(attributes);
 
@@ -127,39 +127,37 @@ impl EvaluationExtractor {
     fn extract_scores(&self, attributes: &HashMap<String, json::Value>) -> EvaluationScores {
         // Extract quality score (aggregate)
         let quality_score = self
-            .extract_score(attributes, EvaluationAttributes::QUALITY_SCORE)
+            .extract_score(attributes, O2Attributes::EVALUATION_QUALITY)
             .or_else(|| self.extract_score(attributes, "llm_evaluation_quality_score"));
 
         // Extract per-evaluator scores (try both naming conventions)
         let relevance = self
-            .extract_score(attributes, EvaluationAttributes::RELEVANCE)
-            .or_else(|| self.extract_score(attributes, EvaluationAttributes::EVAL_RELEVANCE))
+            .extract_score(attributes, O2Attributes::EVALUATION_RELEVANCE)
+            .or_else(|| self.extract_score(attributes, "evaluation_relevance"))
             .or_else(|| self.extract_score(attributes, "llm_evaluation_relevance"));
 
         let completeness = self
-            .extract_score(attributes, EvaluationAttributes::COMPLETENESS)
-            .or_else(|| self.extract_score(attributes, EvaluationAttributes::EVAL_COMPLETENESS))
+            .extract_score(attributes, O2Attributes::EVALUATION_COMPLETENESS)
+            .or_else(|| self.extract_score(attributes, "evaluation_completeness"))
             .or_else(|| self.extract_score(attributes, "llm_evaluation_completeness"));
 
         let tool_effectiveness = self
-            .extract_score(attributes, EvaluationAttributes::TOOL_EFFECTIVENESS)
-            .or_else(|| {
-                self.extract_score(attributes, EvaluationAttributes::EVAL_TOOL_EFFECTIVENESS)
-            })
+            .extract_score(attributes, O2Attributes::EVALUATION_TOOL_EFFECTIVENESS)
+            .or_else(|| self.extract_score(attributes, "evaluation_tool_effectiveness"))
             .or_else(|| self.extract_score(attributes, "llm_evaluation_tool_effectiveness"));
 
         let groundedness = self
-            .extract_score(attributes, EvaluationAttributes::GROUNDEDNESS)
-            .or_else(|| self.extract_score(attributes, EvaluationAttributes::EVAL_GROUNDEDNESS))
+            .extract_score(attributes, O2Attributes::EVALUATION_GROUNDEDNESS)
+            .or_else(|| self.extract_score(attributes, "evaluation_groundedness"))
             .or_else(|| self.extract_score(attributes, "llm_evaluation_groundedness"));
 
         let safety = self
-            .extract_score(attributes, EvaluationAttributes::SAFETY)
-            .or_else(|| self.extract_score(attributes, EvaluationAttributes::EVAL_SAFETY))
+            .extract_score(attributes, O2Attributes::EVALUATION_SAFETY)
+            .or_else(|| self.extract_score(attributes, "evaluation_safety"))
             .or_else(|| self.extract_score(attributes, "llm_evaluation_safety"));
 
         let duration_ms = self
-            .extract_score(attributes, EvaluationAttributes::DURATION_MS)
+            .extract_score(attributes, O2Attributes::EVALUATION_DURATION_MS)
             .or_else(|| self.extract_score(attributes, "llm_evaluation_duration_ms"));
 
         EvaluationScores {
@@ -175,15 +173,15 @@ impl EvaluationExtractor {
 
     fn extract_evaluator_info(&self, attributes: &HashMap<String, json::Value>) -> EvaluatorInfo {
         let name = self
-            .extract_string(attributes, EvaluationAttributes::EVALUATOR_NAME)
+            .extract_string(attributes, O2Attributes::EVALUATOR_NAME)
             .or_else(|| self.extract_string(attributes, "llm_evaluator_name"));
 
         let version = self
-            .extract_string(attributes, EvaluationAttributes::EVALUATOR_VERSION)
+            .extract_string(attributes, O2Attributes::EVALUATOR_VERSION)
             .or_else(|| self.extract_string(attributes, "llm_evaluator_version"));
 
         let evaluator_type = self
-            .extract_string(attributes, EvaluationAttributes::EVALUATOR_TYPE)
+            .extract_string(attributes, O2Attributes::EVALUATOR_TYPE)
             .or_else(|| self.extract_string(attributes, "llm_evaluator_type"))
             .map(|s| EvaluatorType::from_str(&s))
             .unwrap_or(EvaluatorType::Deterministic);
