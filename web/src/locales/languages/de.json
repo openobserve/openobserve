@@ -116,7 +116,9 @@
     "set": "+ Satz",
     "copy": "Kopieren",
     "copySuccess": "In die Zwischenablage kopiert",
-    "copyError": "Fehler beim Kopieren in die Zwischenablage"
+    "copyError": "Fehler beim Kopieren in die Zwischenablage",
+    "goBack": "Geh zurück",
+    "stopGenerating": "Generieren beenden"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -320,7 +322,36 @@
     "buildQuery": "Bauen",
     "enableSqlModeForBuild": "Bitte aktivieren Sie den SQL-Modus und wählen Sie einen einzelnen Stream aus, um den Query Builder zu verwenden",
     "applyToSearch": "Für die Suche bewerben",
-    "complexQueryDetected": "Eine komplexe Abfrage wurde erkannt. Im benutzerdefinierten Modus."
+    "complexQueryDetected": "Eine komplexe Abfrage wurde erkannt. Im benutzerdefinierten Modus.",
+    "searchDimension": "Dimensionen suchen",
+    "nlpModeLabel": "Modus für natürliche Sprache",
+    "generateSQL": "Generieren Sie SQL",
+    "generateQuery": "Frag KI",
+    "askAI": "Frag KI",
+    "generateSQLTooltip": "Generieren Sie eine SQL-Abfrage aus natürlicher Sprache (Strg/Cmd + Enter)",
+    "generateQueryTooltip": "Bitten Sie KI um Hilfe bei Ihrer Anfrage",
+    "askAITooltip": "Bitten Sie KI um Hilfe bei Ihrer Anfrage",
+    "generating": "Generieren...",
+    "nlQueryGenerationFailed": "Die Abfrage konnte nicht generiert werden. Bitte versuchen Sie es erneut.",
+    "nlQueryGenerationSuccess": "Die Abfrage wurde erfolgreich generiert!",
+    "askAIPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Anfrage...",
+    "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
+    "enterPrompt": "Geben Sie eine Aufforderung ein, um eine Abfrage zu generieren",
+    "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren",
+    "analyzingQuery": "Abfrage wird analysiert...",
+    "generatingQuery": "Abfrage wird generiert...",
+    "queryGeneratedSuccess": "Die Abfrage wurde erfolgreich generiert!",
+    "queryGenerationStopped": "Die Generierung der Abfrage wurde gestoppt.",
+    "queryGenerationFailed": "Die Generierung der Abfrage ist fehlgeschlagen.",
+    "fetchingResults": "Suchergebnisse werden abgerufen...",
+    "noResultsFound": "Keine Ergebnisse gefunden",
+    "errorFetchingResults": "Fehler beim Abrufen der Ergebnisse",
+    "somethingWentWrong": "Etwas ist schief gelaufen",
+    "selectStreamForAI": "Wählen Sie zuerst einen Stream aus, um KI zu verwenden",
+    "collapseFields": "Felder ausblenden",
+    "openFields": "Felder öffnen",
+    "aiBarSuccessPlaceholder": "Was möchtest du als Nächstes tun?",
+    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden"
   },
   "menu": {
     "home": "Startseite",
@@ -965,7 +996,10 @@
     "jsType": "JavaScript (ES2023)",
     "vrlfunction": "VRL-Funktion",
     "jsFunctionHint": "Verwenden Sie das Objekt `row`, um auf Protokollfelder zuzugreifen und diese zu ändern. Beispiel: row.new_field = row.existing_field + 'verarbeitet';",
-    "vrlFunctionHint": "Verwenden Sie das `.`, um das aktuelle Ereignis darzustellen. Beispiel: .new_field = .existing_field + 'verarbeitet'"
+    "vrlFunctionHint": "Verwenden Sie das `.`, um das aktuelle Ereignis darzustellen. Beispiel: .new_field = .existing_field + 'verarbeitet'",
+    "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
+    "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren",
+    "jsErrorDetails": "JavaScript-Fehlerdetails"
   },
   "confirmDialog": {
     "cancel": "Abbrechen",
@@ -1429,7 +1463,14 @@
     "panelTimeSettingsTooltip": "Konfigurieren Sie, wie dieses Panel seinen Zeitbereich bestimmt. Sie können den Zeitraum des Dashboards verwenden oder einen benutzerdefinierten Zeitraum für diesen Bereich festlegen.",
     "panelTimeMode": "Quelle für den Zeitbereich (beim Laden des Dashboards)",
     "useDefaultTimeTooltip": "Wenn diese Option aktiviert ist, verwendet dieses Panel die konfigurierte Standarddauer als Zeitraum beim Laden des Dashboards und nicht die globale Dashboard-Zeit.",
-    "defaultDuration": "Standarddauer"
+    "defaultDuration": "Standarddauer",
+    "toggleFunctionEditor": "Funktionseditor umschalten",
+    "useSavedFunction": "Verwenden Sie die Funktion Gespeichert",
+    "showQueryResults": "Abfrageergebnisse anzeigen",
+    "hideQueryResults": "Abfrageergebnisse ausblenden",
+    "vrlExtractionTooltip": "Um extrahierte VRL-Felder im Diagramm zu verwenden, schreiben Sie eine VRL-Funktion und klicken Sie auf die Schaltfläche Anwenden. Die Felder werden extrahiert, sodass Sie sie zum Erstellen des Diagramms verwenden können.",
+    "errorFetchingFunctions": "Fehler beim Abrufen von Funktionen",
+    "functionAppliedSuccess": "Die Funktion {name} wurde erfolgreich angewendet."
   },
   "panel": {
     "header": "Panel",
@@ -2014,7 +2055,20 @@
       "variablesTooltip": "Variablen werden verwendet, um Daten von der Warnung an das Ziel zu übergeben.",
       "rowTemplateTooltip": "Die Zeilenvorlage wird verwendet, um die Warnmeldung zu formatieren.",
       "templateType": "Vorlagentyp:"
-    }
+    },
+    "addConditions": "Bedingungen hinzufügen",
+    "sqlEditor": "SQL-Editor",
+    "promqlEditor": "PromQL Editor",
+    "vrlEditor": "VRL-Redakteur",
+    "generateVRL": "VRL generieren",
+    "applyVRL": "VRL anwenden",
+    "runQuery": "Abfrage ausführen",
+    "onStream": "auf",
+    "streamLabel": "fließen",
+    "noStreamSelected": "Kein Stream ausgewählt",
+    "resultsIncludeAllWindows": "Die Ergebnisse beinhalten alle Ergänzungen mit mehreren Fenstern",
+    "runQueryForOutput": "Bitte klicken Sie auf Abfrage ausführen, um die Ausgabe zu sehen",
+    "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen"
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2456,7 +2510,23 @@
     "samplingAllTraces": "Alle Spuren (100%)",
     "samplingOfTraces": "von Spuren",
     "nameLabel": "Name",
-    "llmEvaluationDescription": "Wertet Traces aus und schreibt Ergebnisse in einen separaten Log-Stream"
+    "llmEvaluationDescription": "Wertet Traces aus und schreibt Ergebnisse in einen separaten Log-Stream",
+    "llmEvaluationEnableToggle": "LLM-Auswertung für diesen Trace-Stream aktivieren",
+    "llmEvaluationEnableHelp": "Erstellt eine Echtzeit-Pipeline, die LLM-Traces auswertet und Ergebnisse in einen separaten Log-Stream schreibt.",
+    "llmSpanIdentifierFieldHelp": "Feld, das LLM-Bereiche identifiziert (z. B. gen_ai_system)",
+    "llmEvaluationSamplingRateLabel": "Stichprobenrate: {percentage}%",
+    "llmEvaluationSamplingHelp": "Prozentsatz der auszuwertenden Spuren",
+    "llmEvaluationOutputStreamName": "Name des Ausgabestreams",
+    "llmEvaluationOutputStreamHelp": "Die Bewertungsergebnisse werden in diesen Log-Stream geschrieben",
+    "llmEvaluationRemoveWarning": "Um eine bestehende LLM-Evaluierungspipeline zu entfernen, verwalten Sie sie auf der Seite Pipelines.",
+    "llmEvaluationPipelineExists": "Eine Pipeline mit dem Namen „{streamName}“ existiert bereits für diesen Traces-Stream. Verwalte ihn von der Pipelines-Seite aus.",
+    "llmEvaluationPipelineDescription": "LLM-Evaluierungspipeline für Traces Stream {streamName}",
+    "llmEvaluationCreatedSuccess": "Die LLM-Evaluierungspipeline „{streamName}“ wurde erfolgreich erstellt.",
+    "llmEvaluationCreationFailed": "Die LLM-Evaluierungspipeline konnte nicht erstellt werden.",
+    "promqlOnlyForMetrics": "PromQL ist nur für den Metrik-Stream-Typ verfügbar",
+    "invalidCronExpression": "Ungültiger Cron-Ausdruck",
+    "thresholdShouldNotBeEmpty": "Der Schwellenwert sollte nicht leer sein",
+    "errorGettingResults": "Fehler beim Abrufen der Ergebnisse"
   },
   "reports": {
     "header": "Berichte",
@@ -2515,7 +2585,18 @@
     "timeRangeUpdated": "Der gewählte Zeitraum enthielt diese Spur nicht. Der Zeitbereich wurde aktualisiert, sodass er dem Zeitstempel der Spur entspricht.",
     "fetchingMoreTraces": "Weitere Spuren werden abgerufen...",
     "showErrorOnly": "Nur Fehler anzeigen",
-    "openInTraces": "In Traces öffnen"
+    "openInTraces": "In Traces öffnen",
+    "errorRetrievingTraces": "Beim Abrufen der Spuren ist ein Fehler aufgetreten.",
+    "fetchingTraces": "Halt dich fest, wir suchen deine Spuren.",
+    "noTracesFoundAdjust": "Keine Spuren gefunden. Bitte passen Sie die Filter an und versuchen Sie es erneut.",
+    "tracesTitle": "SPUREN",
+    "tracesFound": "Spuren gefunden",
+    "error": "FEHLER",
+    "errors": "FEHLER",
+    "success": "ERFOLG",
+    "today": "Heute",
+    "yesterday": "Gestern",
+    "spanColorPalettePreview": "Vorschau der Span-Farbpalette"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -2913,7 +2994,8 @@
     "tracesErrorDetails": "Beim Abrufen der Trace-Daten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
     "metricsError": "Metriken können nicht geladen werden",
     "metricsErrorDetails": "Beim Abrufen der Metrikdaten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
-    "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden."
+    "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden.",
+    "errorRetrievingTraces": "Beim Abrufen der Spuren ist ein Fehler aufgetreten."
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",
@@ -2962,5 +3044,10 @@
     "invalidFormat": "Ungültiges Format",
     "mustBeGreaterThan": "Muss größer als {value} sein",
     "mustBeLessThan": "Muss kleiner als {value} sein"
+  },
+  "nlMode": {
+    "toggle": "Modus für natürliche Sprache",
+    "noAdditionalOptions": "Keine zusätzlichen Optionen",
+    "generateVRL": "VRL generieren"
   }
 }

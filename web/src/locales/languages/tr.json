@@ -116,7 +116,9 @@
     "set": "+ Ayarla",
     "copy": "Kopyalama",
     "copySuccess": "Panoya kopyalandı",
-    "copyError": "Panoya kopyalanamadı"
+    "copyError": "Panoya kopyalanamadı",
+    "goBack": "Geri Dön",
+    "stopGenerating": "Oluşturmayı bırak"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -320,7 +322,36 @@
     "buildQuery": "İnşa",
     "enableSqlModeForBuild": "Lütfen SQL modunu etkinleştirin ve sorgu oluşturucuyu kullanmak için tek bir akış seçin",
     "applyToSearch": "Aramaya Uygula",
-    "complexQueryDetected": "Karmaşık sorgu algılandı. Özel modu kullanma."
+    "complexQueryDetected": "Karmaşık sorgu algılandı. Özel modu kullanma.",
+    "searchDimension": "Arama Boyutları",
+    "nlpModeLabel": "Doğal Dil Modu",
+    "generateSQL": "SQL oluştur",
+    "generateQuery": "Yapay zekaya sor",
+    "askAI": "Yapay zekaya sor",
+    "generateSQLTooltip": "Doğal dilden SQL sorgusu oluşturun (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Yapay zekadan sorgunuzla ilgili yardım isteyin",
+    "askAITooltip": "Yapay zekadan sorgunuzla ilgili yardım isteyin",
+    "generating": "Oluşturuluyor...",
+    "nlQueryGenerationFailed": "Sorgu oluşturulamadı. Lütfen tekrar deneyin.",
+    "nlQueryGenerationSuccess": "Sorgu başarıyla oluşturuldu!",
+    "askAIPlaceholder": "Yapay zekadan sorgunuzla ilgili yardım isteyin...",
+    "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
+    "enterPrompt": "Sorgu oluşturmak için bir istem girin",
+    "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin",
+    "analyzingQuery": "Sorgu analiz ediyor...",
+    "generatingQuery": "Sorgu oluşturuluyor...",
+    "queryGeneratedSuccess": "Sorgu başarıyla oluşturuldu!",
+    "queryGenerationStopped": "Sorgu oluşturma durduruldu.",
+    "queryGenerationFailed": "Sorgu oluşturma başarısız oldu.",
+    "fetchingResults": "Arama Sonuçları Getiriliyor...",
+    "noResultsFound": "Hiçbir sonuç bulunamadı",
+    "errorFetchingResults": "Sonuçları getirirken hata oluştu",
+    "somethingWentWrong": "Bir şeyler ters gitti",
+    "selectStreamForAI": "Yapay zekayı kullanmak için önce bir akış seçin",
+    "collapseFields": "Alanları Daralt",
+    "openFields": "Açık Alanlar",
+    "aiBarSuccessPlaceholder": "Bundan sonra ne yapmak istersin?",
+    "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -965,7 +996,10 @@
     "jsType": "JavaScript (ES2023)",
     "vrlfunction": "VRL Fonksiyonu",
     "jsFunctionHint": "Günlük alanlarına erişmek ve değiştirmek için `row` nesnesini kullanın. Örnek: Row.new_field = Row.existing_field + 'processed';",
-    "vrlFunctionHint": "Geçerli olayı temsil etmek için `.` tuşunu kullanın. Örnek: .new_field = .existing_field + 'işlenmiş'"
+    "vrlFunctionHint": "Geçerli olayı temsil etmek için `.` tuşunu kullanın. Örnek: .new_field = .existing_field + 'işlenmiş'",
+    "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
+    "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin",
+    "jsErrorDetails": "JavaScript Hata Ayrıntıları"
   },
   "confirmDialog": {
     "cancel": "İptal",
@@ -1429,7 +1463,14 @@
     "panelTimeSettingsTooltip": "Bu panelin zaman aralığını nasıl belirlediğini yapılandırın. Gösterge panelinin zaman aralığını kullanabilir veya bu panel için özel bir tane ayarlayabilirsiniz.",
     "panelTimeMode": "Zaman Aralığı Kaynağı (Gösterge Tablosu Yüklemesinde)",
     "useDefaultTimeTooltip": "Etkinleştirildiğinde, bu panel genel gösterge paneli zamanı yerine gösterge tablosu yüklenmesinde zaman aralığı olarak yapılandırılmış varsayılan süreyi kullanır.",
-    "defaultDuration": "Varsayılan Süre"
+    "defaultDuration": "Varsayılan Süre",
+    "toggleFunctionEditor": "İşlev Düzenleyicisini Aç/Kapat",
+    "useSavedFunction": "Kaydedilmiş işlevini kullan",
+    "showQueryResults": "Sorgu sonuçlarını göster",
+    "hideQueryResults": "Sorgu sonuçlarını gizle",
+    "vrlExtractionTooltip": "Grafikte çıkarılan VRL alanlarını kullanmak için bir VRL işlevi yazın ve Uygula düğmesine tıklayın. Alanlar çıkarılacak ve bunları grafiği oluşturmak için kullanmanıza izin verecektir.",
+    "errorFetchingFunctions": "İşlevleri getirirken hata oluştu",
+    "functionAppliedSuccess": "{name} işlevi başarıyla uygulandı."
   },
   "panel": {
     "header": "Panel",
@@ -2014,7 +2055,20 @@
       "variablesTooltip": "Değişkenler, verileri uyarıdan hedefe iletmek için kullanılır.",
       "rowTemplateTooltip": "Satır Şablonu uyarı mesajını biçimlendirmek için kullanılır.",
       "templateType": "Şablon Türü:"
-    }
+    },
+    "addConditions": "Koşulları Ekle",
+    "sqlEditor": "SQL Düzenleyici",
+    "promqlEditor": "PromQL Editörü",
+    "vrlEditor": "VRL Editörü",
+    "generateVRL": "VRL oluştur",
+    "applyVRL": "VRL uygulayın",
+    "runQuery": "Sorguyu Çalıştırma",
+    "onStream": "üzerinde",
+    "streamLabel": "akış",
+    "noStreamSelected": "Akış Seçilmedi",
+    "resultsIncludeAllWindows": "Sonuçlar tüm çoklu pencere eklemelerini içerir",
+    "runQueryForOutput": "Çıktıyı görmek için lütfen Sorguyu Çalıştır'a tıklayın",
+    "applyVRLForOutput": "Kombine çıktıyı görmek için lütfen VRL Uygula'ya tıklayın"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2456,7 +2510,23 @@
     "samplingAllTraces": "Tüm izler (100%)",
     "samplingOfTraces": "izlerin",
     "nameLabel": "İsim",
-    "llmEvaluationDescription": "İzleri değerlendirir ve sonuçları ayrı bir günlük akışına yazar"
+    "llmEvaluationDescription": "İzleri değerlendirir ve sonuçları ayrı bir günlük akışına yazar",
+    "llmEvaluationEnableToggle": "Bu izleme akışı için LLM Değerlendirmesini etkinleştir",
+    "llmEvaluationEnableHelp": "LLM izlerini değerlendiren ve sonuçları ayrı bir günlük akışına yazan gerçek zamanlı bir boru hattı oluşturur.",
+    "llmSpanIdentifierFieldHelp": "LLM aralıklarını tanımlayan alan (örn. gen_ai_system)",
+    "llmEvaluationSamplingRateLabel": "Örnekleme oranı: {yüzde} %",
+    "llmEvaluationSamplingHelp": "Değerlendirilecek izlerin yüzdesi",
+    "llmEvaluationOutputStreamName": "Çıktı Akışı Adı",
+    "llmEvaluationOutputStreamHelp": "Değerlendirme sonuçları bu günlük akışına yazılacaktır",
+    "llmEvaluationRemoveWarning": "Mevcut bir LLM Değerlendirme boru hattını kaldırmak için Boru Hatları sayfasından yönetin.",
+    "llmEvaluationPipelineExists": "Bu izleme akışı için “{streamName}” adlı bir boru hattı zaten var. Boru Hatları sayfasından yönetin.",
+    "llmEvaluationPipelineDescription": "İzleme akışı için LLM Değerlendirme boru hattı {streamName}",
+    "llmEvaluationCreatedSuccess": "LLM Değerlendirme boru hattı “{streamName}” başarıyla oluşturuldu.",
+    "llmEvaluationCreationFailed": "LLM Değerlendirme boru hattı oluşturulamadı.",
+    "promqlOnlyForMetrics": "PromQL yalnızca metrik akış türü için kullanılabilir",
+    "invalidCronExpression": "Geçersiz cron ifadesi",
+    "thresholdShouldNotBeEmpty": "Eşik boş olmamalıdır",
+    "errorGettingResults": "Sonuç alınırken hata oluştu"
   },
   "reports": {
     "header": "Raporlar",
@@ -2515,7 +2585,18 @@
     "timeRangeUpdated": "Seçilen zaman aralığı bu izi içermiyordu. Zaman aralığı, izlemenin zaman damgasıyla eşleşecek şekilde güncellendi.",
     "fetchingMoreTraces": "Daha fazla iz getiriyor...",
     "showErrorOnly": "Yalnızca Hatayı Göster",
-    "openInTraces": "Traces'te aç"
+    "openInTraces": "Traces'te aç",
+    "errorRetrievingTraces": "İzler alınırken hata oluştu.",
+    "fetchingTraces": "Sıkı tutun, izlerini getiriyoruz.",
+    "noTracesFoundAdjust": "Hiçbir iz bulunamadı. Lütfen filtreleri ayarlayın ve tekrar deneyin.",
+    "tracesTitle": "İZLERİ",
+    "tracesFound": "İzler Bulundu",
+    "error": "HATA",
+    "errors": "HATALAR",
+    "success": "BAŞARI",
+    "today": "Bugün",
+    "yesterday": "Dün",
+    "spanColorPalettePreview": "Span Renk Paleti Önizlemesi"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -2913,7 +2994,8 @@
     "tracesErrorDetails": "İzleme verileri alınırken bir hata oluştu. Lütfen tekrar deneyin.",
     "metricsError": "Metrikler Yüklenemiyor",
     "metricsErrorDetails": "Metrik verileri alınırken bir hata oluştu. Lütfen tekrar deneyin.",
-    "noMetricsDescription": "Seçilen zaman aralığında bu korelasyon için hiçbir metrik bulunamadı."
+    "noMetricsDescription": "Seçilen zaman aralığında bu korelasyon için hiçbir metrik bulunamadı.",
+    "errorRetrievingTraces": "İzler alınırken hata oluştu."
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",
@@ -2962,5 +3044,10 @@
     "invalidFormat": "Geçersiz biçim",
     "mustBeGreaterThan": "{value} 'den büyük olmalıdır",
     "mustBeLessThan": "{value} 'den küçük olmalıdır"
+  },
+  "nlMode": {
+    "toggle": "Doğal Dil Modu",
+    "noAdditionalOptions": "Ek seçenek yok",
+    "generateVRL": "VRL oluştur"
   }
 }

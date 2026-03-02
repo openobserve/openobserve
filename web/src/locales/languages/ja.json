@@ -116,7 +116,9 @@
     "copyError": "クリップボードへのコピーに失敗しました",
     "reset": "リセット",
     "retry": "リトライ",
-    "set": "+ セット"
+    "set": "+ セット",
+    "goBack": "戻る",
+    "stopGenerating": "生成を停止"
   },
   "search": {
     "metrics": "メトリクス",
@@ -320,7 +322,36 @@
     "buildQuery": "ビルド",
     "enableSqlModeForBuild": "SQL モードを有効にして、クエリビルダーを使用するストリームを 1 つ選択してください",
     "applyToSearch": "検索に適用",
-    "complexQueryDetected": "複雑なクエリが検出されました。カスタムモードを使用する。"
+    "complexQueryDetected": "複雑なクエリが検出されました。カスタムモードを使用する。",
+    "searchDimension": "ディメンション検索",
+    "nlpModeLabel": "自然言語モード",
+    "generateSQL": "SQL を生成",
+    "generateQuery": "AI に聞く",
+    "askAI": "AI に聞く",
+    "generateSQLTooltip": "自然言語から SQL クエリを生成 (Ctrl/Cmd+Enter キー)",
+    "generateQueryTooltip": "AIに問い合わせを依頼する",
+    "askAITooltip": "AIに問い合わせを依頼する",
+    "generating": "生成中...",
+    "nlQueryGenerationFailed": "クエリを生成できませんでした。もう一度試してください。",
+    "nlQueryGenerationSuccess": "クエリは正常に生成されました!",
+    "askAIPlaceholder": "AIに問い合わせて...",
+    "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
+    "enterPrompt": "クエリを生成するプロンプトを入力してください",
+    "enterFunctionPrompt": "関数を生成するプロンプトを入力してください",
+    "analyzingQuery": "クエリを分析中...",
+    "generatingQuery": "クエリーを生成中...",
+    "queryGeneratedSuccess": "クエリは正常に生成されました!",
+    "queryGenerationStopped": "クエリの生成が停止されました。",
+    "queryGenerationFailed": "クエリの生成が失敗しました。",
+    "fetchingResults": "検索結果を取得中...",
+    "noResultsFound": "結果が見つかりません",
+    "errorFetchingResults": "結果を取得中にエラーが発生しました",
+    "somethingWentWrong": "何かがおかしくなった",
+    "selectStreamForAI": "AI を使用するには、まずストリームを選択してください",
+    "collapseFields": "フィールドを折りたたむ",
+    "openFields": "オープンフィールド",
+    "aiBarSuccessPlaceholder": "次は何をしたいですか？",
+    "nlpModeDisabledForVisualization": "複数のストリームを含むビジュアライゼーションでは、自然言語モードを無効にすることはできません"
   },
   "menu": {
     "home": "ホーム",
@@ -982,7 +1013,10 @@
     "jsType": "ジャバスクリプト (2023)",
     "vrlfunction": "VRL ファンクション",
     "jsFunctionHint": "`row` オブジェクトを使用して、ログフィールドにアクセスして変更します。例:row.new_field = row.existing_field + 'processed';",
-    "vrlFunctionHint": "現在のイベントを表すには `.` を使用してください。例:.new_field = .既存のフィールド + '処理済み'"
+    "vrlFunctionHint": "現在のイベントを表すには `.` を使用してください。例:.new_field = .既存のフィールド + '処理済み'",
+    "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
+    "enterFunctionPrompt": "関数を生成するプロンプトを入力してください",
+    "jsErrorDetails": "JavaScript エラーの詳細"
   },
   "confirmDialog": {
     "cancel": "キャンセル",
@@ -1446,7 +1480,14 @@
     "panelTimeSettingsTooltip": "このパネルが時間範囲を決定する方法を設定します。このパネルには、ダッシュボードの時間範囲を使用することも、カスタムの時間範囲を設定することもできます。",
     "panelTimeMode": "時間範囲ソース (ダッシュボードロード時)",
     "useDefaultTimeTooltip": "有効にすると、このパネルは、ダッシュボードのグローバル時間ではなく、設定されたデフォルトの期間をダッシュボードロード時の時間範囲として使用します。",
-    "defaultDuration": "デフォルト期間"
+    "defaultDuration": "デフォルト期間",
+    "toggleFunctionEditor": "関数エディターの切り替え",
+    "useSavedFunction": "保存済み関数を使う",
+    "showQueryResults": "クエリ結果を表示",
+    "hideQueryResults": "クエリ結果を非表示にする",
+    "vrlExtractionTooltip": "抽出された VRL フィールドをチャートで使用するには、VRL 関数を記述して [適用] ボタンをクリックします。フィールドが抽出され、そのフィールドを使用してチャートを作成できます。",
+    "errorFetchingFunctions": "関数を取得中にエラーが発生しました",
+    "functionAppliedSuccess": "{name} 関数が正常に適用されました。"
   },
   "panel": {
     "header": "パネル",
@@ -2031,7 +2072,20 @@
       "variablesTooltip": "変数は、アラートから宛先にデータを渡すために使用されます。",
       "rowTemplateTooltip": "行テンプレートはアラートメッセージのフォーマットに使用されます。",
       "templateType": "テンプレートタイプ:"
-    }
+    },
+    "addConditions": "条件を追加",
+    "sqlEditor": "SQL エディター",
+    "promqlEditor": "プロムQL エディター",
+    "vrlEditor": "VRL エディター",
+    "generateVRL": "VRL を生成",
+    "applyVRL": "VRL を適用",
+    "runQuery": "クエリーを実行",
+    "onStream": "オン",
+    "streamLabel": "ストリーム",
+    "noStreamSelected": "ストリームが選択されていません",
+    "resultsIncludeAllWindows": "結果にはマルチウィンドウの追加がすべて含まれます",
+    "runQueryForOutput": "[クエリの実行] をクリックして出力を確認してください",
+    "applyVRLForOutput": "結合された出力を確認するには、[VRL を適用] をクリックしてください"
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -2477,7 +2531,23 @@
     "samplingAllTraces": "すべてのトレース (100%)",
     "samplingOfTraces": "トレースの",
     "nameLabel": "[名前]",
-    "llmEvaluationDescription": "トレースを評価し、結果を別のログストリームに書き込みます"
+    "llmEvaluationDescription": "トレースを評価し、結果を別のログストリームに書き込みます",
+    "llmEvaluationEnableToggle": "このトレースストリームの LLM 評価を有効にする",
+    "llmEvaluationEnableHelp": "LLM トレースを評価し、結果を別のログストリームに書き込むリアルタイムパイプラインを作成します。",
+    "llmSpanIdentifierFieldHelp": "LLM スパンを識別するフィールド (例:gen_ai_system)",
+    "llmEvaluationSamplingRateLabel": "サンプリングレート:{パーセンテージ}%",
+    "llmEvaluationSamplingHelp": "評価するトレースの割合",
+    "llmEvaluationOutputStreamName": "出力ストリーム名",
+    "llmEvaluationOutputStreamHelp": "評価結果はこのログストリームに書き込まれます",
+    "llmEvaluationRemoveWarning": "既存の LLM 評価パイプラインを削除するには、パイプラインページから管理します。",
+    "llmEvaluationPipelineExists": "このトレースストリームには、「{streamName}」という名前のパイプラインがすでに存在します。パイプラインページから管理してください。",
+    "llmEvaluationPipelineDescription": "トレースストリーム {StreamName} の LLM 評価パイプライン",
+    "llmEvaluationCreatedSuccess": "LLM 評価パイプライン「{StreamName}」は正常に作成されました。",
+    "llmEvaluationCreationFailed": "LLM 評価パイプラインを作成できませんでした。",
+    "promqlOnlyForMetrics": "PromQL はメトリクスストリームタイプでのみ使用できます",
+    "invalidCronExpression": "cron 表現が無効です",
+    "thresholdShouldNotBeEmpty": "敷居は空であってはなりません",
+    "errorGettingResults": "結果を取得中にエラーが発生しました"
   },
   "reports": {
     "header": "レポート",
@@ -2536,7 +2606,18 @@
     "timeRangeUpdated": "選択した時間範囲にはこのトレースが含まれていません。時間範囲はトレースのタイムスタンプと一致するように更新されました。",
     "fetchingMoreTraces": "さらにトレースを取得中...",
     "showErrorOnly": "エラーのみ表示",
-    "openInTraces": "トレースで開く"
+    "openInTraces": "トレースで開く",
+    "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。",
+    "fetchingTraces": "しっかりつかまって足跡を掴んでる",
+    "noTracesFoundAdjust": "トレースが見つかりません。フィルターを調整して、もう一度試してください。",
+    "tracesTitle": "トレース",
+    "tracesFound": "トレースが見つかりました",
+    "error": "エラー",
+    "errors": "エラー",
+    "success": "成功",
+    "today": "今日",
+    "yesterday": "昨日",
+    "spanColorPalettePreview": "Span カラーパレットのプレビュー"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -2913,7 +2994,8 @@
     "tracesErrorDetails": "トレースデータの取得中にエラーが発生しました。もう一度試してください。",
     "metricsError": "メトリクスを読み込めません",
     "metricsErrorDetails": "メトリックスデータの取得中にエラーが発生しました。もう一度試してください。",
-    "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。"
+    "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。",
+    "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",
@@ -2962,5 +3044,10 @@
     "invalidFormat": "形式が無効です",
     "mustBeGreaterThan": "{value} より大きくなければなりません",
     "mustBeLessThan": "{value} より小さくなければなりません"
+  },
+  "nlMode": {
+    "toggle": "自然言語モード",
+    "noAdditionalOptions": "追加オプションなし",
+    "generateVRL": "VRL を生成"
   }
 }
