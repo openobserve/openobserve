@@ -100,11 +100,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading banner: shown above rows while a new page is fetching -->
           <template #loading-banner>
             <div
-              data-test="traces-table-loading-banner"
-              class="tw:sticky tw:top-[2.25rem] tw:z-[1] tw:min-w-max tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.3rem] tw:text-[0.75rem] tw:font-semibold tw:border-b tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg-solid)] tw:opacity-90"
+              data-test="traces-table-loading-row"
+              class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
             >
-              <q-spinner-hourglass size="1rem" color="primary" />
-              {{ t("traces.fetchingTraces") }}
+              <q-spinner-hourglass
+                color="primary"
+                size="1.25rem"
+                class="tw:mx-[0.25rem]"
+              />
+              <span
+                class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
+                >{{ t("traces.fetchingTraces") }}</span
+              >
             </div>
           </template>
 
@@ -112,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #loading>
             <div
               data-test="traces-table-loading-row"
-              class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]! tw:ml-[0.5rem]"
+              class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
             >
               <q-spinner-hourglass
                 color="primary"
