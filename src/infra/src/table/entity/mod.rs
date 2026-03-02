@@ -31,6 +31,7 @@ pub mod search_job_results;
 pub mod search_jobs;
 pub mod search_queue;
 pub mod sessions;
+pub mod source_maps;
 pub mod system_prompts;
 pub mod system_settings;
 pub mod templates;

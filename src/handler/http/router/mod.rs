@@ -734,7 +734,12 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/service_accounts/{email_id}", get(service_accounts::get_api_token).put(service_accounts::update).delete(service_accounts::delete))
 
         // MCP
-        .route("/{org_id}/mcp", get(mcp::handle_mcp_get).post(mcp::handle_mcp_post));
+        .route("/{org_id}/mcp", get(mcp::handle_mcp_get).post(mcp::handle_mcp_post))
+
+        // sourcemaps
+        .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
+        .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
+        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace));
 
     #[cfg(feature = "enterprise")]
     {
