@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="field.ftsKey || !field.isSchemaField || !field.showValues"
     class="field-container flex content-center ellipsis full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
-    :class="field.name !== timestampColumn ? 'q-pl-lg' : ''"
+
     :title="field.name"
   >
     <div
@@ -33,7 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-if="field.dataType"
           class="field-type-badge"
-          :style="{ backgroundColor: fieldTypeInfo.color }"
+          :style="{
+            backgroundColor: fieldTypeInfo.color,
+            color: fieldTypeInfo.textColor,
+          }"
           :title="field.dataType"
         >{{ fieldTypeInfo.label }}</span>
         {{ field.name }}
@@ -134,14 +137,42 @@ const isFieldSelected = computed(() =>
 );
 
 const fieldTypeInfo = computed(() => {
-  if (props.field.name === props.timestampColumn) return { label: "T", color: "#3498db" };
+  if (props.field.name === props.timestampColumn)
+    return {
+      label: "T",
+      color: "var(--o2-field-type-timestamp-bg)",
+      textColor: "var(--o2-field-type-timestamp-text)",
+    };
   const t = (props.field.dataType || "").toLowerCase();
-  if (t === "boolean") return { label: "B", color: "#e74c3c" };
-  if (t.includes("float")) return { label: "~", color: "#9b59b6" };
-  if (t.includes("int") || t.includes("uint")) return { label: "#", color: "#e67e22" };
+  if (t === "boolean")
+    return {
+      label: "B",
+      color: "var(--o2-field-type-boolean-bg)",
+      textColor: "var(--o2-field-type-boolean-text)",
+    };
+  if (t.includes("float"))
+    return {
+      label: "~",
+      color: "var(--o2-field-type-float-bg)",
+      textColor: "var(--o2-field-type-float-text)",
+    };
+  if (t.includes("int") || t.includes("uint"))
+    return {
+      label: "#",
+      color: "var(--o2-field-type-number-bg)",
+      textColor: "var(--o2-field-type-number-text)",
+    };
   if (t.includes("timestamp") || t === "date32" || t === "date64")
-    return { label: "T", color: "#3498db" };
-  return { label: "S", color: "#27ae60" };
+    return {
+      label: "T",
+      color: "var(--o2-field-type-timestamp-bg)",
+      textColor: "var(--o2-field-type-timestamp-text)",
+    };
+  return {
+    label: "S",
+    color: "var(--o2-field-type-string-bg)",
+    textColor: "var(--o2-field-type-string-text)",
+  };
 });
 </script>
 
@@ -177,7 +208,7 @@ const fieldTypeInfo = computed(() => {
   height: 1rem;
   border-radius: 0.2rem;
   font-size: 0.6rem;
-  font-weight: 700;
+  font-weight: 800;
   color: #fff;
   margin-right: 0.3rem;
   flex-shrink: 0;
