@@ -635,6 +635,21 @@ const modifyResourcePermissions = (resource: Resource) => {
     resource.permission.AllowDelete.show = false;
     resource.permission.AllowPost.show = false;
   }
+  if (
+    resource.resourceName === "logs_pattern" ||
+    resource.resourceName === "logs_insights"
+  ) {
+    resource.permission.AllowList.show = false;
+    resource.permission.AllowDelete.show = false;
+    resource.permission.AllowPost.show = false;
+    resource.permission.AllowPut.show = false;
+  }
+  if (resource.resourceName === "logs_cache") {
+    resource.permission.AllowList.show = false;
+    resource.permission.AllowGet.show = false;
+    resource.permission.AllowPost.show = false;
+    resource.permission.AllowPut.show = false;
+  }
 };
 
 const getResourcePermissions = () => {
@@ -1388,6 +1403,9 @@ const getResourceEntities = (resource: Resource | Entity) => {
     cipher_keys: getCipherKeys,
     afolder: getAlertFolders,
     re_patterns: getRePatterns,
+    logs_pattern: getLogsPatternStreams,
+    logs_insights: getLogsInsightsStreams,
+    logs_cache: getLogsCacheStreams,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1635,6 +1653,36 @@ const getLogs = async (resource: Resource | Entity) => {
   updateEntityEntities(resource, ["name"], logs.list);
 
   return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getLogsPatternStreams = async (resource: Resource | Entity) => {
+  const logs: any = await getStreams("logs", false);
+
+  updateResourceEntities("logs_pattern", ["name"], logs.list);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getLogsInsightsStreams = async (resource: Resource | Entity) => {
+  const logs: any = await getStreams("logs", false);
+
+  updateResourceEntities("logs_insights", ["name"], logs.list);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getLogsCacheStreams = async (resource: Resource | Entity) => {
+  const logs: any = await getStreams("logs", false);
+
+  updateResourceEntities("logs_cache", ["name"], logs.list);
+
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1963,6 +2011,25 @@ const updateResourceEntities = (
       top_level: !!resource.childs.find((child) => child.name === childName)
         ?.top_level,
     });
+    // Hide non-applicable permissions for logs_pattern and logs_insights entities
+    if (
+      resourceName === "logs_pattern" ||
+      resourceName === "logs_insights"
+    ) {
+      const entity = resource.entities[resource.entities.length - 1];
+      entity.permission.AllowList.show = false;
+      entity.permission.AllowDelete.show = false;
+      entity.permission.AllowPost.show = false;
+      entity.permission.AllowPut.show = false;
+    }
+    // Hide non-applicable permissions for logs_cache entities (only All and Delete)
+    if (resourceName === "logs_cache") {
+      const entity = resource.entities[resource.entities.length - 1];
+      entity.permission.AllowList.show = false;
+      entity.permission.AllowGet.show = false;
+      entity.permission.AllowPost.show = false;
+      entity.permission.AllowPut.show = false;
+    }
   });
 };
 
