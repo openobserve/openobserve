@@ -49,7 +49,7 @@ mod triggers_schema;
 mod usage_schema;
 
 #[cfg(feature = "cloud")]
-use ingestion::ingest_data_retention_usages;
+pub use ingestion::ingest_data_retention_usages;
 
 pub async fn run() {
     #[cfg(not(feature = "enterprise"))]
