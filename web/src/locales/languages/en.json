@@ -2318,7 +2318,9 @@
       "frequencyTooltipCron": "Standard UNIX cron format with 5 fields separated by space: [Minute 0-59] [Hour 0-23] [Day of Month 1-31] [Month 1-12 or JAN-DEC] [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].",
       "timezoneWarning": "Warning: The displayed timezone is approximate. Verify and select the correct timezone manually.",
       "destinationsTooltip": "Select one or more destinations to send alert notifications.",
-      "templateTooltip": "Optional: Select a template to use for all destinations in this alert. Templates allow you to customize the format of alert messages. If not selected, each destination will use its own configured template."
+      "templateTooltip": "Optional: Select a template to use for all destinations in this alert. Templates allow you to customize the format of alert messages. If not selected, each destination will use its own configured template.",
+      "createsIncident": "Creates Incident",
+      "createsIncidentTooltip": "If an alert can create an incident, it does not send a dedicated notification. Instead, a notification for the incident is sent when a new incident is created or a new alert type joins an existing incident."
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -2345,7 +2347,7 @@
     "body": "Body"
   },
   "alert_destinations": {
-    "header": "Alert Destinations",
+    "header": "Notification Destinations",
     "add": "New destination",
     "edit": "Edit",
     "search": "Search destination",

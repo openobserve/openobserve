@@ -92,6 +92,13 @@ pub struct Alert {
     pub last_edited_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deduplication: Option<DeduplicationConfig>,
+    /// When true, this alert creates/joins incidents instead of sending direct notifications.
+    /// Notification is sent only when a new incident is created or a new alert type joins
+    /// an existing incident. Repeated firings are suppressed.
+    /// When false (default), the alert sends notifications directly and does not correlate
+    /// to any incident.
+    #[serde(default)]
+    pub creates_incident: bool,
 }
 
 impl MemorySize for Alert {
@@ -148,6 +155,7 @@ impl Default for Alert {
             last_edited_by: None,
             last_satisfied_at: None,
             deduplication: None,
+            creates_incident: false,
         }
     }
 }
@@ -614,6 +622,24 @@ mod tests {
             Some((StreamType::Logs, Some("test_stream".to_string())))
         );
         assert_eq!(params.page_size_and_idx, Some((20, 1)));
+    }
+
+    #[test]
+    fn test_creates_incident_defaults_to_false() {
+        // Deserializing an alert JSON without creates_incident should default to false
+        let json = r#"{
+            "name": "test_alert",
+            "org_id": "test_org",
+            "stream_type": "logs",
+            "stream_name": "test_stream",
+            "is_real_time": false,
+            "destinations": [],
+            "description": "",
+            "enabled": false,
+            "tz_offset": 0
+        }"#;
+        let alert: Alert = serde_json::from_str(json).unwrap();
+        assert_eq!(alert.creates_incident, false);
     }
 
     #[test]
