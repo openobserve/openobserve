@@ -504,6 +504,17 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-tag-grey-1: #E2E8F0;
   --o2-tag-grey-2: #eaebec;
 
+  // Field Type Badge Colors
+  --o2-field-type-string-bg: oklch(95% 0.052 163.051);
+  --o2-field-type-string-text: oklch(59.6% 0.145 163.225);
+  --o2-field-type-boolean-bg: #e74c3c;
+  --o2-field-type-boolean-text: #fff;
+  --o2-field-type-float-bg: oklch(94.6% 0.033 307.174);
+  --o2-field-type-float-text: oklch(55.8% 0.288 302.321);
+  --o2-field-type-number-bg: oklch(95.4% 0.038 75.164);
+  --o2-field-type-number-text: oklch(64.6% 0.222 41.116);
+  --o2-field-type-timestamp-bg: oklch(93.2% 0.032 255.585);
+  --o2-field-type-timestamp-text: oklch(54.6% 0.245 262.881);
 
   // Span Colors for Traces (Light Mode)
   --o2-span-1: #{$o2-span-1};
