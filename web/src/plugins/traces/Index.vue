@@ -199,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="searchResultRef"
                   @update:datetime="setHistogramDate"
                   @update:scroll="getMoreData"
+                  @update:sort="runQueryFn"
                   @shareLink="copyTracesUrl"
                   @metrics:filters-updated="onMetricsFiltersUpdated"
                 />
@@ -792,6 +793,8 @@ async function getQueryData(isPagination: boolean = false) {
           end_time: queryReq.query.end_time,
           from: queryReq.query.from,
           size: queryReq.query.size,
+          sort_by: searchObj.meta.resultGrid.sortBy || "start_time",
+          sort_order: searchObj.meta.resultGrid.sortOrder || "desc",
         },
         type: "traces",
         traceId: searchTraceId,

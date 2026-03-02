@@ -51,14 +51,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="header in table.getHeaderGroups()[0].headers"
         :key="header.id"
-        class="tw:px-2 tw:truncate text-caption text-weight-bold"
-        :class="getAlignClass(header.column)"
+        class="tw:px-2 tw:truncate text-caption text-weight-bold tw:select-none"
+        :class="[
+          getAlignClass(header.column),
+          header.column.columnDef.meta?.sortable ? 'tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-[0.25rem]' : '',
+        ]"
         :style="getColumnStyle(header.column)"
+        @click="handleHeaderClick(header.column)"
       >
         <FlexRender
           :render="header.column.columnDef.header"
           :props="header.getContext()"
         />
+        <template v-if="header.column.columnDef.meta?.sortable">
+          <q-icon
+            v-if="SORT_FIELD_MAP[header.column.id] === sortBy"
+            :name="sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'"
+            data-test="traces-table-sort-icon-active"
+            size="0.85rem"
+            class="tw:text-[var(--o2-primary-color)]"
+          />
+          <q-icon
+            v-else
+            name="unfold_more"
+            data-test="traces-table-sort-icon-inactive"
+            size="0.85rem"
+            class="tw:opacity-40"
+          />
+        </template>
       </div>
     </div>
 
@@ -123,6 +143,8 @@ declare module "@tanstack/vue-table" {
     width?: number;
     /** text alignment for both header and cell */
     align?: "left" | "center" | "right";
+    /** whether clicking the header triggers server-side sort */
+    sortable?: boolean;
   }
 }
 export default {};
@@ -157,12 +179,17 @@ const props = withDefaults(
     rowClass?: (
       row: T,
     ) => string | string[] | Record<string, boolean> | undefined;
+    /** Active sort field name (backend field, e.g. "start_time" or "duration") */
+    sortBy?: string;
+    /** Active sort direction */
+    sortOrder?: "asc" | "desc";
   }>(),
   { loading: false },
 );
 
 const emit = defineEmits<{
   "row-click": [row: T];
+  "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
 }>();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,6 +223,25 @@ const rowVirtualizer = useVirtualizer(
   })),
 );
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sort
+// ─────────────────────────────────────────────────────────────────────────────
+/** Maps column id → backend sort_by field name */
+const SORT_FIELD_MAP: Record<string, string> = {
+  timestamp: "start_time",
+  duration: "duration",
+};
+
+function handleHeaderClick(column: Column<T, unknown>) {
+  if (!column.columnDef.meta?.sortable) return;
+  const fieldName = SORT_FIELD_MAP[column.id] ?? column.id;
+  if (fieldName === props.sortBy) {
+    emit("sort-change", fieldName, props.sortOrder === "desc" ? "asc" : "desc");
+  } else {
+    emit("sort-change", fieldName, "desc");
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column sizing helpers

@@ -35,6 +35,7 @@ export function useTracesTableColumns(showLlmColumns: Ref<boolean>) {
         id: "timestamp",
         header: "TIMESTAMP",
         size: 160,
+        meta: { sortable: true },
       },
       {
         id: "service_operation",
@@ -45,6 +46,7 @@ export function useTracesTableColumns(showLlmColumns: Ref<boolean>) {
         id: "duration",
         header: "DURATION",
         size: 120,
+        meta: { sortable: true },
       },
       {
         id: "spans",

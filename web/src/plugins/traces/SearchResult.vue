@@ -73,9 +73,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :current-page="searchObj.data.resultGrid.currentPage + 1"
         :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
         :show-pagination="searchObj.meta.resultGrid.showPagination"
+        :sort-by="searchObj.meta.resultGrid.sortBy"
+        :sort-order="searchObj.meta.resultGrid.sortOrder"
         @row-click="expandRowDetail"
         @page-change="changePage"
         @rows-per-page-change="changeRowsPerPage"
+        @sort-change="changeSortBy"
       />
     </div>
   </div>
@@ -102,6 +105,7 @@ export default defineComponent({
   emits: [
     "update:scroll",
     "update:datetime",
+    "update:sort",
     "remove:searchTerm",
     "search:timeboxed",
     "get:traceDetails",
@@ -194,6 +198,14 @@ export default defineComponent({
       emit("update:scroll");
     }
 
+    function changeSortBy(sortBy: string, sortOrder: "asc" | "desc") {
+      if (searchObj.loading) return;
+      searchObj.meta.resultGrid.sortBy = sortBy;
+      searchObj.meta.resultGrid.sortOrder = sortOrder;
+      searchObj.data.resultGrid.currentPage = 0;
+      emit("update:sort");
+    }
+
     return {
       t,
       store,
@@ -208,6 +220,7 @@ export default defineComponent({
       searchPerformed,
       changePage,
       changeRowsPerPage,
+      changeSortBy,
     };
   },
 });

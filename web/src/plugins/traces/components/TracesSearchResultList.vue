@@ -108,7 +108,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows="hits"
           :loading="loading"
           :row-class="traceRowClass"
+          :sort-by="props.sortBy"
+          :sort-order="props.sortOrder"
           @row-click="(row: any) => emit('row-click', row)"
+          @sort-change="(by, order) => emit('sort-change', by, order)"
         >
           <!-- Loading banner: shown above rows while a new page is fetching -->
           <template #loading-banner>
@@ -247,6 +250,10 @@ interface Props {
   showPagination?: boolean;
   /** Error trace count from the count query. */
   errorCount?: number;
+  /** Active sort field (backend field name, e.g. "zo_sql_timestamp") */
+  sortBy?: string;
+  /** Active sort direction */
+  sortOrder?: "asc" | "desc";
 }
 
 const { t } = useI18n();
@@ -259,12 +266,15 @@ const props = withDefaults(defineProps<Props>(), {
   rowsPerPage: 25,
   showPagination: false,
   errorCount: undefined,
+  sortBy: undefined,
+  sortOrder: undefined,
 });
 
 const emit = defineEmits<{
   "row-click": [row: any];
   "page-change": [page: number];
   "rows-per-page-change": [rowsPerPage: number];
+  "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
 }>();
 
 const rowsPerPageOptions = [10, 25, 50, 100];

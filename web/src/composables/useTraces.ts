@@ -70,6 +70,8 @@ const defaultObject = {
       manualRemoveFields: false,
       rowsPerPage: 25,
       showPagination: false,
+      sortBy: "start_time" as string,
+      sortOrder: "desc" as "asc" | "desc",
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
