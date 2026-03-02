@@ -11,10 +11,11 @@
     <template v-slot:header>
       <div class="flex content-center ellipsis full-width" :title="row.name">
         <div
-          class="field_label ellipsis"
+          class="field_label ellipsis tw:flex tw:items-center"
           style="width: calc(100% - 28px); font-size: 14px"
           :title="row.label || row.name"
         >
+          <FieldTypeBadge :dataType="row.dataType" />
           {{ row.label || row.name }}
         </div>
         <div class="field_overlay">
@@ -148,6 +149,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 import {
   outlinedAdd,
   outlinedArrowBackIos,
