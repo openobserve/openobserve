@@ -318,12 +318,13 @@ const handleAddMultipleSearchTerms = (
   values: string[],
   action: string,
 ) => {
-  const terms = values
-    .map((v) =>
-      action === "include" ? `${fieldName}='${v}'` : `${fieldName}!='${v}'`,
-    )
-    .join(action === "include" ? " or " : " and ");
-  addSearchTerm(terms);
+  const joinOp = action === "include" ? " or " : " and ";
+  const expressions = values.map((v) =>
+    action === "include" ? `${fieldName}='${v}'` : `${fieldName}!='${v}'`,
+  );
+  const combined =
+    expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0];
+  addSearchTerm(combined);
 };
 
 const handleBeforeHide = () => {
