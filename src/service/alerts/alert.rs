@@ -1743,8 +1743,9 @@ async fn process_dest_template(
                     resp = resp.replace(&pattern, &json_str);
                     // Also replace plain "{rows}" if it coexists
                     if resp.contains("\"{rows}\"") {
-                        let all_rows_str = serde_json::to_string(&Value::Array(rows_tpl_val.to_vec()))
-                            .unwrap_or_else(|_| "[]".to_string());
+                        let all_rows_str =
+                            serde_json::to_string(&Value::Array(rows_tpl_val.to_vec()))
+                                .unwrap_or_else(|_| "[]".to_string());
                         resp = resp.replace("\"{rows}\"", &all_rows_str);
                     }
                 } else {
@@ -3216,10 +3217,7 @@ mod tests {
 
         // Not in value position — should be false
         assert!(!check_json_context(r#""{...rows}": "value""#, "rows"));
-        assert!(!check_json_context(
-            r#""data": "prefix {...rows}""#,
-            "rows"
-        ));
+        assert!(!check_json_context(r#""data": "prefix {...rows}""#, "rows"));
     }
 
     #[test]
@@ -3232,10 +3230,7 @@ mod tests {
             extract_spread_rows_limit(r#""data": "{...rows:10}""#),
             Some(10)
         );
-        assert_eq!(
-            extract_spread_rows_limit(r#""data": "{...rows}""#),
-            None
-        );
+        assert_eq!(extract_spread_rows_limit(r#""data": "{...rows}""#), None);
         assert_eq!(extract_spread_rows_limit(r#""data": "{rows:3}""#), None);
     }
 
@@ -3343,10 +3338,7 @@ mod tests {
     async fn test_process_dest_template_spread_rows_single_objects() {
         // "{...rows}" with single object rows (no arrays) — works like "{rows}"
         let dest_tpl = r#"{"data": "{...rows}"}"#;
-        let rows_tpl_val = vec![
-            json!({"user": "Alice"}),
-            json!({"user": "Bob"}),
-        ];
+        let rows_tpl_val = vec![json!({"user": "Alice"}), json!({"user": "Bob"})];
         let mut row1 = Map::new();
         row1.insert("user".to_string(), json!("Alice"));
         let mut row2 = Map::new();
