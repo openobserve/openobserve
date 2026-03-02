@@ -2742,7 +2742,7 @@
     "timeRangeUpdated": "The selected time range did not include this trace. The time range has been updated to match the trace's timestamp.",
     "fetchingMoreTraces": "Fetching more traces...",
     "errorRetrievingTraces": "Error occurred while retrieving traces.",
-    "fetchingTraces": "Hold on tight, we're fetching your traces.",
+    "fetchingTraces": "Loading traces...",
     "noTracesFoundAdjust": "No traces found. Please adjust the filters and try again.",
     "tracesTitle": "TRACES",
     "tracesFound": "Traces Found",

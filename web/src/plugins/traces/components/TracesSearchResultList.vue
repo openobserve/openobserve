@@ -16,26 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="traces-search-result-list tw:h-full tw:flex tw:flex-col">
-    <!-- ════════════════════ Loading State ════════════════════ -->
-    <div
-      v-if="loading"
-      class="full-height flex justify-center items-center tw:pt-[4rem]"
-    >
-      <div class="q-pb-lg">
-        <q-spinner-hourglass
-          color="primary"
-          size="40px"
-          class="tw:mx-auto tw:block"
-        />
-        <span class="text-center">
-          {{ t("traces.fetchingTraces") }}
-        </span>
-      </div>
-    </div>
-
     <!-- ════════════════════ Empty State ════════════════════ -->
     <div
-      v-else-if="noResults"
+      v-if="noResults"
       class="text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
     >
       <q-icon name="info" color="primary" size="md" />
@@ -45,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════════════════ Traces List Section ════════════════════ -->
     <div
       v-else
-      v-show="hasResults"
+      v-show="hasResults || loading"
       data-test="traces-table-wrapper"
       class="column tw:h-full tw:flex-1 tw:min-h-0"
     >
@@ -110,9 +93,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <TracesTable
           :columns="tracesColumns"
           :rows="hits"
+          :loading="loading"
           :row-class="traceRowClass"
           @row-click="(row: any) => emit('row-click', row)"
         >
+          <!-- Loading banner: shown above rows while a new page is fetching -->
+          <template #loading-banner>
+            <div
+              data-test="traces-table-loading-banner"
+              class="tw:sticky tw:top-[2.25rem] tw:z-[1] tw:min-w-max tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.3rem] tw:text-[0.75rem] tw:font-semibold tw:border-b tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg-solid)] tw:opacity-90"
+            >
+              <q-spinner-hourglass size="1rem" color="primary" />
+              {{ t("traces.fetchingTraces") }}
+            </div>
+          </template>
+
+          <!-- Loading row: shown when no rows exist yet (first fetch) -->
+          <template #loading>
+            <div
+              data-test="traces-table-loading-row"
+              class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]! tw:ml-[0.5rem]"
+            >
+              <q-spinner-hourglass
+                color="primary"
+                size="1.25rem"
+                class="tw:mr-[0.25rem]"
+              />
+              <span
+                class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
+                >{{ t("traces.fetchingTraces") }}</span
+              >
+            </div>
+          </template>
+
           <template #cell-timestamp="{ item }">
             <TraceTimestampCell :item="item" />
           </template>

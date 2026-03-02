@@ -28,7 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     Use 'oz-table__row--error' to render the red left-border error variant.
 
   Slots:
-    #loading              — shown while loading=true
+    #loading-banner       — shown as a sticky row above data rows while loading=true
+                            and rows are already present (use for inline progress indicator)
+    #loading              — shown while loading=true and rows array is empty
     #empty                — shown when rows is empty and loading=false
     #cell-{columnId}      — scoped slot for a specific column cell.
                             Slot props: { item: T, cell: Cell<T, unknown> }
@@ -60,8 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- ── Virtual rows ───────────────────────────────────────────────────── -->
-    <template v-if="!loading && allRows.length">
+    <!-- ── Loading banner slot (rows already present, new fetch in progress) -->
+    <slot v-if="loading && allRows.length" name="loading-banner" />
+
+    <!-- ── Virtual rows (always shown when rows are available) ───────────── -->
+    <template v-if="allRows.length">
       <div
         class="tw:relative tw:w-full"
         :style="{ height: `${rowVirtualizer.getTotalSize()}px` }"
