@@ -50,6 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="`${props.total != null ? props.total : hits.length} ${t('traces.tracesFound')}`"
           class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
         />
+        <q-badge
+          v-if="props.errorCount != null"
+          data-test="traces-error-count-badge"
+          rounded
+          :label="`${props.errorCount} ${t('traces.errorsFound')}`"
+          class="text-caption tw:bg-[var(--q-negative)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-white! tw:mr-[0.85rem]"
+        />
 
         <q-space />
 
@@ -58,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-select
             :model-value="rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination tw:mr-[0.25rem] tw:border-0!"
+            class="select-pagination tw:mr-[0.25rem]"
             size="sm"
             dense
             borderless
@@ -232,6 +239,8 @@ interface Props {
   rowsPerPage?: number;
   /** Whether to show the pagination controls. */
   showPagination?: boolean;
+  /** Error trace count from the count query. */
+  errorCount?: number;
 }
 
 const { t } = useI18n();
@@ -243,6 +252,7 @@ const props = withDefaults(defineProps<Props>(), {
   currentPage: 1,
   rowsPerPage: 25,
   showPagination: false,
+  errorCount: undefined,
 });
 
 const emit = defineEmits<{

@@ -2746,6 +2746,7 @@
     "noTracesFoundAdjust": "No traces found. Please adjust the filters and try again.",
     "tracesTitle": "TRACES",
     "tracesFound": "Traces Found",
+    "errorsFound": "Error Traces",
     "error": "ERROR",
     "errors": "ERRORS",
     "success": "SUCCESS",

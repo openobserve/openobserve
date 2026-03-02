@@ -641,7 +641,7 @@ function fetchTracesCount() {
   if (!queryReq || !selectedStreamName.value) return;
 
   const streamName = selectedStreamName.value;
-  const countSql = `select approx_distinct(trace_id) as trace_count FROM "${streamName}"${builtWhereClause ? " WHERE " + builtWhereClause : ""}`;
+  const countSql = `select approx_distinct(trace_id) as trace_count, (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR')) as error_count FROM "${streamName}"${builtWhereClause ? " WHERE " + builtWhereClause : ""}`;
   const countTraceId = getUUID().replace(/-/g, "");
 
   fetchQueryDataWithHttpStream(
@@ -668,6 +668,7 @@ function fetchTracesCount() {
         if (hits.length > 0) {
           const count = hits[0]?.trace_count ?? 0;
           searchObj.data.queryResults.total = count;
+          searchObj.data.queryResults.errorCount = hits[0]?.error_count ?? 0;
           searchObj.meta.resultGrid.showPagination = count > 0;
         }
       },
@@ -759,6 +760,8 @@ async function getQueryData(isPagination: boolean = false) {
     queryReq.query.from =
       searchObj.data.resultGrid.currentPage *
       searchObj.meta.resultGrid.rowsPerPage;
+
+    queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
     // Filters are already in editorValue (set by metrics dashboard brush selections)
     const filter = searchObj.data.editorValue.trim();

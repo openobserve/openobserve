@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="searchObj.loading"
         :search-performed="searchPerformed"
         :total="searchObj.data.queryResults.total"
+        :error-count="searchObj.data.queryResults.errorCount"
         :show-header="
           !!(
             searchObj.data.stream.selectedStream.value &&
