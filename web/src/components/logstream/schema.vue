@@ -243,6 +243,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Configuration"
                     no-caps
                   />
+                  <!-- LLM Evaluation Tab (enterprise + ai_enabled + traces only) -->
+                  <q-tab
+                    v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled && indexData.stream_type === 'traces'"
+                    name="llmEvaluation"
+                    icon="psychology"
+                    :label="t('pipeline.llmEvaluation')"
+                    no-caps
+                    data-test="stream-llm-evaluation-tab"
+                  />
                 </q-tabs>
               </div>
             </div>
@@ -861,6 +870,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
+
+            <!-- LLM Evaluation tab -->
+            <LlmEvaluationSettings
+              v-if="activeMainTab == 'llmEvaluation'"
+              ref="llmEvalSettingsRef"
+              :stream-name="indexData.name"
+              :stream-fields="llmEvalStreamFields"
+              @dirty="llmEvalFormDirty = true"
+            />
+
             <!-- floating footer for the table -->
             <div
               :class="
@@ -870,8 +889,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               class="floating-buttons q-px-sm q-py-xs"
             >
+              <!-- LLM Evaluation tab footer -->
               <div
-                v-if="indexData.schema.length > 0"
+                v-if="activeMainTab === 'llmEvaluation'"
+                class="flex items-center justify-end"
+              >
+                <q-btn
+                  v-close-popup="true"
+                  data-test="schema-cancel-button"
+                  class="q-ml-md o2-secondary-button tw:h-[36px]"
+                  :label="t('logStream.cancel')"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  no-caps
+                  flat
+                  @click="llmEvalFormDirty = false"
+                />
+                <q-btn
+                  v-bind:disable="!llmEvalFormDirty"
+                  data-test="schema-update-settings-button"
+                  :label="t('logStream.updateSettings')"
+                  class="no-border q-ml-md o2-primary-button tw:h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                  no-caps
+                  flat
+                  @click="llmEvalSettingsRef?.save()"
+                />
+              </div>
+
+              <div
+                v-else-if="indexData.schema.length > 0"
                 class="flex items-center justify-between"
               >
                 <div class="flex items-center">
@@ -1022,6 +1068,7 @@ import DateTime from "@/components/DateTime.vue";
 
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
+import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 
 const defaultValue: any = () => {
   return {
@@ -1050,6 +1097,7 @@ export default defineComponent({
     DateTime,
     AssociatedRegexPatterns,
     PerformanceFieldsDialog,
+    LlmEvaluationSettings,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -1092,6 +1140,12 @@ export default defineComponent({
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
+
+    const llmEvalStreamFields = computed(() =>
+      (indexData.value.schema || []).map((f: any) => ({ label: f.name, value: f.name }))
+    );
+    const llmEvalSettingsRef = ref<any>(null);
+    const llmEvalFormDirty = ref(false);
     const isDialogOpen = ref(false);
     const patternAssociations = ref([]);
     const redDaysList = ref([]);
@@ -1907,6 +1961,7 @@ export default defineComponent({
 
     const updateActiveMainTab = (tab) => {
       activeMainTab.value = tab;
+      if (tab !== "llmEvaluation") llmEvalFormDirty.value = false;
     };
 
     // Function to get missing FTS and Secondary Index fields
@@ -2383,9 +2438,6 @@ export default defineComponent({
         : getImageURL("images/streams/timeline.svg");
     });
 
-
-
-
     return {
       t,
       q,
@@ -2486,6 +2538,9 @@ export default defineComponent({
       quickModeIcon,
       getConfigIcon,
       getTimelineIcon,
+      llmEvalStreamFields,
+      llmEvalSettingsRef,
+      llmEvalFormDirty,
     };
   },
   created() {

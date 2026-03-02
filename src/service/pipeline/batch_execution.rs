@@ -404,24 +404,22 @@ impl ExecutablePipeline {
             log::info!(
                 "[Pipeline] {pl_name_for_results} [inv={inv_id_for_results}]: starts result collecting job"
             );
-            let mut count: usize = 0;
             let mut results = HashMap::new();
             while let Some((idx, stream_params, record)) = result_receiver.recv().await {
-                log::info!(
-                    "[Pipeline] {pl_name_for_results} [inv={inv_id_for_results}]: result collector got record for {}:{}",
-                    stream_params.stream_type,
-                    stream_params.stream_name,
-                );
+                if stream_params.stream_type != StreamType::Traces {
+                    log::info!("record: {:?}", record);
+                    log::info!(
+                        "[Pipeline] {pl_name_for_results} [inv={inv_id_for_results}]: result collector got record for {}:{}",
+                        stream_params.stream_type,
+                        stream_params.stream_name,
+                    );
+                }
+
                 results
                     .entry(stream_params)
                     .or_insert(Vec::new())
                     .push((idx, record));
-                count += 1;
             }
-            log::info!(
-                "[Pipeline] {pl_name_for_results} [inv={inv_id_for_results}]: collected {count} records total, {} streams",
-                results.len()
-            );
             results
         });
 
