@@ -430,7 +430,13 @@ fn group_leader_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspecto
 fn sort_events_by_timestamp(mut events: Vec<SearchInspectorFields>) -> Vec<SearchInspectorFields> {
     events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
     // reset trace_id to None
-    // events.iter_mut().for_each(|e| e.trace_id = None);
+    events.iter_mut().for_each(|e| {
+        e.trace_id = None;
+        e.search_role = None;
+        e.cluster = None;
+        e.region = None;
+        e.node_name = None;
+    });
     events
 }
 
