@@ -417,15 +417,12 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       // Step 1 (Setup) - pre-filled → Continue
       await continueBtn.click();
-      await page.waitForLoadState("networkidle", { timeout: 5000 });
 
       // Step 2 (SQL/Conditions) - pre-filled → Continue
       await continueBtn.click();
-      await page.waitForLoadState("networkidle", { timeout: 5000 });
 
       // Step 3 (Compare with Past) → Skip, Continue
       await continueBtn.click();
-      await page.waitForLoadState("networkidle", { timeout: 5000 });
 
       // Step 4 (Settings) → Set threshold and select destination
       const thresholdOperator = page.locator(
@@ -461,11 +458,9 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       // Step 5 (Dedup) → Skip, Continue
       await continueBtn.click();
-      await page.waitForLoadState("networkidle", { timeout: 5000 });
 
       // Step 6 (Advanced) → Skip, Continue
       await continueBtn.click();
-      await page.waitForLoadState("networkidle", { timeout: 5000 });
 
       // Submit the alert
       await page.locator('[data-test="add-alert-submit-btn"]').click();
