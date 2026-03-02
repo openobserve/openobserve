@@ -834,15 +834,15 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         return Err(AlertError::AlertNotFound);
     };
     let now = Utc::now().timestamp_micros();
-    let (success_message, err_message) = alert.send_notification(&[], now, None, now).await?;
 
+    // For creates_incident=true alerts the incident correlation path handles
+    // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    if alert.creates_incident
+    let incident_routed = if alert.creates_incident
         && o2_enterprise::enterprise::common::config::get_config()
             .incidents
             .enabled
     {
-        // Create synthetic result row with alert metadata
         let synthetic_row = config::utils::json::json!({
             "stream_name": alert.stream_name,
             "stream_type": alert.stream_type.to_string(),
@@ -851,11 +851,12 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             "trigger_type": "manual"
         });
         let synthetic_row = synthetic_row.as_object().unwrap();
+        let notify = std::slice::from_ref(synthetic_row);
 
         match crate::service::alerts::incidents::correlate_alert_to_incident(
             &alert,
             synthetic_row,
-            &[], // manual trigger: notification already sent above, don't double-send
+            notify,
             now,
         )
         .await
@@ -868,6 +869,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                     outcome.incident_id(),
                     outcome.service_name(),
                 );
+                true
             }
             Ok(None) => {
                 log::debug!(
@@ -875,13 +877,27 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                     org_id,
                     &alert.name
                 );
+                false
             }
             Err(e) => {
-                log::error!("Error correlating manual trigger to incident: {e}");
-                // Don't fail the trigger if incident correlation fails
+                log::error!(
+                    "Error correlating manual trigger to incident, falling back to direct notification: {e}"
+                );
+                false
             }
         }
-    }
+    } else {
+        false
+    };
+
+    #[cfg(not(feature = "enterprise"))]
+    let incident_routed = false;
+
+    let (success_message, err_message) = if !incident_routed {
+        alert.send_notification(&[], now, None, now).await?
+    } else {
+        (String::new(), String::new())
+    };
 
     Ok((success_message, err_message))
 }
@@ -899,16 +915,15 @@ pub async fn trigger_by_name(
         }
     };
     let now = Utc::now().timestamp_micros();
-    let (success_message, err_message) = alert.send_notification(&[], now, None, now).await?;
 
-    // [ENTERPRISE] Create incident for manual trigger
+    // For creates_incident=true alerts the incident correlation path handles
+    // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    if alert.creates_incident
+    let incident_routed = if alert.creates_incident
         && o2_enterprise::enterprise::common::config::get_config()
             .incidents
             .enabled
     {
-        // Create synthetic result row with alert metadata
         let synthetic_row = config::utils::json::json!({
             "stream_name": alert.stream_name,
             "stream_type": alert.stream_type.to_string(),
@@ -916,11 +931,12 @@ pub async fn trigger_by_name(
             "trigger_type": "manual"
         });
         let synthetic_row = synthetic_row.as_object().unwrap();
+        let notify = std::slice::from_ref(synthetic_row);
 
         match crate::service::alerts::incidents::correlate_alert_to_incident(
             &alert,
             synthetic_row,
-            &[], // manual trigger: notification already sent above, don't double-send
+            notify,
             now,
         )
         .await
@@ -933,6 +949,7 @@ pub async fn trigger_by_name(
                     outcome.incident_id(),
                     outcome.service_name(),
                 );
+                true
             }
             Ok(None) => {
                 log::debug!(
@@ -940,13 +957,27 @@ pub async fn trigger_by_name(
                     org_id,
                     &alert.name
                 );
+                false
             }
             Err(e) => {
-                log::error!("Error correlating manual trigger to incident: {e}");
-                // Don't fail the trigger if incident correlation fails
+                log::error!(
+                    "Error correlating manual trigger to incident, falling back to direct notification: {e}"
+                );
+                false
             }
         }
-    }
+    } else {
+        false
+    };
+
+    #[cfg(not(feature = "enterprise"))]
+    let incident_routed = false;
+
+    let (success_message, err_message) = if !incident_routed {
+        alert.send_notification(&[], now, None, now).await?
+    } else {
+        (String::new(), String::new())
+    };
 
     Ok((success_message, err_message))
 }
@@ -1110,6 +1141,7 @@ impl AlertExt for Alert {
 ///
 /// Used by incident notifications, which build their own payload rather than
 /// going through the alert template system.
+#[cfg(feature = "enterprise")]
 pub(crate) async fn dispatch_notification(
     dest_type: &DestinationType,
     subject: &str,

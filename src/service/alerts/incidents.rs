@@ -65,6 +65,7 @@ fn extract_service_name_from_dimensions(
 /// `base_destinations` (the current alert's destinations) are always included.
 /// Any additional destinations from other alerts in the incident are appended,
 /// deduplicated by name.
+#[cfg(feature = "enterprise")]
 async fn collect_incident_destinations(
     org_id: &str,
     incident_id: &str,
@@ -105,6 +106,7 @@ async fn collect_incident_destinations(
 /// Loads severity, title, and service from the incident record. Constructs an
 /// incident-centric JSON body (not the alert row template) and dispatches to each
 /// destination using the raw transport (HTTP/email/SNS).
+#[cfg(feature = "enterprise")]
 async fn send_incident_notifications(
     alert: &Alert,
     incident_id: &str,
@@ -226,6 +228,7 @@ async fn send_incident_notifications(
 }
 
 /// Send a notification for an incident severity change to all correlated alert destinations.
+#[cfg(feature = "enterprise")]
 async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
     let incident_alerts = match infra::table::alert_incidents::get_incident_alerts(incident_id)
         .await
@@ -654,13 +657,10 @@ async fn find_or_create_incident(
         let dimensions_changed =
             merge_dimensions(&mut current_dims, stable_dimensions, &existing.id);
 
-        // Check if this alert_id is new to the incident (before adding it)
-        let prior_alerts = infra::table::alert_incidents::get_incident_alerts(&existing.id).await?;
-        let is_new_alert_type = !prior_alerts
-            .iter()
-            .any(|a| a.alert_id == alert.get_unique_key());
-
-        infra::table::alert_incidents::add_alert_to_incident(
+        // add_alert_to_incident checks whether this alert_id is new to the
+        // incident and inserts the row atomically in the same transaction,
+        // avoiding the read-then-write race of a separate check.
+        let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
             &existing.id,
             &alert.get_unique_key(),
             &alert.name,

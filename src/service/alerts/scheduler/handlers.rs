@@ -846,13 +846,8 @@ async fn handle_alert_triggers(
         // True when incident correlation ran and handled the notification internally
         // (either sent it for a new incident/alert type, or suppressed it for a repeat).
         // When false, the direct send_notification() call below fires instead.
-        let mut incident_handled_notification = false;
-
-        // [ENTERPRISE] Incident correlation — only for alerts that opt in via creates_incident.
-        // When creates_incident=false (default), no correlation happens and the alert
-        // sends notifications directly, preserving pre-existing behavior exactly.
         #[cfg(feature = "enterprise")]
-        if alert.creates_incident
+        let incident_handled_notification = if alert.creates_incident
             && o2_enterprise::enterprise::common::config::get_config()
                 .incidents
                 .enabled
@@ -876,7 +871,7 @@ async fn handle_alert_triggers(
                     );
                     // Notification was handled inside correlate_alert_to_incident
                     // (sent for new incidents/alert types, suppressed for repeats).
-                    incident_handled_notification = true;
+                    true
                 }
                 Ok(None) => {
                     log::debug!(
@@ -884,15 +879,22 @@ async fn handle_alert_triggers(
                         &new_trigger.org,
                         &alert.name,
                     );
+                    false
                 }
                 Err(e) => {
                     log::error!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Error in incident correlation, falling back to direct notification: {e}"
                     );
                     // Fall through to direct notification — don't silently lose the notification.
+                    false
                 }
             }
-        }
+        } else {
+            false
+        };
+
+        #[cfg(not(feature = "enterprise"))]
+        let incident_handled_notification = false;
 
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only

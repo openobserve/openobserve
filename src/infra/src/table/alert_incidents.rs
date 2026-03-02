@@ -19,7 +19,7 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait,
+    QuerySelect, Set, TransactionTrait, sea_query::LockType,
 };
 use svix_ksuid::KsuidLike;
 
@@ -94,13 +94,18 @@ pub async fn create(
 }
 
 /// Add an alert to an existing incident (updates last_alert_at and alert_count)
+/// Add an alert to an incident and return whether this is the first time this
+/// `alert_id` appears in the incident (`true` = new alert type, `false` = repeat).
+///
+/// The check and the insert happen inside the same transaction to avoid the
+/// read-then-write race that would occur if they were separate operations.
 pub async fn add_alert_to_incident(
     incident_id: &str,
     alert_id: &str,
     alert_name: &str,
     alert_fired_at: i64,
     correlation_reason: &str,
-) -> Result<(), errors::Error> {
+) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
 
@@ -109,6 +114,30 @@ pub async fn add_alert_to_incident(
         .begin()
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    // Lock the incident row first so that concurrent transactions serialise on
+    // it. Without this lock, two READ COMMITTED transactions can both read
+    // prior_count == 0 before either commits (the PK includes alert_fired_at,
+    // so both inserts succeed), resulting in duplicate NewAlertTypeJoined
+    // notifications. FOR UPDATE is a no-op on SQLite (file-level locking
+    // already serialises writes there).
+    let incident = alert_incidents::Entity::find_by_id(incident_id)
+        .lock(LockType::Update)
+        .one(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+
+    // With the incident row locked, check whether this alert_id already
+    // appears in the incident. Only one transaction can hold the lock at a
+    // time, so this count is stable until we commit.
+    let prior_count = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .count(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let is_new_alert_type = prior_count == 0;
 
     // Insert alert link
     let alert_link = alert_incident_alerts::ActiveModel {
@@ -125,13 +154,6 @@ pub async fn add_alert_to_incident(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    // Update incident: increment count, update last_alert_at
-    let incident = alert_incidents::Entity::find_by_id(incident_id)
-        .one(&txn)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
-        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
-
     let mut active: alert_incidents::ActiveModel = incident.into();
     active.alert_count = Set(active.alert_count.unwrap() + 1);
     active.last_alert_at = Set(alert_fired_at.max(active.last_alert_at.unwrap()));
@@ -145,7 +167,7 @@ pub async fn add_alert_to_incident(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    Ok(())
+    Ok(is_new_alert_type)
 }
 
 /// Update incident status
