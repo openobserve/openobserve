@@ -669,6 +669,7 @@ export default defineComponent({
       toggleAddAnnotationMode,
       handleAddAnnotation,
       closeAddAnnotation,
+      disableAddAnnotationMode,
       fetchAllPanels,
       panelsList,
     } = useAnnotationsData(
@@ -903,6 +904,9 @@ export default defineComponent({
     // Watch loading state changes and emit them to parent
     watch(loading, (newLoadingState) => {
       emit("loading-state-change", newLoadingState);
+      if (newLoadingState) {
+        disableAddAnnotationMode();
+      }
     });
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
