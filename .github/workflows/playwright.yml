@@ -323,7 +323,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: release-binary
           path: release-binary
@@ -727,7 +727,7 @@ jobs:
         run: cd tests/ui-testing && npm ci
 
       - name: Download blob reports from GitHub Actions Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         continue-on-error: true
         id: download_blobs
         with:
@@ -886,7 +886,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download Playwright Coverage Data
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: playwright-coverage-*-attempt-${{ github.run_attempt }}
           path: merged-coverage
