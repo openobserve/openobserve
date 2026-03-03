@@ -161,6 +161,14 @@ pub mod keys {
     pub const LIGHT_MODE_THEME_COLOR: &str = "light_mode_theme_color";
     /// Dark mode theme color
     pub const DARK_MODE_THEME_COLOR: &str = "dark_mode_theme_color";
+    /// AI features enabled for org
+    pub const AI_ENABLED: &str = "ai_enabled";
+    /// AI evaluation enabled for org
+    pub const AI_EVALUATION_ENABLED: &str = "ai_evaluation_enabled";
+    /// AI SRE (incident agent) enabled for org
+    pub const AI_SRE_ENABLED: &str = "ai_sre_enabled";
+    /// AI assistant (copilot) enabled for org
+    pub const AI_ASSISTANT_ENABLED: &str = "ai_assistant_enabled";
 }
 
 /// A system setting record

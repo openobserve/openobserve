@@ -104,7 +104,7 @@
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
       <q-btn
-        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled && !hideNlToggle && !isAIMode"
+        v-if="store.getters.isAiEnabled && !hideNlToggle && !isAIMode"
         :data-test="`${dataTestPrefix}-ai-toggle-btn`"
         round
         unelevated

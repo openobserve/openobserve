@@ -225,7 +225,7 @@ size="lg" color="primary" />
             </q-item>
             <q-item
               v-if="
-                config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
+                store.getters.isAiEnabled
               "
               clickable
               v-close-popup
@@ -258,7 +258,7 @@ size="lg" color="primary" />
             </q-item>
             <q-item
               v-if="
-                config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
+                store.getters.isAiEnabled
               "
               clickable
               v-close-popup
@@ -651,7 +651,7 @@ export default {
       };
 
       // Add event listeners
-      if (config.isEnterprise == "true" && store.state.zoConfig.ai_enabled) {
+      if (store.getters.isAiEnabled) {
         window.addEventListener("click", handleOutsideClick);
         window.addEventListener("contextmenu", handleContextMenu);
       }
@@ -660,7 +660,7 @@ export default {
       //this is used to remove the event listeners when the component is unmounted
       //it is used to avoid memory leaks
       onUnmounted(() => {
-        if (config.isEnterprise == "true" && store.state.zoConfig.ai_enabled) {
+        if (store.getters.isAiEnabled) {
           window.removeEventListener("click", handleOutsideClick);
           window.removeEventListener("contextmenu", handleContextMenu);
         }

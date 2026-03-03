@@ -156,6 +156,15 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "ai_settings",
+          name: "aiSettings",
+          meta: { title: "AI Settings" },
+          component: () => import("@/components/settings/AiSettings.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "license",
           name: "license",
           component: () => import("@/components/settings/License.vue"),

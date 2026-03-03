@@ -37,6 +37,12 @@ describe('O2AIContextAddBtn', () => {
     store.state.zoConfig = {
       ai_enabled: true
     };
+    store.state.organizationData.organizationSettings.ai = {
+      enabled: true,
+      assistant_enabled: true,
+      sre_enabled: false,
+      evaluation_enabled: false,
+    };
 
     // Mount component with Quasar
     wrapper = mount(O2AIContextAddBtn, {

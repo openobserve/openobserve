@@ -56,6 +56,12 @@ const organizationObj = {
     trace_id_field_name: "trace_id",
     span_id_field_name: "span_id",
     free_trial_expiry: "",
+    ai: {
+      enabled: false,
+      assistant_enabled: false,
+      sre_enabled: false,
+      evaluation_enabled: false,
+    },
   },
   isDataIngested: false,
   regexPatterns: [],
@@ -466,6 +472,22 @@ export default createStore({
     },
     setRegexPatterns(context, payload) {
       context.commit("setRegexPatterns", payload);
+    },
+  },
+  getters: {
+    isAiEnabled(state: any): boolean {
+      return (
+        state.zoConfig.ai_enabled &&
+        (state.organizationData.organizationSettings.ai?.enabled ?? false) &&
+        (state.organizationData.organizationSettings.ai?.assistant_enabled ?? false)
+      );
+    },
+    isAiSreEnabled(state: any): boolean {
+      return (
+        state.zoConfig.ai_enabled &&
+        (state.organizationData.organizationSettings.ai?.enabled ?? false) &&
+        (state.organizationData.organizationSettings.ai?.sre_enabled ?? false)
+      );
     },
   },
   modules: {

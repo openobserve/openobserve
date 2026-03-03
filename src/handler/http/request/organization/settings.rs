@@ -145,6 +145,29 @@ pub async fn create(
         data.usage_stream_enabled = usage_stream_enabled;
     }
 
+    if let Some(ai) = settings.ai {
+        use config::meta::system_settings::{
+            SettingCategory, SystemSetting,
+            keys::{AI_ASSISTANT_ENABLED, AI_ENABLED, AI_EVALUATION_ENABLED, AI_SRE_ENABLED},
+        };
+        let ai_fields: &[(Option<bool>, &str)] = &[
+            (ai.enabled, AI_ENABLED),
+            (ai.assistant_enabled, AI_ASSISTANT_ENABLED),
+            (ai.sre_enabled, AI_SRE_ENABLED),
+            (ai.evaluation_enabled, AI_EVALUATION_ENABLED),
+        ];
+        for &(value, key) in ai_fields {
+            if let Some(v) = value {
+                let setting = SystemSetting::new_org(&org_id, key, serde_json::Value::Bool(v))
+                    .with_category(SettingCategory::General);
+                if let Err(e) = crate::service::db::system_settings::set(&setting).await {
+                    return MetaHttpResponse::bad_request(e.to_string().as_str());
+                }
+                field_found = true;
+            }
+        }
+    }
+
     if !field_found {
         return MetaHttpResponse::bad_request("No valid field found");
     }
@@ -189,22 +212,59 @@ pub async fn create(
     )
 )]
 pub async fn get(Path(org_id): Path<String>) -> Response {
-    match get_org_setting(&org_id).await {
-        Ok(data) => (StatusCode::OK, Json(OrganizationSettingResponse { data })).into_response(),
+    let mut data = match get_org_setting(&org_id).await {
+        Ok(data) => data,
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 let setting = OrganizationSetting::default();
                 if let Ok(()) = set_org_setting(&org_id, &setting).await {
-                    return (
-                        StatusCode::OK,
-                        Json(OrganizationSettingResponse { data: setting }),
-                    )
-                        .into_response();
+                    setting
+                } else {
+                    return MetaHttpResponse::bad_request(&err);
                 }
-            };
-            MetaHttpResponse::bad_request(&err)
+            } else {
+                return MetaHttpResponse::bad_request(&err);
+            }
+        }
+    };
+
+    {
+        use config::meta::system_settings::{
+            SettingScope,
+            keys::{AI_ASSISTANT_ENABLED, AI_ENABLED, AI_EVALUATION_ENABLED, AI_SRE_ENABLED},
+        };
+        let get = |key| {
+            crate::service::db::system_settings::get(&SettingScope::Org, Some(&org_id), None, key)
+        };
+        let (enabled, assistant, sre, evaluation) = tokio::join!(
+            get(AI_ENABLED),
+            get(AI_ASSISTANT_ENABLED),
+            get(AI_SRE_ENABLED),
+            get(AI_EVALUATION_ENABLED),
+        );
+        if let Ok(Some(s)) = enabled
+            && let Some(v) = s.setting_value.as_bool()
+        {
+            data.ai.enabled = v;
+        }
+        if let Ok(Some(s)) = assistant
+            && let Some(v) = s.setting_value.as_bool()
+        {
+            data.ai.assistant_enabled = v;
+        }
+        if let Ok(Some(s)) = sre
+            && let Some(v) = s.setting_value.as_bool()
+        {
+            data.ai.sre_enabled = v;
+        }
+        if let Ok(Some(s)) = evaluation
+            && let Some(v) = s.setting_value.as_bool()
+        {
+            data.ai.evaluation_enabled = v;
         }
     }
+
+    (StatusCode::OK, Json(OrganizationSettingResponse { data })).into_response()
 }
 
 #[cfg(feature = "enterprise")]

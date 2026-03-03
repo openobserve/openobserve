@@ -62,15 +62,47 @@ describe("Header Component", () => {
       stubsOverrides = {}
     } = options;
 
+    const mergedZoConfig = {
+      ...mockStore.state.zoConfig,
+      ...storeOverrides.state?.zoConfig,
+    };
+    // Compute isAiEnabled based on the merged zoConfig and org settings
+    const mergedAiOrgSettings = {
+      ...mockStore.state.organizationData.organizationSettings.ai,
+      ...storeOverrides.state?.organizationData?.organizationSettings?.ai,
+    };
+    const isAiEnabled = !!(
+      mergedZoConfig.ai_enabled &&
+      mergedAiOrgSettings.enabled &&
+      mergedAiOrgSettings.assistant_enabled
+    );
+    const isAiSreEnabled = !!(
+      mergedZoConfig.ai_enabled &&
+      mergedAiOrgSettings.enabled &&
+      mergedAiOrgSettings.sre_enabled
+    );
+
     const store = {
       ...mockStore,
       state: {
         ...mockStore.state,
         ...storeOverrides.state,
-        zoConfig: {
-          ...mockStore.state.zoConfig,
-          ...storeOverrides.state?.zoConfig,
+        zoConfig: mergedZoConfig,
+        organizationData: {
+          ...mockStore.state.organizationData,
+          ...storeOverrides.state?.organizationData,
+          organizationSettings: {
+            ...mockStore.state.organizationData.organizationSettings,
+            ...storeOverrides.state?.organizationData?.organizationSettings,
+            ai: mergedAiOrgSettings,
+          },
         },
+      },
+      getters: {
+        ...mockStore.getters,
+        ...storeOverrides.getters,
+        isAiEnabled,
+        isAiSreEnabled,
       },
     };
 
@@ -123,12 +155,24 @@ describe("Header Component", () => {
         },
         organizationData: {
           quotaThresholdMsg: "",
+          organizationSettings: {
+            ai: {
+              enabled: false,
+              assistant_enabled: false,
+              sre_enabled: false,
+              evaluation_enabled: false,
+            },
+          },
         },
         isAiChatEnabled: false,
         selectedOrganization: {
           identifier: "test-org",
           label: "Test Organization",
         },
+      },
+      getters: {
+        isAiEnabled: false,
+        isAiSreEnabled: false,
       },
     };
 
@@ -462,6 +506,16 @@ describe("Header Component", () => {
             zoConfig: {
               ai_enabled: true,
             },
+            organizationData: {
+              organizationSettings: {
+                ai: {
+                  enabled: true,
+                  assistant_enabled: true,
+                  sre_enabled: false,
+                  evaluation_enabled: false,
+                },
+              },
+            },
           },
         },
         configOverrides: {
@@ -543,6 +597,16 @@ describe("Header Component", () => {
             zoConfig: {
               ai_enabled: true,
             },
+            organizationData: {
+              organizationSettings: {
+                ai: {
+                  enabled: true,
+                  assistant_enabled: true,
+                  sre_enabled: false,
+                  evaluation_enabled: false,
+                },
+              },
+            },
             isAiChatEnabled: true,
           },
         },
@@ -572,6 +636,16 @@ describe("Header Component", () => {
             zoConfig: {
               ai_enabled: true,
             },
+            organizationData: {
+              organizationSettings: {
+                ai: {
+                  enabled: true,
+                  assistant_enabled: true,
+                  sre_enabled: false,
+                  evaluation_enabled: false,
+                },
+              },
+            },
             isAiChatEnabled: false,
           },
         },
@@ -600,6 +674,16 @@ describe("Header Component", () => {
           state: {
             zoConfig: {
               ai_enabled: true,
+            },
+            organizationData: {
+              organizationSettings: {
+                ai: {
+                  enabled: true,
+                  assistant_enabled: true,
+                  sre_enabled: false,
+                  evaluation_enabled: false,
+                },
+              },
             },
           },
         },
@@ -634,6 +718,16 @@ describe("Header Component", () => {
             zoConfig: {
               ai_enabled: true,
             },
+            organizationData: {
+              organizationSettings: {
+                ai: {
+                  enabled: true,
+                  assistant_enabled: true,
+                  sre_enabled: false,
+                  evaluation_enabled: false,
+                },
+              },
+            },
           },
         },
         configOverrides: {
@@ -666,6 +760,16 @@ describe("Header Component", () => {
           state: {
             zoConfig: {
               ai_enabled: true,
+            },
+            organizationData: {
+              organizationSettings: {
+                ai: {
+                  enabled: true,
+                  assistant_enabled: true,
+                  sre_enabled: false,
+                  evaluation_enabled: false,
+                },
+              },
             },
           },
         },

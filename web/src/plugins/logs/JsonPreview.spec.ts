@@ -147,7 +147,13 @@ describe("JsonPreview Component", () => {
     store.state.hiddenMenus = new Set();
     store.state.organizationData = {
       organizationSettings: {
-        trace_id_field_name: "trace_id"
+        trace_id_field_name: "trace_id",
+        ai: {
+          enabled: true,
+          assistant_enabled: true,
+          sre_enabled: true,
+          evaluation_enabled: false,
+        },
       }
     };
     store.state.selectedOrganization = {

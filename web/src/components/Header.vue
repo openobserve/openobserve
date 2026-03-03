@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel -->
       <q-btn
         v-if="
-          config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
+          store.getters.isAiEnabled
         "
         :ripple="false"
         @click="toggleAIChat"

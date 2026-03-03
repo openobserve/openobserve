@@ -255,7 +255,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Tab Content Container -->
       <div class="tw:flex tw:flex-1 tw:overflow-hidden">
       <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
-      <div v-if="activeTab === 'incidentAnalysis'" class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col tw:h-full" style="order: 1;">
+      <!-- Also hidden when SRE is disabled and no existing analysis, since there are no sections to navigate -->
+      <div v-if="activeTab === 'incidentAnalysis' && (store.getters.isAiSreEnabled || hasExistingRca)" class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col tw:h-full" style="order: 1;">
 
         <!-- Table of Contents (only on Incident Analysis) -->
         <IncidentTableOfContents
@@ -865,6 +866,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rca-stream-content="rcaStreamContent"
           :formatted-rca-content="formattedRcaContent"
           :is-dark-mode="isDarkMode"
+          :is-ai-sre-enabled="store.getters.isAiSreEnabled"
           @trigger-rca="triggerRca"
         />
 

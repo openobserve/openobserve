@@ -120,19 +120,32 @@ describe("ScheduledPipeline Component", () => {
           min_auto_refresh_interval: 900,
           sql_base64_enabled: false,
           timestamp_column: "_timestamp",
-          all_fields_name: "_all"
+          all_fields_name: "_all",
+          ai_enabled: false,
         },
         isAiChatEnabled: false,
         organizationData: {
           functions: [
             { name: 'avg', description: 'Average function', function: 'avg(value)' },
             { name: 'sum', description: 'Sum function', function: 'sum(value)' }
-          ]
+          ],
+          organizationSettings: {
+            ai: {
+              enabled: false,
+              assistant_enabled: false,
+              sre_enabled: false,
+              evaluation_enabled: false,
+            },
+          },
         },
         timezone: "UTC",
         userInfo: {
           email: "test@example.com"
         }
+      },
+      getters: {
+        isAiEnabled: false,
+        isAiSreEnabled: false,
       },
       dispatch: vi.fn()
     };

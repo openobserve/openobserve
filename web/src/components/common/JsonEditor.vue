@@ -12,7 +12,7 @@
       <div class="tw:flex tw:items-center">
         <div>
           <q-btn
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+          v-if="store.getters.isAiEnabled"
           :ripple="false"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"

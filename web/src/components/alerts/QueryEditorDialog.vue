@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:flex tw:items-center">
               <q-btn
-                v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                v-if="store.getters.isAiEnabled"
                 :ripple="false"
                 @click="toggleAIChat"
                 data-test="menu-link-ai-item"

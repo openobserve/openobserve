@@ -24,7 +24,7 @@
       <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
         <!-- NL Mode Toggle (always visible when AI enabled and enterprise) -->
         <div
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+          v-if="store.getters.isAiEnabled"
           class="toolbar-toggle-container element-box-shadow"
         >
           <q-toggle

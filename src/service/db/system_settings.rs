@@ -401,6 +401,147 @@ pub fn get_default_fqn_priority_dimensions() -> Vec<String> {
     }
 }
 
+/// Check whether AI features are enabled for an organization
+///
+/// In enterprise builds: returns false if the global AI flag is disabled, otherwise
+/// checks for an org-level `ai_enabled` SystemSetting override, defaulting to true
+/// when the global flag is on.
+///
+/// In OSS builds: always returns false.
+pub async fn is_ai_enabled_for_org(org_id: &str) -> bool {
+    use config::meta::system_settings::keys::AI_ENABLED;
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
+        // Global flag is the hard gate
+        if !get_enterprise_config().ai.enabled {
+            return false;
+        }
+        // Check org-level override from SystemSettings
+        if let Ok(Some(setting)) = get_resolved(Some(org_id), None, AI_ENABLED).await
+            && let Some(v) = setting.setting_value.as_bool()
+        {
+            return v;
+        }
+        // Default: inherit global (true, since global is enabled)
+        true
+    }
+    #[cfg(not(feature = "enterprise"))]
+    false
+}
+
+/// Check whether AI evaluation is enabled for an organization
+///
+/// In enterprise builds: returns false if the global AI evaluation flag is disabled, otherwise
+/// checks for an org-level `ai_evaluation_enabled` SystemSetting override, defaulting to true
+/// when the global flag is on.
+///
+/// In OSS builds: always returns false.
+pub async fn is_ai_evaluation_enabled_for_org(org_id: &str) -> bool {
+    use config::meta::system_settings::keys::{AI_ENABLED, AI_EVALUATION_ENABLED};
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
+        let cfg = get_enterprise_config();
+        // Global AI gate — if AI itself is off, evaluation cannot be on
+        if !cfg.ai.enabled {
+            return false;
+        }
+        // Org-level AI gate — if AI features are disabled for the org, so is evaluation
+        if let Ok(Some(setting)) = get_resolved(Some(org_id), None, AI_ENABLED).await
+            && let Some(false) = setting.setting_value.as_bool()
+        {
+            return false;
+        }
+        // Global evaluation gate
+        if !cfg.ai.evaluation_enabled {
+            return false;
+        }
+        // Org-level evaluation override
+        if let Ok(Some(setting)) = get_resolved(Some(org_id), None, AI_EVALUATION_ENABLED).await
+            && let Some(v) = setting.setting_value.as_bool()
+        {
+            return v;
+        }
+        // Default: inherit global (true, since global evaluation is enabled)
+        true
+    }
+    #[cfg(not(feature = "enterprise"))]
+    false
+}
+
+/// Check whether AI SRE (incident agent) is enabled for an organization
+///
+/// In enterprise builds: returns false if the global AI flag is disabled or if
+/// org-level AI is explicitly disabled, otherwise checks for an org-level
+/// `ai_sre_enabled` SystemSetting override, defaulting to true when all gates pass.
+///
+/// In OSS builds: always returns false.
+pub async fn is_ai_sre_enabled_for_org(org_id: &str) -> bool {
+    use config::meta::system_settings::keys::{AI_ENABLED, AI_SRE_ENABLED};
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
+        let cfg = get_enterprise_config();
+        // Global AI gate
+        if !cfg.ai.enabled {
+            return false;
+        }
+        // Org-level AI gate — if AI features are disabled for the org, so is SRE
+        if let Ok(Some(setting)) = get_resolved(Some(org_id), None, AI_ENABLED).await
+            && let Some(false) = setting.setting_value.as_bool()
+        {
+            return false;
+        }
+        // Org-level SRE override
+        if let Ok(Some(setting)) = get_resolved(Some(org_id), None, AI_SRE_ENABLED).await
+            && let Some(v) = setting.setting_value.as_bool()
+        {
+            return v;
+        }
+        // Default: enabled when global + org AI both enabled
+        true
+    }
+    #[cfg(not(feature = "enterprise"))]
+    false
+}
+
+/// Check whether AI assistant (copilot) is enabled for an organization
+///
+/// In enterprise builds: returns false if the global AI flag is disabled or if
+/// org-level AI is explicitly disabled, otherwise checks for an org-level
+/// `ai_assistant_enabled` SystemSetting override, defaulting to true when all gates pass.
+///
+/// In OSS builds: always returns false.
+pub async fn is_ai_assistant_enabled_for_org(org_id: &str) -> bool {
+    use config::meta::system_settings::keys::{AI_ASSISTANT_ENABLED, AI_ENABLED};
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
+        let cfg = get_enterprise_config();
+        // Global AI gate
+        if !cfg.ai.enabled {
+            return false;
+        }
+        // Org-level AI gate — if AI features are disabled for the org, so is the assistant
+        if let Ok(Some(setting)) = get_resolved(Some(org_id), None, AI_ENABLED).await
+            && let Some(false) = setting.setting_value.as_bool()
+        {
+            return false;
+        }
+        // Org-level assistant override
+        if let Ok(Some(setting)) = get_resolved(Some(org_id), None, AI_ASSISTANT_ENABLED).await
+            && let Some(v) = setting.setting_value.as_bool()
+        {
+            return v;
+        }
+        // Default: enabled when global + org AI both enabled
+        true
+    }
+    #[cfg(not(feature = "enterprise"))]
+    false
+}
+
 /// Get semantic field groups for an organization
 ///
 /// Resolution order:

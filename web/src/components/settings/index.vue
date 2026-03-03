@@ -210,6 +210,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('settings.correlationSettings')"
                   content-class="tab_content"
                 />
+                <q-route-tab
+                  v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                  data-test="settings-ai-tab"
+                  name="aiSettings"
+                  :to="{
+                    name: 'aiSettings',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  icon="smart_toy"
+                  :label="t('settings.aiSettingsTitle')"
+                  content-class="tab_content"
+                />
                 </q-tabs>
               </div>
             </div>

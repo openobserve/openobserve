@@ -1,7 +1,7 @@
 <template>
     <!-- ai button is only enabled when it is enteprise version and also ai is enabled from the BE -->
     <q-btn
-        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+        v-if="store.getters.isAiEnabled"
         :ripple="false"
         @click.stop="sendToAiChat"
         data-test="o2-ai-context-add-btn"

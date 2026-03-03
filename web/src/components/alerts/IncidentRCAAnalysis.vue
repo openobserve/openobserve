@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="rca-analysis-container" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden">
-    <!-- Trigger button when no analysis exists and not loading -->
-    <div v-if="!hasExistingRca && !rcaLoading" data-test="rca-trigger-section" class="tw:mb-2 tw:flex-shrink-0">
+    <!-- Trigger button when no analysis exists, not loading, and SRE is enabled -->
+    <div v-if="!hasExistingRca && !rcaLoading && isAiSreEnabled" data-test="rca-trigger-section" class="tw:mb-2 tw:flex-shrink-0">
       <q-btn
         data-test="trigger-rca-btn"
         size="sm"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- Existing analysis content -->
+    <!-- Existing analysis content (always shown regardless of SRE setting) -->
     <div v-else-if="hasExistingRca" data-test="rca-existing-container" class="rca-container tw:rounded tw:p-3 tw:flex-1 tw:overflow-auto tw:border" :class="isDarkMode ? ' tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'">
       <div
         data-test="rca-existing-content"
@@ -54,7 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- No analysis yet -->
+    <!-- SRE disabled — no new analysis can be started -->
+    <div v-else-if="!isAiSreEnabled" data-test="rca-sre-disabled-state" class="tw:rounded tw:p-3 tw:text-sm tw:flex-1 tw:border" :class="isDarkMode ? 'tw:bg-gray-700 tw:border-gray-600 tw:text-gray-300' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-gray-500'">
+      {{ $t('alerts.incidents.rcaSreDisabled') }}
+    </div>
+
+    <!-- No analysis yet (SRE enabled but not yet triggered) -->
     <div v-else data-test="rca-empty-state" class="tw:rounded tw:p-3 tw:text-sm tw:flex-1 tw:border" :class="isDarkMode ? 'tw:bg-gray-700 tw:border-gray-600 tw:text-gray-300' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-gray-500'">
       No analysis performed yet
     </div>
@@ -86,6 +91,10 @@ export default defineComponent({
     isDarkMode: {
       type: Boolean,
       required: true,
+    },
+    isAiSreEnabled: {
+      type: Boolean,
+      default: true,
     },
   },
   emits: ['trigger-rca'],

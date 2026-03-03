@@ -64,6 +64,9 @@ use crate::{
         request::search::search_stream::report_to_audit,
         router::X_O2_ASSISTANT_SESSION_ID,
     },
+    service::db::system_settings::{
+        is_ai_assistant_enabled_for_org, is_ai_enabled_for_org, is_ai_sre_enabled_for_org,
+    },
 };
 
 /// Extract headers from the request that match the configured passthrough patterns.
@@ -180,7 +183,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         let config = get_o2_config();
 
         // Check if AI/agent is enabled
-        if !config.ai.enabled {
+        if !is_ai_enabled_for_org(org_id.as_str()).await {
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
@@ -260,6 +263,19 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
         // Must be done before context is moved into QueryRequest
         let agent_type = get_agent_type(&context);
+
+        // Gate SRE agent behind per-org ai_sre_enabled setting
+        if agent_type == INCIDENT_AGENT_TYPE && !is_ai_sre_enabled_for_org(org_id.as_str()).await {
+            return MetaHttpResponse::bad_request("AI SRE is not enabled for this organization");
+        }
+
+        if agent_type != INCIDENT_AGENT_TYPE
+            && !is_ai_assistant_enabled_for_org(org_id.as_str()).await
+        {
+            return MetaHttpResponse::bad_request(
+                "AI Assistant is not enabled for this organization",
+            );
+        }
 
         // Convert images to agent format
         let images = prompt_body.images.map(|imgs| {
@@ -562,14 +578,13 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         use futures::StreamExt;
         use o2_enterprise::enterprise::alerts::rca_agent::{QueryRequest, get_agent_client};
 
-        let config = get_o2_config();
         let org_id_str = org_id.clone();
 
         let mut code = StatusCode::OK.as_u16();
         let body_bytes_str = serde_json::to_string(&prompt_body).unwrap_or_default();
 
         // Check if AI/agent is enabled
-        if !config.ai.enabled {
+        if !is_ai_enabled_for_org(org_id.as_str()).await {
             let error_message = Some("AI is not enabled".to_string());
             code = StatusCode::BAD_REQUEST.as_u16();
             report_to_audit(
@@ -653,6 +668,48 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
         // Must be done before context is moved into QueryRequest
         let agent_type = get_agent_type(&context);
+
+        // Gate SRE agent behind per-org ai_sre_enabled setting
+        if agent_type == INCIDENT_AGENT_TYPE && !is_ai_sre_enabled_for_org(org_id.as_str()).await {
+            let error_message = Some("AI SRE is not enabled for this organization".to_string());
+            code = StatusCode::BAD_REQUEST.as_u16();
+            report_to_audit(
+                user_id.clone(),
+                org_id_str.clone(),
+                trace_id.clone(),
+                code,
+                error_message,
+                "POST".to_string(),
+                format!("/api/{}/ai/chat_stream", org_id_str),
+                String::new(),
+                body_bytes_str,
+            )
+            .await;
+            return MetaHttpResponse::bad_request("AI SRE is not enabled for this organization");
+        }
+
+        if agent_type != INCIDENT_AGENT_TYPE
+            && !is_ai_assistant_enabled_for_org(org_id.as_str()).await
+        {
+            let error_message =
+                Some("AI Assistant is not enabled for this organization".to_string());
+            code = StatusCode::BAD_REQUEST.as_u16();
+            report_to_audit(
+                user_id.clone(),
+                org_id_str.clone(),
+                trace_id.clone(),
+                code,
+                error_message,
+                "POST".to_string(),
+                format!("/api/{}/ai/chat_stream", org_id_str),
+                String::new(),
+                body_bytes_str,
+            )
+            .await;
+            return MetaHttpResponse::bad_request(
+                "AI Assistant is not enabled for this organization",
+            );
+        }
 
         // Convert images to agent format
         let images = prompt_body.images.map(|imgs| {
@@ -845,7 +902,7 @@ pub async fn confirm_action(
 
         let config = get_o2_config();
 
-        if !config.ai.enabled {
+        if !is_ai_enabled_for_org(_org_id.as_str()).await {
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 

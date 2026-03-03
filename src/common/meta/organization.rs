@@ -316,6 +316,43 @@ fn default_claim_parser_function() -> String {
     "".to_string()
 }
 
+/// AI feature sub-settings for an organization (payload / request)
+#[derive(Serialize, ToSchema, Deserialize, Debug, Clone, Default)]
+pub struct OrgAiSettingsPayload {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assistant_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sre_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evaluation_enabled: Option<bool>,
+}
+
+/// AI feature sub-settings for an organization (response)
+#[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
+pub struct OrgAiSettings {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub assistant_enabled: bool,
+    #[serde(default)]
+    pub sre_enabled: bool,
+    #[serde(default)]
+    pub evaluation_enabled: bool,
+}
+
+impl Default for OrgAiSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            assistant_enabled: false,
+            sre_enabled: false,
+            evaluation_enabled: false,
+        }
+    }
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -330,6 +367,8 @@ pub struct OrganizationSettingPayload {
     pub toggle_ingestion_logs: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub streaming_aggregation_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai: Option<OrgAiSettingsPayload>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_streaming_search: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -361,6 +400,8 @@ pub struct OrganizationSetting {
     pub toggle_ingestion_logs: bool,
     #[serde(default = "default_enable_streaming_aggregation")]
     pub streaming_aggregation_enabled: bool,
+    #[serde(default)]
+    pub ai: OrgAiSettings,
     #[serde(default = "default_enable_streaming_search")]
     pub enable_streaming_search: bool,
     #[serde(default = "default_auto_refresh_interval")]
@@ -402,6 +443,7 @@ impl Default for OrganizationSetting {
             span_id_field_name: default_span_id_field_name(),
             toggle_ingestion_logs: default_toggle_ingestion_logs(),
             streaming_aggregation_enabled: default_enable_streaming_aggregation(),
+            ai: OrgAiSettings::default(),
             enable_streaming_search: default_enable_streaming_search(),
             min_auto_refresh_interval: default_auto_refresh_interval(),
             free_trial_expiry: None,
