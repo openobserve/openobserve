@@ -352,7 +352,8 @@
     "askAIFunctionPlaceholder": "让 AI 帮你完成任务...",
     "enterFunctionPrompt": "输入提示生成函数",
     "recordsPerPage": "每页记录数",
-    "searchDimension": "搜索尺寸"
+    "searchDimension": "搜索尺寸",
+    "createAlertFromPattern": "使用此模式创建警报"
   },
   "menu": {
     "home": "主页",
@@ -2069,7 +2070,9 @@
     "noStreamSelected": "未选择任何直播",
     "resultsIncludeAllWindows": "结果包括所有多窗口新增内容",
     "runQueryForOutput": "请单击 “运行查询” 以查看输出",
-    "applyVRLForOutput": "请单击 Apply VRL 查看组合输出"
+    "applyVRLForOutput": "请单击 Apply VRL 查看组合输出",
+    "importedFromPattern": "根据日志模式预先填充警报",
+    "importedFromAnomalyPattern": "根据异常日志模式预先填充警报 — 查看紧急设置"
   },
   "alert_templates": {
     "header": "模板",

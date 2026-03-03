@@ -1950,6 +1950,126 @@ export default defineComponent({
     };
 
 
+    const loadPatternDataIfPresent = async () => {
+      const route = router.currentRoute.value;
+
+      if (route.query.fromPattern === "true" && route.query.patternData) {
+        try {
+          const patternData = JSON.parse(
+            decodeURIComponent(route.query.patternData as string),
+          );
+
+          const isAnomaly = !!patternData.isAnomaly;
+
+          // --- Stream & Query ---
+          if (patternData.streamName) {
+            formData.value.stream_type = patternData.streamType || "logs";
+            await updateStreams(false);
+            formData.value.stream_name = patternData.streamName;
+          }
+
+          formData.value.query_condition.type = "sql";
+          if (patternData.sqlQuery) {
+            formData.value.query_condition.sql = patternData.sqlQuery;
+          }
+
+          // --- Alert Name ---
+          formData.value.name =
+            patternData.alertName ||
+            `Alert_${patternData.streamName || "pattern"}`;
+
+          // --- Trigger Conditions (anomaly-aware) ---
+          const period = patternData.periodMinutes || 15;
+          // Frequency should be shorter than period so we don't miss events
+          const frequency = Math.max(1, Math.min(period, Math.floor(period / 2)));
+
+          formData.value.trigger_condition.period = period;
+          formData.value.trigger_condition.frequency = frequency;
+          formData.value.trigger_condition.frequency_type = "minutes";
+          formData.value.trigger_condition.operator = ">=";
+
+          if (isAnomaly) {
+            // Anomalies are urgent: alert on any occurrence, shorter silence
+            formData.value.trigger_condition.threshold = 1;
+            formData.value.trigger_condition.silence = 10;
+            formData.value.creates_incident = true;
+          } else {
+            // Normal patterns: scale threshold with frequency to avoid noise
+            const freq = patternData.patternFrequency || 0;
+            if (freq > 1000) {
+              formData.value.trigger_condition.threshold = Math.round(freq * 0.5);
+            } else if (freq > 100) {
+              formData.value.trigger_condition.threshold = Math.round(freq * 0.25);
+            } else {
+              formData.value.trigger_condition.threshold = 1;
+            }
+            formData.value.trigger_condition.silence = 30;
+          }
+
+          // Scheduled alert works best for pattern monitoring
+          formData.value.is_real_time = "false";
+
+          // --- Description ---
+          const descParts = [
+            `Auto-created from log pattern detection.`,
+            `Pattern: ${patternData.patternTemplate || "N/A"}`,
+            `Stream: ${patternData.streamName || "N/A"}`,
+          ];
+          if (patternData.patternFrequency) {
+            descParts.push(
+              `Matched ${patternData.patternFrequency.toLocaleString()} logs` +
+                (patternData.patternPercentage
+                  ? ` (${patternData.patternPercentage.toFixed(2)}% of analyzed logs)`
+                  : ""),
+            );
+          }
+          if (isAnomaly) {
+            descParts.push("⚠ This pattern was flagged as an anomaly.");
+          }
+          formData.value.description = descParts.join("\n");
+
+          // --- Context Attributes (pattern metadata for notification templates) ---
+          formData.value.context_attributes = [
+            {
+              id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-1`,
+              key: "source_pattern_template",
+              value: patternData.patternTemplate || "",
+            },
+            {
+              id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-2`,
+              key: "source_pattern_id",
+              value: patternData.patternId || "",
+            },
+            {
+              id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-3`,
+              key: "pattern_frequency",
+              value: String(patternData.patternFrequency || 0),
+            },
+            {
+              id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-4`,
+              key: "pattern_is_anomaly",
+              value: String(isAnomaly),
+            },
+          ];
+
+          q.notify({
+            type: "positive",
+            message: isAnomaly
+              ? t("alerts.importedFromAnomalyPattern")
+              : t("alerts.importedFromPattern"),
+            timeout: 3000,
+          });
+
+          await nextTick();
+          if (previewAlertRef.value?.refreshData) {
+            previewAlertRef.value.refreshData();
+          }
+        } catch (error) {
+          console.error("Error loading pattern data:", error);
+        }
+      }
+    };
+
     const openJsonEditor = () => {
       showJsonEditorDialog.value = true;
     };
@@ -2252,6 +2372,7 @@ export default defineComponent({
       generateSqlQuery: generateSqlQueryLocal,
       track,
       loadPanelDataIfPresent,
+      loadPatternDataIfPresent,
       isLoadingPanelData,
       focusManager,
       streamFieldRef,
@@ -2283,9 +2404,10 @@ export default defineComponent({
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
 
-    // Check if this is from a dashboard panel - if so, don't set default query type
+    // Check if this is from a dashboard panel or log pattern - if so, don't set default query type
     const route = this.router.currentRoute.value;
     const isFromPanel = route.query.fromPanel === "true" && route.query.panelData;
+    const isFromPattern = route.query.fromPattern === "true" && route.query.patternData;
 
     if(!this.isUpdated){
       this.formData.is_real_time = this.alertType === 'realTime'? true : false;
@@ -2296,6 +2418,12 @@ export default defineComponent({
     if (isFromPanel) {
       this.formData.query_condition.type = ""; // Temporarily set to empty
       await this.loadPanelDataIfPresent(); // Load panel data and set correct type
+    }
+
+    // If from pattern, load pattern data BEFORE initializing child components
+    if (isFromPattern) {
+      this.formData.query_condition.type = ""; // Temporarily set to empty
+      await this.loadPatternDataIfPresent(); // Load pattern data and set correct type
     }
 
     // Set default frequency to min_auto_refresh_interval

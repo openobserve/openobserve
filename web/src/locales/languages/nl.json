@@ -352,7 +352,8 @@
     "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
     "enterFunctionPrompt": "Voer een prompt in om een functie te genereren",
     "recordsPerPage": "Records per pagina",
-    "searchDimension": "Afmetingen zoeken"
+    "searchDimension": "Afmetingen zoeken",
+    "createAlertFromPattern": "Creëer een waarschuwing op basis van dit patroon"
   },
   "menu": {
     "home": "Home",
@@ -2069,7 +2070,9 @@
     "noStreamSelected": "Geen stream geselecteerd",
     "resultsIncludeAllWindows": "De resultaten omvatten alle toevoegingen met meerdere vensters",
     "runQueryForOutput": "Klik op Query uitvoeren om de uitvoer te zien",
-    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien"
+    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien",
+    "importedFromPattern": "Waarschuwing vooraf ingevuld op basis van logpatroon",
+    "importedFromAnomalyPattern": "Waarschuwing vooraf ingevuld op basis van een abnormaal logpatroon — bekijk de urgentie-instellingen"
   },
   "alert_templates": {
     "header": "Sjablonen",

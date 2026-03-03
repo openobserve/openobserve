@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Actions Column -->
-    <div class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center">
+    <div class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center">
       <q-btn
         size="6px"
         @click.stop="$emit('include', pattern)"
@@ -121,6 +121,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</q-tooltip>
         </q-icon>
       </q-btn>
+      <q-btn
+        size="6px"
+        class="cursor-pointer pattern-details-btn"
+        round
+        :data-test="`pattern-card-${index}-create-alert-btn`"
+        @click.stop="$emit('create-alert', pattern)"
+      >
+        <q-icon name="add_alert" style="height: 8px; width: 8px">
+          <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
+        </q-icon>
+      </q-btn>
     </div>
   </div>
 </template>
@@ -142,6 +153,7 @@ defineEmits<{
   (e: "click", pattern: any, index: number): void;
   (e: "include", pattern: any): void;
   (e: "exclude", pattern: any): void;
+  (e: "create-alert", pattern: any): void;
 }>();
 
 const store = useStore();

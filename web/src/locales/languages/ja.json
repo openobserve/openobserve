@@ -352,7 +352,8 @@
     "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
     "enterFunctionPrompt": "関数を生成するプロンプトを入力してください",
     "recordsPerPage": "1 ページあたりのレコード数",
-    "searchDimension": "ディメンション検索"
+    "searchDimension": "ディメンション検索",
+    "createAlertFromPattern": "このパターンからアラートを作成"
   },
   "menu": {
     "home": "ホーム",
@@ -2086,7 +2087,9 @@
     "noStreamSelected": "ストリームが選択されていません",
     "resultsIncludeAllWindows": "結果にはマルチウィンドウの追加がすべて含まれます",
     "runQueryForOutput": "[クエリの実行] をクリックして出力を確認してください",
-    "applyVRLForOutput": "結合された出力を確認するには、[VRL を適用] をクリックしてください"
+    "applyVRLForOutput": "結合された出力を確認するには、[VRL を適用] をクリックしてください",
+    "importedFromPattern": "ログパターンから事前入力されたアラート",
+    "importedFromAnomalyPattern": "異常なログパターンから事前入力されたアラート — 緊急度設定を確認"
   },
   "alert_templates": {
     "header": "テンプレート",

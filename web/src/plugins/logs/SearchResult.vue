@@ -344,6 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :wrap="searchObj.meta.toggleSourceWrap"
           @open-details="openPatternDetails"
           @add-to-search="addPatternToSearch"
+          @create-alert="createAlertFromPattern"
         />
       </div>
 
@@ -1156,6 +1157,17 @@ export default defineComponent({
       return constants;
     };
 
+    // Shared escaping helper for match_all() SQL clauses
+    const escapeForMatchAll = (str: string): string => {
+      return str
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .replace(/\t/g, "\\t");
+    };
+
     const addPatternToSearch = (
       pattern: any,
       action: "include" | "exclude",
@@ -1173,18 +1185,8 @@ export default defineComponent({
       }
 
       // Build multiple match_all() clauses, one for each constant
-      // Each match_all takes a single string
       const matchAllClauses = constants.map((constant) => {
-        // Escape special characters for match_all query
-        // Order matters: backslash must be escaped first
-        const escapedConstant = constant
-          .replace(/\\/g, "\\\\") // Escape backslashes
-          .replace(/'/g, "\\'") // Escape single quotes
-          .replace(/"/g, '\\"') // Escape double quotes
-          .replace(/\n/g, "\\n") // Escape newlines
-          .replace(/\r/g, "\\r") // Escape carriage returns
-          .replace(/\t/g, "\\t"); // Escape tabs
-        return `match_all('${escapedConstant}')`;
+        return `match_all('${escapeForMatchAll(constant)}')`;
       });
 
       // Combine with AND
@@ -1204,6 +1206,99 @@ export default defineComponent({
 
       // Switch to logs view to show the filtered results
       searchObj.meta.logsVisualizeToggle = "logs";
+    };
+
+    const createAlertFromPattern = (pattern: any) => {
+      const streamName = searchObj.data.stream.selectedStream[0];
+      if (!streamName) {
+        $q.notify({
+          type: "warning",
+          message: "No stream selected. Please select a stream before creating an alert.",
+          timeout: 2000,
+        });
+        return;
+      }
+
+      // For alerts, use a lower min-length threshold (3 chars) so we still
+      // get useful WHERE clauses even for short-fragment patterns.
+      const parts = pattern.template.split(/<[*:][^>]*>/);
+      const constants: string[] = [];
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (trimmed.length >= 3) {
+          constants.push(trimmed);
+        }
+      }
+
+      // Build SQL query with properly escaped match_all() clauses
+      let sqlQuery = `SELECT * FROM '${streamName}'`;
+      if (constants.length > 0) {
+        const conditions = constants.map((c: string) => {
+          return `match_all('${escapeForMatchAll(c)}')`;
+        });
+        sqlQuery += ` WHERE ${conditions.join(" AND ")}`;
+      }
+
+      // Warn user if no constants could be extracted at all
+      if (constants.length === 0) {
+        $q.notify({
+          type: "warning",
+          message:
+            "Pattern has very short constant segments. The alert query will match all logs in this stream — consider adding manual filters.",
+          timeout: 5000,
+        });
+      }
+
+      // Derive alert name: prefix based on anomaly, include stream, cap length
+      const alertName = (() => {
+        const prefix = pattern.is_anomaly ? "Anomaly" : "Alert";
+        const words = pattern.template
+          .replace(/<[^>]*>/g, " ")
+          .split(/[\s\W]+/)
+          .filter((w: string) => /[a-zA-Z]{2,}/.test(w))
+          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .slice(0, 5);
+        const suffix = words.length > 0 ? words.join("_") : streamName;
+        const name = `${prefix}_${streamName}_${suffix}`;
+        // Truncate to 60 chars, trim trailing underscore
+        return name.slice(0, 60).replace(/_+$/, "");
+      })();
+
+      // Estimate alert period from the current search time range (clamped 5–60 min)
+      const periodMinutes = (() => {
+        const dt = (searchObj.data as any).datetime;
+        const start = dt?.startTime;
+        const end = dt?.endTime;
+        if (start && end) {
+          const diffMin = Math.round((end - start) / 60_000_000);
+          return Math.max(5, Math.min(60, diffMin));
+        }
+        return 15;
+      })();
+
+      const patternData = {
+        streamName,
+        streamType: "logs",
+        sqlQuery,
+        patternTemplate: pattern.template,
+        alertName,
+        periodMinutes,
+        // Additional metadata for smarter alert defaults
+        patternId: pattern.pattern_id || "",
+        patternFrequency: pattern.frequency || 0,
+        patternPercentage: pattern.percentage || 0,
+        isAnomaly: !!pattern.is_anomaly,
+        totalLogsAnalyzed: searchObj.data.queryResults?.scan_records || 0,
+      };
+
+      router.push({
+        name: "addAlert",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          fromPattern: "true",
+          patternData: encodeURIComponent(JSON.stringify(patternData)),
+        },
+      });
     };
 
     const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
@@ -1533,6 +1628,7 @@ export default defineComponent({
       openPatternDetails,
       navigatePatternDetail,
       addPatternToSearch,
+      createAlertFromPattern,
       extractConstantsFromPattern,
       openVolumeAnalysisDashboard,
       closeVolumeAnalysisDashboard,

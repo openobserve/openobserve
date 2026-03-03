@@ -352,7 +352,8 @@
     "askAIFunctionPlaceholder": "Peça ajuda à IA com sua função...",
     "enterFunctionPrompt": "Insira um prompt para gerar a função",
     "recordsPerPage": "Registros por página",
-    "searchDimension": "Dimensões de pesquisa"
+    "searchDimension": "Dimensões de pesquisa",
+    "createAlertFromPattern": "Crie um alerta a partir desse padrão"
   },
   "menu": {
     "home": "Início",
@@ -2069,7 +2070,9 @@
     "noStreamSelected": "Nenhum stream selecionado",
     "resultsIncludeAllWindows": "Os resultados incluem todas as adições de várias janelas",
     "runQueryForOutput": "Clique em Executar consulta para ver a saída",
-    "applyVRLForOutput": "Clique em Aplicar VRL para ver a saída combinada"
+    "applyVRLForOutput": "Clique em Aplicar VRL para ver a saída combinada",
+    "importedFromPattern": "Alerta pré-preenchido a partir do padrão de registro",
+    "importedFromAnomalyPattern": "Alerta pré-preenchido a partir de um padrão de registro anômalo — revise as configurações de urgência"
   },
   "alert_templates": {
     "header": "Modelos",

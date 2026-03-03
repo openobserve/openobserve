@@ -352,7 +352,8 @@
     "askAIFunctionPlaceholder": "AI에게 당신의 기능을 도와달라고 요청하세요...",
     "enterFunctionPrompt": "함수 생성 프롬프트 입력",
     "recordsPerPage": "페이지당 레코드 수",
-    "searchDimension": "치수 검색"
+    "searchDimension": "치수 검색",
+    "createAlertFromPattern": "이 패턴으로 알림 생성"
   },
   "menu": {
     "home": "홈",
@@ -2069,7 +2070,9 @@
     "noStreamSelected": "선택한 스트림 없음",
     "resultsIncludeAllWindows": "결과에는 모든 다중 창 추가 사항이 포함됩니다.",
     "runQueryForOutput": "결과를 보려면 [쿼리 실행] 을 클릭하십시오.",
-    "applyVRLForOutput": "VRL 적용을 클릭하여 결합된 출력을 확인하십시오."
+    "applyVRLForOutput": "VRL 적용을 클릭하여 결합된 출력을 확인하십시오.",
+    "importedFromPattern": "로그 패턴으로 미리 채워진 경고",
+    "importedFromAnomalyPattern": "비정상적인 로그 패턴으로 미리 채워진 경고 — 긴급 설정 검토"
   },
   "alert_templates": {
     "header": "템플릿",

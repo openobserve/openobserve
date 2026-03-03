@@ -191,6 +191,32 @@ describe("PatternCard", () => {
       // Card click should not be emitted when button is clicked
       expect(wrapper.emitted("click")).toBeFalsy();
     });
+
+    it("should display create alert button", () => {
+      const createAlertBtn = wrapper.find(
+        '[data-test="pattern-card-0-create-alert-btn"]',
+      );
+      expect(createAlertBtn.exists()).toBe(true);
+    });
+
+    it("should emit create-alert event when create alert button is clicked", async () => {
+      const createAlertBtn = wrapper.find(
+        '[data-test="pattern-card-0-create-alert-btn"]',
+      );
+      await createAlertBtn.trigger("click");
+
+      expect(wrapper.emitted("create-alert")).toBeTruthy();
+      expect(wrapper.emitted("create-alert")![0]).toEqual([mockPattern]);
+    });
+
+    it("should not trigger card click when create alert button is clicked", async () => {
+      const createAlertBtn = wrapper.find(
+        '[data-test="pattern-card-0-create-alert-btn"]',
+      );
+      await createAlertBtn.trigger("click");
+
+      expect(wrapper.emitted("click")).toBeFalsy();
+    });
   });
 
   describe("Multiple Patterns", () => {
