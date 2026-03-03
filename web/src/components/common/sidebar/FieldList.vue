@@ -39,7 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
                 :title="props.row.name"
               >
-                <div class="field_label ellipsis">
+                <div class="field_label ellipsis tw:flex tw:items-center">
+                  <FieldTypeBadge :dataType="props.row.type" />
                   {{ props.row.name }}
                 </div>
                 <div
@@ -57,23 +58,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-expansion-item
                 v-else
                 dense
-                switch-toggle-side
+                hide-expand-icon
                 :label="props.row.name"
-                expand-icon-class="field-expansion-icon tw:text-[1rem]! tw:text-[var(--o2-icon-color)]"
-                expand-icon="
-                     expand_more
-                  "
                 @before-show="
-                  (event: any) => openFilterCreator(event, props.row)
+                  (event: any) => {
+                    expandedRows[props.row.name] = true;
+                    openFilterCreator(event, props.row);
+                  }
                 "
+                @before-hide="expandedRows[props.row.name] = false"
                 class="hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
               >
                 <template v-slot:header>
                   <div
-                    class="flex content-center ellipsis"
+                    class="flex content-center ellipsis field-expansion-header"
                     :title="props.row.name"
                   >
-                    <div class="field_label ellipsis">
+                    <div class="field_label ellipsis tw:flex tw:items-center">
+                      <span class="field-type-container" :title="props.row.type">
+                        <FieldTypeBadge :dataType="props.row.type" />
+                        <q-icon
+                          class="field-expand-icon"
+                          :name="expandedRows[props.row.name] ? 'expand_less' : 'expand_more'"
+                          size="1rem"
+                        />
+                      </span>
                       {{ props.row.name }}
                     </div>
                     <div
@@ -258,12 +267,14 @@ import streamService from "@/services/stream";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 
 export default defineComponent({
   name: "IndexList",
   components: {
     EqualIcon,
     NotEqualIcon,
+    FieldTypeBadge,
   },
   props: {
     fields: {
@@ -313,6 +324,8 @@ export default defineComponent({
         values: { key: string; count: string }[];
       };
     }> = ref({});
+
+    const expandedRows: Ref<Record<string, boolean>> = ref({});
 
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
@@ -395,6 +408,7 @@ export default defineComponent({
       openFilterCreator,
       addSearchTerm,
       fieldValues,
+      expandedRows,
       outlinedAdd,
       filterFieldValue,
       copyContentValue,
@@ -609,12 +623,34 @@ export default defineComponent({
           }
         }
       }
-      .field-expansion-icon {
-        img {
-          width: 10px;
-          height: 10px;
-        }
-      }
+    }
+
+    .field-type-container {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1rem;
+      height: 1rem;
+      margin-right: 0.3rem;
+      margin-left: 0.2rem;
+      flex-shrink: 0;
+      vertical-align: middle;
+    }
+
+    .field-expand-icon {
+      position: absolute;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .field-expansion-header:hover .field-type-badge {
+      opacity: 0;
+    }
+
+    .field-expansion-header:hover .field-expand-icon {
+      opacity: 1;
+      left: -2px;
     }
 
     .field-container {
