@@ -323,6 +323,8 @@ export default defineComponent({
 
     // ─── Filter ──────────────────────────────────────────────────────────
 
+    const expandedRows: Ref<Record<string, boolean>> = ref({});
+
     const filterFieldFn = (rows: any, terms: any) => {
       const filtered = [];
       if (terms !== "") {
