@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-select
                 v-model="localDestinations"
                 :options="filteredDestinations"
+                data-test="alert-destinations-select"
                 color="input-border"
                 bg-color="input-bg"
                 class="showLabelOnTop no-case destinations-select-field"
@@ -108,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-slot:option="option">
                   <q-list dense>
-                    <q-item tag="label">
+                    <q-item tag="label" :data-test="`alert-destination-option-${option.opt}`">
                       <q-item-section avatar>
                         <q-checkbox
                           size="xs"
@@ -253,6 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-select
                       v-model="formData.trigger_condition.operator"
                       :options="triggerOperators"
+                      data-test="alert-threshold-operator-select"
                       class="showLabelOnTop no-case q-py-none"
                       borderless
                       dense
@@ -281,6 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div style="width: 89px; margin-left: 0 !important">
                         <q-input
                           v-model.number="formData.trigger_condition.threshold"
+                          data-test="alert-threshold-value-input"
                           type="number"
                           dense
                           borderless
@@ -607,6 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="destinationsFieldRef"
                 v-model="localDestinations"
                 :options="filteredDestinations"
+                data-test="alert-destinations-select"
                 class="no-case q-py-none destinations-select-field"
                 borderless
                 dense
@@ -630,7 +634,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-slot:option="option">
                   <q-list dense>
-                    <q-item tag="label">
+                    <q-item tag="label" :data-test="`alert-destination-option-${option.opt}`">
                       <q-item-section avatar>
                         <q-checkbox
                           size="xs"
@@ -745,6 +749,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
+
+      <!-- Creates Incident toggle — shown for all alert types -->
+      <div class="flex items-start tw:pb-4 tw:mb-4">
+        <div
+          class="tw:font-semibold flex items-center"
+          style="width: 190px; height: 36px"
+        >
+          {{ t("alerts.alertSettings.createsIncident") }}
+          <q-icon
+            name="info"
+            size="17px"
+            class="q-ml-xs cursor-pointer"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          >
+            <q-tooltip anchor="center right" self="center left" max-width="350px">
+              <span style="font-size: 14px">
+                {{ t("alerts.alertSettings.createsIncidentTooltip") }}
+              </span>
+            </q-tooltip>
+          </q-icon>
+        </div>
+        <q-toggle
+          v-model="formData.creates_incident"
+          data-test="alert-creates-incident-toggle"
+          color="primary"
+          size="30px"
+          class="o2-toggle-button-xs"
+        />
+      </div>
       </q-form>
     </div>
   </div>

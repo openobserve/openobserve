@@ -1,0 +1,105 @@
+/* ============================================================================
+   PAGINATION BLOCK
+   ============================================================================ */
+.paginator-section {
+  line-height: 1.5rem; // 24px - more compact
+  max-height: 1.5rem; // 24px
+  border-radius: 0.5rem;
+  padding: 0.125rem 0.25rem; // Compact padding
+  background: rgba(255, 255, 255, 0.1); // Glassmorphic
+  backdrop-filter: blur(10px);
+  margin-top: 0.4rem;
+
+  :deep(.q-btn) {
+    padding: 0.125rem 0.25rem;
+    min-height: 1.5rem;
+    font-size: 0.75rem;
+    border-radius: 0.25rem;
+    line-height: 1rem;
+  }
+}
+
+.select-pagination {
+  position: relative;
+  line-height: 1.75rem !important; // 28px - slightly taller to prevent clipping
+  border-radius: 0.25rem !important;
+  padding: 0.125rem 0.5rem !important; // Add vertical padding
+  background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
+  backdrop-filter: blur(10px) !important;
+  min-height: 1.45rem !important;
+  height: 1.45rem !important;
+  border: 0.0626rem solid var(--o2-border-color) !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow: visible !important;
+  margin-top: 0.4rem;
+
+  :deep(.q-field__control-container) {
+    padding-top: 0 !important;
+
+    .q-field__native{
+      padding: 0 !important;
+      min-height: 1.5rem !important;
+      height: 1.5rem !important;
+    }
+  }
+
+  :deep(.q-field__control) {
+    height: 1.4rem !important;
+    min-height: 1.4rem !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    overflow: visible !important;
+    top: -3px;
+    border: none !important;
+
+    &:before,
+    &:after {
+      border: none !important;
+    }
+  }
+
+  :deep(.q-field__native) {
+    padding: 0 0.25rem !important;
+    line-height: 100% !important;
+    font-size: 0.75rem !important;
+    overflow: visible !important;
+    height: 100% !important;
+    display: flex;
+    align-items: center;
+
+    span {
+      padding: 0 !important;
+      height: auto;
+    }
+
+    input {
+      display: none;
+    }
+  }
+
+  :deep(.q-field__input) {
+    padding: 0 !important;
+    line-height: 100% !important;
+  }
+
+  :deep(.q-field__append) {
+    padding: 0 !important;
+    padding-left: 0.125rem !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  :deep(.q-icon) {
+    font-size: 1rem !important;
+    transform: none !important;
+  }
+
+  // Selected value display
+  :deep(input[readonly]) {
+    line-height: 1.75rem !important;
+    padding: 0 !important;
+  }
+}

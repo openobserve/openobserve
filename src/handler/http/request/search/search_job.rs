@@ -23,7 +23,8 @@ use config::meta::search::Request;
 #[cfg(feature = "enterprise")]
 use {
     crate::handler::http::request::search::{
-        query_manager::cancel_query_inner, utils::check_stream_permissions,
+        query_manager::cancel_query_inner,
+        utils::{StreamPermissionResourceType, check_stream_permissions},
     },
     crate::service::search_jobs::{get_result, merge_response},
     crate::{
@@ -181,8 +182,14 @@ pub async fn submit_job(
 
         // Check permissions on stream
         for stream_name in stream_names.iter() {
-            if let Some(res) =
-                check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
+            if let Some(res) = check_stream_permissions(
+                stream_name,
+                &org_id,
+                &user_id,
+                &stream_type,
+                StreamPermissionResourceType::Search,
+            )
+            .await
             {
                 return res;
             }
@@ -714,8 +721,14 @@ async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Optio
     let stream_type = StreamType::from(job.stream_type.as_str());
     let stream_names: Vec<String> = json::from_str(&job.stream_names).unwrap();
     for stream_name in stream_names.iter() {
-        if let Some(res) =
-            check_stream_permissions(stream_name, org_id, user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            stream_name,
+            org_id,
+            user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
         {
             return Some(res);
         }

@@ -29,12 +29,13 @@ use config::{
     },
 };
 use hashbrown::HashMap;
-use serde::{Deserialize, Serialize};
 use serde_json;
 use tracing::{Instrument, Span};
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::check_stream_permissions;
+use crate::handler::http::request::search::utils::{
+    StreamPermissionResourceType, check_stream_permissions,
+};
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
@@ -47,10 +48,7 @@ use crate::{
         },
     },
     handler::http::{extractors::Headers, request::search::error_utils},
-    service::{
-        search::inspector::{SearchInspectorFields, extract_search_inspector_fields},
-        self_reporting::http_report_metrics,
-    },
+    service::{search::inspector::*, self_reporting::http_report_metrics},
 };
 
 /// GetSearchProfile
@@ -189,7 +187,14 @@ pub async fn get_search_profile(
 
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
-    if let Some(res) = check_stream_permissions(&stream_name, org_id, &user_id, &stream_type).await
+    if let Some(res) = check_stream_permissions(
+        &stream_name,
+        org_id,
+        &user_id,
+        &stream_type,
+        StreamPermissionResourceType::Search,
+    )
+    .await
     {
         return res;
     }
@@ -286,6 +291,9 @@ pub async fn get_search_profile(
                 start_time: "".to_string(),
                 end_time: "".to_string(),
                 total_duration: 0,
+                scan_size: 0,
+                scan_records: 0,
+                data_records: 0,
                 events: vec![],
             };
 
@@ -308,6 +316,9 @@ pub async fn get_search_profile(
                                     si.start_time = time_range.0;
                                     si.end_time = time_range.1;
                                     si.total_duration = fields.duration.unwrap_or_default();
+                                    si.scan_size = fields.scan_size.unwrap_or_default();
+                                    si.scan_records = fields.scan_records.unwrap_or_default();
+                                    si.data_records = fields.data_records.unwrap_or_default();
                                 } else {
                                     fields.timestamp = Some(event._timestamp.to_string());
                                     inspectors.push(fields);
@@ -320,7 +331,7 @@ pub async fn get_search_profile(
                 }
             }
 
-            si.events = events;
+            si.events = organize_events(events);
 
             Json(si).into_response()
         }
@@ -344,24 +355,158 @@ pub async fn get_search_profile(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SearchInspectorEvent {
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub inspector: Option<SearchInspectorFields>,
-    pub _timestamp: i64,
-    pub code_namespace: Option<String>,
-    pub target: Option<String>,
-    pub code_filepath: Option<String>,
-    pub code_lineno: Option<String>,
-    pub level: Option<String>,
+/// Organize events by cluster and regions
+/// When we enable super clsuter, we need to show the events which search_role is super as first
+/// level, and the group all the other events by cluster and region and just show the total duration
+/// in the first level. Then show the events which search_role is leader as second level, and the
+/// group all the other events by cluster and region and node and just show the total duration in
+/// the second level. Finally show the events which search_role is follower as third level and sort
+/// by _timestamp.
+fn organize_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspectorFields> {
+    #[cfg(not(feature = "enterprise"))]
+    let is_super_cluster = false;
+    #[cfg(feature = "enterprise")]
+    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+
+    if !is_super_cluster {
+        return group_leader_events(events);
+    }
+
+    let (super_events, other_events): (Vec<_>, Vec<_>) = events
+        .into_iter()
+        .partition(|e| e.search_role.as_deref() == Some("super"));
+
+    let mut organized_events: Vec<SearchInspectorFields> = super_events;
+    let grouped = group_by_key(
+        other_events,
+        |e| {
+            (
+                format_trace_id(e.trace_id.clone()),
+                e.cluster.clone().unwrap_or_default(),
+                e.region.clone().unwrap_or_default(),
+            )
+        },
+        |mut summary, (trace_id, cluster, region), timestamp, duration, nested| {
+            summary.trace_id = Some(trace_id);
+            summary.cluster = Some(cluster);
+            summary.region = Some(region);
+            summary.timestamp = Some(timestamp);
+            summary.duration = Some(duration);
+            summary.search_role = Some("leader".to_string());
+            summary.events = Some(group_leader_events(nested));
+            summary
+        },
+    );
+    organized_events.extend(grouped);
+    organized_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    organized_events
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SearchInspector {
-    pub sql: String,
-    pub start_time: String,
-    pub end_time: String,
-    pub total_duration: usize,
-    pub events: Vec<SearchInspectorFields>,
+fn group_leader_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspectorFields> {
+    let (leader_events, other_events): (Vec<_>, Vec<_>) = events
+        .into_iter()
+        .partition(|e| e.search_role.as_deref() == Some("leader"));
+
+    let mut organized_events: Vec<SearchInspectorFields> = leader_events;
+    let grouped = group_by_key(
+        other_events,
+        |e| {
+            (
+                format_trace_id(e.trace_id.clone()),
+                e.node_name.clone().unwrap_or_default(),
+            )
+        },
+        |mut summary, (trace_id, node_name), timestamp, duration, nested| {
+            summary.trace_id = Some(trace_id);
+            summary.node_name = Some(node_name);
+            summary.timestamp = Some(timestamp);
+            summary.duration = Some(duration);
+            summary.search_role = Some("follower".to_string());
+            summary.events = Some(sort_events_by_timestamp(nested));
+            summary
+        },
+    );
+    organized_events.extend(grouped);
+    organized_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    organized_events
+}
+
+fn sort_events_by_timestamp(mut events: Vec<SearchInspectorFields>) -> Vec<SearchInspectorFields> {
+    events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    // reset trace_id to None
+    events.iter_mut().for_each(|e| {
+        e.trace_id = None;
+        e.search_role = None;
+        e.cluster = None;
+        e.region = None;
+        e.node_name = None;
+    });
+    events
+}
+
+/// Group events by key, aggregate max timestamp and sum duration per group, then build summary
+/// entries via `build_summary`. Keys must implement `Hash + Eq + Clone`.
+fn group_by_key<K, F, B>(
+    events: Vec<SearchInspectorFields>,
+    key_fn: F,
+    build_summary: B,
+) -> Vec<SearchInspectorFields>
+where
+    K: std::hash::Hash + Eq + Clone,
+    F: Fn(&SearchInspectorFields) -> K,
+    B: Fn(
+        SearchInspectorFields,
+        K,
+        String,
+        usize,
+        Vec<SearchInspectorFields>,
+    ) -> SearchInspectorFields,
+{
+    let mut groups: HashMap<K, (String, usize, Vec<SearchInspectorFields>)> = HashMap::new();
+    for event in events {
+        let key = key_fn(&event);
+        let ts = event.timestamp.clone().unwrap_or_default();
+        let dur = event.duration.unwrap_or_default();
+        let entry = groups
+            .entry(key)
+            .or_insert_with(|| (String::new(), 0, Vec::new()));
+        if entry.0.is_empty() || ts < entry.0 {
+            entry.0 = ts;
+        }
+        entry.1 += dur;
+        entry.2.push(event);
+    }
+    groups
+        .into_iter()
+        .map(|(key, (timestamp, duration, events))| {
+            build_summary(
+                SearchInspectorFields::new(),
+                key,
+                timestamp,
+                duration,
+                events,
+            )
+        })
+        .collect()
+}
+
+fn format_trace_id(trace_id: Option<String>) -> String {
+    let Some(trace_id) = trace_id else {
+        return "".to_string();
+    };
+    let mut cols = trace_id.split("-").collect::<Vec<&str>>();
+    // 019cae07a3f0740ab34831ba04563200-1-13jPR6A
+    // 21aae3eed2c6fd63aabba9feed664331-Evlj599
+    // we only need the first two columns or the first column when the second is not number, the
+    // third used for different stage on same node
+    if cols.len() >= 2 {
+        if cols[1].chars().all(|c| c.is_ascii_digit()) {
+            cols.truncate(2);
+        } else {
+            cols.truncate(1);
+        }
+    }
+    cols.join("-")
 }

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -204,6 +204,7 @@ impl Drop for FlightDecoderStream {
                     start.elapsed().as_millis(),
                 ),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(node.get_name())
                     .region(node.get_region())
                     .cluster(node.get_cluster())

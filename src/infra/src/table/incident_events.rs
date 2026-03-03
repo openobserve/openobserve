@@ -97,8 +97,9 @@ pub async fn append(
 }
 
 /// Record an alert event with compaction.
-/// If an Alert event with the same alert_id exists, increment count and update last_at.
-/// Otherwise append a new Alert event.
+/// Scans backwards through the trailing block of consecutive Alert events; if a matching
+/// alert_id is found within that block, its count is incremented. If a non-Alert event is
+/// encountered first (or the list is empty), a new Alert event is appended.
 pub async fn record_alert(
     org_id: &str,
     incident_id: &str,
@@ -120,11 +121,21 @@ pub async fn record_alert(
             let mut events: Vec<IncidentEvent> =
                 serde_json::from_value(model.events.clone()).unwrap_or_default();
 
-            // Compact only if the last event is an Alert for the same alert_id.
-            // Otherwise append a new event (preserves interleaving: A x5, B x3, A x2).
-            let compacted = events
-                .last_mut()
-                .is_some_and(|e| e.increment_alert(alert_id, triggered_at));
+            // Scan backwards through the trailing block of Alert events.
+            // If a matching alert_id is found within that block, increment it.
+            // Stop (and append) as soon as a non-Alert event is encountered.
+            let compacted = 'scan: {
+                for event in events.iter_mut().rev() {
+                    if !event.is_alert() {
+                        break 'scan false;
+                    }
+                    if event.is_alert_for(alert_id) {
+                        event.increment_alert(alert_id, triggered_at);
+                        break 'scan true;
+                    }
+                }
+                false
+            };
 
             if !compacted {
                 events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));

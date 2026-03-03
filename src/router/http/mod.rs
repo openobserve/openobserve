@@ -154,6 +154,7 @@ async fn resolve_target(path: &str, base_uri: &str) -> Result<ProxyTarget, Strin
     }
 
     let node = select_node(&nodes);
+    let path = format!("{}{}", base_uri, path);
     Ok(ProxyTarget {
         path: path.to_string(),
         full_url: format!("{}{}", node.http_addr, path),

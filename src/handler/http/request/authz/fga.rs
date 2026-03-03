@@ -981,7 +981,7 @@ pub async fn get_group_details(Path(_path): Path<(String, String)>) -> Response 
 pub async fn get_resources(Path(_org_id): Path<String>) -> Response {
     #[cfg(feature = "cloud")]
     use o2_openfga::meta::mapping::NON_CLOUD_RESOURCE_KEYS;
-    use o2_openfga::meta::mapping::Resource;
+    use o2_openfga::meta::mapping::{Resource, remove_resource_keys};
     let resources = o2_openfga::meta::mapping::OFGA_MODELS
         .values()
         .collect::<Vec<&Resource>>();
@@ -989,6 +989,12 @@ pub async fn get_resources(Path(_org_id): Path<String>) -> Response {
     let resources = resources
         .into_iter()
         .filter(|r| !NON_CLOUD_RESOURCE_KEYS.contains(&r.key))
+        .collect::<Vec<&Resource>>();
+
+    let remove_keys = remove_resource_keys();
+    let resources = resources
+        .into_iter()
+        .filter(|r| !remove_keys.contains(&r.key))
         .collect::<Vec<&Resource>>();
     Json(resources).into_response()
 }

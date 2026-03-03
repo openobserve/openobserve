@@ -332,7 +332,7 @@ pub async fn get_latest_traces(
         .map_or("desc", |v| v.as_str())
         .to_string()
         .to_lowercase();
-    let sort_order_sql = if sort_order == "asc" { "ASC" } else { "DESC" };
+    let sort_order = if sort_order == "asc" { "ASC" } else { "DESC" };
 
     // search
     let query_sql = if is_llm_stream {
@@ -356,8 +356,8 @@ pub async fn get_latest_traces(
         )
     };
     let sql_order_expr = match sort_by.as_str() {
-        "duration" => format!("zo_sql_duration {sort_order_sql}"),
-        "start_time" | "_timestamp" => format!("zo_sql_timestamp {sort_order_sql}"),
+        "duration" => format!("zo_sql_duration {sort_order}"),
+        "start_time" | "_timestamp" => format!("zo_sql_timestamp {sort_order}"),
         _ => {
             return MetaHttpResponse::bad_request(
                 "Invalid sort_by field, only support duration and start_time",
@@ -506,7 +506,7 @@ pub async fn get_latest_traces(
     req.query.sql = query_sql.to_string();
     req.query.start_time = start_time;
     req.query.end_time = end_time;
-    let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
+    let mut traces_service_name: HashMap<String, HashMap<String, (u16, i64)>> = HashMap::new();
 
     loop {
         let search_res = SearchService::cache::search(
@@ -588,8 +588,9 @@ pub async fn get_latest_traces(
                 trace.end_time = trace_end_time;
             }
             let service_name_map = traces_service_name.entry(trace_id.clone()).or_default();
-            let count = service_name_map.entry(service_name.clone()).or_default();
-            *count += 1;
+            let entry = service_name_map.entry(service_name.clone()).or_default();
+            entry.0 += 1;
+            entry.1 += duration;
         }
         if resp_size < req.query.size {
             break;
@@ -600,24 +601,25 @@ pub async fn get_latest_traces(
     // apply service_name to traces_data
     for (trace_id, service_name_map) in traces_service_name {
         let trace = traces_data.get_mut(&trace_id).unwrap();
-        for (service_name, count) in service_name_map {
+        for (service_name, (count, duration)) in service_name_map {
             trace.service_name.push(TraceServiceNameItem {
                 service_name,
                 count,
+                duration,
             });
         }
     }
     let mut traces_data = traces_data.values().collect::<Vec<&TraceResponseItem>>();
     match sort_by.as_str() {
         "duration" => {
-            if sort_order == "asc" {
+            if sort_order == "ASC" {
                 traces_data.sort_by(|a, b| a.duration.cmp(&b.duration));
             } else {
                 traces_data.sort_by(|a, b| b.duration.cmp(&a.duration));
             }
         }
         _ => {
-            if sort_order == "asc" {
+            if sort_order == "ASC" {
                 traces_data.sort_by(|a, b| a.start_time.cmp(&b.start_time));
             } else {
                 traces_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
@@ -687,6 +689,8 @@ pub async fn get_latest_traces(
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
+        ("sort_by" = Option<String>, Query, description = "sort by field: start_time, duration (default: start_time)"),
+        ("sort_order" = Option<String>, Query, description = "sort order: asc, desc (default: desc)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
@@ -834,6 +838,26 @@ pub async fn get_latest_traces_stream(
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    let sort_by = query
+        .get("sort_by")
+        .map_or("start_time", |v| v.as_str())
+        .to_string()
+        .to_lowercase();
+    let sort_order = query
+        .get("sort_order")
+        .map_or("desc", |v| v.as_str())
+        .to_string()
+        .to_lowercase();
+    let sort_order = if sort_order == "asc" { "ASC" } else { "DESC" };
+    let sql_order_expr = match sort_by.as_str() {
+        "duration" => format!("zo_sql_duration {sort_order}"),
+        "start_time" | "_timestamp" => format!("zo_sql_timestamp {sort_order}"),
+        _ => {
+            return MetaHttpResponse::bad_request(
+                "Invalid sort_by field, only support duration and start_time",
+            );
+        }
+    };
 
     let use_cache = get_use_cache_from_request(&query);
 
@@ -851,6 +875,9 @@ pub async fn get_latest_traces_stream(
             from,
             size,
             timeout,
+            sort_by,
+            sort_order.to_string(),
+            sql_order_expr,
             is_llm_stream,
             use_cache,
             range_error,
@@ -911,6 +938,9 @@ async fn process_latest_traces_stream(
     from: i64,
     size: i64,
     timeout: i64,
+    sort_by: String,
+    sort_order: String,
+    sql_order_expr: String,
     is_llm_stream: bool,
     use_cache: bool,
     range_error: String,
@@ -957,9 +987,9 @@ async fn process_latest_traces_stream(
         )
     };
     let query_sql = if filter.is_empty() {
-        format!("{query_sql_base} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
+        format!("{query_sql_base} GROUP BY trace_id ORDER BY {sql_order_expr}")
     } else {
-        format!("{query_sql_base} WHERE {filter} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
+        format!("{query_sql_base} WHERE {filter} GROUP BY trace_id ORDER BY {sql_order_expr}")
     };
 
     // Build a base search request. from/size are set per-partition; leave at 0 here.
@@ -1240,7 +1270,7 @@ async fn process_latest_traces_stream(
             .collect();
         let trace_ids_str = sanitized_ids.join("','");
         let detail_sql = format!(
-            "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, span_status \
+            "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status \
              FROM \"{stream_name}\" WHERE trace_id IN ('{trace_ids_str}') ORDER BY {TIMESTAMP_COL_NAME} ASC"
         );
 
@@ -1250,7 +1280,7 @@ async fn process_latest_traces_stream(
         req2.query.size = get_config().limit.query_default_limit;
         req2.query.start_time = p_start_actual;
         req2.query.end_time = p_end_actual;
-        let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
+        let mut traces_service_name: HashMap<String, HashMap<String, (u16, i64)>> = HashMap::new();
 
         loop {
             if sender.is_closed() {
@@ -1319,7 +1349,9 @@ async fn process_latest_traces_stream(
                         trace.end_time = trace_end_time;
                     }
                     let svc_map = traces_service_name.entry(tid).or_default();
-                    *svc_map.entry(service_name).or_default() += 1;
+                    let entry = svc_map.entry(service_name).or_default();
+                    entry.0 += 1;
+                    entry.1 += duration;
                 }
             }
 
@@ -1332,10 +1364,11 @@ async fn process_latest_traces_stream(
         // Apply service_name aggregations
         for (tid, svc_map) in traces_service_name {
             if let Some(trace) = traces_data.get_mut(&tid) {
-                for (svc, count) in svc_map {
+                for (svc, (count, duration)) in svc_map {
                     trace.service_name.push(TraceServiceNameItem {
                         service_name: svc,
                         count,
+                        duration,
                     });
                 }
             }
@@ -1343,7 +1376,22 @@ async fn process_latest_traces_stream(
 
         // Sort by start_time descending (Q2 may have refined start_time from actual span data).
         let mut partition_hits: Vec<&TraceResponseItem> = traces_data.values().collect();
-        partition_hits.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+        match sort_by.as_str() {
+            "duration" => {
+                if sort_order == "ASC" {
+                    partition_hits.sort_by(|a, b| a.duration.cmp(&b.duration));
+                } else {
+                    partition_hits.sort_by(|a, b| b.duration.cmp(&a.duration));
+                }
+            }
+            _ => {
+                if sort_order == "ASC" {
+                    partition_hits.sort_by(|a, b| a.start_time.cmp(&b.start_time));
+                } else {
+                    partition_hits.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+                }
+            }
+        }
 
         let deliverable: Vec<serde_json::Value> = partition_hits
             .iter()
@@ -1413,4 +1461,5 @@ struct TraceResponseItem {
 struct TraceServiceNameItem {
     service_name: String,
     count: u16,
+    duration: i64,
 }

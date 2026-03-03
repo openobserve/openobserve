@@ -315,7 +315,7 @@ size="lg" color="primary" />
           :data-test="`log-expand-detail-key-${key}`"
           :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
-          <span class="log-key">"{{ key }}"</span><span class="log-separator">: </span><span
+          <span class="log-key">{{ key }}</span><span class="log-separator">: </span><span
           ><ChunkedContent
             v-if="getContentSize(value[key]) > 50000"
             :data="value[key]"

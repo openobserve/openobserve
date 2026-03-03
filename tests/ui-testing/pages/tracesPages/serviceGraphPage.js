@@ -1,6 +1,6 @@
 // serviceGraphPage.js
 // Page object for Service Graph feature in Traces module
-// Selectors verified against: ServiceGraph.vue, ServiceGraphSidePanel.vue, ServiceGraphEdgePanel.vue
+// Selectors verified against: ServiceGraph.vue, ServiceGraphSidePanel.vue
 
 import { expect } from '@playwright/test';
 
@@ -44,18 +44,6 @@ export class ServiceGraphPage {
     this.sidePanelRecentTraces = '[data-test="service-graph-side-panel-recent-traces"]';
     this.sidePanelTraceItem = '[data-test="service-graph-side-panel-trace-item"]';
     this.sidePanelCopyTraceBtn = '[data-test="service-graph-side-panel-copy-trace-btn"]';
-
-    // ===== EDGE DETAIL PANEL (ServiceGraphEdgePanel.vue) =====
-    this.edgePanel = '[data-test="service-graph-edge-panel"]';
-    this.edgePanelHeader = '[data-test="service-graph-edge-panel-header"]';
-    this.edgePanelTitle = '[data-test="service-graph-edge-panel-title"]';
-    this.edgePanelCloseBtn = '[data-test="service-graph-edge-panel-close-btn"]';
-    this.edgePanelStats = '[data-test="service-graph-edge-panel-stats"]';
-    this.edgePanelTotalRequests = '[data-test="service-graph-edge-panel-total-requests"]';
-    this.edgePanelRequestRate = '[data-test="service-graph-edge-panel-request-rate"]';
-    this.edgePanelSuccessRate = '[data-test="service-graph-edge-panel-success-rate"]';
-    this.edgePanelErrorRate = '[data-test="service-graph-edge-panel-error-rate"]';
-    this.edgePanelLatencyDistribution = '[data-test="service-graph-edge-panel-latency-distribution"]';
 
     // ===== TELEMETRY CORRELATION DIALOG =====
     this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
@@ -261,23 +249,6 @@ export class ServiceGraphPage {
       .waitFor({ state: 'visible', timeout: 5000 });
   }
 
-  /**
-   * Click an edge in the service graph to open the edge panel.
-   */
-  async clickEdgeByServices(fromService, toService) {
-    const result = await this._callHandleNodeClick({
-      dataType: 'edge',
-      data: { source: fromService, target: toService },
-    });
-
-    if (result?.error) {
-      throw new Error(`clickEdgeByServices("${fromService}", "${toService}") failed: ${result.error}`);
-    }
-
-    await this.page.locator(this.edgePanel)
-      .waitFor({ state: 'visible', timeout: 5000 });
-  }
-
   // ===== SIDE PANEL (Node Detail) =====
 
   async expectSidePanelVisible() {
@@ -361,6 +332,11 @@ export class ServiceGraphPage {
   }
 
   async getRecentTraceCount() {
+    // Wait for the loading spinner inside the recent traces section to disappear.
+    // fetchRecentTraces() is async — the section div renders immediately but trace
+    // items only appear after the API call completes and loadingTraces becomes false.
+    const section = this.page.locator(this.sidePanelRecentTraces);
+    await section.locator('.q-spinner').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     return await this.page.locator(this.sidePanelTraceItem).count();
   }
 
@@ -435,45 +411,6 @@ export class ServiceGraphPage {
       tabNames.push((await tabs.nth(i).textContent()).trim());
     }
     return tabNames;
-  }
-
-  // ===== EDGE PANEL =====
-
-  async expectEdgePanelVisible() {
-    await expect(this.page.locator(this.edgePanel)).toBeVisible({ timeout: 10000 });
-  }
-
-  async isEdgePanelVisible() {
-    return await this.page.locator(this.edgePanel)
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-  }
-
-  async getEdgePanelTitle() {
-    return await this.page.locator(this.edgePanelTitle).textContent();
-  }
-
-  async getEdgePanelTotalRequests() {
-    return await this.page.locator(this.edgePanelTotalRequests).textContent();
-  }
-
-  async getEdgePanelRequestRate() {
-    return await this.page.locator(this.edgePanelRequestRate).textContent();
-  }
-
-  async getEdgePanelSuccessRate() {
-    return await this.page.locator(this.edgePanelSuccessRate).textContent();
-  }
-
-  async getEdgePanelErrorRate() {
-    return await this.page.locator(this.edgePanelErrorRate).textContent();
-  }
-
-  async closeEdgePanel() {
-    await this.page.locator(this.edgePanelCloseBtn).click();
-    await this.page.locator(this.edgePanel)
-      .waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   // ===== SCREENSHOTS (Visual Verification) =====

@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Simple field without expansion (FTS keys or fields without values) -->
   <div
     v-if="field.ftsKey || !field.isSchemaField || !field.showValues"
-    class="field-container flex content-center ellipsis q-pl-lg full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
+    class="field-container flex content-center ellipsis full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
+
     :title="field.name"
   >
     <div
@@ -29,6 +30,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="ellipsis tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]!"
         style="display: inline-block"
       >
+        <span
+          v-if="field.dataType"
+          class="field-type-badge"
+          :style="{
+            backgroundColor: fieldTypeInfo.color,
+            color: fieldTypeInfo.textColor,
+          }"
+          :title="field.dataType"
+        >{{ fieldTypeInfo.label }}</span>
         {{ field.name }}
       </div>
       <span class="float-right">
@@ -125,6 +135,45 @@ defineEmits<{
 const isFieldSelected = computed(() =>
   props.selectedFields.includes(props.field.name),
 );
+
+const fieldTypeInfo = computed(() => {
+  if (props.field.name === props.timestampColumn)
+    return {
+      label: "T",
+      color: "var(--o2-field-type-timestamp-bg)",
+      textColor: "var(--o2-field-type-timestamp-text)",
+    };
+  const t = (props.field.dataType || "").toLowerCase();
+  if (t === "boolean")
+    return {
+      label: "B",
+      color: "var(--o2-field-type-boolean-bg)",
+      textColor: "var(--o2-field-type-boolean-text)",
+    };
+  if (t.includes("float"))
+    return {
+      label: "~",
+      color: "var(--o2-field-type-float-bg)",
+      textColor: "var(--o2-field-type-float-text)",
+    };
+  if (t.includes("int") || t.includes("uint"))
+    return {
+      label: "#",
+      color: "var(--o2-field-type-number-bg)",
+      textColor: "var(--o2-field-type-number-text)",
+    };
+  if (t.includes("timestamp") || t === "date32" || t === "date64")
+    return {
+      label: "T",
+      color: "var(--o2-field-type-timestamp-bg)",
+      textColor: "var(--o2-field-type-timestamp-text)",
+    };
+  return {
+    label: "S",
+    color: "var(--o2-field-type-string-bg)",
+    textColor: "var(--o2-field-type-string-text)",
+  };
+});
 </script>
 
 <style scoped lang="scss">
@@ -149,5 +198,20 @@ const isFieldSelected = computed(() =>
 
 .field_label {
   padding: 0.25rem 0;
+}
+
+.field-type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.2rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #fff;
+  margin-right: 0.3rem;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 </style>

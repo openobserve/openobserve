@@ -351,7 +351,8 @@
     "openFields": "オープンフィールド",
     "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
     "enterFunctionPrompt": "関数を生成するプロンプトを入力してください",
-    "recordsPerPage": "1 ページあたりのレコード数"
+    "recordsPerPage": "1 ページあたりのレコード数",
+    "searchDimension": "ディメンション検索"
   },
   "menu": {
     "home": "ホーム",
@@ -2567,7 +2568,18 @@
     "timeRangeUpdated": "選択した時間範囲にはこのトレースが含まれていません。時間範囲はトレースのタイムスタンプと一致するように更新されました。",
     "fetchingMoreTraces": "さらにトレースを取得中...",
     "showErrorOnly": "エラーのみ表示",
-    "openInTraces": "トレースで開く"
+    "openInTraces": "トレースで開く",
+    "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。",
+    "fetchingTraces": "しっかりつかまって足跡を掴んでる",
+    "noTracesFoundAdjust": "トレースが見つかりません。フィルターを調整して、もう一度試してください。",
+    "tracesTitle": "トレース",
+    "tracesFound": "トレースが見つかりました",
+    "error": "エラー",
+    "errors": "エラー",
+    "success": "成功",
+    "today": "今日",
+    "yesterday": "昨日",
+    "spanColorPalettePreview": "Span カラーパレットのプレビュー"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -2944,7 +2956,8 @@
     "tracesErrorDetails": "トレースデータの取得中にエラーが発生しました。もう一度試してください。",
     "metricsError": "メトリクスを読み込めません",
     "metricsErrorDetails": "メトリックスデータの取得中にエラーが発生しました。もう一度試してください。",
-    "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。"
+    "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。",
+    "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",

@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 32;
+pub const DB_SCHEMA_VERSION: u64 = 33;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2672,6 +2672,15 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
+    // check queue store
+    if cfg.common.queue_store.is_empty() {
+        cfg.common.queue_store = "nats".to_string();
+    }
+    cfg.common.queue_store = cfg.common.queue_store.to_lowercase();
+    if !cfg.common.queue_store.starts_with("nats") {
+        return Err(anyhow::anyhow!("Queue store only supports nats."));
+    }
+
     // format metadata storage
     if cfg.common.meta_store.is_empty() {
         if cfg.common.local_mode {
@@ -3392,6 +3401,11 @@ mod tests {
         assert_eq!(cfg.common.data_stream_dir, "/abc/".to_string());
         assert_eq!(cfg.common.data_dir, "/abc/".to_string());
         assert_eq!(cfg.common.base_uri, "/abc".to_string());
+
+        cfg.common.base_uri = "/".to_string();
+        let ret = check_path_config(&mut cfg);
+        assert!(ret.is_ok());
+        assert_eq!(cfg.common.base_uri, "".to_string());
 
         // Test route dispatch strategies
         cfg.route.dispatch_strategy = RouteDispatchStrategy::Workload;

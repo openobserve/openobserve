@@ -88,9 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             dense
             color="primary"
-            icon="analytics"
+            icon="timeline"
             :label="t('volumeInsights.insightsButtonLabel')"
-            class="q-ml-md"
+            class="tw:ml-[0.5rem]! analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
             size="sm"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
@@ -156,14 +156,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
           <!-- Wrap Content Button -->
           <q-btn
-            v-if="searchObj.meta.logsVisualizeToggle === 'logs'"
+            v-if="searchObj.meta.logsVisualizeToggle === 'logs' || searchObj.meta.logsVisualizeToggle === 'patterns'"
             data-test="logs-search-result-wrap-table-content-btn"
             icon="wrap_text"
             flat
             dense
             class="wrap-content-btn float-right"
-            :class="{ 'wrap-content-btn--active': searchObj.meta.toggleSourceWrap }"
-            @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+            :class="{
+              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
+            }"
+            @click="
+              searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
+            "
           >
             <q-tooltip>
               {{ t("search.messageWrapContent") }}

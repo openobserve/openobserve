@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-show="searchObj.meta.showFields"
                 ref="indexListRef"
                 :field-list="searchObj.data.stream.selectedStreamFields"
-                data-test="logs-search-index-list"
+                data-test="traces-search-index-list"
                 class="card-container"
                 :key="searchObj.data.stream.streamLists"
                 @update:changeStream="onChangeStream"
@@ -106,108 +106,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-              <div class="card-container tw:h-full tw:overflow-hidden">
-                <div
-                  v-if="
-                    searchObj.data.errorMsg !== '' && searchObj.loading == false
-                  "
-                >
-                  <h5 class="text-center">
-                    <div
-                      data-test="logs-search-result-not-found-text"
-                      v-if="
-                        searchObj.data.stream.streamLists.length &&
-                        searchObj.data.errorCode == 0
-                      "
-                    >
-                      {{ t("traces.noTracesFound") }}
-                    </div>
-                    <SanitizedHtmlRenderer
-                      data-test="logs-search-error-message"
-                      :htmlContent="`${searchObj.data.errorMsg}
-                  ${searchObj.data.errorDetail ? `<h6 style='font-size: 14px; margin: 0;'>${searchObj.data.errorDetail}</h6>` : ''}`"
-                    />
-                    <div
-                      data-test="logs-search-error-20003"
-                      v-if="parseInt(searchObj.data.errorCode) == 20003"
-                    >
-                      <q-btn
-                        no-caps
-                        unelevated
-                        size="sm"
-                        bg-secondary
-                        class="no-border bg-secondary text-white"
-                        :to="
-                          '/streams?dialog=' +
-                          searchObj.data.stream.selectedStream.label
-                        "
-                        >Click here</q-btn
-                      >
-                      {{ t("traces.configureFullTextSearch") }}
-                    </div>
-                    <br />
-                    <q-item-label>{{
-                      searchObj.data.additionalErrorMsg
-                    }}</q-item-label>
-                  </h5>
-                </div>
-                <div v-else-if="!isStreamSelected">
+              <div
+                v-if="
+                  searchObj.data.errorMsg !== '' &&
+                  parseInt(searchObj.data.errorCode) !== 0 &&
+                  searchObj.loading == false
+                "
+                class="card-container tw:h-full"
+              >
+                <div class="text-center tw:pt-[2rem]">
+                  <!-- Actual error case -->
                   <div
-                    data-test="logs-search-no-stream-selected-text"
-                    class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
+                    data-test="traces-search-error-message"
+                    class="tw:text-[1.3rem] q-pt-lg"
                   >
-                    <q-icon name="info" color="primary" size="md" />
-                    {{ t("search.noStreamSelectedMessage") }}
+                    {{ t("traces.errorRetrievingTraces") }}
+                    <q-btn
+                      v-if="searchObj.data.errorDetail"
+                      @click="toggleErrorDetails"
+                      size="sm"
+                      class="o2-secondary-button q-ml-sm"
+                      data-test="traces-search-error-details-btn"
+                      >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                    >
                   </div>
+                  <!-- FTS not configured -->
+                  <div
+                    data-test="traces-search-error-20003"
+                    v-if="parseInt(searchObj.data.errorCode) == 20003"
+                  >
+                    <q-btn
+                      no-caps
+                      unelevated
+                      size="sm"
+                      bg-secondary
+                      class="no-border bg-secondary text-white"
+                      :to="
+                        '/streams?dialog=' +
+                        searchObj.data.stream.selectedStream.label
+                      "
+                      >Click here</q-btn
+                    >
+                    {{ t("traces.configureFullTextSearch") }}
+                  </div>
+                  <q-item-label>{{
+                    searchObj.data.additionalErrorMsg
+                  }}</q-item-label>
                 </div>
+              </div>
+              <div
+                v-else-if="
+                  searchObj.data.errorMsg !== '' &&
+                  parseInt(searchObj.data.errorCode) == 0 &&
+                  !searchObj.loading
+                "
+                data-test="traces-search-result-not-found-text"
+                class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
+              >
+                <q-icon name="info" color="primary" size="md" />
+                {{ searchObj.data.errorMsg }}
+              </div>
+              <div
+                v-else-if="!isStreamSelected"
+                class="card-container tw:h-full"
+              >
                 <div
-                  data-test="logs-search-result-not-found-text"
-                  v-else-if="
-                    isStreamSelected &&
-                    !searchObj.searchApplied &&
-                    !searchObj.data.queryResults?.hits?.length
-                  "
-                  class="text-center tw:mx-[10%] tw:py-[40px] tw:text-[20px]"
+                  data-test="logs-search-no-stream-selected-text"
+                  class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
                 >
                   <q-icon name="info" color="primary" size="md" />
-                  {{ t("search.applySearch") }}
+                  {{ t("search.noStreamSelectedMessage") }}
                 </div>
-
-                <div data-test="logs-search-search-result">
-                  <search-result
-                    ref="searchResultRef"
-                    @update:datetime="setHistogramDate"
-                    @update:scroll="getMoreData"
-                    @shareLink="copyTracesUrl"
-                    @metrics:filters-updated="onMetricsFiltersUpdated"
-                  />
-                </div>
+              </div>
+              <div
+                data-test="traces-search-result-not-found-text"
+                v-else-if="
+                  isStreamSelected &&
+                  !searchObj.searchApplied &&
+                  !searchObj.data.queryResults?.hits?.length
+                "
+                class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
+              >
+                <q-icon name="info" color="primary" size="md" />
+                {{ t("search.applySearch") }}
+              </div>
+              <div
+                v-else
+                data-test="logs-search-search-result"
+                class="tw:h-full!"
+              >
+                <search-result
+                  ref="searchResultRef"
+                  @update:datetime="setHistogramDate"
+                  @update:scroll="getMoreData"
+                  @shareLink="copyTracesUrl"
+                  @metrics:filters-updated="onMetricsFiltersUpdated"
+                />
+              </div>
+              <!-- Collapsible error detail — shown below results when toggled -->
+              <div class="text-center">
+                <h5 class="tw:my-none">
+                  <span v-if="disableMoreErrorDetails">
+                    <SanitizedHtmlRenderer
+                      data-test="traces-search-detail-error-message"
+                      :htmlContent="searchObj?.data?.errorMsg"
+                    />
+                    <div
+                      v-if="searchObj?.data?.errorDetail"
+                      class="error-display__message"
+                    >
+                      {{ searchObj.data.errorDetail }}
+                    </div>
+                  </span>
+                </h5>
               </div>
             </div>
           </template>
         </q-splitter>
       </div>
     </div>
-
-    <!-- Color Preview Dialog (Test) -->
-    <q-dialog
-      v-model="showColorPreview"
-      maximized
-      transition-show="slide-up"
-      transition-hide="slide-down"
-    >
-      <q-card class="tw:bg-[var(--o2-primary-background)]">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">Span Color Palette Preview</div>
-          <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
-        </q-card-section>
-
-        <q-card-section class="tw:h-[calc(100vh-60px)] tw:overflow-auto">
-          <span-color-preview />
-        </q-card-section>
-      </q-card>
-    </q-dialog>
   </q-page>
 </template>
 
@@ -230,7 +247,6 @@ import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
 
-import searchService from "@/services/search";
 import TransformService from "@/services/jstransform";
 import {
   b64EncodeUnicode,
@@ -277,11 +293,15 @@ const searchBarRef = ref(null);
 let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
+const disableMoreErrorDetails = ref(false);
+const toggleErrorDetails = () => {
+  disableMoreErrorDetails.value = !disableMoreErrorDetails.value;
+};
 const indexListRef = ref(null);
-const showColorPreview = ref(false);
 const { getStreams, getStream } = useStreams();
 const chartRedrawTimeout = ref(null);
-const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
+  useHttpStreaming();
 // Track the current search stream so we can cancel it when a new search starts
 let currentSearchTraceId: string | null = null;
 
@@ -699,7 +719,7 @@ async function getQueryData() {
     const filter = searchObj.data.editorValue.trim();
     const combinedFilter = filter;
 
-    if (queryReq.query.from === 0) searchResultRef.value.getDashboardData();
+    if (queryReq.query.from === 0) searchResultRef?.value?.getDashboardData();
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {
@@ -745,8 +765,7 @@ async function getQueryData() {
             response.type === "search_response_metadata" ||
             response.type === "search_response_hits"
           ) {
-            const rawHits: any[] =
-              response.content?.results?.hits || [];
+            const rawHits: any[] = response.content?.results?.hits || [];
             if (rawHits.length === 0) return;
 
             // Handle single-trace-id filter: auto-adjust time range on first hit batch
@@ -787,7 +806,9 @@ async function getQueryData() {
             // fall back to hits.length only if not provided.
             const backendTotal = response.content?.results?.total;
             searchObj.data.queryResults.total =
-              backendTotal != null ? backendTotal : searchObj.data.queryResults.hits.length;
+              backendTotal != null
+                ? backendTotal
+                : searchObj.data.queryResults.hits.length;
 
             updateFieldValues(rawHits);
             updateGridColumns();
@@ -798,28 +819,19 @@ async function getQueryData() {
           if (dismiss) dismiss();
 
           const errData = err?.content || err;
-          if (errData?.message) {
-            searchObj.data.errorMsg = errData.message;
-          } else if (err?.message) {
-            searchObj.data.errorMsg = err.message;
-          } else {
-            searchObj.data.errorMsg = "Search request failed";
+          const { message, trace_id, code, error_detail } = errData ?? {};
+
+          let errorMsg = message || err?.message || "Search request failed";
+          if (code) {
+            searchObj.data.errorCode = code;
+            const customMessage = logsErrorMessage(code);
+            if (customMessage) errorMsg = t(customMessage);
           }
-          if (errData?.code) {
-            searchObj.data.errorCode = errData.code;
-            const customMessage = logsErrorMessage(errData.code);
-            if (customMessage !== "") {
-              searchObj.data.errorMsg = t(customMessage);
-            }
+          if (trace_id) {
+            errorMsg += ` <br><span class='text-subtitle1'>TraceID: ${trace_id}</span>`;
           }
-          if (errData?.code && errData?.message) {
-            searchObj.data.errorMsg = errData.message;
-            searchObj.data.errorCode = errData.code;
-          }
-          if (errData?.code && errData?.error_detail) {
-            searchObj.data.errorDetail = errData.error_detail;
-            searchObj.data.errorCode = errData.code;
-          }
+          searchObj.data.errorMsg = errorMsg;
+          searchObj.data.errorDetail = error_detail || "";
           currentSearchTraceId = null;
         },
         complete: (_payload: any) => {
@@ -831,12 +843,13 @@ async function getQueryData() {
           searchObj.data.queryResults = {};
           searchObj.data.sortedQueryResults = [];
         },
-      }
+      },
     );
   } catch (e: any) {
     console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
-    showErrorNotification("Search request failed");
+    searchObj.data.errorMsg = e?.message || "Search request failed";
+    searchObj.data.errorDetail = "";
   }
 }
 
