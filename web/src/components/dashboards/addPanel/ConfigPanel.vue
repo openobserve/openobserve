@@ -388,6 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? 'o2-toggle-button-lg-dark'
           : 'o2-toggle-button-lg-light'
       "
+      :disable="isPivotMode"
     />
 
     <div class="space"></div>
@@ -404,7 +405,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? 'o2-toggle-button-lg-dark'
           : 'o2-toggle-button-lg-light'
       "
+      :disable="isPivotMode"
     />
+    <div class="space"></div>
+
+    <!-- Pivot Table Options (shown when pivot mode active) -->
+    <div
+      v-if="
+        dashboardPanelData.data.type == 'table' &&
+        !promqlMode &&
+        isPivotMode
+      "
+      class="q-mb-sm"
+    >
+      <div class="q-mb-xs" style="font-weight: 600; font-size: 12px">
+        {{ t("dashboard.pivotOptions") }}
+      </div>
+      <q-toggle
+        v-model="dashboardPanelData.data.config.table_pivot_show_row_totals"
+        :label="t('dashboard.pivotShowRowTotals')"
+        data-test="dashboard-config-pivot-row-totals"
+        class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+        size="lg"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-toggle-button-lg-dark'
+            : 'o2-toggle-button-lg-light'
+        "
+      />
+      <q-toggle
+        v-model="dashboardPanelData.data.config.table_pivot_show_col_totals"
+        :label="t('dashboard.pivotShowColTotals')"
+        data-test="dashboard-config-pivot-col-totals"
+        class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+        size="lg"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-toggle-button-lg-dark'
+            : 'o2-toggle-button-lg-light'
+        "
+      />
+    </div>
     <div class="space"></div>
 
     <q-toggle
@@ -1212,7 +1253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-input
         v-if="
-          ['area', 'line', 'area-stacked', 'bar', 'stacked'].includes(
+          ['area', 'line', 'area-stacked', 'bar', 'stacked', 'table'].includes(
             dashboardPanelData.data.type,
           ) && !promqlMode
         "
@@ -2037,9 +2078,8 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { dashboardPanelData, promqlMode } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const { dashboardPanelData, promqlMode, isPivotMode } =
+      useDashboardPanelData(dashboardPanelDataPageKey);
 
     const { t } = useI18n();
     const store = useStore();
@@ -2715,6 +2755,33 @@ export default defineComponent({
       { deep: true },
     );
 
+    // When pivot mode activates: disable conflicting features and
+    // initialize pivot config values (undefined → false/0 defaults).
+    // Without this, q-toggle shows undefined as OFF but conversion
+    // may treat undefined differently — causing a mismatch.
+    watch(
+      () => isPivotMode.value,
+      (active) => {
+        if (active) {
+          dashboardPanelData.data.config.table_transpose = false;
+          dashboardPanelData.data.config.table_dynamic_columns = false;
+          if (
+            dashboardPanelData.data.config.table_pivot_show_row_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_show_row_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_show_col_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_show_col_totals = false;
+          }
+        }
+      },
+      { immediate: true },
+    );
+
     // Cancel (remove set time via X icon) → back to "+Set" button
     const onCancelPanelTime = () => {
       dashboardPanelData.data.config.panel_time_range = null;
@@ -2806,6 +2873,7 @@ export default defineComponent({
       formattedPickerValue,
       onToggleDefaultTime,
       onCancelPanelTime,
+      isPivotMode,
     };
   },
 });

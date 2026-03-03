@@ -275,6 +275,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </q-btn>
                   <q-btn
+                    v-if="dashboardPanelData.data.type == 'table'"
+                    padding="sm"
+                    :disabled="isAddBreakdownNotAllowed"
+                    @click="addBreakDownAxisItem(props.row)"
+                    data-test="dashboard-add-p-data"
+                  >
+                    <div>+P</div>
+                  </q-btn>
+                  <q-btn
                     v-if="
                       dashboardPanelData.data.type == 'area' ||
                       dashboardPanelData.data.type == 'bar' ||

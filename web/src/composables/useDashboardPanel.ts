@@ -145,6 +145,9 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       column_order: [],
       table_pagination: false,
       table_pagination_rows_per_page: null,
+      // Pivot table config
+      table_pivot_show_row_totals: false,
+      table_pivot_show_col_totals: false,
       panel_time_enabled: false,
       panel_time_range: null,
     },
@@ -358,6 +361,19 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     () => dashboardPanelData.data.queryType == "promql",
   );
 
+  const isPivotMode = computed(() => {
+    if (dashboardPanelData.data.type !== "table") return false;
+    const currentQuery =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ];
+    return (
+      (currentQuery?.fields?.breakdown?.length ?? 0) > 0 &&
+      (currentQuery?.fields?.y?.length ?? 0) > 0 &&
+      (currentQuery?.fields?.x?.length ?? 0) > 0
+    );
+  });
+
   // Watch queryType and toggle off VRL functions when switching to PromQL
   watch(
     () => dashboardPanelData.data.queryType,
@@ -559,6 +575,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.breakdown?.length >= 1
+        );
+      case "table":
+        // Allow up to 3 pivot fields for table charts
+        return (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.breakdown?.length >= 3
         );
     }
   });
@@ -2718,19 +2741,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   );
 
   const currentXLabel = computed(() => {
-    return dashboardPanelData.data.type == "table"
-      ? "First Column"
-      : dashboardPanelData.data.type == "h-bar"
-        ? "Y-Axis"
-        : "X-Axis";
+    if (dashboardPanelData.data.type == "table") {
+      return isPivotMode.value ? "Row Fields" : "First Column";
+    }
+    return dashboardPanelData.data.type == "h-bar" ? "Y-Axis" : "X-Axis";
   });
 
   const currentYLabel = computed(() => {
-    return dashboardPanelData.data.type == "table"
-      ? "Other Columns"
-      : dashboardPanelData.data.type == "h-bar"
-        ? "X-Axis"
-        : "Y-Axis";
+    if (dashboardPanelData.data.type == "table") {
+      return isPivotMode.value ? "Value Fields" : "Other Columns";
+    }
+    return dashboardPanelData.data.type == "h-bar" ? "X-Axis" : "Y-Axis";
   });
 
   const resetFields = () => {
@@ -3127,6 +3148,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     isAddYAxisNotAllowed,
     isAddZAxisNotAllowed,
     promqlMode,
+    isPivotMode,
     addQuery,
     removeQuery,
     resetAggregationFunction,

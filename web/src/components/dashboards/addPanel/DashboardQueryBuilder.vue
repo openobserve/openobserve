@@ -33,14 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="flex: 1">
         <div style="display: flex; flex-direction: row">
           <div class="layout-name">
-            {{
-              dashboardPanelData.data.type == "table"
-                ? t("panel.firstColumn")
-                : dashboardPanelData.data.type == "h-bar" ||
-                    dashboardPanelData.data.type == "h-stacked"
-                  ? t("panel.yAxis")
-                  : t("panel.xAxis")
-            }}
+            {{ currentXLabel }}
             <q-icon name="info_outline" class="q-ml-xs">
               <q-tooltip>
                 {{ xAxisHint }}
@@ -186,6 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         style="flex: 1"
         v-if="
+          dashboardPanelData.data.type == 'table' ||
           dashboardPanelData.data.type == 'area' ||
           dashboardPanelData.data.type == 'bar' ||
           dashboardPanelData.data.type == 'line' ||
@@ -197,14 +191,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <div style="display: flex; flex-direction: row" class="q-pl-md">
-          <!-- Separator between X and Breakdown -->
+          <!-- Separator between X and Breakdown/Pivot -->
           <q-separator vertical class="q-mr-md" />
           <div class="layout-name" style="min-width: 0 !important">
-            {{ t("panel.breakdown") }}
+            {{
+              dashboardPanelData.data.type == 'table'
+                ? t("panel.pivotField")
+                : t("panel.breakdown")
+            }}
             <q-icon name="info_outline" class="q-ml-xs">
               <q-tooltip>
                 <span
-                  v-if="
+                  v-if="dashboardPanelData.data.type == 'table'"
+                >
+                  Drag a dimension field here. Its distinct values become column
+                  headers in the pivot table. Up to 3 fields allowed for
+                  multi-level pivoting.
+                </span>
+                <span
+                  v-else-if="
                     dashboardPanelData.data.type == 'h-bar' ||
                     dashboardPanelData.data.type == 'h-stacked'
                   "
@@ -362,14 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- y axis container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
-        {{
-          dashboardPanelData.data.type == "table"
-            ? t("panel.otherColumn")
-            : dashboardPanelData.data.type == "h-bar" ||
-                dashboardPanelData.data.type == "h-stacked"
-              ? t("panel.xAxis")
-              : t("panel.yAxis")
-        }}
+        {{ currentYLabel }}
         <q-icon name="info_outline" class="q-ml-xs">
           <q-tooltip>
             {{ yAxisHint }}
@@ -781,7 +779,10 @@ export default defineComponent({
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
       selectedStreamFieldsBasedOnUserDefinedSchema,
-      fetchPromQLLabels
+      fetchPromQLLabels,
+      currentXLabel,
+      currentYLabel,
+      isPivotMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const { parsePromQlQuery } = usePromqlSuggestions();
@@ -1413,6 +1414,9 @@ export default defineComponent({
       bLabel,
       onFieldDragStart,
       onDragEnd,
+      currentXLabel,
+      currentYLabel,
+      isPivotMode,
     };
   },
 });

@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :virtual-scroll="!showPagination"
       v-model:pagination="pagination"
       :rows-per-page-options="paginationOptions"
-      :virtual-scroll-sticky-size-start="48"
+      :virtual-scroll-sticky-size-start="pivotHeaderLevels.length > 0 ? 28 * pivotHeaderLevels.length : 48"
       dense
       :wrap-cells="wrapCells"
       :rows="data.rows || []"
@@ -35,7 +35,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-panel-table"
       @row-click="(...args: any) => $emit('row-click', ...args)"
       hide-no-data
+      :row-class="getRowClass"
     >
+      <!-- N-level hierarchical headers for pivot tables -->
+      <template v-slot:header="headerProps" v-if="pivotHeaderLevels.length > 0">
+        <q-tr
+          v-for="(level, levelIdx) in pivotHeaderLevels"
+          :key="'hl_' + levelIdx"
+        >
+          <!-- Row field headers — only in first row, spanning all levels -->
+          <q-th
+            v-if="levelIdx === 0"
+            v-for="col in pivotRowColumns"
+            :key="'rh_' + col.name"
+            :rowspan="pivotHeaderLevels.length"
+            class="pivot-group-header"
+            :style="getStickyColumnStyle(col)"
+          >
+            {{ col.label }}
+          </q-th>
+          <!-- Pivot/value group headers at this level -->
+          <q-th
+            v-for="(cell, cellIdx) in level.cells"
+            :key="'c_' + levelIdx + '_' + cell.key"
+            :colspan="cell.colspan"
+            :class="[
+              level.isLeaf ? 'pivot-value-header' : 'pivot-group-header text-center',
+              { 'pivot-section-border': cell.hasBorder }
+            ]"
+          >
+            {{ cell.label }}
+          </q-th>
+        </q-tr>
+      </template>
       <template v-slot:body-cell="props">
         <q-td
           :props="props"
@@ -199,6 +231,19 @@ export default defineComponent({
 
     // Use sticky columns composable
     const { getStickyColumnStyle } = useStickyColumns(props, store);
+
+    // Pivot table header levels (from convertPivotTableData)
+    const pivotHeaderLevels = computed(() => {
+      return props.data?.pivotHeaderLevels || [];
+    });
+
+    const pivotRowColumns = computed(() => {
+      return props.data?.columns?.filter((c: any) => c._isRowField) || [];
+    });
+
+    const getRowClass = (row: any) => {
+      return row?.__isTotalRow ? "pivot-total-row" : "";
+    };
 
     function wrapCsvValue(val: any, formatFn?: any, row?: any) {
       let formatted = formatFn !== void 0 ? formatFn(val, row) : val;
@@ -419,6 +464,9 @@ export default defineComponent({
       copyCellContent,
       isCellCopied,
       shouldShowCopyButton,
+      pivotHeaderLevels,
+      pivotRowColumns,
+      getRowClass,
     };
   },
 });
@@ -437,7 +485,7 @@ export default defineComponent({
 
   :deep(.q-table__top),
   :deep(.q-table__bottom),
-  :deep(thead tr:first-child th) {
+  :deep(thead tr th) {
     /* bg color is important for th; just specify one */
     background-color: #fff;
   }
@@ -448,14 +496,23 @@ export default defineComponent({
     z-index: 1;
   }
 
-  /* this will be the loading indicator */
-  :deep(thead tr:last-child th) {
-    /* height of all previous header rows */
-    top: 48px;
-  }
-
   :deep(thead tr:first-child th) {
     top: 0;
+  }
+
+  /* Second header row (for 2+ row headers in pivot or loading indicator) */
+  :deep(thead tr:nth-child(2) th) {
+    top: 28px;
+  }
+
+  /* Third header row (for 3-level pivot: 2 pivot levels + Y labels) */
+  :deep(thead tr:nth-child(3) th) {
+    top: 56px;
+  }
+
+  /* Fourth header row (for 4-level pivot: 3 pivot levels + Y labels) */
+  :deep(thead tr:nth-child(4) th) {
+    top: 84px;
   }
 
   :deep(.q-virtual-scroll) {
@@ -470,9 +527,8 @@ export default defineComponent({
 .my-sticky-virtscroll-table.q-dark {
   :deep(.q-table__top),
   :deep(.q-table__bottom),
-  :deep(thead tr:first-child th) {
+  :deep(thead tr th) {
     /* bg color is important for th; just specify one */
-    //   background-color: #fff;
     background-color: $dark-page !important;
   }
 }
@@ -500,6 +556,30 @@ export default defineComponent({
   height: 100%;
   width: 100%;
   position: relative;
+}
+
+// Pivot table styles
+:deep(.pivot-total-row) {
+  font-weight: bold;
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.body--dark :deep(.pivot-total-row) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+:deep(.pivot-group-header) {
+  font-weight: 600;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.12);
+}
+
+:deep(.pivot-section-border) {
+  border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+:deep(.pivot-value-header) {
+  font-weight: 500;
+  font-size: 0.85em;
 }
 
 @media print {

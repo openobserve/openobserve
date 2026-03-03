@@ -1,0 +1,463 @@
+// Copyright 2023 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import {
+  formatUnitValue,
+  getUnitValue,
+} from "./convertDataIntoUnitValue";
+import { getDataValue } from "./aliasUtils";
+
+const MAX_PIVOT_COLUMNS = 50;
+const PIVOT_SEPARATOR = " > ";
+
+/**
+ * Builds N-level header metadata for the TableRenderer.
+ *
+ * header_rows = max(1, pivot_count + (y_count > 1 ? 1 : 0))
+ *
+ * When header_rows === 1 (1 pivot + 1 Y), returns [] to use standard q-table headers.
+ * Otherwise returns an array of header level objects with cells[] and isLeaf flag.
+ */
+function buildPivotHeaderLevels(
+  breakdownFields: any[],
+  allPivotKeys: string[],
+  yFields: any[],
+  showRowTotals: boolean,
+): any[] {
+  const pivotCount = breakdownFields.length;
+  const yCount = yFields.length;
+  const needsMultiRowHeader = pivotCount > 1 || yCount > 1;
+
+  if (!needsMultiRowHeader) return [];
+
+  const levels: any[] = [];
+
+  // Parse pivot keys into per-level values
+  // e.g., "GET > 200" → ["GET", "200"]
+  const parsedKeys = allPivotKeys.map((pk) => pk.split(PIVOT_SEPARATOR));
+
+  // Track top-level (level 0) group boundary positions (leaf column indices)
+  // These propagate down so borders align across all header rows.
+  const topLevelBoundaries: Set<number> = new Set();
+
+  // Build one header row per pivot level
+  for (let lvl = 0; lvl < pivotCount; lvl++) {
+    const cells: any[] = [];
+    let i = 0;
+    let leafColPos = 0; // tracks leaf column position
+
+    while (i < parsedKeys.length) {
+      const groupValue = parsedKeys[i][lvl];
+      let span = 0;
+
+      while (
+        i + span < parsedKeys.length &&
+        parsedKeys[i + span][lvl] === groupValue &&
+        parsedKeys[i + span]
+          .slice(0, lvl)
+          .every(
+            (v: string, idx: number) => v === parsedKeys[i].slice(0, lvl)[idx],
+          )
+      ) {
+        span++;
+      }
+
+      const colspan = span * (yCount > 1 ? yCount : 1);
+
+      // For level 0, record group boundary positions
+      if (lvl === 0 && cells.length > 0) {
+        topLevelBoundaries.add(leafColPos);
+      }
+
+      // For deeper levels, check if this cell starts at a top-level boundary
+      const hasBorder =
+        lvl === 0
+          ? cells.length > 0 // level 0: border on every group except first
+          : topLevelBoundaries.has(leafColPos); // deeper: align with level 0
+
+      cells.push({
+        key: `${lvl}_${groupValue}_${i}`,
+        label: groupValue,
+        colspan,
+        hasBorder,
+      });
+
+      leafColPos += colspan;
+      i += span;
+    }
+
+    // Total group at level 0 only
+    if (lvl === 0 && showRowTotals) {
+      topLevelBoundaries.add(leafColPos);
+      cells.push({
+        key: `${lvl}_Total`,
+        label: "Total",
+        colspan: yCount > 1 ? yCount : 1,
+        hasBorder: true,
+      });
+    }
+
+    levels.push({ cells, isLeaf: false });
+  }
+
+  // Add Y-label row if 2+ Y fields
+  if (yCount > 1) {
+    const yCells: any[] = [];
+    let leafColPos = 0;
+    for (const pk of allPivotKeys) {
+      for (const yField of yFields) {
+        yCells.push({
+          key: `${pk}_${yField.alias}`,
+          label: yField.label,
+          colspan: 1,
+          hasBorder: topLevelBoundaries.has(leafColPos),
+        });
+        leafColPos++;
+      }
+    }
+    if (showRowTotals) {
+      for (let tIdx = 0; tIdx < yFields.length; tIdx++) {
+        yCells.push({
+          key: `Total_${yFields[tIdx].alias}`,
+          label: yFields[tIdx].label,
+          colspan: 1,
+          hasBorder: topLevelBoundaries.has(leafColPos),
+        });
+        leafColPos++;
+      }
+    }
+    levels.push({ cells: yCells, isLeaf: true });
+  } else {
+    // Mark the last pivot level as the leaf
+    if (levels.length > 0) {
+      levels[levels.length - 1].isLeaf = true;
+    }
+  }
+
+  return levels;
+}
+
+/**
+ * Converts flat query results into a pivoted table.
+ *
+ * Pivot mode is active when: x.length > 0 && breakdown.length > 0 && y.length > 0
+ * The breakdown field values become column headers, y values fill the cells.
+ *
+ * Supports multi-level pivot (multiple breakdown fields) and
+ * multiple value fields (grouped hierarchical column headers).
+ */
+export const convertPivotTableData = (
+  panelSchema: any,
+  searchQueryData: any,
+  store: any,
+): { rows: any[]; columns: any[]; pivotHeaderLevels: any[] } => {
+  const empty = { rows: [], columns: [], pivotHeaderLevels: [] };
+
+  if (
+    !Array.isArray(searchQueryData) ||
+    searchQueryData.length === 0 ||
+    !searchQueryData[0] ||
+    !panelSchema
+  ) {
+    return empty;
+  }
+
+  const tableRows = searchQueryData[0];
+  if (tableRows.length === 0) {
+    return empty;
+  }
+
+  const query = panelSchema.queries[0];
+  const config = panelSchema.config || {};
+  const xFields = query.fields?.x || [];
+  const yFields = query.fields?.y || [];
+  const breakdownFields = query.fields?.breakdown || [];
+
+  if (
+    breakdownFields.length === 0 ||
+    yFields.length === 0 ||
+    xFields.length === 0
+  ) {
+    return empty;
+  }
+
+  const xAliases = xFields.map((f: any) => f.alias);
+  const yAliases = yFields.map((f: any) => f.alias);
+  const breakdownAliases = breakdownFields.map((f: any) => f.alias);
+
+  const missingValue = config.no_value_replacement ?? "";
+  const showRowTotals = config.table_pivot_show_row_totals ?? false;
+  const showColTotals = config.table_pivot_show_col_totals ?? false;
+
+  // --- Step 1: Build pivot keys and count totals ---
+  const pivotKeyTotals: Map<string, number> = new Map();
+
+  const getPivotKey = (row: any): string => {
+    return breakdownAliases
+      .map((alias: string) => String(getDataValue(row, alias) ?? "(empty)"))
+      .join(PIVOT_SEPARATOR);
+  };
+
+  for (const row of tableRows) {
+    const pk = getPivotKey(row);
+    let total = pivotKeyTotals.get(pk) || 0;
+    for (const yAlias of yAliases) {
+      total += Math.abs(Number(getDataValue(row, yAlias)) || 0);
+    }
+    pivotKeyTotals.set(pk, total);
+  }
+
+  // Sort by total descending first, then limit
+  let pivotKeys = Array.from(pivotKeyTotals.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([key]) => key);
+
+  const hasOthers = pivotKeys.length > MAX_PIVOT_COLUMNS;
+  if (hasOthers) {
+    pivotKeys = pivotKeys.slice(0, MAX_PIVOT_COLUMNS);
+  }
+  const pivotKeySet = new Set(pivotKeys);
+
+  // For multi-level pivot (2+ breakdown fields), re-sort hierarchically so
+  // same-parent entries are grouped together. This ensures "China > Beijing"
+  // and "China > Shanghai" are adjacent, allowing proper colspan grouping.
+  // Within each parent group, the original total-value order is preserved.
+  if (breakdownAliases.length > 1) {
+    const parsed = pivotKeys.map((pk) => ({
+      key: pk,
+      parts: pk.split(PIVOT_SEPARATOR),
+    }));
+
+    // Stable hierarchical sort: sort by level-0, then level-1, etc.
+    // Within same parent group, preserve original order (by total desc).
+    parsed.sort((a, b) => {
+      for (let lvl = 0; lvl < breakdownAliases.length - 1; lvl++) {
+        if (a.parts[lvl] !== b.parts[lvl]) {
+          return a.parts[lvl].localeCompare(b.parts[lvl]);
+        }
+      }
+      return 0; // same parent group — keep original total-value order
+    });
+
+    pivotKeys = parsed.map((p) => p.key);
+  }
+
+  // --- Step 2: Build pivoted rows ---
+  const rowMap: Map<string, any> = new Map();
+
+  for (const row of tableRows) {
+    const keyParts: string[] = [];
+    const rowObj: any = {};
+
+    for (const xAlias of xAliases) {
+      const val = getDataValue(row, xAlias);
+      keyParts.push(String(val ?? ""));
+      rowObj[xAlias] = val;
+    }
+
+    const rowKey = keyParts.join("|||");
+    const pivotKey = getPivotKey(row);
+
+    if (!rowMap.has(rowKey)) {
+      rowMap.set(rowKey, { ...rowObj });
+    }
+
+    const targetRow = rowMap.get(rowKey)!;
+
+    for (const yAlias of yAliases) {
+      const numericValue = Number(getDataValue(row, yAlias)) || 0;
+
+      if (pivotKeySet.has(pivotKey)) {
+        const colKey = `${pivotKey}_${yAlias}`;
+        targetRow[colKey] = numericValue;
+      } else if (hasOthers) {
+        const othersKey = `Others_${yAlias}`;
+        targetRow[othersKey] = (targetRow[othersKey] || 0) + numericValue;
+      }
+    }
+  }
+
+  // --- Step 3: Fill missing values + row totals ---
+  const allPivotKeys = hasOthers ? [...pivotKeys, "Others"] : pivotKeys;
+  const pivotedRows = Array.from(rowMap.values());
+
+  for (const row of pivotedRows) {
+    for (const yAlias of yAliases) {
+      let rowTotal = 0;
+      for (const pk of allPivotKeys) {
+        const colKey = `${pk}_${yAlias}`;
+        if (row[colKey] === undefined || row[colKey] === null) {
+          row[colKey] = missingValue;
+        }
+        rowTotal += Number(row[colKey]) || 0;
+      }
+      if (showRowTotals) {
+        row[`Total_${yAlias}`] = rowTotal;
+      }
+    }
+  }
+
+  // --- Step 4: Column totals row ---
+  if (showColTotals && pivotedRows.length > 0) {
+    const totalRow: any = { __isTotalRow: true };
+    for (let i = 0; i < xAliases.length; i++) {
+      totalRow[xAliases[i]] = i === 0 ? "Total" : "";
+    }
+
+    for (const yAlias of yAliases) {
+      for (const pk of allPivotKeys) {
+        const colKey = `${pk}_${yAlias}`;
+        let colTotal = 0;
+        for (const row of pivotedRows) {
+          colTotal += Number(row[colKey]) || 0;
+        }
+        totalRow[colKey] = colTotal;
+      }
+      if (showRowTotals) {
+        let grandTotal = 0;
+        for (const row of pivotedRows) {
+          grandTotal += Number(row[`Total_${yAlias}`]) || 0;
+        }
+        totalRow[`Total_${yAlias}`] = grandTotal;
+      }
+    }
+
+    pivotedRows.push(totalRow);
+  }
+
+  // --- Step 5: Build column definitions ---
+  const overrideConfigs = config.override_config || [];
+  const unitConfigMap: Record<string, any> = {};
+
+  for (const o of overrideConfigs) {
+    const alias = o?.field?.value;
+    const cfg = o?.config?.[0];
+    if (alias && cfg?.type === "unit") {
+      unitConfigMap[alias.toLowerCase()] = {
+        unit: cfg.value?.unit,
+        customUnit: cfg.value?.customUnit,
+      };
+    }
+  }
+
+  const columns: any[] = [];
+  const isSingleValueField = yAliases.length === 1;
+  const needsMultiRowHeader =
+    breakdownAliases.length > 1 || yAliases.length > 1;
+
+  // Row field columns (x-axis) — marked with _isRowField for header rendering
+  for (const xField of xFields) {
+    columns.push({
+      name: xField.alias,
+      field: xField.alias,
+      label: xField.label,
+      align: "left",
+      sortable: true,
+      _isRowField: true,
+    });
+  }
+
+  // Pivot value columns
+  for (let pkIdx = 0; pkIdx < allPivotKeys.length; pkIdx++) {
+    const pk = allPivotKeys[pkIdx];
+    for (let yIdx = 0; yIdx < yFields.length; yIdx++) {
+      const yField = yFields[yIdx];
+      const colKey = `${pk}_${yField.alias}`;
+      // Mark the first Y column of each pivot group as a group boundary
+      const isGroupStart = yIdx === 0;
+
+      // When multi-row headers are used, parent headers provide context,
+      // so the leaf column label is just the value field label ("Count").
+      // When single-row, use the full label ("GET" or "GET - Count").
+      const label = needsMultiRowHeader
+        ? yField.label
+        : isSingleValueField
+          ? pk
+          : `${pk} - ${yField.label}`;
+
+      const yAliasLower = yField.alias.toLowerCase();
+      const unitToUse = unitConfigMap[yAliasLower]?.unit || config.unit;
+      const customUnitToUse =
+        unitConfigMap[yAliasLower]?.customUnit || config.unit_custom;
+      const decimals = config.decimals ?? 2;
+
+      columns.push({
+        name: colKey,
+        field: colKey,
+        label,
+        align: "right",
+        sortable: true,
+        _groupStart: isGroupStart,
+        sort: (a: any, b: any) => parseFloat(a) - parseFloat(b),
+        format: (val: any) => {
+          if (val === null || val === undefined) return String(missingValue);
+          return !Number.isNaN(val)
+            ? `${formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, decimals)) ?? 0}`
+            : val;
+        },
+      });
+    }
+  }
+
+  // Total column(s)
+  if (showRowTotals) {
+    for (let tIdx = 0; tIdx < yFields.length; tIdx++) {
+      const yField = yFields[tIdx];
+      const colKey = `Total_${yField.alias}`;
+      const label = needsMultiRowHeader
+        ? yField.label
+        : isSingleValueField
+          ? "Total"
+          : `Total - ${yField.label}`;
+
+      const yAliasLower = yField.alias.toLowerCase();
+      const unitToUse = unitConfigMap[yAliasLower]?.unit || config.unit;
+      const customUnitToUse =
+        unitConfigMap[yAliasLower]?.customUnit || config.unit_custom;
+      const decimals = config.decimals ?? 2;
+
+      columns.push({
+        name: colKey,
+        field: colKey,
+        label,
+        align: "right",
+        sortable: true,
+        _groupStart: tIdx === 0,
+        sort: (a: any, b: any) => parseFloat(a) - parseFloat(b),
+        format: (val: any) => {
+          if (val === null || val === undefined) return String(missingValue);
+          return !Number.isNaN(val)
+            ? `${formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, decimals)) ?? 0}`
+            : val;
+        },
+        headerStyle: "font-weight: bold",
+      });
+    }
+  }
+
+  // --- Step 6: Build N-level header metadata ---
+  const pivotHeaderLevels = buildPivotHeaderLevels(
+    breakdownFields,
+    allPivotKeys,
+    yFields,
+    showRowTotals,
+  );
+
+  return {
+    rows: pivotedRows,
+    columns,
+    pivotHeaderLevels,
+  };
+};
