@@ -157,6 +157,8 @@ impl TryFrom<alerts::Model> for MetaAlert {
             alert.deduplication = Some(dedup_config);
         }
 
+        alert.creates_incident = value.creates_incident;
+
         Ok(alert)
     }
 }
@@ -717,6 +719,7 @@ fn update_mutable_fields(
     alert_am.dedup_enabled = Set(dedup_enabled);
     alert_am.dedup_time_window_minutes = Set(dedup_time_window_minutes);
     alert_am.dedup_config = Set(dedup_config);
+    alert_am.creates_incident = Set(alert.creates_incident);
     Ok(())
 }
 

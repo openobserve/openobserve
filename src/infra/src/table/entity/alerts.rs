@@ -48,6 +48,7 @@ pub struct Model {
     pub dedup_enabled: bool,
     pub dedup_time_window_minutes: Option<i32>,
     pub dedup_config: Option<Json>,
+    pub creates_incident: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

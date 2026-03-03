@@ -265,13 +265,15 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     await pm.serviceGraphPage.closeSidePanel();
   });
 
-  test("P1: Verify edge detail panel shows connection stats", {
+  test("P1: Verify edge connection stats via topology API", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     const pm = new PageManager(page);
-    testLogger.info('=== Verifying edge detail panel ===');
+    testLogger.info('=== Verifying edge connection stats ===');
 
-    // Step 1: API validation — confirm edge data exists
+    // API validation — confirm edge data exists with expected metrics
+    // NOTE: Edge stats are shown via ECharts canvas hover tooltips, not a dedicated
+    // DOM panel, so UI interaction is not possible with standard selectors.
     const edge = await pm.serviceGraphPage.findEdge('api-gateway', 'order-service');
     expect(edge).toBeTruthy();
     testLogger.info(`Edge api-gateway → order-service: ${JSON.stringify(edge)}`);
@@ -284,18 +286,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     expect(edge.p95_latency_ns).toBeDefined();
     expect(edge.p99_latency_ns).toBeDefined();
     testLogger.info(`P50: ${edge.p50_latency_ns}ns, P95: ${edge.p95_latency_ns}ns, P99: ${edge.p99_latency_ns}ns`);
-
-    // Step 2: UI validation — click edge and verify panel
-    await pm.serviceGraphPage.navigateToServiceGraphUrl();
-    await pm.serviceGraphPage.expectServiceGraphPageVisible();
-
-    await pm.serviceGraphPage.clickEdgeByServices('api-gateway', 'order-service');
-    await pm.serviceGraphPage.expectEdgePanelVisible();
-
-    const title = await pm.serviceGraphPage.getEdgePanelTitle();
-    testLogger.info(`Edge panel title: ${title}`);
-
-    await pm.serviceGraphPage.closeEdgePanel();
   });
 
   test("P1: Switch between Tree View and Graph View", {
