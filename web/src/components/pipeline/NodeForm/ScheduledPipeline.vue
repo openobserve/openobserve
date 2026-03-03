@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center">
         <q-btn
           v-if="
-            store.getters.isAiEnabled
+            store.getters.isAiAssistantEnabled
           "
           :ripple="false"
           @click="toggleAIChat"

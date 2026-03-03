@@ -225,7 +225,7 @@ size="lg" color="primary" />
             </q-item>
             <q-item
               v-if="
-                store.getters.isAiEnabled
+                store.getters.isAiAssistantEnabled
               "
               clickable
               v-close-popup
@@ -258,7 +258,7 @@ size="lg" color="primary" />
             </q-item>
             <q-item
               v-if="
-                store.getters.isAiEnabled
+                store.getters.isAiAssistantEnabled
               "
               clickable
               v-close-popup
@@ -651,7 +651,7 @@ export default {
       };
 
       // Add event listeners
-      if (store.getters.isAiEnabled) {
+      if (store.getters.isAiAssistantEnabled) {
         window.addEventListener("click", handleOutsideClick);
         window.addEventListener("contextmenu", handleContextMenu);
       }
@@ -660,7 +660,7 @@ export default {
       //this is used to remove the event listeners when the component is unmounted
       //it is used to avoid memory leaks
       onUnmounted(() => {
-        if (store.getters.isAiEnabled) {
+        if (store.getters.isAiAssistantEnabled) {
           window.removeEventListener("click", handleOutsideClick);
           window.removeEventListener("contextmenu", handleContextMenu);
         }

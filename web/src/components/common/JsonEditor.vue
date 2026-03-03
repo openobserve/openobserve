@@ -12,7 +12,7 @@
       <div class="tw:flex tw:items-center">
         <div>
           <q-btn
-          v-if="store.getters.isAiEnabled"
+          v-if="store.getters.isAiAssistantEnabled"
           :ripple="false"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"

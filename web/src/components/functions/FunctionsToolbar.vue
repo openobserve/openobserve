@@ -97,7 +97,7 @@
     </div>
     <div class="add-function-actions flex justify-center tw:gap-2">
       <q-btn
-            v-if="store.getters.isAiEnabled && !isAddFunctionComponent"
+            v-if="store.getters.isAiAssistantEnabled && !isAddFunctionComponent"
             :ripple="false"
             @click="emit('open:chat',!store.state.isAiChatEnabled)"
             data-test="menu-link-ai-item"

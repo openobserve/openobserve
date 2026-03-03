@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="tw:flex tw:items-center tw:justify-between tw:gap-2">
             <q-btn
-            v-if="store.getters.isAiEnabled"
+            v-if="store.getters.isAiAssistantEnabled"
             :ripple="false"
             @click="toggleAIChat"
             data-test="add-regex-pattern-open-close-ai-btn"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="regex-pattern-input-label">
                             Regex Pattern
                         </span>
-                        <q-btn v-if="store.getters.isAiEnabled"
+                        <q-btn v-if="store.getters.isAiAssistantEnabled"
                          class="tw:px-2 tw:py-1 tw:flex tw:items-center"
                         style="border-radius: 4px;" dense no-caps flat  @click="toggleAIChat">
                         <img :src="goToAILogo" class="tw:w-[20px] tw:h-[20px] tw:mr-1" />

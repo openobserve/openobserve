@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:flex tw:items-center">
               <q-btn
-                v-if="store.getters.isAiEnabled"
+                v-if="store.getters.isAiAssistantEnabled"
                 :ripple="false"
                 @click="toggleAIChat"
                 data-test="menu-link-ai-item"

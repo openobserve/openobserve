@@ -271,6 +271,12 @@ const store = createStore({
     isAiEnabled(state: any): boolean {
       return (
         (state.zoConfig?.ai_enabled ?? false) &&
+        (state.organizationData?.organizationSettings?.ai?.enabled ?? false)
+      );
+    },
+    isAiAssistantEnabled(state: any): boolean {
+      return (
+        (state.zoConfig?.ai_enabled ?? false) &&
         (state.organizationData?.organizationSettings?.ai?.enabled ?? false) &&
         (state.organizationData?.organizationSettings?.ai?.assistant_enabled ?? false)
       );

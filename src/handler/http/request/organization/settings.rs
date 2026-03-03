@@ -229,13 +229,10 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
     };
 
     {
-        use config::meta::system_settings::{
-            SettingScope,
-            keys::{AI_ASSISTANT_ENABLED, AI_ENABLED, AI_EVALUATION_ENABLED, AI_SRE_ENABLED},
+        use config::meta::system_settings::keys::{
+            AI_ASSISTANT_ENABLED, AI_ENABLED, AI_EVALUATION_ENABLED, AI_SRE_ENABLED,
         };
-        let get = |key| {
-            crate::service::db::system_settings::get(&SettingScope::Org, Some(&org_id), None, key)
-        };
+        let get = |key| crate::service::db::system_settings::get_resolved(Some(&org_id), None, key);
         let (enabled, assistant, sre, evaluation) = tokio::join!(
             get(AI_ENABLED),
             get(AI_ASSISTANT_ENABLED),

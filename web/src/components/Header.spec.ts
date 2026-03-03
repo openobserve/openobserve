@@ -66,12 +66,16 @@ describe("Header Component", () => {
       ...mockStore.state.zoConfig,
       ...storeOverrides.state?.zoConfig,
     };
-    // Compute isAiEnabled based on the merged zoConfig and org settings
+    // Compute AI getters based on the merged zoConfig and org settings
     const mergedAiOrgSettings = {
       ...mockStore.state.organizationData.organizationSettings.ai,
       ...storeOverrides.state?.organizationData?.organizationSettings?.ai,
     };
     const isAiEnabled = !!(
+      mergedZoConfig.ai_enabled &&
+      mergedAiOrgSettings.enabled
+    );
+    const isAiAssistantEnabled = !!(
       mergedZoConfig.ai_enabled &&
       mergedAiOrgSettings.enabled &&
       mergedAiOrgSettings.assistant_enabled
@@ -102,6 +106,7 @@ describe("Header Component", () => {
         ...mockStore.getters,
         ...storeOverrides.getters,
         isAiEnabled,
+        isAiAssistantEnabled,
         isAiSreEnabled,
       },
     };
@@ -172,6 +177,7 @@ describe("Header Component", () => {
       },
       getters: {
         isAiEnabled: false,
+        isAiAssistantEnabled: false,
         isAiSreEnabled: false,
       },
     };

@@ -145,6 +145,7 @@ describe("ScheduledPipeline Component", () => {
       },
       getters: {
         isAiEnabled: false,
+        isAiAssistantEnabled: false,
         isAiSreEnabled: false,
       },
       dispatch: vi.fn()
