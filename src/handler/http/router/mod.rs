@@ -1025,8 +1025,11 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(req).await.unwrap();
-        // The route should be reachable; the actual status depends on network
-        // availability and remote server response (e.g. 401, 404, 500).
-        assert_ne!(response.status(), StatusCode::OK);
+        // The route should be reachable and return an error status.
+        assert!(
+            response.status().is_client_error() || response.status().is_server_error(),
+            "expected 4xx/5xx, got {}",
+            response.status()
+        );
     }
 }
