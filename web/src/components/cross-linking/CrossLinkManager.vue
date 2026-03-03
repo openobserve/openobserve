@@ -14,7 +14,7 @@
         flat
         no-caps
         icon="add"
-        label="Add Cross-Link"
+        :label="t('crossLinks.addCrossLink')"
         class="o2-secondary-button tw:h-[36px]"
         :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         @click="onAddClick"
@@ -91,7 +91,7 @@
       style="color: var(--o2-text-muted)"
       data-test="cross-link-empty"
     >
-      No cross-links configured. Click "Add Cross-Link" to create one.
+      {{ t("crossLinks.emptyState", { addLabel: t("crossLinks.addCrossLink") }) }}
     </div>
 
     <!-- Add/Edit Dialog -->
@@ -108,6 +108,7 @@
 <script lang="ts">
 import { defineComponent, ref, computed, type PropType } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 
 export interface CrossLink {
@@ -149,6 +150,7 @@ export default defineComponent({
   emits: ["update:modelValue", "change"],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const showAddDialog = ref(false);
     const editingLink = ref<CrossLink | null>(null);
     const editingOriginalName = ref("");
@@ -198,6 +200,7 @@ export default defineComponent({
     }
 
     return {
+      t,
       store,
       links,
       showAddDialog,

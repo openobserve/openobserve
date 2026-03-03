@@ -79,8 +79,8 @@
       <q-separator class="q-mt-lg q-mb-md" />
       <CrossLinkManager
         v-model="crossLinks"
-        title="Cross-Linking Configuration"
-        subtitle="Define global cross-links that apply to all streams."
+        :title="t('crossLinks.orgConfigTitle')"
+        :subtitle="t('crossLinks.orgConfigSubtitle')"
         @change="formDirty = true"
       />
     </template>

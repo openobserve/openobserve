@@ -4,7 +4,7 @@
       <q-card-section>
         <div class="tw:flex tw:items-center tw:justify-between">
           <div class="text-h6">
-            {{ isEditing ? "Edit" : "Add" }} Cross-Link
+            {{ isEditing ? t("crossLinks.editCrossLink") : t("crossLinks.addCrossLink") }}
           </div>
           <CrossLinkUserGuide />
         </div>
@@ -14,12 +14,12 @@
         <q-form @submit.prevent="onSubmit">
           <!-- Name -->
           <div class="tw:mb-3">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">Name *</label>
+            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.name") }} *</label>
             <q-input
               v-model="form.name"
               dense
-              placeholder="e.g., View Trace Details"
-              :rules="[(val: string) => !!val || 'Name is required']"
+              :placeholder="t('crossLinks.namePlaceholder')"
+              :rules="[(val: string) => !!val || t('crossLinks.nameRequired')]"
               borderless
               hide-bottom-space
               data-test="cross-link-name-input"
@@ -28,26 +28,26 @@
 
           <!-- URL Template -->
           <div class="tw:mb-3">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">URL Template *</label>
+            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.urlTemplate") }} *</label>
             <q-input
               v-model="form.url"
               dense
-              placeholder="e.g., https://example.com/trace/${field.__value}?from=${start_time}&to=${end_time}"
-              :rules="[(val: string) => !!val || 'URL is required']"
+              :placeholder="t('crossLinks.urlPlaceholder')"
+              :rules="[(val: string) => !!val || t('crossLinks.urlRequired')]"
               borderless
               hide-bottom-space
               data-test="cross-link-url-input"
             />
             <div class="tw:text-xs tw:mt-1" style="color: var(--o2-text-muted)">
-              Use ${field.__name}, ${field.__value}, ${start_time}, ${end_time}, ${query}, ${query_encoded}
+              {{ t("crossLinks.urlHint") }}
             </div>
           </div>
 
           <!-- Fields -->
           <div class="tw:mb-2">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">Fields *</label>
+            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.fields") }} *</label>
             <div class="tw:text-xs tw:mb-2" style="color: var(--o2-text-muted)">
-              Show link only when at least one field is present in the record
+              {{ t("crossLinks.fieldsHint") }}
             </div>
             <div v-if="form.fields.length > 0" class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2">
               <q-chip
@@ -79,14 +79,14 @@
                 dense
                 borderless
                 class="tw:flex-1"
-                placeholder="Type to search or enter custom field"
+                :placeholder="t('crossLinks.fieldSearchPlaceholder')"
                 hide-bottom-space
                 data-test="cross-link-field-input"
               >
                 <template v-slot:no-option>
                   <q-item>
                     <q-item-section class="tw:text-xs" style="color: var(--o2-text-muted)">
-                      No matching fields. Press Enter or + to add custom field.
+                      {{ t("crossLinks.noMatchingFields") }}
                     </q-item-section>
                   </q-item>
                 </template>
@@ -97,7 +97,7 @@
                 dense
                 borderless
                 class="tw:flex-1"
-                placeholder="Enter field name and press Enter or click +"
+                :placeholder="t('crossLinks.fieldInputPlaceholder')"
                 @keyup.enter="addField"
                 hide-bottom-space
                 data-test="cross-link-field-input"
@@ -123,7 +123,7 @@
           flat
           no-caps
           dense
-          label="Cancel"
+          :label="t('common.cancel')"
           class="o2-secondary-button tw:h-[36px]"
           :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="onCancel"
@@ -133,7 +133,7 @@
           flat
           no-caps
           dense
-          :label="isEditing ? 'Update' : 'Add'"
+          :label="isEditing ? t('crossLinks.update') : t('crossLinks.add')"
           class="o2-primary-button tw:h-[36px] q-ml-md"
           :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="onSubmit"
@@ -148,6 +148,7 @@
 <script lang="ts">
 import { defineComponent, ref, watch, computed, type PropType } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 
 export interface CrossLink {
@@ -176,6 +177,7 @@ export default defineComponent({
   emits: ["update:modelValue", "save", "cancel"],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const dialogVisible = computed({
       get: () => props.modelValue,
       set: (val) => emit("update:modelValue", val),
@@ -271,6 +273,7 @@ export default defineComponent({
     }
 
     return {
+      t,
       store,
       dialogVisible,
       isEditing,

@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="store.state.zoConfig?.enable_cross_linking"
                     name="crossLinking"
                     icon="link"
-                    label="Cross-Linking"
+                    :label="t('crossLinks.header')"
                     no-caps
                   />
                 </q-tabs>
@@ -876,8 +876,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Stream-level cross-links (editable) -->
                 <CrossLinkManager
                   v-model="streamCrossLinks"
-                  title="Stream Cross-Links"
-                  subtitle="Links specific to this stream. These take priority over organization-level links."
+                  :title="t('crossLinks.streamCrossLinks')"
+                  :subtitle="t('crossLinks.streamCrossLinksSubtitle')"
                   :availableFields="streamFieldNames"
                   @change="formDirtyFlag = true"
                 />
@@ -887,8 +887,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-separator class="tw:my-4" />
                   <CrossLinkManager
                     :modelValue="orgCrossLinks"
-                    title="Organization-Level Links (Read-Only)"
-                    subtitle="These links are defined at the organization level. Go to Organization Parameters to modify them."
+                    :title="t('crossLinks.orgCrossLinks')"
+                    :subtitle="t('crossLinks.orgCrossLinksSubtitle')"
                     readonly
                   />
                 </template>

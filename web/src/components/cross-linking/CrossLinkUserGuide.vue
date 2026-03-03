@@ -10,7 +10,7 @@
       data-test="cross-link-help-btn"
     >
       <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
-        User Guide
+        {{ t("crossLinks.userGuide") }}
       </q-tooltip>
     </q-btn>
   </div>
@@ -33,59 +33,52 @@
     "
     ref="userGuideDivRef"
   >
-    <p>
-      You can use the following variables in your URL template:
-    </p>
+    <p>{{ t("crossLinks.guideIntro") }}</p>
 
-    <div class="header">Field Information</div>
-    <p>Reference the field that triggered the cross-link:</p>
+    <div class="header">{{ t("crossLinks.guideFieldHeader") }}</div>
+    <p>{{ t("crossLinks.guideFieldDesc") }}</p>
     <ul>
       <li>
-        <span class="bg-highlight">${field.__name}</span> – The field name
-        (e.g., trace_id, kubernetes_namespace_name)
+        <span class="bg-highlight">${field.__name}</span> – {{ t("crossLinks.guideFieldName") }}
       </li>
       <li>
-        <span class="bg-highlight">${field.__value}</span> – The value of that
-        field from the record
+        <span class="bg-highlight">${field.__value}</span> – {{ t("crossLinks.guideFieldValue") }}
       </li>
     </ul>
 
     <br />
 
-    <div class="header">Time Range</div>
-    <p>Reference the current selected time period:</p>
+    <div class="header">{{ t("crossLinks.guideTimeHeader") }}</div>
+    <p>{{ t("crossLinks.guideTimeDesc") }}</p>
     <ul>
       <li>
-        <span class="bg-highlight">${start_time}</span> – Start time (epoch
-        milliseconds)
+        <span class="bg-highlight">${start_time}</span> – {{ t("crossLinks.guideStartTime") }}
       </li>
       <li>
-        <span class="bg-highlight">${end_time}</span> – End time (epoch
-        milliseconds)
+        <span class="bg-highlight">${end_time}</span> – {{ t("crossLinks.guideEndTime") }}
       </li>
     </ul>
-    For Example:
-    <span class="bg-highlight">from=${start_time}&to=${end_time}</span>
+    {{ t("crossLinks.guideTimeExample") }}
+    <span class="bg-highlight">from=${start_time}&amp;to=${end_time}</span>
 
     <br />
     <br />
 
-    <div class="header">Query</div>
-    <p>Reference the current SQL query:</p>
+    <div class="header">{{ t("crossLinks.guideQueryHeader") }}</div>
+    <p>{{ t("crossLinks.guideQueryDesc") }}</p>
     <ul>
-      <li><span class="bg-highlight">${query}</span> – Current SQL query</li>
+      <li><span class="bg-highlight">${query}</span> – {{ t("crossLinks.guideQuery") }}</li>
       <li>
-        <span class="bg-highlight">${query_encoded}</span> – Base64-encoded SQL
-        query
+        <span class="bg-highlight">${query_encoded}</span> – {{ t("crossLinks.guideQueryEncoded") }}
       </li>
     </ul>
 
     <br />
 
-    <div class="header">Example</div>
+    <div class="header">{{ t("crossLinks.guideExampleHeader") }}</div>
     <p>
       <span class="bg-highlight"
-        >https://example.com/trace/${field.__value}?from=${start_time}&to=${end_time}</span
+        >https://example.com/trace/${field.__value}?from=${start_time}&amp;to=${end_time}</span
       >
     </p>
   </div>
@@ -94,11 +87,13 @@
 <script lang="ts">
 import { ref } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 
 export default {
   name: "CrossLinkUserGuide",
   setup() {
     const store = useStore();
+    const { t } = useI18n();
     const showUserGuide = ref(false);
 
     const userGuideBtnRef: any = ref(null);
@@ -116,6 +111,7 @@ export default {
     };
 
     return {
+      t,
       store,
       onUserGuideClick,
       showUserGuide,
