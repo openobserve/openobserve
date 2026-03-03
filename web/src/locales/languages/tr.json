@@ -352,7 +352,8 @@
     "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
     "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin",
     "recordsPerPage": "Sayfa başına kayıtlar",
-    "searchDimension": "Arama Boyutları"
+    "searchDimension": "Arama Boyutları",
+    "createAlertFromPattern": "Bu modelden uyarı oluştur"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -2069,7 +2070,9 @@
     "noStreamSelected": "Akış Seçilmedi",
     "resultsIncludeAllWindows": "Sonuçlar tüm çoklu pencere eklemelerini içerir",
     "runQueryForOutput": "Çıktıyı görmek için lütfen Sorguyu Çalıştır'a tıklayın",
-    "applyVRLForOutput": "Kombine çıktıyı görmek için lütfen VRL Uygula'ya tıklayın"
+    "applyVRLForOutput": "Kombine çıktıyı görmek için lütfen VRL Uygula'ya tıklayın",
+    "importedFromPattern": "Günlük düzeninden önceden doldurulmuş uyarı",
+    "importedFromAnomalyPattern": "Anormal günlük düzeninden önceden doldurulmuş uyarı - aciliyet ayarlarını gözden geçirin"
   },
   "alert_templates": {
     "header": "Şablonlar",

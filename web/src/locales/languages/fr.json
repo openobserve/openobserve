@@ -352,7 +352,8 @@
     "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
     "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
     "recordsPerPage": "Enregistrements par page",
-    "searchDimension": "Dimensions de recherche"
+    "searchDimension": "Dimensions de recherche",
+    "createAlertFromPattern": "Créer une alerte à partir de ce modèle"
   },
   "menu": {
     "home": "Accueil",
@@ -2069,7 +2070,9 @@
     "noStreamSelected": "Aucun flux sélectionné",
     "resultsIncludeAllWindows": "Les résultats incluent tous les ajouts multi-fenêtres",
     "runQueryForOutput": "Cliquez sur Exécuter la requête pour voir le résultat",
-    "applyVRLForOutput": "Cliquez sur Appliquer VRL pour voir la sortie combinée"
+    "applyVRLForOutput": "Cliquez sur Appliquer VRL pour voir la sortie combinée",
+    "importedFromPattern": "Alerte préremplie à partir du modèle de journal",
+    "importedFromAnomalyPattern": "Alerte préremplie à partir d'un modèle de journal anormal : passez en revue les paramètres d'urgence"
   },
   "alert_templates": {
     "header": "Modèles",

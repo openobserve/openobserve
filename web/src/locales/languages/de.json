@@ -352,7 +352,8 @@
     "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
     "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren",
     "recordsPerPage": "Datensätze pro Seite",
-    "searchDimension": "Dimensionen suchen"
+    "searchDimension": "Dimensionen suchen",
+    "createAlertFromPattern": "Warnung anhand dieses Musters erstellen"
   },
   "menu": {
     "home": "Startseite",
@@ -2069,7 +2070,9 @@
     "noStreamSelected": "Kein Stream ausgewählt",
     "resultsIncludeAllWindows": "Die Ergebnisse beinhalten alle Ergänzungen mit mehreren Fenstern",
     "runQueryForOutput": "Bitte klicken Sie auf Abfrage ausführen, um die Ausgabe zu sehen",
-    "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen"
+    "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen",
+    "importedFromPattern": "Warnung aus dem Protokollmuster vorab ausgefüllt",
+    "importedFromAnomalyPattern": "Warnung aufgrund eines anomalen Protokollmusters vorab ausgefüllt — Dringlichkeitseinstellungen überprüfen"
   },
   "alert_templates": {
     "header": "Vorlagen",
