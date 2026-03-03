@@ -2379,7 +2379,18 @@
     "maxSeriesPerQueryDescription": "Nombre maximum de séries pouvant être renvoyées à partir d'une seule requête ProMQL. Aide à prévenir le gel de l'interface utilisateur en cas de grands ensembles de résultats. Laissez ce champ vide pour utiliser la valeur par défaut du système (40 000).",
     "maxSeriesPerQueryTooltip": "Lorsqu'une requête ProMQL telle que « count (metric) by (label) » renvoie trop de séries, elle peut geler l'interface utilisateur. Cette limite empêche cela. Définissez la valeur par défaut du système sur null ou spécifiez une valeur comprise entre 1 000 et 1 000 000.",
     "maxSeriesPerQueryValidation": "La valeur doit être comprise entre 1 000 et 1 000 000, ou laisser vide par défaut",
-    "systemDefault": "défaut du système"
+    "systemDefault": "défaut du système",
+    "aiSettingsTitle": "Paramètres de l'IA",
+    "aiEnabledLabel": "Activer les fonctionnalités de l'IA",
+    "aiEnabledDescription": "Autoriser les fonctionnalités basées sur l'IA pour cette organisation",
+    "aiEvaluationEnabledLabel": "Activer les évaluations LLM",
+    "aiEvaluationEnabledDescription": "Autoriser l'évaluation LLM des réponses de l'IA pour cette organisation",
+    "aiEvaluationDisabledTooltip": "Activez les fonctionnalités d'IA pour activer cette option",
+    "aiSreEnabledLabel": "Activer l'agent AI SRE",
+    "aiSreEnabledDescription": "Permettre à l'agent AI SRE de participer à l'enquête sur les incidents pour cette organisation",
+    "aiSubFeatureDisabledTooltip": "Activez d'abord les fonctionnalités d'IA pour configurer ce paramètre",
+    "aiAssistantEnabledLabel": "Activer l'assistant O2 AI",
+    "aiAssistantEnabledDescription": "Permettre à l'assistant O2 AI de faciliter les requêtes et l'analyse des journaux"
   },
   "iam": {
     "users": "Les utilisateurs",

@@ -2377,7 +2377,18 @@
     "maxSeriesPerQueryDescription": "Numero massimo di serie che possono essere restituite da una singola query ProMQL. Aiuta a prevenire il blocco dell'interfaccia utente con set di risultati di grandi dimensioni. Lascia vuoto per utilizzare l'impostazione predefinita del sistema (40.000).",
     "maxSeriesPerQueryTooltip": "Quando una query ProMQL come «count (metric) by (label)» restituisce troppe serie, può bloccare l'interfaccia utente. Questo limite lo impedisce. Imposta su null per l'impostazione predefinita del sistema o specifica un valore compreso tra 1.000 e 1.000.000.",
     "maxSeriesPerQueryValidation": "Il valore deve essere compreso tra 1.000 e 1.000.000 o lasciare vuoto per impostazione predefinita",
-    "systemDefault": "impostazione predefinita del sistema"
+    "systemDefault": "impostazione predefinita del sistema",
+    "aiSettingsTitle": "Impostazioni AI",
+    "aiEnabledLabel": "Abilita le funzionalità AI",
+    "aiEnabledDescription": "Consenti funzionalità basate sull'intelligenza artificiale per questa organizzazione",
+    "aiEvaluationEnabledLabel": "Abilita le valutazioni LLM",
+    "aiEvaluationEnabledDescription": "Consenti la valutazione LLM delle risposte AI per questa organizzazione",
+    "aiEvaluationDisabledTooltip": "Abilita le funzionalità AI per attivarlo",
+    "aiSreEnabledLabel": "Abilita l'agente AI SRE",
+    "aiSreEnabledDescription": "Consenti all'agente AI SRE di fornire assistenza nelle indagini sugli incidenti per questa organizzazione",
+    "aiSubFeatureDisabledTooltip": "Abilita prima le funzionalità AI per configurare questa impostazione",
+    "aiAssistantEnabledLabel": "Abilita O2 AI Assistant",
+    "aiAssistantEnabledDescription": "Consenti all'assistente O2 AI di aiutarti con le domande e l'analisi dei log"
   },
   "iam": {
     "users": "Utenti",

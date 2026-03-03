@@ -2400,7 +2400,18 @@
     "maxSeriesPerQueryDescription": "1 つの PromQL クエリから返されるシリーズの最大数。結果セットが大きい場合に UI がフリーズするのを防ぐのに役立ちます。システムデフォルト (40,000) を使用するには空のままにします。",
     "maxSeriesPerQueryTooltip": "「count (metric) by (label)」のようなPromQLクエリで返されるシリーズが多すぎると、UIがフリーズすることがあります。この制限によりそれが防止されます。システムデフォルトの場合は null に設定するか、1,000 ～ 1,000,000 の間の値を指定します。",
     "maxSeriesPerQueryValidation": "値は1,000から1,000,000の間でなければなりません。デフォルトでは空白のままにしてください",
-    "systemDefault": "システムデフォルト"
+    "systemDefault": "システムデフォルト",
+    "aiSettingsTitle": "AI セッティング",
+    "aiEnabledLabel": "AI 機能を有効にする",
+    "aiEnabledDescription": "この組織に AI を活用した機能を許可する",
+    "aiEvaluationEnabledLabel": "LLM 評価を有効にする",
+    "aiEvaluationEnabledDescription": "この組織の AI 対応の LLM 評価を許可",
+    "aiEvaluationDisabledTooltip": "これを切り替えるには AI 機能を有効にします",
+    "aiSreEnabledLabel": "AI SRE エージェントを有効にする",
+    "aiSreEnabledDescription": "AI SRE エージェントにこの組織のインシデント調査を支援してもらう",
+    "aiSubFeatureDisabledTooltip": "最初に AI 機能を有効にしてこの設定を構成してください",
+    "aiAssistantEnabledLabel": "O2 AI アシスタントを有効にする",
+    "aiAssistantEnabledDescription": "O2 AI アシスタントがクエリとログ分析を支援できるようにする"
   },
   "iam": {
     "users": "ユーザー",

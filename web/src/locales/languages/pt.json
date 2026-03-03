@@ -2379,7 +2379,18 @@
     "maxSeriesPerQueryDescription": "Número máximo de séries que podem ser retornadas de uma única consulta ProMQL. Ajuda a evitar o congelamento da interface com grandes conjuntos de resultados. Deixe em branco para usar o padrão do sistema (40.000).",
     "maxSeriesPerQueryTooltip": "Quando uma consulta ProMQL como 'count (metric) by (label) 'retorna muitas séries, ela pode congelar a interface do usuário. Esse limite evita isso. Defina como null para o padrão do sistema ou especifique um valor entre 1.000 e 1.000.000.",
     "maxSeriesPerQueryValidation": "O valor deve estar entre 1.000 e 1.000.000 ou deixar em branco por padrão",
-    "systemDefault": "padrão do sistema"
+    "systemDefault": "padrão do sistema",
+    "aiSettingsTitle": "Configurações de IA",
+    "aiEnabledLabel": "Ativar recursos de IA",
+    "aiEnabledDescription": "Permitir recursos baseados em IA para esta organização",
+    "aiEvaluationEnabledLabel": "Habilitar avaliações de LLM",
+    "aiEvaluationEnabledDescription": "Permitir a avaliação do LLM das respostas de IA para esta organização",
+    "aiEvaluationDisabledTooltip": "Ative os recursos de IA para alternar isso",
+    "aiSreEnabledLabel": "Habilite o AI SRE Agent",
+    "aiSreEnabledDescription": "Permita que o agente do AI SRE ajude na investigação de incidentes para essa organização",
+    "aiSubFeatureDisabledTooltip": "Ative os recursos de IA primeiro para definir essa configuração",
+    "aiAssistantEnabledLabel": "Ativar o O2 AI Assistant",
+    "aiAssistantEnabledDescription": "Permita que o assistente O2 AI ajude com consultas e análises de registros"
   },
   "iam": {
     "users": "Usuários",

@@ -2379,7 +2379,18 @@
     "maxSeriesPerQueryDescription": "Maximaal aantal series dat kan worden geretourneerd uit een enkele ProMQL-query. Helpt bij grote resultatensets te voorkomen dat de gebruikersinterface vastloopt. Laat dit veld leeg om de systeemstandaard te gebruiken (40.000).",
     "maxSeriesPerQueryTooltip": "Wanneer een ProMQL-query zoals 'count (metric) by (label) 'te veel reeksen retourneert, kan de gebruikersinterface vastlopen. Deze limiet voorkomt dat. Stel de waarde in op null voor de systeemstandaard, of geef een waarde op tussen 1.000 en 1.000.000.",
     "maxSeriesPerQueryValidation": "De waarde moet tussen 1.000 en 1.000.000 liggen, of als standaardwaarde leeg laten",
-    "systemDefault": "standaardinstelling van het systeem"
+    "systemDefault": "standaardinstelling van het systeem",
+    "aiSettingsTitle": "AI-instellingen",
+    "aiEnabledLabel": "AI-functies inschakelen",
+    "aiEnabledDescription": "AI-functies voor deze organisatie toestaan",
+    "aiEvaluationEnabledLabel": "LLM-evaluaties inschakelen",
+    "aiEvaluationEnabledDescription": "LLM-evaluatie van AI-reacties voor deze organisatie toestaan",
+    "aiEvaluationDisabledTooltip": "Schakel AI-functies in om dit in te schakelen",
+    "aiSreEnabledLabel": "AI SRE Agent inschakelen",
+    "aiSreEnabledDescription": "Laat de AI SRE-agent assisteren bij incidentonderzoek voor deze organisatie",
+    "aiSubFeatureDisabledTooltip": "Schakel eerst AI-functies in om deze instelling te configureren",
+    "aiAssistantEnabledLabel": "O2 AI Assistant inschakelen",
+    "aiAssistantEnabledDescription": "Laat de O2 AI-assistent helpen bij vragen en logboekanalyse"
   },
   "iam": {
     "users": "Gebruikers",
