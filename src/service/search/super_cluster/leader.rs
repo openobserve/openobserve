@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -105,6 +105,7 @@ pub async fn search(
         search_inspector_fields(
             format!("[trace_id {trace_id}] super get clusters: {clusters_num}"),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("super get clusters".to_string())
                 .search_role("super".to_string())
@@ -269,6 +270,7 @@ async fn run_datafusion(
             search_inspector_fields(
                 format!("[trace_id {trace_id}] super cluster leader: datafusion collect done"),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("super:leader:run_datafusion collect done".to_string())
                     .search_role("super".to_string())

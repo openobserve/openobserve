@@ -118,6 +118,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
                 sql.time_range, file_id_list_num, file_id_list_records, file_id_list_took,
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:leader get file id".to_string())
                 .search_role("leader".to_string())
@@ -181,6 +182,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
                 querier_num,
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:leader get nodes".to_string())
                 .search_role("leader".to_string())
@@ -407,6 +409,7 @@ pub async fn run_datafusion(
             search_inspector_fields(
                 format!("[trace_id {trace_id}] flight->search: datafusion collect done"),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight:run_datafusion collect done".to_string())
                     .search_role("follower".to_string())

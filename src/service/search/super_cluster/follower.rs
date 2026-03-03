@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -133,6 +133,7 @@ pub async fn search(
                 req.time_range, file_id_list_num, file_id_list_took,
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("super:leader get file id".to_string())
                 .search_role("leader".to_string())
@@ -190,6 +191,7 @@ pub async fn search(
                 querier_num,
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("super:leader get nodes".to_string())
                 .search_role("leader".to_string())

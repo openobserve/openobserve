@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -238,6 +238,7 @@ pub async fn search(
                     file_list_took,
                 ),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight:do_get::search get file_list by ids".to_string())
                     .search_role("follower".to_string())
@@ -265,6 +266,7 @@ pub async fn search(
                     file_list.len()
                 ),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight:do_get::search handle tantivy optimize".to_string())
                     .search_role("follower".to_string())
@@ -295,6 +297,7 @@ pub async fn search(
             search_inspector_fields(
                 format!("[trace_id {trace_id}] flight->search: sort file list"),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight:do_get::search sort file list".to_string())
                     .search_role("follower".to_string())
@@ -334,6 +337,7 @@ pub async fn search(
                     file_list.len()
                 ),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight:do_get::search storage search".to_string())
                     .search_role("follower".to_string())
@@ -430,6 +434,7 @@ pub async fn search(
         search_inspector_fields(
             format!("[trace_id {trace_id}] flight->search: created union table"),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:do_get::search union table creation".to_string())
                 .search_role("follower".to_string())
@@ -452,6 +457,7 @@ pub async fn search(
         search_inspector_fields(
             format!("[trace_id {trace_id}] flight->search: union table scan"),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:do_get::search union table scan".to_string())
                 .search_role("follower".to_string())
@@ -468,6 +474,7 @@ pub async fn search(
         search_inspector_fields(
             format!("[trace_id {trace_id}] flight->search: physical plan rewrite"),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:do_get::search physical plan rewrite".to_string())
                 .search_role("follower".to_string())
@@ -504,6 +511,7 @@ pub async fn search(
             search_inspector_fields(
                 format!("[trace_id {trace_id}] flight->search: tantivy optimize rewrite"),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight:do_get::search tantivy optimize rewrite".to_string())
                     .search_role("follower".to_string())
@@ -521,6 +529,7 @@ pub async fn search(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:do_get::search generated physical plan".to_string())
                 .search_role("follower".to_string())
