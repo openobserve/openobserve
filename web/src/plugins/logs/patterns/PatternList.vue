@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Actions Column - No Header -->
-        <div class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:relative table-head">
+        <div class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:relative table-head">
         </div>
       </div>
 
@@ -82,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('open-details', pattern, index)"
           @include="$emit('add-to-search', pattern, 'include')"
           @exclude="$emit('add-to-search', pattern, 'exclude')"
+          @create-alert="$emit('create-alert', pattern)"
         />
       </q-virtual-scroll>
     </div>
@@ -144,6 +145,7 @@ defineProps<{
 defineEmits<{
   (e: "open-details", pattern: any, index: number): void;
   (e: "add-to-search", pattern: any, action: "include" | "exclude"): void;
+  (e: "create-alert", pattern: any): void;
 }>();
 
 const store = useStore();
