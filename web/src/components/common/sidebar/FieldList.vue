@@ -324,6 +324,22 @@ export default defineComponent({
     // ─── Filter ──────────────────────────────────────────────────────────
 
     const expandedRows: Ref<Record<string, boolean>> = ref({});
+    // Per-field pagination state
+    const currentFrom: Ref<Record<string, number>> = ref({});
+    const currentKeyword: Ref<Record<string, string>> = ref({});
+
+    const defaultValuesCount = computed(
+      () => store.state.zoConfig?.query_values_default_num || 10,
+    );
+
+    const {
+      fieldValues,
+      fetchFieldValues,
+      cancelFieldStream,
+      resetFieldValues,
+    } = useFieldValuesStream();
+
+    // ─── Filter ──────────────────────────────────────────────────────────
 
     const filterFieldFn = (rows: any, terms: any) => {
       const filtered = [];
