@@ -409,44 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <div class="space"></div>
 
-    <!-- Pivot Table Options (shown when pivot mode active) -->
-    <div
-      v-if="
-        dashboardPanelData.data.type == 'table' &&
-        !promqlMode &&
-        isPivotMode
-      "
-      class="q-mb-sm"
-    >
-      <div class="q-mb-xs" style="font-weight: 600; font-size: 12px">
-        {{ t("dashboard.pivotOptions") }}
-      </div>
-      <q-toggle
-        v-model="dashboardPanelData.data.config.table_pivot_show_row_totals"
-        :label="t('dashboard.pivotShowRowTotals')"
-        data-test="dashboard-config-pivot-row-totals"
-        class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
-        size="lg"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-toggle-button-lg-dark'
-            : 'o2-toggle-button-lg-light'
-        "
-      />
-      <q-toggle
-        v-model="dashboardPanelData.data.config.table_pivot_show_col_totals"
-        :label="t('dashboard.pivotShowColTotals')"
-        data-test="dashboard-config-pivot-col-totals"
-        class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
-        size="lg"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-toggle-button-lg-dark'
-            : 'o2-toggle-button-lg-light'
-        "
-      />
-    </div>
-    <div class="space"></div>
+   
 
     <q-toggle
       v-if="dashboardPanelData.data.type == 'table'"
@@ -508,6 +471,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-input>
 
+    <div class="space"></div>
+
+    <!-- Pivot Table Options (shown when pivot mode active) -->
+    <div
+      v-if="
+        dashboardPanelData.data.type == 'table' && !promqlMode && isPivotMode
+      "
+      class="q-mb-sm"
+    >
+      <div class="q-mb-xs" style="font-weight: 600; font-size: 12px">
+        {{ t("dashboard.pivotOptions") }}
+      </div>
+      <div class="row items-center">
+        <q-toggle
+          v-model="dashboardPanelData.data.config.table_pivot_show_row_totals"
+          :label="t('dashboard.pivotShowRowTotals')"
+          data-test="dashboard-config-pivot-row-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        />
+        <div>
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-pivot-row-totals-info"
+          />
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotShowRowTotalsTooltip") }}
+          </q-tooltip>
+        </div>
+      </div>
+      <div class="row items-center">
+        <q-toggle
+          v-model="dashboardPanelData.data.config.table_pivot_show_col_totals"
+          :label="t('dashboard.pivotShowColTotals')"
+          data-test="dashboard-config-pivot-col-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        />
+        <div>
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-pivot-col-totals-info"
+          />
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotShowColTotalsTooltip") }}
+          </q-tooltip>
+        </div>
+      </div>
+    </div>
     <div class="space"></div>
 
     <div class="o2-input">
