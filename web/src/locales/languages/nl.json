@@ -1476,7 +1476,9 @@
     "pivotShowRowTotals": "Rijtotalen weergeven",
     "pivotShowColTotals": "Kolomtotalen weergeven",
     "pivotMissingValue": "Ontbrekende waarde",
-    "pivotMissingValueHint": "Getoonde waarde voor cellen zonder gegevens"
+    "pivotMissingValueHint": "Getoonde waarde voor cellen zonder gegevens",
+    "pivotShowRowTotalsTooltip": "Een rij met totalen onder aan de draaitabel weergeven met een samenvatting van de waarden van elke kolom",
+    "pivotShowColTotalsTooltip": "Een kolom met totalen aan de rechterkant van de draaitabel weergeven met een samenvatting van de waarden van elke rij"
   },
   "panel": {
     "header": "Paneel",

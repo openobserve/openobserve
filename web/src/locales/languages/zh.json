@@ -1476,7 +1476,9 @@
     "pivotShowRowTotals": "显示行总数",
     "pivotShowColTotals": "显示列总数",
     "pivotMissingValue": "缺失的价值",
-    "pivotMissingValueHint": "为没有数据的单元格显示的值"
+    "pivotMissingValueHint": "为没有数据的单元格显示的值",
+    "pivotShowRowTotalsTooltip": "在数据透视表底部显示总计行，汇总每列的值",
+    "pivotShowColTotalsTooltip": "在数据透视表的右侧显示总计列，汇总每行的值"
   },
   "panel": {
     "header": "面板",

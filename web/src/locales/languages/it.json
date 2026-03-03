@@ -1476,7 +1476,9 @@
     "pivotShowRowTotals": "Mostra i totali delle righe",
     "pivotShowColTotals": "Mostra i totali delle colonne",
     "pivotMissingValue": "Valore mancante",
-    "pivotMissingValueHint": "Valore mostrato per le celle senza dati"
+    "pivotMissingValueHint": "Valore mostrato per le celle senza dati",
+    "pivotShowRowTotalsTooltip": "Visualizza una riga dei totali nella parte inferiore della tabella pivot che riassume i valori di ogni colonna",
+    "pivotShowColTotalsTooltip": "Visualizza una colonna dei totali sul lato destro della tabella pivot che riassume i valori di ogni riga"
   },
   "panel": {
     "header": "Pannello",

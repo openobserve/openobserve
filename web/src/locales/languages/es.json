@@ -1476,7 +1476,9 @@
     "pivotShowRowTotals": "Mostrar totales de fila",
     "pivotShowColTotals": "Mostrar totales de columna",
     "pivotMissingValue": "Valor faltante",
-    "pivotMissingValueHint": "Se muestra el valor de las celdas sin datos"
+    "pivotMissingValueHint": "Se muestra el valor de las celdas sin datos",
+    "pivotShowRowTotalsTooltip": "Mostrar una fila de totales en la parte inferior de la tabla dinámica que resume los valores de cada columna",
+    "pivotShowColTotalsTooltip": "Muestra una columna de totales en el lado derecho de la tabla dinámica que resume los valores de cada fila"
   },
   "panel": {
     "header": "Panel",

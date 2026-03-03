@@ -1476,7 +1476,9 @@
     "pivotShowRowTotals": "Afficher les totaux des lignes",
     "pivotShowColTotals": "Afficher les totaux des colonnes",
     "pivotMissingValue": "Valeur manquante",
-    "pivotMissingValueHint": "Valeur affichée pour les cellules sans données"
+    "pivotMissingValueHint": "Valeur affichée pour les cellules sans données",
+    "pivotShowRowTotalsTooltip": "Afficher une ligne de totaux en bas du tableau croisé dynamique résumant les valeurs de chaque colonne",
+    "pivotShowColTotalsTooltip": "Afficher une colonne de totaux sur le côté droit du tableau croisé dynamique résumant les valeurs de chaque ligne"
   },
   "panel": {
     "header": "Panneau",
