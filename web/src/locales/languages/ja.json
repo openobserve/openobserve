@@ -1488,7 +1488,12 @@
     "panelTimeSettingsTooltip": "このパネルが時間範囲を決定する方法を設定します。このパネルには、ダッシュボードの時間範囲を使用することも、カスタムの時間範囲を設定することもできます。",
     "panelTimeMode": "時間範囲ソース (ダッシュボードロード時)",
     "useDefaultTimeTooltip": "有効にすると、このパネルは、ダッシュボードのグローバル時間ではなく、設定されたデフォルトの期間をダッシュボードロード時の時間範囲として使用します。",
-    "defaultDuration": "デフォルト期間"
+    "defaultDuration": "デフォルト期間",
+    "pivotOptions": "ピボットオプション",
+    "pivotShowRowTotals": "行合計を表示",
+    "pivotShowColTotals": "列の合計を表示",
+    "pivotMissingValue": "値が見つかりません",
+    "pivotMissingValueHint": "データがないセルに表示される値"
   },
   "panel": {
     "header": "パネル",
@@ -1570,7 +1575,9 @@
     "sqlBuilder": "SQL ビルダー",
     "generatedSql": "生成された SQL",
     "enterCustomSql": "カスタム SQL クエリを入力してください...",
-    "customSql": "カスタム SQL"
+    "customSql": "カスタム SQL",
+    "pivotField": "ピボットフィールド",
+    "addToPivot": "ピボットフィールドに追加"
   },
   "home": {
     "streams": "ストリーム",

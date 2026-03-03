@@ -1471,7 +1471,12 @@
     "panelTimeSettingsTooltip": "Bu panelin zaman aralığını nasıl belirlediğini yapılandırın. Gösterge panelinin zaman aralığını kullanabilir veya bu panel için özel bir tane ayarlayabilirsiniz.",
     "panelTimeMode": "Zaman Aralığı Kaynağı (Gösterge Tablosu Yüklemesinde)",
     "useDefaultTimeTooltip": "Etkinleştirildiğinde, bu panel genel gösterge paneli zamanı yerine gösterge tablosu yüklenmesinde zaman aralığı olarak yapılandırılmış varsayılan süreyi kullanır.",
-    "defaultDuration": "Varsayılan Süre"
+    "defaultDuration": "Varsayılan Süre",
+    "pivotOptions": "Pivot Seçenekleri",
+    "pivotShowRowTotals": "Satır Toplamlarını Göster",
+    "pivotShowColTotals": "Sütun Toplamlarını Göster",
+    "pivotMissingValue": "Eksik Değer",
+    "pivotMissingValueHint": "Veri içermeyen hücreler için gösterilen değer"
   },
   "panel": {
     "header": "Panel",
@@ -1553,7 +1558,9 @@
     "sqlBuilder": "SQL Oluşturucu",
     "generatedSql": "Oluşturulan SQL",
     "enterCustomSql": "Özel SQL sorgunuzu girin...",
-    "customSql": "Özel SQL"
+    "customSql": "Özel SQL",
+    "pivotField": "Pivot Alanı",
+    "addToPivot": "Pivot Alanına Ekle"
   },
   "home": {
     "streams": "Akışlar",

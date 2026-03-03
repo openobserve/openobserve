@@ -1471,7 +1471,12 @@
     "panelTimeSettingsTooltip": "配置此面板如何确定其时间范围。您可以使用仪表板的时间范围，也可以为该面板设置自定义时间范围。",
     "panelTimeMode": "时间范围来源（仪表板加载时）",
     "useDefaultTimeTooltip": "启用后，此面板将使用配置的默认持续时间作为仪表板加载的时间范围，而不是全局仪表板时间。",
-    "defaultDuration": "默认持续时间"
+    "defaultDuration": "默认持续时间",
+    "pivotOptions": "数据透视选项",
+    "pivotShowRowTotals": "显示行总数",
+    "pivotShowColTotals": "显示列总数",
+    "pivotMissingValue": "缺失的价值",
+    "pivotMissingValueHint": "为没有数据的单元格显示的值"
   },
   "panel": {
     "header": "面板",
@@ -1553,7 +1558,9 @@
     "sqlBuilder": "SQL 生成器",
     "generatedSql": "生成的 SQL",
     "enterCustomSql": "输入您的自定义 SQL 查询...",
-    "customSql": "自定义 SQL"
+    "customSql": "自定义 SQL",
+    "pivotField": "枢轴字段",
+    "addToPivot": "添加到数据透视字段"
   },
   "home": {
     "streams": "数据流",

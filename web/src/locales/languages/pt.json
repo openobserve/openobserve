@@ -1471,7 +1471,12 @@
     "panelTimeSettingsTooltip": "Configure como esse painel determina seu intervalo de tempo. Você pode usar o intervalo de tempo do painel ou definir um personalizado para esse painel.",
     "panelTimeMode": "Fonte do intervalo de tempo (no carregamento do painel)",
     "useDefaultTimeTooltip": "Quando ativado, esse painel usará a duração padrão configurada como seu intervalo de tempo no carregamento do painel, em vez do tempo global do painel.",
-    "defaultDuration": "Duração padrão"
+    "defaultDuration": "Duração padrão",
+    "pivotOptions": "Opções de pivô",
+    "pivotShowRowTotals": "Mostrar totais de linhas",
+    "pivotShowColTotals": "Mostrar totais de colunas",
+    "pivotMissingValue": "Valor ausente",
+    "pivotMissingValueHint": "Valor mostrado para células sem dados"
   },
   "panel": {
     "header": "Painel",
@@ -1553,7 +1558,9 @@
     "sqlBuilder": "Construtor de SQL",
     "generatedSql": "SQL gerado",
     "enterCustomSql": "Insira sua consulta SQL personalizada...",
-    "customSql": "SQL personalizado"
+    "customSql": "SQL personalizado",
+    "pivotField": "Campo pivô",
+    "addToPivot": "Adicionar ao campo dinâmico"
   },
   "home": {
     "streams": "Transmissões",

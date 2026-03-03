@@ -1471,7 +1471,12 @@
     "panelTimeSettingsTooltip": "이 패널에서 시간 범위를 결정하는 방법을 구성합니다.대시보드의 시간 범위를 사용하거나 이 패널에 사용자 지정 시간 범위를 설정할 수 있습니다.",
     "panelTimeMode": "시간 범위 소스 (대시보드 로드 시)",
     "useDefaultTimeTooltip": "활성화하면 이 패널은 글로벌 대시보드 시간 대신 구성된 기본 기간을 대시보드 로드 시 시간 범위로 사용합니다.",
-    "defaultDuration": "기본 기간"
+    "defaultDuration": "기본 기간",
+    "pivotOptions": "피벗 옵션",
+    "pivotShowRowTotals": "행 합계 표시",
+    "pivotShowColTotals": "컬럼 합계 보기",
+    "pivotMissingValue": "누락된 값",
+    "pivotMissingValueHint": "데이터가 없는 셀에 표시된 값"
   },
   "panel": {
     "header": "패널",
@@ -1553,7 +1558,9 @@
     "sqlBuilder": "SQL 빌더",
     "generatedSql": "생성된 SQL",
     "enterCustomSql": "사용자 지정 SQL 쿼리를 입력하세요...",
-    "customSql": "사용자 지정 SQL"
+    "customSql": "사용자 지정 SQL",
+    "pivotField": "피벗 필드",
+    "addToPivot": "피벗 필드에 추가"
   },
   "home": {
     "streams": "스트림",

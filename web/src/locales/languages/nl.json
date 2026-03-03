@@ -1471,7 +1471,12 @@
     "panelTimeSettingsTooltip": "Configureer hoe dit paneel het tijdbereik bepaalt. U kunt het tijdbereik van het dashboard gebruiken of een aangepaste tijdsperiode instellen voor dit paneel.",
     "panelTimeMode": "Bron voor tijdbereik (bij laden van het dashboard)",
     "useDefaultTimeTooltip": "Indien ingeschakeld, gebruikt dit paneel de ingestelde standaardduur als tijdsbereik bij het laden van het dashboard, in plaats van de globale dashboardtijd.",
-    "defaultDuration": "Standaardduur"
+    "defaultDuration": "Standaardduur",
+    "pivotOptions": "Pivot-opties",
+    "pivotShowRowTotals": "Rijtotalen weergeven",
+    "pivotShowColTotals": "Kolomtotalen weergeven",
+    "pivotMissingValue": "Ontbrekende waarde",
+    "pivotMissingValueHint": "Getoonde waarde voor cellen zonder gegevens"
   },
   "panel": {
     "header": "Paneel",
@@ -1553,7 +1558,9 @@
     "sqlBuilder": "SQL Builder",
     "generatedSql": "Gegenereerde SQL",
     "enterCustomSql": "Voer uw aangepaste SQL-query in...",
-    "customSql": "SQL op maat"
+    "customSql": "SQL op maat",
+    "pivotField": "Draaiveld",
+    "addToPivot": "Aan draadveld toevoegen"
   },
   "home": {
     "streams": "Streams",

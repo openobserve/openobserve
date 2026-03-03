@@ -1471,7 +1471,12 @@
     "panelTimeMode": "Source de plage horaire (lors du chargement du tableau de bord)",
     "useDefaultTimeTooltip": "Lorsqu'il est activé, ce panneau utilise la durée par défaut configurée comme plage de temps lors du chargement du tableau de bord, au lieu de l'heure globale du tableau de bord.",
     "defaultDuration": "Durée par défaut",
-    "connectNullValuesTooltip": "Connectez les points de données entre les valeurs manquantes à l'aide d'une ligne."
+    "connectNullValuesTooltip": "Connectez les points de données entre les valeurs manquantes à l'aide d'une ligne.",
+    "pivotOptions": "Options de pivot",
+    "pivotShowRowTotals": "Afficher les totaux des lignes",
+    "pivotShowColTotals": "Afficher les totaux des colonnes",
+    "pivotMissingValue": "Valeur manquante",
+    "pivotMissingValueHint": "Valeur affichée pour les cellules sans données"
   },
   "panel": {
     "header": "Panneau",
@@ -1553,7 +1558,9 @@
     "sqlBuilder": "Générateur SQL",
     "generatedSql": "SQL généré",
     "enterCustomSql": "Entrez votre requête SQL personnalisée...",
-    "customSql": "SQL personnalisé"
+    "customSql": "SQL personnalisé",
+    "pivotField": "Champ pivot",
+    "addToPivot": "Ajouter au champ Pivot"
   },
   "home": {
     "streams": "Ruisseaux",

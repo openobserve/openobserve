@@ -1471,7 +1471,12 @@
     "panelTimeMode": "Origine dell'intervallo di tempo (al caricamento del dashboard)",
     "useDefaultTimeTooltip": "Se abilitato, questo pannello utilizzerà la durata predefinita configurata come intervallo di tempo al caricamento del dashboard, anziché il tempo globale del dashboard.",
     "defaultDuration": "Durata predefinita",
-    "connectNullValuesTooltip": "Collega i punti dati tra i valori mancanti con una linea."
+    "connectNullValuesTooltip": "Collega i punti dati tra i valori mancanti con una linea.",
+    "pivotOptions": "Opzioni Pivot",
+    "pivotShowRowTotals": "Mostra i totali delle righe",
+    "pivotShowColTotals": "Mostra i totali delle colonne",
+    "pivotMissingValue": "Valore mancante",
+    "pivotMissingValueHint": "Valore mostrato per le celle senza dati"
   },
   "panel": {
     "header": "Pannello",
@@ -1553,7 +1558,9 @@
     "sqlBuilder": "SQL Builder",
     "generatedSql": "SQL generato",
     "enterCustomSql": "Inserisci la tua query SQL personalizzata...",
-    "customSql": "SQL personalizzato"
+    "customSql": "SQL personalizzato",
+    "pivotField": "Campo pivot",
+    "addToPivot": "Aggiungi al campo pivot"
   },
   "home": {
     "streams": "Stream",
