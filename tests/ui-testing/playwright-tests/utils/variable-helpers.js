@@ -17,6 +17,7 @@ export async function monitorVariableAPICalls(page, options = {}) {
   const { expectedCount = 1, timeout = 15000, matchFn = null } = options;
   const startTime = Date.now();
   const apiCalls = [];
+  const handledRequests = new Set(); // Track request objects handled by requestHandler
   let matchedCount = 0;
   let resolved = false;
 
@@ -88,6 +89,9 @@ export async function monitorVariableAPICalls(page, options = {}) {
         try {
           const { stream, field, requestBody } = parseCallInfo(url, request.postData());
 
+          // Mark this request as handled so responseHandler won't double-count it
+          handledRequests.add(request);
+
           processCall({
             url,
             status: 0, // Not yet known from request alone
@@ -106,13 +110,16 @@ export async function monitorVariableAPICalls(page, options = {}) {
       }
     };
 
-    // Secondary listener: 'response' event for non-streaming endpoints where
-    // response body analysis is needed. Kept for backward compatibility.
+    // Secondary listener: only fires for requests NOT already handled by requestHandler.
+    // This covers edge cases where the request event was missed.
     const responseHandler = async (response) => {
       if (resolved) return;
       const url = response.url();
 
       if (url.includes('_values_stream') || url.includes('/values')) {
+        // Skip if requestHandler already processed this same request object
+        if (handledRequests.has(response.request())) return;
+
         try {
           const status = response.status();
           let body = '';
@@ -124,7 +131,6 @@ export async function monitorVariableAPICalls(page, options = {}) {
               )
             ]);
           } catch (_bodyErr) {
-            // SSE body read failed/timed out — request handler already covered this
             return;
           }
 
