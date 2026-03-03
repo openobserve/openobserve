@@ -61,7 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Field values list -->
       <div v-for="value in displayValues" :key="value.key">
         <q-list dense>
-          <q-item tag="label" class="q-pr-none">
+          <q-item
+              tag="label"
+              class="q-pr-none"
+              :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
+            >
             <!-- Checkbox for multi-select -->
             <q-checkbox
               v-if="showMultiSelect"
@@ -106,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="emit('add-search-term', fieldName, value.key, 'include')"
                 title="Include Term"
                 round
+                :data-test="`log-search-subfield-list-equal-${fieldName}-field-btn`"
               >
                 <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
                   <EqualIcon />
@@ -117,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="emit('add-search-term', fieldName, value.key, 'exclude')"
                 title="Exclude Term"
                 round
+                :data-test="`log-search-subfield-list-not-equal-${fieldName}-field-btn`"
               >
                 <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
                   <NotEqualIcon />
@@ -141,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         padding="0.1rem 0.3rem"
         class="view-more-btn full-width"
         @click="emit('load-more-values', fieldName)"
+        :data-test="`log-search-subfield-load-more-${fieldName}`"
       >
         View more values
       </q-btn>
@@ -166,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="theme === 'dark' ? 'text-white' : 'text-dark'"
             title="Clear selection"
             @click="selectedValues = []"
+            :data-test="`log-search-subfield-clear-selected-${fieldName}`"
           >
             <q-icon name="close" size="0.6rem" />
           </q-btn>
@@ -178,6 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="multi-select-include-btn"
             @click="handleApplyMultiSelect('include')"
             title="Include selected values (OR)"
+            :data-test="`log-search-subfield-include-selected-${fieldName}`"
           >
             Include
           </q-btn>
@@ -190,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="multi-select-exclude-btn"
             @click="handleApplyMultiSelect('exclude')"
             title="Exclude selected values"
+            :data-test="`log-search-subfield-exclude-selected-${fieldName}`"
           >
             Exclude
           </q-btn>
