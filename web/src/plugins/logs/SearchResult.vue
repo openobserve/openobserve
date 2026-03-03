@@ -1210,6 +1210,14 @@ export default defineComponent({
 
     const createAlertFromPattern = (pattern: any) => {
       const streamName = searchObj.data.stream.selectedStream[0];
+      if (!streamName) {
+        $q.notify({
+          type: "warning",
+          message: "No stream selected. Please select a stream before creating an alert.",
+          timeout: 2000,
+        });
+        return;
+      }
 
       // For alerts, use a lower min-length threshold (3 chars) so we still
       // get useful WHERE clauses even for short-fragment patterns.
