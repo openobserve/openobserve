@@ -345,7 +345,11 @@ pub struct CreateAnomalyConfigRequest {
     pub detection_function: String, // "count(*)", "avg(field)", etc.
     pub detection_interval: String, // "1h", "30m", etc.
     pub training_window_days: Option<i32>,
-    pub sensitivity: Option<i32>,
+    /// Anomaly score percentile threshold (50.0–99.9). Points whose RCF score exceeds
+    /// the N-th percentile of training scores are flagged as anomalies.
+    /// 97.0 is the recommended default (flags top 3% of scores as anomalies).
+    /// Lower values = more anomalies; higher values = fewer, more extreme anomalies.
+    pub percentile: Option<f64>,
     pub rcf_num_trees: Option<i32>,
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
@@ -361,7 +365,8 @@ pub struct UpdateAnomalyConfigRequest {
     pub description: Option<String>,
     pub detection_function: Option<String>,
     pub detection_interval: Option<String>,
-    pub sensitivity: Option<i32>,
+    /// Anomaly score percentile threshold (50.0–99.9). Changing this requires retraining.
+    pub percentile: Option<f64>,
     pub alert_enabled: Option<bool>,
     pub alert_destination_id: Option<String>,
     pub enabled: Option<bool>,

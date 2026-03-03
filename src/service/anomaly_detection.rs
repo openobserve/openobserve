@@ -93,7 +93,9 @@ pub async fn create_config(
         detection_function: Set(req.detection_function.clone()),
         detection_interval: Set(req.detection_interval.clone()),
         training_window_days: Set(req.training_window_days.unwrap_or(7)),
-        sensitivity: Set(req.sensitivity.unwrap_or(5)),
+        // Store percentile as i32 (e.g. 97.0 → 97). Whole-number percentiles are
+        // sufficient; the valid range is 50–99 and we clamp at the model level.
+        sensitivity: Set(req.percentile.unwrap_or(97.0).clamp(50.0, 99.9) as i32),
         is_trained: Set(false),
         training_started_at: Set(None),
         training_completed_at: Set(None),
@@ -155,8 +157,8 @@ pub async fn update_config(
     if let Some(detection_interval) = req.detection_interval {
         active_model.detection_interval = Set(detection_interval);
     }
-    if let Some(sensitivity) = req.sensitivity {
-        active_model.sensitivity = Set(sensitivity);
+    if let Some(percentile) = req.percentile {
+        active_model.sensitivity = Set(percentile.clamp(50.0, 99.9) as i32);
     }
     if let Some(alert_enabled) = req.alert_enabled {
         active_model.alert_enabled = Set(alert_enabled);
