@@ -3,6 +3,14 @@ rustflags = [
     "-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2",
     "-C", "linker=clang",
     "-C", "link-arg=-fuse-ld=mold",
+    # Disable C++ demangling pass in mold; Rust uses its own demangler and
+    # skipping this saves noticeable time on large binaries.
+    "-C", "link-arg=-Wl,--no-demangle",
+    # Reduce the number of threads mold uses for hashing/symbol-resolution.
+    # 15 threads is a good ceiling on the 30-vCPU CI runner; more causes
+    # contention with concurrent LLVM codegen threads.
+    # Rule of thumb: half the runner's vCPU count.
+    "-C", "link-arg=-Wl,--thread-count=15",
 ]
 
 [target.x86_64-unknown-linux-musl]
