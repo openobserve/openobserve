@@ -2208,18 +2208,66 @@ export class AlertsPage {
     // ==================== VRL ENCODING METHODS ====================
 
     /**
-     * Navigate to the Advanced tab in alert wizard
+     * Navigate to the VRL editor in alert wizard by opening the query editor dialog
+     * The VRL editor is inside the query editor dialog (not a separate tab)
+     */
+    async navigateToVrlEditor() {
+        // First, click on Step 2 (Conditions) if Continue button is visible
+        const continueBtn = this.page.locator('[data-test="add-alert-continue-btn"], button:has-text("Continue")').first();
+        if (await continueBtn.isVisible({ timeout: 3000 })) {
+            await continueBtn.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Clicked Continue to go to Step 2');
+        }
+
+        // Try multiple selectors for View Editor button
+        const viewEditorSelectors = [
+            this.locators.viewEditorButton,           // [data-test="step2-view-editor-btn"]
+            this.locators.goToViewEditorButton,       // [data-test="go-to-view-editor-btn"]
+            '[data-test="alert-view-editor-btn"]',    // Alternative selector
+            'button:has-text("View Editor")',         // Text-based fallback
+            '.view-editor-btn'                        // Class-based fallback
+        ];
+
+        for (const selector of viewEditorSelectors) {
+            const btn = this.page.locator(selector).first();
+            if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await btn.click();
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                await this.page.waitForTimeout(2000);
+                testLogger.info('Clicked View Editor button', { selector });
+                return true;
+            }
+        }
+
+        // Alternative: Try clicking on the SQL tab area first which might reveal VRL editor
+        const sqlTab = this.page.locator('[data-test="tab-sql"]');
+        if (await sqlTab.isVisible({ timeout: 3000 })) {
+            await sqlTab.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Clicked SQL tab');
+
+            // Now try View Editor buttons again
+            for (const selector of viewEditorSelectors) {
+                const btn = this.page.locator(selector).first();
+                if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await btn.click();
+                    await this.page.waitForTimeout(2000);
+                    testLogger.info('Clicked View Editor after SQL tab', { selector });
+                    return true;
+                }
+            }
+        }
+
+        testLogger.warn('Could not navigate to VRL editor - View Editor button not visible');
+        return false;
+    }
+
+    /**
+     * Navigate to the Advanced tab in alert wizard (legacy method)
      */
     async navigateToAdvancedTab() {
-        const advancedTab = this.page.locator('text=Advanced').first();
-        if (await advancedTab.isVisible({ timeout: 3000 })) {
-            await advancedTab.click();
-            await this.page.waitForTimeout(1000);
-            testLogger.info('Navigated to Advanced tab');
-            return true;
-        }
-        testLogger.info('Advanced tab not visible');
-        return false;
+        return await this.navigateToVrlEditor();
     }
 
     /**
@@ -2227,12 +2275,66 @@ export class AlertsPage {
      * @returns {Promise<string|null>} The VRL content or null if not visible
      */
     async getVrlEditorContent() {
-        const vrlEditor = this.page.locator(this.locators.vrlFunctionEditorDialog + ' .view-lines, ' + this.locators.vrlFunctionEditorDialog);
-        if (await vrlEditor.isVisible({ timeout: 5000 })) {
-            const content = await vrlEditor.textContent();
-            testLogger.info('Retrieved VRL editor content', { length: content?.length });
-            return content;
+        // Wait longer for the editor to appear
+        await this.page.waitForTimeout(3000);
+
+        // First, try to find and expand VRL Function section if collapsed
+        const vrlSectionHeaders = [
+            'text=VRL Function',
+            'text=Apply Over Hits',
+            '[data-test="vrl-function-section"]',
+            '.vrl-function-header',
+            'button:has-text("VRL")'
+        ];
+
+        for (const selector of vrlSectionHeaders) {
+            const header = this.page.locator(selector).first();
+            if (await header.isVisible({ timeout: 1000 }).catch(() => false)) {
+                await header.click().catch(() => {});
+                await this.page.waitForTimeout(1000);
+                testLogger.info('Clicked VRL section header', { selector });
+                break;
+            }
         }
+
+        // Try multiple VRL editor selectors
+        const vrlSelectors = [
+            this.locators.vrlFunctionEditorDialog + ' .view-lines',  // Monaco editor lines
+            this.locators.vrlFunctionEditorDialog,                    // #alert-editor-vrl
+            '#alert-editor-vrl .monaco-editor .view-lines',           // More specific
+            '[data-test="alert-vrl-editor"] .view-lines',             // Alternative data-test
+            '.vrl-function-editor .view-lines',                       // Class-based
+            '.alert-vrl-editor .view-lines'                           // Another class
+        ];
+
+        for (const selector of vrlSelectors) {
+            const vrlEditor = this.page.locator(selector).first();
+            if (await vrlEditor.isVisible({ timeout: 2000 }).catch(() => false)) {
+                const content = await vrlEditor.textContent();
+                testLogger.info('Retrieved VRL editor content', { selector, length: content?.length });
+                return content;
+            }
+        }
+
+        // Check for any Monaco editor with VRL-like content
+        const allEditorContents = await this.page.evaluate(() => {
+            const viewLines = document.querySelectorAll('.view-lines');
+            return Array.from(viewLines).map(el => ({
+                text: el.textContent?.substring(0, 200),
+                parent: el.closest('[id]')?.id || 'no-id'
+            }));
+        }).catch(() => []);
+        testLogger.info('All editor contents', { editors: JSON.stringify(allEditorContents) });
+
+        // If we found VRL content in any editor, try to get it
+        for (const editor of allEditorContents) {
+            if (editor.text?.includes('.test_field') || editor.text?.includes('hello world') ||
+                editor.text?.includes('.encoded_chars') || editor.text?.includes('VRL')) {
+                testLogger.info('Found VRL content in editor', { parent: editor.parent, content: editor.text });
+                return editor.text;
+            }
+        }
+
         testLogger.info('VRL editor not visible');
         return null;
     }

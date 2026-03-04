@@ -270,9 +270,11 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     expect(vrlResult.content).not.toContain('%3D');
     expect(vrlResult.content).not.toContain('%25');
 
-    // Should contain our test values
-    expect(vrlResult.content).toContain('test_field');
-    expect(vrlResult.content).toContain('hello world');
+    // Should contain our test values (Monaco uses NBSP char 160 instead of space char 32)
+    // Normalize content by replacing NBSP with regular space for assertions
+    const normalizedContent = vrlResult.content?.replace(/\u00A0/g, ' ') || '';
+    expect(normalizedContent).toContain('test_field');
+    expect(normalizedContent).toContain('hello world');
 
     testLogger.info('VRL displays correctly in UI - not encoded');
 
