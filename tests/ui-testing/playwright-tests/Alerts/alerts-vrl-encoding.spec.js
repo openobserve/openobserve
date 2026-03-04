@@ -221,7 +221,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     // Double-encoding would produce invalid base64 or extra padding
     expect(vrlFromApi).toMatch(/^[A-Za-z0-9+/]+=*$/); // Valid base64 pattern
 
-    testLogger.info('✅ VRL encoding test passed - VRL correctly base64 encoded, no double-encoding');
+    testLogger.info('VRL encoding test passed - VRL correctly base64 encoded, no double-encoding');
 
     // Cleanup
     await cleanup(page, createdAlertId);
@@ -243,53 +243,34 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     // Navigate to alerts page
     await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await page.waitForLoadState("networkidle");
+
+    // Use page object methods - search and select alert
+    await pm.alertsPage.searchAlert(ALERT_NAME);
+    await pm.alertsPage.clickAlertRow(ALERT_NAME);
+
+    // Click Edit button using page object
+    await pm.alertsPage.clickAlertDetailsEditButton();
     await page.waitForTimeout(2000);
 
-    // Search for our test alert
-    const searchInput = page.locator('[data-test="alert-list-search-input"], input[placeholder*="Search"]').first();
-    if (await searchInput.isVisible()) {
-      await searchInput.fill(ALERT_NAME);
-      await page.waitForTimeout(1000);
-    }
+    // Navigate to Advanced tab using page object
+    await pm.alertsPage.navigateToAdvancedTab();
 
-    // Click on the alert row
-    const alertRow = page.locator(`text=${ALERT_NAME}`).first();
-    await expect(alertRow).toBeVisible({ timeout: 10000 });
-    await alertRow.click();
-    await page.waitForTimeout(2000);
+    // Check VRL editor content using page object
+    const vrlResult = await pm.alertsPage.expectVrlEditorNotContainsEncodedChars();
 
-    // Click Edit button
-    const editBtn = page.locator('[data-test="alert-details-edit-btn"]');
-    await expect(editBtn).toBeVisible({ timeout: 5000 });
-    await editBtn.click();
-    await page.waitForTimeout(3000);
-
-    // Navigate to Advanced tab to see VRL editor
-    const advancedTab = page.locator('text=Advanced').first();
-    if (await advancedTab.isVisible()) {
-      await advancedTab.click();
-      await page.waitForTimeout(1000);
-    }
-
-    // Check VRL editor content
-    const vrlEditor = page.locator('#alert-editor-vrl .view-lines, #alert-editor-vrl');
-
-    if (await vrlEditor.isVisible()) {
-      const vrlContent = await vrlEditor.textContent();
-      testLogger.info('VRL Editor Content', { content: vrlContent });
-
+    if (vrlResult.content) {
       // Verify content is readable (not URL-encoded)
-      expect(vrlContent).not.toContain('%2F');
-      expect(vrlContent).not.toContain('%3D');
-      expect(vrlContent).not.toContain('%25');
+      expect(vrlResult.content).not.toContain('%2F');
+      expect(vrlResult.content).not.toContain('%3D');
+      expect(vrlResult.content).not.toContain('%25');
 
       // Should contain our test values
-      expect(vrlContent).toContain('test_field');
-      expect(vrlContent).toContain('hello world');
+      expect(vrlResult.content).toContain('test_field');
+      expect(vrlResult.content).toContain('hello world');
 
-      testLogger.info('✅ VRL displays correctly in UI - not encoded');
+      testLogger.info('VRL displays correctly in UI - not encoded');
     } else {
-      testLogger.info('ℹ️ VRL editor not visible in Advanced tab - checking other locations');
+      testLogger.info('VRL editor not visible in Advanced tab - checking other locations');
     }
 
     // Cleanup
@@ -311,50 +292,30 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     // Navigate to alerts and edit
     await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await page.waitForLoadState("networkidle");
+
+    // Use page object methods
+    await pm.alertsPage.searchAlert(ALERT_NAME);
+    await pm.alertsPage.clickAlertRow(ALERT_NAME);
+    await pm.alertsPage.clickAlertDetailsEditButton();
     await page.waitForTimeout(2000);
 
-    // Search and click alert
-    const searchInput = page.locator('[data-test="alert-list-search-input"], input[placeholder*="Search"]').first();
-    if (await searchInput.isVisible()) {
-      await searchInput.fill(ALERT_NAME);
-      await page.waitForTimeout(1000);
-    }
-
-    const alertRow = page.locator(`text=${ALERT_NAME}`).first();
-    await expect(alertRow).toBeVisible({ timeout: 10000 });
-    await alertRow.click();
-    await page.waitForTimeout(2000);
-
-    // Click Edit
-    const editBtn = page.locator('[data-test="alert-details-edit-btn"]');
-    await expect(editBtn).toBeVisible({ timeout: 5000 });
-    await editBtn.click();
-    await page.waitForTimeout(3000);
-
-    // Navigate to Advanced tab to see VRL editor
-    const advancedTab = page.locator('text=Advanced').first();
-    if (await advancedTab.isVisible()) {
-      await advancedTab.click();
-      await page.waitForTimeout(1000);
-    }
+    // Navigate to Advanced tab using page object
+    await pm.alertsPage.navigateToAdvancedTab();
 
     // Check that VRL is displayed correctly (not double-encoded in UI)
-    // The VRL editor should show decoded content
-    const vrlEditor = page.locator('#alert-editor-vrl .view-lines, #alert-editor-vrl');
-    if (await vrlEditor.isVisible()) {
-      const vrlContent = await vrlEditor.textContent();
-      testLogger.info('VRL in editor during edit', { content: vrlContent?.substring(0, 100) });
+    const vrlResult = await pm.alertsPage.expectVrlEditorNotContainsEncodedChars();
 
+    if (vrlResult.content) {
       // Verify VRL is NOT URL-encoded in the editor
-      expect(vrlContent).not.toContain('%2F');
-      expect(vrlContent).not.toContain('%3D');
-      expect(vrlContent).not.toContain('%25');
-      expect(vrlContent).not.toContain('%22');
+      expect(vrlResult.content).not.toContain('%2F');
+      expect(vrlResult.content).not.toContain('%3D');
+      expect(vrlResult.content).not.toContain('%25');
+      expect(vrlResult.content).not.toContain('%22');
 
-      testLogger.info('✅ VRL displays correctly in edit mode - not double-encoded');
+      testLogger.info('VRL displays correctly in edit mode - not double-encoded');
     } else {
       // If VRL editor not visible, skip this check - the core API test already passed
-      testLogger.info('ℹ️ VRL editor not visible in edit mode - skipping UI check');
+      testLogger.info('VRL editor not visible in edit mode - skipping UI check');
     }
 
     // Cleanup
@@ -403,7 +364,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
 
     if (resp.status === 200) {
       // If API accepts plain text, verify it's converted to base64 or stored correctly
-      testLogger.info('✅ API accepts plain text VRL (backward compatible)');
+      testLogger.info('API accepts plain text VRL (backward compatible)');
 
       // Fetch and verify
       const getResp = await getAlertByName(page, plainTextAlertName);
@@ -426,7 +387,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
       }
     } else if (resp.status === 400 && resp.data?.message?.includes('base64')) {
       // API requires base64 - this is the new format
-      testLogger.info('ℹ️ API requires base64 format (new format only)');
+      testLogger.info('API requires base64 format (new format only)');
       // This is still acceptable - just means no backward compatibility needed
     } else {
       testLogger.info('Unexpected response', { status: resp.status, data: resp.data });
@@ -453,75 +414,41 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     const getResp = await getAlertByName(page, ALERT_NAME);
     createdAlertId = getResp.alertId;
 
-    // Capture PUT request
-    let capturedPutRequest = null;
-    page.on('request', (request) => {
-      if (request.method() === 'PUT' && request.url().includes('/alerts/')) {
-        capturedPutRequest = {
-          url: request.url(),
-          body: request.postData()
-        };
-        testLogger.info('📤 Captured PUT request', { url: request.url() });
-      }
-    });
+    // Setup PUT request capture using page object
+    const getCapturedRequest = pm.alertsPage.setupPutRequestCapture();
 
     // Navigate to alerts and edit
     await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await page.waitForLoadState("networkidle");
+
+    // Use page object methods
+    await pm.alertsPage.searchAlert(ALERT_NAME);
+    await pm.alertsPage.clickAlertRow(ALERT_NAME);
+    await pm.alertsPage.clickAlertDetailsEditButton();
     await page.waitForTimeout(2000);
 
-    // Search for alert
-    const searchInput = page.locator('[data-test="alert-list-search-input"], input[placeholder*="Search"]').first();
-    if (await searchInput.isVisible()) {
-      await searchInput.fill(ALERT_NAME);
-      await page.waitForTimeout(1000);
-    }
+    // Navigate through steps using page object
+    await pm.alertsPage.navigateThroughWizardSteps(5);
 
-    // Click alert
-    const alertRow = page.locator(`text=${ALERT_NAME}`).first();
-    await expect(alertRow).toBeVisible({ timeout: 10000 });
-    await alertRow.click();
-    await page.waitForTimeout(2000);
+    // Try to save using page object
+    const submitted = await pm.alertsPage.clickSubmitButton();
 
-    // Click Edit
-    const editBtn = page.locator('[data-test="alert-details-edit-btn"]');
-    await expect(editBtn).toBeVisible({ timeout: 5000 });
-    await editBtn.click();
-    await page.waitForTimeout(3000);
-
-    // Navigate through steps and try to save
-    // Click Continue/Next buttons to get to save
-    const continueBtn = page.locator('[data-test="add-alert-continue-btn"], button:has-text("Continue")').first();
-    for (let i = 0; i < 5; i++) {
-      if (await continueBtn.isVisible()) {
-        await continueBtn.click();
-        await page.waitForTimeout(500);
-      }
-    }
-
-    // Try to save
-    const saveBtn = page.locator('[data-test="add-alert-submit-btn"]');
-    await page.waitForTimeout(2000);
-
-    if (await saveBtn.isEnabled()) {
-      await saveBtn.click();
-      await page.waitForTimeout(3000);
-
-      // Verify PUT request
-      if (capturedPutRequest) {
+    if (submitted) {
+      // Verify PUT request using page object
+      const capturedRequest = getCapturedRequest();
+      if (capturedRequest) {
         testLogger.info('PUT Request Body (first 500 chars)', {
-          body: capturedPutRequest.body?.substring(0, 500)
+          body: capturedRequest.body?.substring(0, 500)
         });
 
-        // Check for double-encoding in PUT request
-        expect(capturedPutRequest.body).not.toContain('%252F'); // Double-encoded /
-        expect(capturedPutRequest.body).not.toContain('%253D'); // Double-encoded =
-        expect(capturedPutRequest.body).not.toContain('%2522'); // Double-encoded "
+        // Verify no double-encoding using page object
+        const isValid = pm.alertsPage.verifyPutRequestNotDoubleEncoded(capturedRequest);
+        expect(isValid).toBe(true);
 
-        testLogger.info('✅ PUT request does not have double-encoded VRL');
+        testLogger.info('PUT request does not have double-encoded VRL');
       }
     } else {
-      testLogger.info('ℹ️ Save button not enabled - form validation incomplete, skipping PUT verification');
+      testLogger.info('Save button not enabled - form validation incomplete, skipping PUT verification');
     }
 
     // Cleanup

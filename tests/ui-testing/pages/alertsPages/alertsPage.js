@@ -2204,4 +2204,140 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked update button for alert', { alertName });
     }
+
+    // ==================== VRL ENCODING METHODS ====================
+
+    /**
+     * Navigate to the Advanced tab in alert wizard
+     */
+    async navigateToAdvancedTab() {
+        const advancedTab = this.page.locator('text=Advanced').first();
+        if (await advancedTab.isVisible({ timeout: 3000 })) {
+            await advancedTab.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Navigated to Advanced tab');
+            return true;
+        }
+        testLogger.info('Advanced tab not visible');
+        return false;
+    }
+
+    /**
+     * Get VRL editor content from the alert wizard
+     * @returns {Promise<string|null>} The VRL content or null if not visible
+     */
+    async getVrlEditorContent() {
+        const vrlEditor = this.page.locator(this.locators.vrlFunctionEditorDialog + ' .view-lines, ' + this.locators.vrlFunctionEditorDialog);
+        if (await vrlEditor.isVisible({ timeout: 5000 })) {
+            const content = await vrlEditor.textContent();
+            testLogger.info('Retrieved VRL editor content', { length: content?.length });
+            return content;
+        }
+        testLogger.info('VRL editor not visible');
+        return null;
+    }
+
+    /**
+     * Verify VRL editor content doesn't contain URL-encoded characters
+     * @returns {Promise<{valid: boolean, content: string|null}>}
+     */
+    async expectVrlEditorNotContainsEncodedChars() {
+        const content = await this.getVrlEditorContent();
+        if (content) {
+            const hasEncodedChars = content.includes('%2F') || content.includes('%3D') ||
+                                    content.includes('%25') || content.includes('%22');
+            if (hasEncodedChars) {
+                testLogger.error('VRL editor contains URL-encoded characters', { content: content.substring(0, 100) });
+            } else {
+                testLogger.info('VRL editor content is not URL-encoded');
+            }
+            return { valid: !hasEncodedChars, content };
+        }
+        return { valid: true, content: null }; // Not visible, can't validate
+    }
+
+    /**
+     * Click alert row by name in the alert list
+     * @param {string} alertName - Name of the alert to click
+     */
+    async clickAlertRow(alertName) {
+        const alertRow = this.page.locator(`text=${alertName}`).first();
+        await expect(alertRow).toBeVisible({ timeout: 10000 });
+        await alertRow.click();
+        await this.page.waitForTimeout(2000);
+        testLogger.info('Clicked alert row', { alertName });
+    }
+
+    /**
+     * Navigate through wizard steps by clicking Continue button multiple times
+     * @param {number} times - Number of times to click Continue
+     */
+    async navigateThroughWizardSteps(times = 5) {
+        for (let i = 0; i < times; i++) {
+            const continueBtn = this.page.locator('[data-test="add-alert-continue-btn"], button:has-text("Continue")').first();
+            if (await continueBtn.isVisible({ timeout: 2000 })) {
+                await continueBtn.click();
+                await this.page.waitForTimeout(500);
+                testLogger.info('Clicked Continue button', { step: i + 1 });
+            }
+        }
+    }
+
+    /**
+     * Click the submit button in alert wizard
+     * @returns {Promise<boolean>} True if button was clicked, false if not enabled
+     */
+    async clickSubmitButton() {
+        const submitBtn = this.page.locator(this.locators.alertSubmitButton);
+        await this.page.waitForTimeout(2000);
+        if (await submitBtn.isEnabled()) {
+            await submitBtn.click();
+            await this.page.waitForTimeout(3000);
+            testLogger.info('Clicked submit button');
+            return true;
+        }
+        testLogger.info('Submit button not enabled');
+        return false;
+    }
+
+    /**
+     * Setup request interception for PUT requests on alerts
+     * @returns {Function} Callback to get captured request
+     */
+    setupPutRequestCapture() {
+        let capturedRequest = null;
+        this.page.on('request', (request) => {
+            if (request.method() === 'PUT' && request.url().includes('/alerts/')) {
+                capturedRequest = {
+                    url: request.url(),
+                    body: request.postData()
+                };
+                testLogger.info('Captured PUT request', { url: request.url() });
+            }
+        });
+        return () => capturedRequest;
+    }
+
+    /**
+     * Verify PUT request doesn't contain double-encoded VRL
+     * @param {object} capturedRequest - The captured request object
+     * @returns {boolean} True if no double-encoding found
+     */
+    verifyPutRequestNotDoubleEncoded(capturedRequest) {
+        if (!capturedRequest?.body) {
+            testLogger.info('No PUT request body to verify');
+            return true;
+        }
+        const hasDoubleEncoding = capturedRequest.body.includes('%252F') ||
+                                  capturedRequest.body.includes('%253D') ||
+                                  capturedRequest.body.includes('%2522');
+        if (hasDoubleEncoding) {
+            testLogger.error('PUT request contains double-encoded VRL', {
+                body: capturedRequest.body.substring(0, 500)
+            });
+        } else {
+            testLogger.info('PUT request does not have double-encoded VRL');
+        }
+        return !hasDoubleEncoding;
+    }
 }
