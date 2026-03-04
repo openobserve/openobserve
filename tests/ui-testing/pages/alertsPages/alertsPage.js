@@ -2326,13 +2326,12 @@ export class AlertsPage {
         }).catch(() => []);
         testLogger.info('All editor contents', { editors: JSON.stringify(allEditorContents) });
 
-        // Return first non-SQL editor content (VRL editors are in fnEditor-dialog)
-        // Avoid hardcoded test-specific strings to keep page object reusable
+        // Find VRL content by parent container - fnEditor-dialog is the VRL function dialog
+        // NOTE: This relies on the fnEditor-dialog parent identifier. A dedicated data-test
+        // attribute in the UI would be more reliable, but this is the best heuristic available.
         for (const editor of allEditorContents) {
-            // Skip SQL editors - VRL is typically in fnEditor-dialog
-            if (editor.parent === 'fnEditor-dialog' ||
-                (editor.text?.startsWith('.') && !editor.text?.includes('SELECT'))) {
-                testLogger.info('Found VRL content in editor', { parent: editor.parent, content: editor.text });
+            if (editor.parent === 'fnEditor-dialog') {
+                testLogger.info('Found VRL content in fnEditor-dialog', { content: editor.text });
                 return editor.text;
             }
         }

@@ -209,6 +209,9 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     const vrlFromApi = getResp.data?.query_condition?.vrl_function;
     testLogger.info('VRL from API (base64)', { vrl: vrlFromApi });
 
+    // Ensure VRL was returned before decoding
+    expect(vrlFromApi).toBeTruthy();
+
     // API returns VRL as base64 - decode it to verify content
     const decodedVrl = Buffer.from(vrlFromApi, 'base64').toString('utf-8');
     testLogger.info('VRL decoded', { decoded: decodedVrl });
@@ -422,6 +425,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     expect(createResp.status).toBe(200);
 
     const getResp = await getAlertByName(page, ALERT_NAME);
+    expect(getResp.status).toBe(200);
     createdAlertId = getResp.alertId;
 
     // Setup PUT request capture using page object (returns { getCaptured, dispose })
