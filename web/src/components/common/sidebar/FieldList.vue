@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter-method="filterFieldFn"
         v-model:pagination="pagination"
         :rows-per-page-options="[]"
+        :hide-bottom="!showPagination"
         hide-header
         class="traces-field-table tw:h-full"
         id="tracesFieldList"
@@ -287,6 +288,10 @@ export default defineComponent({
         .length;
     });
 
+    const showPagination = computed(
+      () => filteredFieldsCount.value > pagination.value.rowsPerPage,
+    );
+
     const visiblePages = computed(() => {
       const pages: number[] = [];
       const page = pagination.value.page;
@@ -490,6 +495,7 @@ export default defineComponent({
       outlinedAdd,
       filterFieldValue,
       filteredFieldsCount,
+      showPagination,
       pagination,
       visiblePages,
       setPage,
