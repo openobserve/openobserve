@@ -2629,13 +2629,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
-    // If tracing_extra_envs is empty, reset to default value
-    if cfg.common.tracing_extra_envs.is_empty() {
-        cfg.common.tracing_extra_envs =
-            "K8S_CLUSTER,K8S_NAMESPACE_NAME,K8S_NODE_NAME,K8S_CONTAINER_NAME,K8S_POD_NAME"
-                .to_string();
-    }
-
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
         cfg.common.instance_name = sysinfo::os::get_hostname();
