@@ -1026,6 +1026,12 @@ pub struct Common {
         default = "Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM="
     )]
     pub tracing_header_value: String,
+    #[env_config(
+        name = "ZO_TRACING_EXTRA_ENVS",
+        default = "",
+        help = "Comma-separated list of environment variable names to include as resource attributes in traces."
+    )]
+    pub tracing_extra_envs: String,
     #[env_config(name = "ZO_TELEMETRY", default = true)]
     pub telemetry_enabled: bool,
     #[env_config(name = "ZO_TELEMETRY_URL", default = "https://e1.zinclabs.dev")]
@@ -2621,6 +2627,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Either grpc or http url should be set when enabling tracing"
         ));
+    }
+
+    // If tracing_extra_envs is empty, reset to default value
+    if cfg.common.tracing_extra_envs.is_empty() {
+        cfg.common.tracing_extra_envs =
+            "K8S_CLUSTER,K8S_NAMESPACE_NAME,K8S_NODE_NAME,K8S_CONTAINER_NAME,K8S_POD_NAME"
+                .to_string();
     }
 
     // HACK instance_name
