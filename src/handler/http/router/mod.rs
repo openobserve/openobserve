@@ -1007,10 +1007,7 @@ pub fn create_app_router() -> Router {
 
 #[cfg(test)]
 mod tests {
-    use axum::{
-        body::Body,
-        http::{Request, StatusCode},
-    };
+    use axum::{body::Body, http::Request};
     use tower::ServiceExt;
 
     use super::*;

@@ -223,6 +223,7 @@ mod tests {
 
     #[test]
     fn test_protobuf_decode_error() {
+        #[allow(deprecated)]
         let decode_error = prost::DecodeError::new("test decode error");
         let loki_error: LokiError = decode_error.into();
         assert!(matches!(loki_error, LokiError::ProtobufDecode { .. }));
