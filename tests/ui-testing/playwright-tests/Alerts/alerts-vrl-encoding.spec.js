@@ -440,23 +440,22 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     // Try to save using page object
     const submitted = await pm.alertsPage.clickSubmitButton();
 
-    if (submitted) {
-      // Verify PUT request using page object
-      const capturedRequest = getCapturedRequest();
-      if (capturedRequest) {
-        testLogger.info('PUT Request Body (first 500 chars)', {
-          body: capturedRequest.body?.substring(0, 500)
-        });
+    // Fail explicitly if form submission was not possible
+    expect(submitted).toBe(true);
 
-        // Verify no double-encoding using page object
-        const isValid = pm.alertsPage.verifyPutRequestNotDoubleEncoded(capturedRequest);
-        expect(isValid).toBe(true);
+    // Verify PUT request using page object
+    const capturedRequest = getCapturedRequest();
+    expect(capturedRequest).toBeTruthy();
 
-        testLogger.info('PUT request does not have double-encoded VRL');
-      }
-    } else {
-      testLogger.info('Save button not enabled - form validation incomplete, skipping PUT verification');
-    }
+    testLogger.info('PUT Request Body (first 500 chars)', {
+      body: capturedRequest.body?.substring(0, 500)
+    });
+
+    // Verify no double-encoding using page object
+    const isValid = pm.alertsPage.verifyPutRequestNotDoubleEncoded(capturedRequest);
+    expect(isValid).toBe(true);
+
+    testLogger.info('PUT request does not have double-encoded VRL');
 
     // Cleanup
     await cleanup(page, createdAlertId);

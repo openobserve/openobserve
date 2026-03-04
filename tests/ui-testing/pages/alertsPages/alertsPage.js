@@ -2362,10 +2362,13 @@ export class AlertsPage {
 
     /**
      * Click alert row by name in the alert list
+     * Uses specific data-test selector scoped to alert list table
      * @param {string} alertName - Name of the alert to click
      */
     async clickAlertRow(alertName) {
-        const alertRow = this.page.locator(`text=${alertName}`).first();
+        // Use specific data-test selector scoped to alert list table
+        const alertTable = this.page.locator(this.locators.alertListTable);
+        const alertRow = alertTable.locator(`tr:has-text("${alertName}")`).first();
         await expect(alertRow).toBeVisible({ timeout: 10000 });
         await alertRow.click();
         await this.page.waitForTimeout(2000);
@@ -2406,19 +2409,23 @@ export class AlertsPage {
 
     /**
      * Setup request interception for PUT requests on alerts
+     * Uses self-removing listener to prevent memory leaks
      * @returns {Function} Callback to get captured request
      */
     setupPutRequestCapture() {
         let capturedRequest = null;
-        this.page.on('request', (request) => {
+        const requestHandler = (request) => {
             if (request.method() === 'PUT' && request.url().includes('/alerts/')) {
                 capturedRequest = {
                     url: request.url(),
                     body: request.postData()
                 };
                 testLogger.info('Captured PUT request', { url: request.url() });
+                // Remove listener after capturing to prevent accumulation
+                this.page.off('request', requestHandler);
             }
-        });
+        };
+        this.page.on('request', requestHandler);
         return () => capturedRequest;
     }
 
