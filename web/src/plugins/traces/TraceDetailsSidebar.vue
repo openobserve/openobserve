@@ -31,10 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-badge
           v-if="isLLMSpan"
           :label="
-            span._o2_llm_observation_type?.charAt(0) +
-            span._o2_llm_observation_type?.slice(1).toLowerCase()
+            span.llm_observation_type?.charAt(0) +
+            span.llm_observation_type?.slice(1).toLowerCase()
           "
-          :color="getObservationTypeColor(span._o2_llm_observation_type)"
+          :color="getObservationTypeColor(span.llm_observation_type)"
           class="q-mr-xs observation-type-badge"
           data-test="trace-details-sidebar-observation-badge"
         />
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Row 2: LLM Metrics (conditional) -->
       <div
-        v-if="isLLMSpan && llmMetrics && span._o2_llm_model_name"
+        v-if="isLLMSpan && llmMetrics && span.llm_model_name"
         class="flex items-center justify-between q-pa-xs llm-metrics-row"
         style="
           overflow-x: auto;
@@ -175,10 +175,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             square
             class="llm-chip model-chip"
             icon="psychology"
-            :title="span._o2_llm_model_name"
+            :title="span.llm_model_name"
           >
             <span class="chip-value text-bold">{{
-              span._o2_llm_model_name
+              span.llm_model_name
             }}</span>
           </q-chip>
 
@@ -226,8 +226,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center">
           <!-- Provider Badge -->
           <q-badge
-            v-if="span._o2_llm_provider_name"
-            :label="span._o2_llm_provider_name"
+            v-if="span.llm_provider_name"
+            :label="span.llm_provider_name"
             class="provider-badge"
           />
         </div>
@@ -342,22 +342,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon="content_copy"
                     title="Copy input"
-                    @click="copyContent(span._o2_llm_input, 'input')"
-                    :disable="!hasContent(span._o2_llm_input)"
+                    @click="copyContent(span.llm_input, 'input')"
+                    :disable="!hasContent(span.llm_input)"
                   />
                 </div>
               </div>
               <div class="llm-content-box">
                 <div
-                  v-if="!hasContent(span._o2_llm_input)"
+                  v-if="!hasContent(span.llm_input)"
                   class="no-data-message"
                 >
                   No data available
                 </div>
                 <LLMContentRenderer
                   v-else
-                  :content="span._o2_llm_input"
-                  :observation-type="span._o2_llm_observation_type"
+                  :content="span.llm_input"
+                  :observation-type="span.llm_observation_type"
                   content-type="input"
                   :span="span"
                   view-mode="formatted"
@@ -389,22 +389,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon="content_copy"
                     title="Copy output"
-                    @click="copyContent(span._o2_llm_output, 'output')"
-                    :disable="!hasContent(span._o2_llm_output)"
+                    @click="copyContent(span.llm_output, 'output')"
+                    :disable="!hasContent(span.llm_output)"
                   />
                 </div>
               </div>
               <div class="llm-content-box">
                 <div
-                  v-if="!hasContent(span._o2_llm_output)"
+                  v-if="!hasContent(span.llm_output)"
                   class="no-data-message"
                 >
                   No data available
                 </div>
                 <LLMContentRenderer
                   v-else
-                  :content="span._o2_llm_output"
-                  :observation-type="span._o2_llm_observation_type"
+                  :content="span.llm_output"
+                  :observation-type="span.llm_observation_type"
                   content-type="output"
                   :span="span"
                   view-mode="formatted"
@@ -415,12 +415,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Model Parameters (collapsible) -->
           <q-expansion-item
-            v-if="span._o2_llm_model_parameters"
+            v-if="span.llm_model_parameters"
             label="Model Parameters"
             class="q-mt-md"
           >
             <pre class="model-params-json q-pa-sm">{{
-              formatModelParams(span._o2_llm_model_parameters)
+              formatModelParams(span.llm_model_parameters)
             }}</pre>
           </q-expansion-item>
         </div>
@@ -436,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows-per-page-options="[0]"
           class="q-table trace-detail-tab-table o2-quasar-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
           :class="
-            isLLMSpan && llmMetrics && span._o2_llm_model_name
+            isLLMSpan && llmMetrics && span.llm_model_name
               ? 'tab-content-with-llm-metrics'
               : 'tab-content-without-llm-metrics'
           "
@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows-per-page-options="[0]"
           class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
           :class="
-            isLLMSpan && llmMetrics && span._o2_llm_model_name
+            isLLMSpan && llmMetrics && span.llm_model_name
               ? 'tab-content-with-llm-metrics'
               : 'tab-content-without-llm-metrics'
           "
@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <pre
           class="attr-text tab-content-dynamic-height-with-header"
           :class="
-            isLLMSpan && llmMetrics && span._o2_llm_model_name
+            isLLMSpan && llmMetrics && span.llm_model_name
               ? 'tab-content-with-llm-metrics'
               : 'tab-content-without-llm-metrics'
           "
@@ -535,7 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows-per-page-options="[0]"
           class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
           :class="
-            isLLMSpan && llmMetrics && span._o2_llm_model_name
+            isLLMSpan && llmMetrics && span.llm_model_name
               ? 'tab-content-with-llm-metrics'
               : 'tab-content-without-llm-metrics'
           "
@@ -600,7 +600,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="full-width text-center tw:flex tw:items-center tw:justify-center q-pt-lg text-bold tab-content-dynamic-height"
           :class="
-            isLLMSpan && llmMetrics && span._o2_llm_model_name
+            isLLMSpan && llmMetrics && span.llm_model_name
               ? 'tab-content-with-llm-metrics'
               : 'tab-content-without-llm-metrics'
           "
@@ -620,7 +620,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows-per-page-options="[0]"
           class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
           :class="
-            isLLMSpan && llmMetrics && span._o2_llm_model_name
+            isLLMSpan && llmMetrics && span.llm_model_name
               ? 'tab-content-with-llm-metrics'
               : 'tab-content-without-llm-metrics'
           "
@@ -751,7 +751,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
           :class="
-            isLLMSpan && llmMetrics && span._o2_llm_model_name
+            isLLMSpan && llmMetrics && span.llm_model_name
               ? 'tab-content-with-llm-metrics'
               : 'tab-content-without-llm-metrics'
           "
@@ -814,7 +814,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
           :class="
-            isLLMSpan && llmMetrics && span._o2_llm_model_name
+            isLLMSpan && llmMetrics && span.llm_model_name
               ? 'tab-content-with-llm-metrics'
               : 'tab-content-without-llm-metrics'
           "
@@ -847,7 +847,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
           :class="
-            isLLMSpan && llmMetrics && span._o2_llm_model_name
+            isLLMSpan && llmMetrics && span.llm_model_name
               ? 'tab-content-with-llm-metrics'
               : 'tab-content-without-llm-metrics'
           "
@@ -897,7 +897,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
           :class="
-            isLLMSpan && llmMetrics && span._o2_llm_model_name
+            isLLMSpan && llmMetrics && span.llm_model_name
               ? 'tab-content-with-llm-metrics'
               : 'tab-content-without-llm-metrics'
           "
@@ -1092,8 +1092,8 @@ export default defineComponent({
       const colors = themeColors;
       const attrs = spanDetails.value.attrs;
       // remove llm input and output
-      delete attrs._o2_llm_input;
-      delete attrs._o2_llm_output;
+      delete attrs.llm_input;
+      delete attrs.llm_output;
       const query = props.searchQuery;
 
       const formatValue = (value: any): string => {
@@ -1197,12 +1197,12 @@ export default defineComponent({
 
     const getTTFT = computed(() => {
       // Only calculate for LLM spans with completion_start_time
-      if (!props.span._o2_llm_completion_start_time || !props.span.start_time) {
+      if (!props.span.llm_completion_start_time || !props.span.start_time) {
         return null;
       }
       // completion_start_time is in microseconds
       // start_time is in nanoseconds, convert to microseconds
-      const completionStartTime = props.span._o2_llm_completion_start_time;
+      const completionStartTime = props.span.llm_completion_start_time;
       const spanStartTimeUs = props.span.start_time / 1000;
       const ttftUs = completionStartTime - spanStartTimeUs;
       return formatTimeWithSuffix(ttftUs);
