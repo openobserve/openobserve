@@ -38,7 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ellipsis tw:max-w-[calc(100%-1.5rem)]!"
             style="display: inline-block"
           >
-            <span v-if="field.dataType" class="field-type-container" :title="field.dataType">
+            <span
+              v-if="field.dataType"
+              class="field-type-container"
+              :title="field.dataType"
+            >
               <FieldTypeBadge :dataType="field.dataType" />
               <q-icon
                 class="field-expand-icon"
@@ -208,31 +212,13 @@ const handleBeforeHide = () => {
   background: var(--q-dark);
 }
 
+// field-type-container base styles come from the global _field-type-badge.scss partial;
+// override only what differs in the logs expansion context.
 .field-type-container {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  margin-right: 0.3rem;
   margin-left: 0.1rem;
-  flex-shrink: 0;
-  vertical-align: middle;
-}
-
-.field-expand-icon {
-  position: absolute;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.field-expansion-header:hover .field-type-badge {
-  opacity: 0;
 }
 
 .field-expansion-header:hover .field-expand-icon {
-  opacity: 1;
   left: -2px;
 }
 
