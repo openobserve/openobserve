@@ -204,6 +204,62 @@ export const b64DecodeUnicode = (str: string) => {
   }
 };
 
+/**
+ * Helper function to check if a string is base64 encoded
+ * Used to detect double-encoded VRL functions from v0.40 legacy data
+ */
+const isBase64Encoded = (str: string): boolean => {
+  if (!str || typeof str !== 'string') return false;
+
+  // Check if string looks like base64 (url-safe format used by OpenObserve)
+  // Base64 pattern: alphanumeric + "-" + "_" + "."
+  const base64Pattern = /^[A-Za-z0-9\-_\.]+$/;
+
+  if (!base64Pattern.test(str)) return false;
+
+  // Try to decode - if it succeeds without error, it's likely base64
+  try {
+    const decoded = b64DecodeUnicode(str);
+    return decoded !== undefined && decoded !== null && decoded !== str;
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
+ * Smart VRL function decoder that handles backwards compatibility
+ * - Detects if VRL is single or double-encoded (legacy v0.40 bug)
+ * - Decodes once, checks if still encoded, decodes again if needed
+ * - Ensures clean decoded VRL for display/editing
+ *
+ * @param vrlFunction - VRL function string (may be single or double encoded)
+ * @returns Fully decoded VRL function
+ */
+export const smartDecodeVrlFunction = (vrlFunction: string | null | undefined): string => {
+  if (!vrlFunction) return "";
+
+  try {
+    // First decode
+    const firstDecode = b64DecodeUnicode(vrlFunction);
+
+    if (!firstDecode) return vrlFunction;
+
+    // Check if result is still base64 encoded (double-encoded case from legacy bug)
+    if (isBase64Encoded(firstDecode)) {
+      // Decode again for double-encoded VRL
+      const secondDecode = b64DecodeUnicode(firstDecode);
+      return secondDecode || firstDecode;
+    }
+
+    // Single-encoded (normal case)
+    return firstDecode;
+  } catch (e) {
+    // If decode fails, return original value
+    console.error("Error decoding VRL function:", e);
+    return vrlFunction;
+  }
+};
+
 export const b64EncodeStandard = (str: string) => {
   try {
     return btoa(
