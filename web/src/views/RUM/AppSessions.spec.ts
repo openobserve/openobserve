@@ -94,6 +94,7 @@ vi.mock("@/utils/zincutils", () => ({
   b64DecodeUnicode: vi.fn((str) => atob(str)),
   b64EncodeUnicode: vi.fn((str) => btoa(str)),
   useLocalOrganization: vi.fn(),
+  useLocalCurrentUser: vi.fn(),
 }));
 
 vi.mock("@/utils/date", () => ({
