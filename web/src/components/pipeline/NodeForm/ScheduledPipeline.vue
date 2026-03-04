@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:mt-1"
                   />
                 </span>
-                <div class="q-pt-sm" v-show="expandState.buildQuery">
+                <div class="q-pt-sm tw:h-full" v-show="expandState.buildQuery">
                   <div>
                     <q-select
                       v-model="selectedStreamType"
@@ -178,19 +178,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
 
-                  <FieldList
-                    :fields="streamFields"
-                    :stream-name="selectedStreamName"
-                    :stream-type="selectedStreamType"
-                    @event-emitted="handleSidebarEvent"
-                    :time-stamp="{
-                      startTime: dateTime.startTime,
-                      endTime: dateTime.endTime,
-                    }"
-                    :hideIncludeExlcude="true"
-                    :hideCopyValue="false"
-                    :hideAddSearchTerm="true"
-                  />
+                  <div class="tw:h-[calc(100%-7.9rem)]!">
+                    <FieldList
+                      :fields="streamFields"
+                      :stream-name="selectedStreamName"
+                      :stream-type="selectedStreamType"
+                      @event-emitted="handleSidebarEvent"
+                      :time-stamp="{
+                        startTime: dateTime.startTime,
+                        endTime: dateTime.endTime,
+                      }"
+                      :hideIncludeExlcude="true"
+                      :hideCopyValue="false"
+                      :hideAddSearchTerm="true"
+                    />
+                  </div>
                 </div>
               </template>
               <template #after>
