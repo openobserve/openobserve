@@ -2238,10 +2238,11 @@ export class AlertsPage {
     }
 
     /**
-     * Verify VRL editor content doesn't contain URL-encoded characters
+     * Get VRL editor content and check for URL-encoded characters
+     * Returns the content and validity status - does NOT assert, caller must check
      * @returns {Promise<{valid: boolean, content: string|null}>}
      */
-    async expectVrlEditorNotContainsEncodedChars() {
+    async getVrlEditorEncodingResult() {
         const content = await this.getVrlEditorContent();
         if (content) {
             const hasEncodedChars = content.includes('%2F') || content.includes('%3D') ||
@@ -2253,7 +2254,8 @@ export class AlertsPage {
             }
             return { valid: !hasEncodedChars, content };
         }
-        return { valid: true, content: null }; // Not visible, can't validate
+        testLogger.warn('VRL editor not visible - content is null');
+        return { valid: false, content: null }; // Not visible, return false to signal missing editor
     }
 
     /**

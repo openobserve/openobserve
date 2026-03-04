@@ -238,7 +238,11 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
 
     const createResp = await createAlertWithVrl(page);
     expect(createResp.status).toBe(200);
-    createdAlertId = createResp.data?.alert_id;
+
+    // Fetch alert to get the ID (createAlertWithVrl doesn't return alert_id)
+    const getResp = await getAlertByName(page, ALERT_NAME);
+    expect(getResp.status).toBe(200);
+    createdAlertId = getResp.alertId;
 
     // Navigate to alerts page
     await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
@@ -256,22 +260,21 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     await pm.alertsPage.navigateToAdvancedTab();
 
     // Check VRL editor content using page object
-    const vrlResult = await pm.alertsPage.expectVrlEditorNotContainsEncodedChars();
+    const vrlResult = await pm.alertsPage.getVrlEditorEncodingResult();
 
-    if (vrlResult.content) {
-      // Verify content is readable (not URL-encoded)
-      expect(vrlResult.content).not.toContain('%2F');
-      expect(vrlResult.content).not.toContain('%3D');
-      expect(vrlResult.content).not.toContain('%25');
+    // Fail explicitly if VRL editor is not visible
+    expect(vrlResult.content).toBeTruthy();
 
-      // Should contain our test values
-      expect(vrlResult.content).toContain('test_field');
-      expect(vrlResult.content).toContain('hello world');
+    // Verify content is readable (not URL-encoded)
+    expect(vrlResult.content).not.toContain('%2F');
+    expect(vrlResult.content).not.toContain('%3D');
+    expect(vrlResult.content).not.toContain('%25');
 
-      testLogger.info('VRL displays correctly in UI - not encoded');
-    } else {
-      testLogger.info('VRL editor not visible in Advanced tab - checking other locations');
-    }
+    // Should contain our test values
+    expect(vrlResult.content).toContain('test_field');
+    expect(vrlResult.content).toContain('hello world');
+
+    testLogger.info('VRL displays correctly in UI - not encoded');
 
     // Cleanup
     await cleanup(page, createdAlertId);
@@ -287,7 +290,11 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
 
     const createResp = await createAlertWithVrl(page);
     expect(createResp.status).toBe(200);
-    createdAlertId = createResp.data?.alert_id;
+
+    // Fetch alert to get the ID (createAlertWithVrl doesn't return alert_id)
+    const getResp = await getAlertByName(page, ALERT_NAME);
+    expect(getResp.status).toBe(200);
+    createdAlertId = getResp.alertId;
 
     // Navigate to alerts and edit
     await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
@@ -303,20 +310,18 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     await pm.alertsPage.navigateToAdvancedTab();
 
     // Check that VRL is displayed correctly (not double-encoded in UI)
-    const vrlResult = await pm.alertsPage.expectVrlEditorNotContainsEncodedChars();
+    const vrlResult = await pm.alertsPage.getVrlEditorEncodingResult();
 
-    if (vrlResult.content) {
-      // Verify VRL is NOT URL-encoded in the editor
-      expect(vrlResult.content).not.toContain('%2F');
-      expect(vrlResult.content).not.toContain('%3D');
-      expect(vrlResult.content).not.toContain('%25');
-      expect(vrlResult.content).not.toContain('%22');
+    // Fail explicitly if VRL editor is not visible
+    expect(vrlResult.content).toBeTruthy();
 
-      testLogger.info('VRL displays correctly in edit mode - not double-encoded');
-    } else {
-      // If VRL editor not visible, skip this check - the core API test already passed
-      testLogger.info('VRL editor not visible in edit mode - skipping UI check');
-    }
+    // Verify VRL is NOT URL-encoded in the editor
+    expect(vrlResult.content).not.toContain('%2F');
+    expect(vrlResult.content).not.toContain('%3D');
+    expect(vrlResult.content).not.toContain('%25');
+    expect(vrlResult.content).not.toContain('%22');
+
+    testLogger.info('VRL displays correctly in edit mode - not double-encoded');
 
     // Cleanup
     await cleanup(page, createdAlertId);
