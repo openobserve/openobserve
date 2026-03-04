@@ -25,9 +25,9 @@ use config::utils::{json, str::EMPTY_STRING, time::parse_timestamp_micro_from_va
 use super::{
     attributes::{LangfuseAttributes, O2Attributes},
     extractors::{
-        InputOutputExtractor, MetadataExtractor, ModelExtractor, ParametersExtractor,
-        PromptExtractor, ProviderExtractor, ScopeInfo, ServiceNameExtractor, ToolExtractor,
-        UsageExtractor, map_to_observation_type,
+        EvaluationExtractor, InputOutputExtractor, MetadataExtractor, ModelExtractor,
+        ParametersExtractor, PromptExtractor, ProviderExtractor, ScopeInfo, ServiceNameExtractor,
+        ToolExtractor, UsageExtractor, map_to_observation_type,
     },
     pricing,
 };
@@ -43,6 +43,7 @@ pub struct OtelIngestionProcessor {
     prompt_extractor: PromptExtractor,
     tool_extractor: ToolExtractor,
     service_name_extractor: ServiceNameExtractor,
+    evaluation_extractor: EvaluationExtractor,
 }
 
 impl Default for OtelIngestionProcessor {
@@ -63,6 +64,7 @@ impl OtelIngestionProcessor {
             prompt_extractor: PromptExtractor,
             tool_extractor: ToolExtractor,
             service_name_extractor: ServiceNameExtractor,
+            evaluation_extractor: EvaluationExtractor,
         }
     }
 
@@ -138,6 +140,9 @@ impl OtelIngestionProcessor {
         let tool_call_result = self
             .tool_extractor
             .extract_tool_call_result(span_attributes);
+
+        // Extract evaluation scores (if present)
+        let evaluation = self.evaluation_extractor.extract(span_attributes);
 
         // Now remove all input/output related attributes
         span_attributes
@@ -287,6 +292,66 @@ impl OtelIngestionProcessor {
 
         if let Some(tresult) = tool_call_result {
             span_attributes.insert(O2Attributes::TOOL_CALL_RESULT.to_string(), tresult);
+        }
+
+        // Add evaluation scores and metadata if present
+        if evaluation.has_any() {
+            if let Some(q) = evaluation.scores.quality_score {
+                span_attributes
+                    .insert(O2Attributes::EVALUATION_QUALITY.to_string(), json::json!(q));
+            }
+            if let Some(r) = evaluation.scores.relevance {
+                span_attributes.insert(
+                    O2Attributes::EVALUATION_RELEVANCE.to_string(),
+                    json::json!(r),
+                );
+            }
+            if let Some(c) = evaluation.scores.completeness {
+                span_attributes.insert(
+                    O2Attributes::EVALUATION_COMPLETENESS.to_string(),
+                    json::json!(c),
+                );
+            }
+            if let Some(t) = evaluation.scores.tool_effectiveness {
+                span_attributes.insert(
+                    O2Attributes::EVALUATION_TOOL_EFFECTIVENESS.to_string(),
+                    json::json!(t),
+                );
+            }
+            if let Some(g) = evaluation.scores.groundedness {
+                span_attributes.insert(
+                    O2Attributes::EVALUATION_GROUNDEDNESS.to_string(),
+                    json::json!(g),
+                );
+            }
+            if let Some(s) = evaluation.scores.safety {
+                span_attributes.insert(O2Attributes::EVALUATION_SAFETY.to_string(), json::json!(s));
+            }
+            if let Some(d) = evaluation.scores.duration_ms {
+                span_attributes.insert(
+                    O2Attributes::EVALUATION_DURATION_MS.to_string(),
+                    json::json!(d),
+                );
+            }
+            if let Some(ref commentary) = evaluation.commentary {
+                span_attributes.insert(
+                    O2Attributes::EVALUATION_COMMENTARY.to_string(),
+                    json::json!(commentary),
+                );
+            }
+            if let Some(ref name) = evaluation.evaluator.name {
+                span_attributes.insert(O2Attributes::EVALUATOR_NAME.to_string(), json::json!(name));
+            }
+            if let Some(ref version) = evaluation.evaluator.version {
+                span_attributes.insert(
+                    O2Attributes::EVALUATOR_VERSION.to_string(),
+                    json::json!(version),
+                );
+            }
+            span_attributes.insert(
+                O2Attributes::EVALUATOR_TYPE.to_string(),
+                json::json!(evaluation.evaluator.evaluator_type.as_str()),
+            );
         }
     }
 }
@@ -708,6 +773,78 @@ mod tests {
         assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
         let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
         assert_eq!(cost.get("total").and_then(|v| v.as_f64()), Some(0.0));
+    }
+
+    #[test]
+    fn test_process_span_extracts_evaluation_scores() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert("gen_ai.request.model".to_string(), json::json!("gpt-4"));
+        // Add evaluation attributes (OTEL format)
+        span_attrs.insert(
+            "llm.evaluation.quality_score".to_string(),
+            json::json!(0.85),
+        );
+        span_attrs.insert("llm.evaluation.relevance".to_string(), json::json!(0.9));
+        span_attrs.insert("llm.evaluation.completeness".to_string(), json::json!(0.8));
+        span_attrs.insert(
+            "llm.evaluation.tool_effectiveness".to_string(),
+            json::json!(0.75),
+        );
+        span_attrs.insert("llm.evaluation.groundedness".to_string(), json::json!(0.88));
+        span_attrs.insert("llm.evaluation.safety".to_string(), json::json!(0.95));
+        span_attrs.insert("llm.evaluation.duration_ms".to_string(), json::json!(12.5));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        // Evaluation scores should be enriched with O2 prefix
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_QUALITY)
+                .and_then(|v| v.as_f64()),
+            Some(0.85)
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_RELEVANCE)
+                .and_then(|v| v.as_f64()),
+            Some(0.9)
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_COMPLETENESS)
+                .and_then(|v| v.as_f64()),
+            Some(0.8)
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_TOOL_EFFECTIVENESS)
+                .and_then(|v| v.as_f64()),
+            Some(0.75)
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_GROUNDEDNESS)
+                .and_then(|v| v.as_f64()),
+            Some(0.88)
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_SAFETY)
+                .and_then(|v| v.as_f64()),
+            Some(0.95)
+        );
+        assert_eq!(
+            span_attrs
+                .get(O2Attributes::EVALUATION_DURATION_MS)
+                .and_then(|v| v.as_f64()),
+            Some(12.5)
+        );
     }
 
     #[test]

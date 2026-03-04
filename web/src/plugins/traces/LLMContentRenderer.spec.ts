@@ -104,10 +104,10 @@ describe("LLMContentRenderer", () => {
   describe("Tool Observation Type", () => {
     it("should render tool content with metadata", () => {
       const mockSpan = {
-        _o2_llm_tool_name: "calculator",
-        _o2_llm_tool_call_id: "call-123",
-        _o2_llm_tool_call_arguments: '{"operation": "add", "numbers": [1, 2]}',
-        _o2_llm_tool_call_result: '{"result": 3}',
+        llm_tool_name: "calculator",
+        llm_tool_call_id: "call-123",
+        llm_tool_call_arguments: '{"operation": "add", "numbers": [1, 2]}',
+        llm_tool_call_result: '{"result": 3}',
       };
 
       wrapper = mount(LLMContentRenderer, {
@@ -127,9 +127,9 @@ describe("LLMContentRenderer", () => {
 
     it("should render tool input arguments", () => {
       const mockSpan = {
-        _o2_llm_tool_name: "search",
-        _o2_llm_tool_call_id: "call-456",
-        _o2_llm_tool_call_arguments: '{"query": "test search"}',
+        llm_tool_name: "search",
+        llm_tool_call_id: "call-456",
+        llm_tool_call_arguments: '{"query": "test search"}',
       };
 
       wrapper = mount(LLMContentRenderer, {
@@ -147,9 +147,9 @@ describe("LLMContentRenderer", () => {
 
     it("should render tool output result", () => {
       const mockSpan = {
-        _o2_llm_tool_name: "calculator",
-        _o2_llm_tool_call_id: "call-789",
-        _o2_llm_tool_call_result: '{"answer": 42}',
+        llm_tool_name: "calculator",
+        llm_tool_call_id: "call-789",
+        llm_tool_call_result: '{"answer": 42}',
       };
 
       wrapper = mount(LLMContentRenderer, {
@@ -167,7 +167,7 @@ describe("LLMContentRenderer", () => {
 
     it("should handle tool content with nested structure", () => {
       const mockSpan = {
-        _o2_llm_tool_call_arguments: JSON.stringify({
+        llm_tool_call_arguments: JSON.stringify({
           content: [{ type: "text", text: "Nested text content" }],
         }),
       };
@@ -195,8 +195,8 @@ describe("LLMContentRenderer", () => {
 
     it("should not render when tool content is null", () => {
       const mockSpan = {
-        _o2_llm_tool_name: "test",
-        _o2_llm_tool_call_arguments: "null",
+        llm_tool_name: "test",
+        llm_tool_call_arguments: "null",
       };
 
       wrapper = mount(LLMContentRenderer, {
@@ -579,7 +579,7 @@ describe("LLMContentRenderer", () => {
     });
 
     it("should accept span prop", () => {
-      const mockSpan = { _o2_llm_tool_name: "test" };
+      const mockSpan = { llm_tool_name: "test" };
 
       wrapper = mount(LLMContentRenderer, {
         props: {
