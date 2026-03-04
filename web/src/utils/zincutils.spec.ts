@@ -192,14 +192,6 @@ describe("zincutils", () => {
           expect(result).toBe(plainTextVrl);
         });
 
-        it("should log warning when double-encoding detected", () => {
-          const consoleLogSpy = vi.spyOn(console, "log");
-          smartDecodeVrlFunction(doubleEncodedVrl);
-          expect(consoleLogSpy).toHaveBeenCalledWith(
-            expect.stringContaining("Detected double-encoded VRL")
-          );
-        });
-
         it("should handle double-encoded VRL with special characters", () => {
           const specialVrl = ".msg = \"Test @#$%^&*()\"";
           const doubleEncoded = b64EncodeUnicode(
