@@ -2327,8 +2327,8 @@ export class AlertsPage {
         testLogger.info('All editor contents', { editors: JSON.stringify(allEditorContents) });
 
         // Find VRL content by parent container - fnEditor-dialog is the VRL function dialog
-        // NOTE: This relies on the fnEditor-dialog parent identifier. A dedicated data-test
-        // attribute in the UI would be more reliable, but this is the best heuristic available.
+        // TODO: Request UI team to add data-test="vrl-editor" attribute for reliable selection.
+        // Current heuristic relies on fnEditor-dialog parent ID which may change without notice.
         for (const editor of allEditorContents) {
             if (editor.parent === 'fnEditor-dialog') {
                 testLogger.info('Found VRL content in fnEditor-dialog', { content: editor.text });
@@ -2336,7 +2336,12 @@ export class AlertsPage {
             }
         }
 
-        testLogger.info('VRL editor not visible');
+        // Log detailed info for debugging when VRL editor not found
+        const availableParents = allEditorContents.map(e => e.parent).join(', ');
+        testLogger.warn('VRL editor not found in fnEditor-dialog container', {
+            availableParents: availableParents || 'none',
+            hint: 'UI may have changed - check if fnEditor-dialog container ID still exists'
+        });
         return null;
     }
 

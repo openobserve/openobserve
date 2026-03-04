@@ -73,7 +73,8 @@ async function ensureTemplate(page) {
     isDefault: false
   });
   testLogger.info('Created template', { name: TEMPLATE_NAME, status: resp.status });
-  return resp.status === 200 || resp.status === 409; // 409 = already exists
+  // 200 = created, 400/409 = already exists (API may return either)
+  return resp.status === 200 || resp.status === 400 || resp.status === 409;
 }
 
 async function ensureDestination(page) {
@@ -87,7 +88,8 @@ async function ensureDestination(page) {
     headers: {}
   });
   testLogger.info('Created destination', { name: DESTINATION_NAME, status: resp.status });
-  return resp.status === 200 || resp.status === 409;
+  // 200 = created, 400/409 = already exists (API may return either)
+  return resp.status === 200 || resp.status === 400 || resp.status === 409;
 }
 
 async function createAlertWithVrl(page) {
@@ -134,18 +136,24 @@ async function createAlertWithVrl(page) {
   return resp;
 }
 
-async function getAlertByName(page, alertName) {
+async function getAlertByName(page, alertName, maxRetries = 3) {
   const org = process.env.ORGNAME || 'default';
-  // List alerts and find the one with our name
-  const listResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts?folder=default`);
-  if (listResp.status === 200) {
-    const alerts = listResp.data?.list || listResp.data || [];
-    const alert = alerts.find(a => a.name === alertName);
-    if (alert) {
-      const alertId = alert.id || alert.alert_id;
-      // Fetch full alert details
-      const detailResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts/${alertId}`);
-      return { ...detailResp, alertId };
+  // Retry loop for API propagation delay
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const listResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts?folder=default`);
+    if (listResp.status === 200) {
+      const alerts = listResp.data?.list || listResp.data || [];
+      const alert = alerts.find(a => a.name === alertName);
+      if (alert) {
+        const alertId = alert.id || alert.alert_id;
+        // Fetch full alert details
+        const detailResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts/${alertId}`);
+        return { ...detailResp, alertId };
+      }
+    }
+    if (attempt < maxRetries) {
+      testLogger.info('Alert not found, retrying...', { attempt, alertName });
+      await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
     }
   }
   return { status: 404, data: null };
@@ -178,6 +186,9 @@ async function cleanup(page, alertId) {
 // ============================================================================
 
 test.describe("VRL Encoding Tests @vrl @alerts", () => {
+  // Run tests serially since they share module-level constants (ALERT_NAME, etc.)
+  test.describe.configure({ mode: 'serial' });
+
   let pm;
   let createdAlertId;
   let putCapture; // Track PUT request capture for cleanup
@@ -194,8 +205,8 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
 
     // Setup: Create template, destination, and alert with VRL
     testLogger.info('Setting up test infrastructure...');
-    await ensureTemplate(page);
-    await ensureDestination(page);
+    expect(await ensureTemplate(page)).toBe(true);
+    expect(await ensureDestination(page)).toBe(true);
 
     const createResp = await createAlertWithVrl(page);
     expect(createResp.status).toBe(200);
@@ -237,8 +248,8 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
 
     // Setup
     testLogger.info('Setting up test infrastructure...');
-    await ensureTemplate(page);
-    await ensureDestination(page);
+    expect(await ensureTemplate(page)).toBe(true);
+    expect(await ensureDestination(page)).toBe(true);
 
     const createResp = await createAlertWithVrl(page);
     expect(createResp.status).toBe(200);
@@ -261,7 +272,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     await page.waitForTimeout(2000);
 
     // Navigate to Advanced tab using page object
-    await pm.alertsPage.navigateToAdvancedTab();
+    expect(await pm.alertsPage.navigateToAdvancedTab()).toBe(true);
 
     // Check VRL editor content using page object
     const vrlResult = await pm.alertsPage.getVrlEditorEncodingResult();
@@ -291,8 +302,8 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     test.setTimeout(180000);
 
     // Setup
-    await ensureTemplate(page);
-    await ensureDestination(page);
+    expect(await ensureTemplate(page)).toBe(true);
+    expect(await ensureDestination(page)).toBe(true);
 
     const createResp = await createAlertWithVrl(page);
     expect(createResp.status).toBe(200);
@@ -313,7 +324,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     await page.waitForTimeout(2000);
 
     // Navigate to Advanced tab using page object
-    await pm.alertsPage.navigateToAdvancedTab();
+    expect(await pm.alertsPage.navigateToAdvancedTab()).toBe(true);
 
     // Check that VRL is displayed correctly (not double-encoded in UI)
     const vrlResult = await pm.alertsPage.getVrlEditorEncodingResult();
@@ -340,8 +351,8 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     // This test verifies that if old alerts had plain text VRL (not base64),
     // the system can still handle them
 
-    await ensureTemplate(page);
-    await ensureDestination(page);
+    expect(await ensureTemplate(page)).toBe(true);
+    expect(await ensureDestination(page)).toBe(true);
 
     const org = process.env.ORGNAME || 'default';
     const plainTextAlertName = `e2e_vrl_plaintext_${RUN_ID}`;
@@ -406,11 +417,9 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
       expect([200, 400]).toContain(resp.status);
     }
 
-    // Cleanup
-    if (createdAlertId) {
-      await cleanup(page, createdAlertId);
-      createdAlertId = null;
-    }
+    // Cleanup - always clean up template/destination, even if no alert was created
+    await cleanup(page, createdAlertId);
+    createdAlertId = null;
   });
 
   test("Update alert - verify PUT request encoding @vrl @P1", async ({ page }) => {
@@ -418,8 +427,8 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
 
     // This test captures the actual PUT request to verify VRL encoding
 
-    await ensureTemplate(page);
-    await ensureDestination(page);
+    expect(await ensureTemplate(page)).toBe(true);
+    expect(await ensureDestination(page)).toBe(true);
 
     const createResp = await createAlertWithVrl(page);
     expect(createResp.status).toBe(200);
