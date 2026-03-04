@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="props.errorCount != null"
           data-test="traces-error-count-badge"
-          class="tw:rounded-xl tw:py-[0.125rem] tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit tw:mr-[0.85rem]"
+          class="tw:rounded-xl tw:py-[0.25rem] tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit tw:mr-[0.85rem]"
           style="
             background: rgba(244, 67, 54, 0.12);
             color: var(--q-negative, #c62828);
