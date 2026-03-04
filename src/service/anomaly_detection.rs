@@ -403,28 +403,38 @@ pub async fn detect_anomalies(org_id: &str, config_id: &str) -> Result<serde_jso
             result.anomaly_count
         );
 
-        // Write anomalies to stream
-        if !result.anomalies.is_empty() {
+        // Write all scored points to the _anomalies stream (not just anomalous ones).
+        // This gives the frontend a continuous score timeline so it can plot every bucket
+        // with its score and the threshold line, regardless of whether it was anomalous.
+        if !result.scored_points.is_empty() {
             log::info!(
-                "[anomaly_detection {}] writing {} anomalies to _anomalies stream",
+                "[anomaly_detection {}] writing {} scored points ({} anomalies) to _anomalies stream",
                 config_id,
-                result.anomalies.len()
+                result.scored_points.len(),
+                result.anomaly_count,
             );
-            let anomaly_records: Vec<serde_json::Value> = result
-                .anomalies
+            let records: Vec<serde_json::Value> = result
+                .scored_points
                 .iter()
-                .map(|a| serde_json::to_value(a))
+                .map(|p| serde_json::to_value(p))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            write_anomalies_to_stream(org_id, anomaly_records).await?;
+            write_anomalies_to_stream(org_id, records).await?;
         }
+
+        // Return only the anomalous points in the API response to keep it concise.
+        let anomaly_points: Vec<_> = result
+            .scored_points
+            .iter()
+            .filter(|p| p.is_anomaly)
+            .collect();
 
         Ok(serde_json::json!({
             "message": "Detection completed",
             "config_id": config_id,
             "anomalies_found": result.anomaly_count,
             "points_scored": result.data_points_processed,
-            "anomalies": result.anomalies
+            "anomalies": anomaly_points
         }))
     }
 
