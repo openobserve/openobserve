@@ -2338,9 +2338,10 @@ export class AlertsPage {
 
         // Log detailed info for debugging when VRL editor not found
         const availableParents = allEditorContents.map(e => e.parent).join(', ');
-        testLogger.warn('VRL editor not found in fnEditor-dialog container', {
+        testLogger.error('VRL editor not found - fnEditor-dialog container missing', {
             availableParents: availableParents || 'none',
-            hint: 'UI may have changed - check if fnEditor-dialog container ID still exists'
+            editorCount: allEditorContents.length,
+            hint: 'UI may have changed - check if fnEditor-dialog container ID still exists. Tests using this method should assert content is not null.'
         });
         return null;
     }

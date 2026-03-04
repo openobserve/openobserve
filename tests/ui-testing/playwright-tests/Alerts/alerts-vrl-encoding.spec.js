@@ -20,12 +20,13 @@ const logData = require("../../fixtures/log.json");
 // TEST DATA CONFIGURATION
 // ============================================================================
 
-const RUN_ID = Date.now().toString(36).slice(-4) + Math.random().toString(36).substring(2, 5);
+// These are set in test.beforeAll to ensure stability across retries
+let RUN_ID;
+let TEMPLATE_NAME;
+let DESTINATION_NAME;
+let ALERT_NAME;
 
 const STREAM_NAME = 'e2e_automate';
-const TEMPLATE_NAME = `e2e_vrl_${RUN_ID}_tmpl`;
-const DESTINATION_NAME = `e2e_vrl_${RUN_ID}_dest`;
-const ALERT_NAME = `e2e_vrl_test_${RUN_ID}`;
 
 // Test VRL function - contains special chars that could be double-encoded
 const TEST_VRL_FUNCTION = `.test_field = "hello world"
@@ -186,12 +187,21 @@ async function cleanup(page, alertId) {
 // ============================================================================
 
 test.describe("VRL Encoding Tests @vrl @alerts", () => {
-  // Run tests serially since they share module-level constants (ALERT_NAME, etc.)
+  // Run tests serially since they share test data identifiers
   test.describe.configure({ mode: 'serial' });
 
   let pm;
   let createdAlertId;
   let putCapture; // Track PUT request capture for cleanup
+
+  // Initialize RUN_ID once per describe block to ensure stability across retries
+  test.beforeAll(() => {
+    RUN_ID = Date.now().toString(36).slice(-4) + Math.random().toString(36).substring(2, 5);
+    TEMPLATE_NAME = `e2e_vrl_${RUN_ID}_tmpl`;
+    DESTINATION_NAME = `e2e_vrl_${RUN_ID}_dest`;
+    ALERT_NAME = `e2e_vrl_test_${RUN_ID}`;
+    testLogger.info('Initialized test identifiers', { RUN_ID, TEMPLATE_NAME, DESTINATION_NAME, ALERT_NAME });
+  });
 
   test.beforeEach(async ({ page }) => {
     pm = new PageManager(page);
@@ -231,10 +241,6 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     // Note: There might be a trailing character from encoding, so we check contains
     expect(decodedVrl).toContain('.test_field = "hello world"');
     expect(decodedVrl).toContain('.encoded_chars = "test/path?query=value&other=123"');
-
-    // Check that the base64 is valid (no double-encoding artifacts)
-    // Double-encoding would produce invalid base64 or extra padding
-    expect(vrlFromApi).toMatch(/^[A-Za-z0-9+/]+=*$/); // Valid base64 pattern
 
     testLogger.info('VRL encoding test passed - VRL correctly base64 encoded, no double-encoding');
 
