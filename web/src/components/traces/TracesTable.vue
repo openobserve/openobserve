@@ -54,7 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:px-2 tw:truncate text-caption text-weight-bold tw:select-none"
         :class="[
           getAlignClass(header.column),
-          header.column.columnDef.meta?.sortable ? 'tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-[0.25rem]' : '',
+          header.column.columnDef.meta?.sortable
+            ? 'tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-[0.25rem]'
+            : '',
         ]"
         :style="getColumnStyle(header.column)"
         @click="handleHeaderClick(header.column)"
@@ -105,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="cell in allRows[virtualRow.index].getVisibleCells()"
             :key="cell.id"
-            class="tw:p-2 tw:overflow-hidden"
+            class="tw:p-2 tw:overflow-hidden tw:text-ellipsis"
             :class="getAlignClass(cell.column)"
             :style="getColumnStyle(cell.column)"
           >
@@ -223,7 +225,6 @@ const rowVirtualizer = useVirtualizer(
   })),
 );
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Sort
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,9 +261,10 @@ function getColumnStyle(column: Column<T, unknown>): Record<string, string> {
 
 function getAlignClass(column: Column<T, unknown>): string {
   const a = column.columnDef.meta?.align;
-  if (a === "center") return "text-center";
-  if (a === "right") return "text-right";
-  return "";
+  const colClass = column.columnDef.meta?.class ?? "";
+  if (a === "center") return `${colClass} text-center`;
+  if (a === "right") return `${colClass} text-right`;
+  return colClass;
 }
 </script>
 

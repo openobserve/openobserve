@@ -38,9 +38,14 @@ export function useTracesTableColumns(showLlmColumns: Ref<boolean>) {
         meta: { sortable: true },
       },
       {
-        id: "service_operation",
-        header: "SERVICE & OPERATION",
-        meta: { grow: true, width: 320 },
+        id: "service",
+        header: "SERVICE",
+        meta: { grow: true, width: 180, class:'tw:text-[var(--o2-text-1)]'},
+      },
+      {
+        id: "operation_name",
+        header: "OPERATION NAME",
+        meta: { grow: true, width: 200, class:'tw:text-[var(--o2-text-1)]'},
       },
       {
         id: "duration",
