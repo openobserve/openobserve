@@ -385,27 +385,27 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     testLogger.info('Create with plain text VRL', { status: resp.status, response: JSON.stringify(resp.data) });
 
     if (resp.status === 200) {
+      // Set alertId from create response immediately to ensure cleanup
+      createdAlertId = resp.data?.id;
+
       // If API accepts plain text, verify it's converted to base64 or stored correctly
-      testLogger.info('API accepts plain text VRL (backward compatible)');
+      testLogger.info('API accepts plain text VRL (backward compatible)', { alertId: createdAlertId });
 
       // Fetch and verify
       const getResp = await getAlertByName(page, plainTextAlertName);
-      if (getResp.status === 200) {
-        const vrlFromApi = getResp.data?.query_condition?.vrl_function;
-        testLogger.info('VRL returned from API', { vrl: vrlFromApi });
+      expect(getResp.status).toBe(200);
+      const vrlFromApi = getResp.data?.query_condition?.vrl_function;
+      testLogger.info('VRL returned from API', { vrl: vrlFromApi });
 
-        // Check if it's base64 or plain text
-        const isBase64 = /^[A-Za-z0-9+/]+=*$/.test(vrlFromApi);
-        if (isBase64) {
-          const decoded = Buffer.from(vrlFromApi, 'base64').toString('utf-8');
-          expect(decoded).toContain('plain_text_vrl');
-          testLogger.info('API converted plain text to base64');
-        } else {
-          expect(vrlFromApi).toContain('plain_text_vrl');
-          testLogger.info('API stored as plain text');
-        }
-
-        createdAlertId = getResp.alertId;
+      // Check if it's base64 or plain text
+      const isBase64 = /^[A-Za-z0-9+/]+=*$/.test(vrlFromApi);
+      if (isBase64) {
+        const decoded = Buffer.from(vrlFromApi, 'base64').toString('utf-8');
+        expect(decoded).toContain('plain_text_vrl');
+        testLogger.info('API converted plain text to base64');
+      } else {
+        expect(vrlFromApi).toContain('plain_text_vrl');
+        testLogger.info('API stored as plain text');
       }
     } else if (resp.status === 400 && resp.data?.message?.includes('base64')) {
       // API requires base64 - this is the new format
