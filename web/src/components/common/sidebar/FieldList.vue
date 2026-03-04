@@ -43,18 +43,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ props.row.name }}
                 </div>
                 <div
-                  class="field_overlay"
-                  :style="{
-                    background:
-                      store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
-                  }"
+                  class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
                 >
                   <q-btn
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                    style="margin-right: 0.375rem"
                     size="0.4rem"
-                    class="q-mr-sm"
                     @click.stop="addSearchTerm(`${props.row.name}=''`)"
                     round
                   />
@@ -82,27 +76,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="field_label ellipsis">
                       {{ props.row.name }}
                     </div>
-                    <div v-if="!hideAddSearchTerm" class="field_overlay">
+                    <div
+                      v-if="!hideAddSearchTerm"
+                      class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
+                    >
                       <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
-                        style="margin-right: 0.375rem"
                         size="0.4rem"
-                        class="q-mr-sm"
                         @click.stop="addSearchTerm(`${props.row.name}=''`)"
                         round
                       />
                     </div>
                     <div
                       v-if="!hideCopyValue"
-                      style="background-color: #e8e8e8"
-                      class="field_overlay"
+                      class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
                     >
                       <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-copy-btn`"
                         icon="content_copy"
-                        size="10px"
-                        class="q-mr-sm"
+                        size="0.4rem"
                         @click.stop="copyContentValue(props.row.name)"
                         round
                         flat
