@@ -78,6 +78,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ searchObj.data.histogram.errorMsg }}
             </q-tooltip>
           </div>
+          <!-- Inspect Button -->
+          <q-btn
+            v-if="
+              searchObj.data?.queryResults?.hits?.length > 0 &&
+              searchObj.data.lastSearchTraceId
+            "
+            outline
+            no-caps
+            dense
+            color="primary"
+            icon="troubleshoot"
+            label="Inspect"
+            class="q-ml-md"
+            size="sm"
+            @click="openSearchJobInspector"
+            data-test="logs-inspect-button"
+          >
+            <q-tooltip>
+              Inspect search job execution details
+            </q-tooltip>
+          </q-btn>
           <!-- Volume Analysis Button -->
           <q-btn
             v-if="
@@ -1376,6 +1397,32 @@ export default defineComponent({
       showVolumeAnalysisDashboard.value = false;
     };
 
+    // Search Job Inspector functions
+    const openSearchJobInspector = () => {
+      // Get the last search trace_id
+      const traceId = searchObj.data.lastSearchTraceId;
+
+      if (!traceId) {
+        $q.notify({
+          type: "warning",
+          message: "No trace ID available for inspection",
+          timeout: 2000,
+        });
+        return;
+      }
+
+      // Navigate to the search job inspector page
+      router.push({
+        name: "searchJobInspector",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          trace_id: traceId,
+          start_time: searchObj.data.datetime.startTime,
+          end_time: searchObj.data.datetime.endTime * 10, // Add extra 0 for testing
+        },
+      });
+    };
+
     const resetPlotChart = computed(() => {
       return searchObj.meta.resetPlotChart;
     });
@@ -1536,6 +1583,7 @@ export default defineComponent({
       extractConstantsFromPattern,
       openVolumeAnalysisDashboard,
       closeVolumeAnalysisDashboard,
+      openSearchJobInspector,
       showCorrelation,
       correlationContext,
       correlationDashboardProps,

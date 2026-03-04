@@ -448,6 +448,9 @@ export const logsUtils = () => {
 
     // Add trace ID to the appropriate collection
     targetTraceIds.push(traceId);
+
+    // Store as the last search trace ID for inspection
+    searchObj.data.lastSearchTraceId = traceId;
   };
 
   /**

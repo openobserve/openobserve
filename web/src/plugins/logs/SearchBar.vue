@@ -719,6 +719,24 @@ class="q-pr-sm q-pt-xs" />
                   >
                 </q-item-section>
               </q-item>
+              <q-separator v-if="config.isEnterprise == 'true'" />
+              <q-item
+                data-test="search-inspect-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                @click="openSearchInspectDialog"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label
+                    class="tw:flex tw:items-center tw:gap-2"
+                    data-test="search-inspect-label"
+                  >
+                    <q-icon name="troubleshoot" size="20px" />
+                    Search Inspect
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
             </q-list>
           </q-menu>
           <q-tooltip style="width: 110px">
@@ -1615,6 +1633,51 @@ class="q-pr-sm q-pt-xs" />
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <!-- Search Inspect Dialog -->
+    <q-dialog v-model="searchInspectDialog">
+      <q-card style="width: 500px; max-width: 90vw">
+        <q-card-section>
+          <div class="text-h6">Search Inspect</div>
+        </q-card-section>
+        <q-card-section class="q-pt-none">
+          <div class="text-left q-mb-xs">Trace ID:</div>
+          <q-input
+            v-model="searchInspectTraceId"
+            placeholder="Enter trace ID"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop"
+            stack-label
+            borderless
+            dense
+            autofocus
+            data-test="search-inspect-trace-id-input"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn
+            unelevated
+            no-caps
+            class="q-mr-sm o2-secondary-button"
+            :label="t('confirmDialog.cancel')"
+            v-close-popup
+            @click="searchInspectDialog = false"
+          />
+          <q-btn
+            unelevated
+            no-caps
+            :label="t('confirmDialog.ok')"
+            class="o2-primary-button"
+            :disable="!searchInspectTraceId.trim()"
+            @click="navigateToSearchInspect"
+            v-close-popup
+            data-test="search-inspect-submit-btn"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <ConfirmDialog
       title="Change Query Mode"
       message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
@@ -2261,6 +2324,8 @@ export default defineComponent({
     const confirmSavedViewDialogVisible: boolean = ref(false);
     const searchSchedulerJob = ref(false);
     const autoSearchSchedulerJob = ref(false);
+    const searchInspectDialog = ref(false);
+    const searchInspectTraceId = ref("");
     let confirmCallback;
     let streamName = "";
 
@@ -4599,6 +4664,23 @@ export default defineComponent({
       searchObj.meta.jobRecords = 100;
     };
 
+    const openSearchInspectDialog = () => {
+      searchInspectTraceId.value = "";
+      searchInspectDialog.value = true;
+    };
+
+    const navigateToSearchInspect = () => {
+      const traceId = searchInspectTraceId.value.trim();
+      if (!traceId) return;
+      router.push({
+        name: "searchJobInspector",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          trace_id: traceId,
+        },
+      });
+    };
+
     const checkQuery = (query) => {
       const jobQuery = router.currentRoute.value.query.query;
       if (jobQuery == b64EncodeUnicode(query)) {
@@ -4812,6 +4894,10 @@ export default defineComponent({
       addJobScheduler,
       routeToSearchSchedule,
       createScheduleJob,
+      searchInspectDialog,
+      searchInspectTraceId,
+      openSearchInspectDialog,
+      navigateToSearchInspect,
       searchTerm,
       filteredActionOptions,
       filteredFunctionOptions,

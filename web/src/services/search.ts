@@ -493,6 +493,17 @@ const search = {
 
     return http({ headers: { traceparent } }).get(url);
   },
+  get_search_profile: (
+    org_identifier: string,
+    trace_id: string,
+    start_time?: number,
+    end_time?: number,
+  ) => {
+    let url = `/api/${org_identifier}/search/profile?trace_id=${trace_id}`;
+    if (start_time) url += `&start_time=${start_time}`;
+    if (end_time) url += `&end_time=${end_time}`;
+    return http().get(url);
+  },
 };
 
 export default search;
