@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="name"
         :filter="filterFieldValue"
         :filter-method="filterFieldFn"
-        :pagination="{ rowsPerPage: 10000 }"
+        v-model:pagination="pagination"
+        :rows-per-page-options="[]"
         hide-header
-        hide-bottom
-        class="traces-field-table tw:h-full!"
+        class="traces-field-table tw:h-full"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
@@ -160,13 +160,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
         </template>
+
+        <template #pagination="scope">
+          <div v-if="scope.pagesNumber > 1" class="field-list-pagination">
+            <q-tooltip
+              anchor="center left"
+              self="center right"
+              max-width="18.75rem"
+              class="text-body2"
+            >
+              Total Fields: {{ filteredFieldsCount }}
+            </q-tooltip>
+            <q-btn
+              icon="fast_rewind"
+              color="primary"
+              flat
+              :disable="scope.isFirstPage"
+              @click="scope.firstPage"
+              class="pagination-nav-btn"
+            />
+            <template v-for="page in visiblePages" :key="page">
+              <q-btn
+                flat
+                :class="[
+                  'pagination-page-btn',
+                  scope.pagination.page === page
+                    ? 'pagination-page-active'
+                    : '',
+                ]"
+                @click="setPage(page)"
+                >{{ page }}</q-btn
+              >
+            </template>
+            <q-btn
+              icon="fast_forward"
+              color="primary"
+              flat
+              :disable="scope.isLastPage"
+              @click="scope.lastPage"
+              class="pagination-nav-btn"
+            />
+          </div>
+        </template>
       </q-table>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, type Ref } from "vue";
+import { computed, defineComponent, ref, watch, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -222,6 +264,15 @@ export default defineComponent({
     const $q = useQuasar();
 
     const expandedRows: Ref<Record<string, boolean>> = ref({});
+
+    // Table pagination
+    const pagination = ref({ page: 1, rowsPerPage: 50 });
+
+    // Reset to first page whenever the search filter changes
+    watch(filterFieldValue, () => {
+      pagination.value.page = 1;
+    });
+
     // Per-field pagination state
     const currentFrom: Ref<Record<string, number>> = ref({});
     const currentKeyword: Ref<Record<string, string>> = ref({});
@@ -229,6 +280,34 @@ export default defineComponent({
     const defaultValuesCount = computed(
       () => store.state.zoConfig?.query_values_default_num || 10,
     );
+
+    const filteredFieldsCount = computed(() => {
+      if (!filterFieldValue.value) return (props.fields as any[]).length;
+      return filterFieldFn(props.fields as any[], filterFieldValue.value)
+        .length;
+    });
+
+    const visiblePages = computed(() => {
+      const pages: number[] = [];
+      const page = pagination.value.page;
+      const total = Math.max(
+        1,
+        Math.ceil(filteredFieldsCount.value / pagination.value.rowsPerPage),
+      );
+      if (total <= 3) {
+        for (let i = 1; i <= total; i++) pages.push(i);
+      } else {
+        let start = Math.max(1, page - 1);
+        let end = Math.min(total, start + 2);
+        if (end === total) start = Math.max(1, end - 2);
+        for (let i = start; i <= end; i++) pages.push(i);
+      }
+      return pages;
+    });
+
+    const setPage = (page: number) => {
+      pagination.value.page = page;
+    };
 
     const {
       fieldValues,
@@ -348,16 +427,24 @@ export default defineComponent({
       });
     };
 
+    const isNullValue = (v: string) =>
+      v === null || v === undefined || v === "" || v.toLowerCase() === "null";
+
+    const buildExpression = (fieldName: string, v: string, action: string) =>
+      isNullValue(v)
+        ? action === "include"
+          ? `${fieldName} IS NULL`
+          : `${fieldName} IS NOT NULL`
+        : action === "include"
+          ? `${fieldName}='${v}'`
+          : `${fieldName}!='${v}'`;
+
     const handleAddSearchTerm = (
       fieldName: string,
       value: string,
       action: string,
     ) => {
-      addSearchTerm(
-        action === "include"
-          ? `${fieldName}='${value}'`
-          : `${fieldName}!='${value}'`,
-      );
+      addSearchTerm(buildExpression(fieldName, value, action));
     };
 
     const handleAddMultipleSearchTerms = (
@@ -367,7 +454,7 @@ export default defineComponent({
     ) => {
       const joinOp = action === "include" ? " or " : " and ";
       const expressions = values.map((v) =>
-        action === "include" ? `${fieldName}='${v}'` : `${fieldName}!='${v}'`,
+        buildExpression(fieldName, v, action),
       );
       addSearchTerm(
         expressions.length > 1
@@ -402,6 +489,10 @@ export default defineComponent({
       defaultValuesCount,
       outlinedAdd,
       filterFieldValue,
+      filteredFieldsCount,
+      pagination,
+      visiblePages,
+      setPage,
       handleAddSearchTerm,
       handleAddMultipleSearchTerms,
       handleLoadMoreValues,
@@ -412,6 +503,47 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.traces-field-table {
+  height: calc(100vh - 212px) !important;
+}
+
+.field-list-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.pagination-nav-btn {
+  padding: 0.375rem 0.25rem !important;
+  margin: 0 !important;
+  min-width: 1.5rem !important;
+  width: 1.5rem !important;
+  min-height: 1.375rem !important;
+  height: 1.375rem !important;
+  border-radius: 0.25rem !important;
+  overflow: visible !important;
+}
+
+.pagination-page-btn {
+  padding: 0.375rem 0.25rem !important;
+  margin: 0 !important;
+  min-width: 1.5rem !important;
+  width: 1.5rem !important;
+  min-height: 1.375rem !important;
+  height: 1.375rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--o2-text-primary) !important;
+  border-radius: 0.25rem !important;
+  overflow: visible !important;
+}
+
+.pagination-page-active {
+  background-color: var(--q-primary) !important;
+  color: white !important;
+}
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
