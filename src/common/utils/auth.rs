@@ -378,8 +378,19 @@ impl FromRequest for AuthExtractor {
                     path_columns[2]
                 )
             } else if url_len == 3 {
+                // Special case for /{org_id}/alerts/history - use alert_folders
+                if path_columns[1].eq("alerts") && path_columns[2].eq("history") {
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    }
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS.get("alert_folders").unwrap().key,
+                        path_columns[1] // org_id
+                    )
+                }
                 // Handle /v2 alert apis
-                if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
+                else if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
                     if method.eq("GET") {
                         method = "LIST".to_string();
                     }
@@ -525,17 +536,7 @@ impl FromRequest for AuthExtractor {
                 // Handle /v2 alert apis
                 if path_columns[0].eq(V2_API_PREFIX) {
                     if path_columns[2].eq("alerts") {
-                        // Special case for /v2/{org_id}/alerts/history - use alert_folders
-                        if path_columns[3].eq("history") {
-                            if method.eq("GET") {
-                                method = "LIST".to_string();
-                            }
-                            format!(
-                                "{}:{}",
-                                OFGA_MODELS.get("alert_folders").unwrap().key,
-                                path_columns[1] // org_id
-                            )
-                        } else if method.eq("POST") && path_columns[3].eq("generate_sql") {
+                        if method.eq("POST") && path_columns[3].eq("generate_sql") {
                             format!(
                                 "{}:{}",
                                 OFGA_MODELS
