@@ -19,6 +19,7 @@ vi.mock('@/services/stream', () => ({
 vi.mock('@/utils/zincutils', () => ({
   formatLargeNumber: vi.fn((num) => num.toString()),
   getImageURL: vi.fn(() => 'test-image-url'),
+  useLocalOrganization: vi.fn(),
 }));
 
 // Mock quasar

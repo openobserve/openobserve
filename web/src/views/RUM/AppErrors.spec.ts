@@ -99,6 +99,7 @@ vi.mock("@/services/search", () => ({
 vi.mock("@/utils/zincutils", () => ({
   b64DecodeUnicode: vi.fn((str) => decodeURIComponent(str)),
   b64EncodeUnicode: vi.fn((str) => encodeURIComponent(str)),
+  useLocalOrganization: vi.fn(),
 }));
 
 // Mock async components
