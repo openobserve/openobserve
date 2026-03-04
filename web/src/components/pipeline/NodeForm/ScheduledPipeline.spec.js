@@ -371,7 +371,8 @@ describe("ScheduledPipeline Component", () => {
         replaceRange: vi.fn()
       };
       wrapper.vm.pipelineEditorRef = mockEditorRef;
-      
+      wrapper.vm.tab = "custom";
+
       await wrapper.vm.handleSidebarEvent("click", "field1");
       await nextTick();
       expect(wrapper.vm.cursorPosition).toBe(15);

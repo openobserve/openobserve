@@ -8,13 +8,20 @@
     @before-hide="handleBeforeHide"
   >
     <template v-slot:header>
-      <div class="flex content-center ellipsis full-width field-expansion-header" :title="row.name">
+      <div
+        class="flex content-center ellipsis full-width field-expansion-header"
+        :title="row.name"
+      >
         <div
           class="field_label ellipsis tw:flex tw:items-center"
           style="width: calc(100% - 28px); font-size: 14px"
           :title="row.label || row.name"
         >
-          <span v-if="row.dataType" class="field-type-container" :title="row.dataType">
+          <span
+            v-if="row.dataType"
+            class="field-type-container"
+            :title="row.dataType"
+          >
             <FieldTypeBadge :dataType="row.dataType" />
             <q-icon
               class="field-expand-icon"
@@ -42,7 +49,14 @@
         <FieldValuesPanel
           ref="fieldValuesPanelRef"
           :field-name="row.name"
-          :field-values="fieldValuesState"
+          :field-values="
+            fieldValues[row.name] || {
+              isLoading: false,
+              values: [],
+              hasMore: false,
+              errMsg: '',
+            }
+          "
           :show-multi-select="true"
           :default-values-count="defaultValuesCount"
           :theme="store.state.theme"
@@ -59,13 +73,12 @@
 <script lang="ts" setup>
 import { computed, ref } from "vue";
 import useTraces from "@/composables/useTraces";
-import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
-import useHttpStreaming from "@/composables/useStreamingSearch";
+import useFieldValuesStream from "@/composables/useFieldValuesStream";
 
 const props = defineProps({
   row: {
@@ -76,27 +89,13 @@ const props = defineProps({
 
 const isExpanded = ref(false);
 const fieldValuesPanelRef = ref();
-const allFetchedValues = ref<{ key: string; count: number }[]>([]);
 const currentFrom = ref(0);
 const currentKeyword = ref("");
-const activeTraceId = ref<string | null>(null);
-const fieldValuesState = ref<{
-  isLoading: boolean;
-  values: { key: string; count: number }[];
-  hasMore: boolean;
-  errMsg: string;
-}>({
-  isLoading: false,
-  values: [],
-  hasMore: false,
-  errMsg: "",
-});
 
 const store = useStore();
-const $q = useQuasar();
 const { searchObj } = useTraces();
-const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-  useHttpStreaming();
+const { fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues } =
+  useFieldValuesStream();
 
 const defaultValuesCount = computed(
   () => store.state.zoConfig?.query_values_default_num || 10,
@@ -154,22 +153,10 @@ const buildSql = () => {
   return b64EncodeUnicode(query_context) || "";
 };
 
-const cancelActiveStream = () => {
-  if (activeTraceId.value) {
-    cancelStreamQueryBasedOnRequestId({ trace_id: activeTraceId.value });
-    activeTraceId.value = null;
-  }
-};
-
 const fetchValues = (from: number = 0, keyword: string = "") => {
-  cancelActiveStream();
-
-  const pageSize = defaultValuesCount.value;
-  const { traceId } = generateTraceContext();
-
   const fetchPayload: any = {
     fields: [props.row.name],
-    size: from + pageSize,
+    size: from + defaultValuesCount.value,
     from,
     no_count: false,
     start_time: searchObj.data.datetime.startTime,
@@ -178,92 +165,14 @@ const fetchValues = (from: number = 0, keyword: string = "") => {
     stream_type: "traces",
     sql: buildSql(),
     timeout: 30000,
-    use_cache: (window as any).use_cache ?? true,
+    use_cache: (globalThis as any).use_cache ?? true,
   };
 
   if (keyword) {
     fetchPayload.keyword = keyword;
   }
 
-  const wsPayload = {
-    queryReq: fetchPayload,
-    type: "values" as const,
-    traceId,
-    org_id: store.state.selectedOrganization.identifier,
-    meta: fetchPayload,
-  };
-
-  activeTraceId.value = traceId;
-  fieldValuesState.value.isLoading = true;
-  fieldValuesState.value.errMsg = "";
-
-  fetchQueryDataWithHttpStream(wsPayload, {
-    data: handleStreamResponse,
-    error: handleStreamError,
-    complete: handleStreamComplete,
-    reset: handleStreamReset,
-  });
-};
-
-const handleStreamResponse = (payload: any, response: any) => {
-  if (response.type !== "search_response_hits") return;
-
-  const isAppend = (payload.queryReq.from ?? 0) > 0;
-  const pageSize = defaultValuesCount.value;
-
-  try {
-    const newValues: { key: string; count: number }[] = [];
-
-    if (response.content?.results?.hits?.length) {
-      response.content.results.hits.forEach((item: any) => {
-        item.values?.forEach((subItem: any) => {
-          newValues.push({
-            key: subItem.zo_sql_key ? subItem.zo_sql_key : "null",
-            count: parseInt(subItem.zo_sql_num),
-          });
-        });
-      });
-    }
-
-    if (isAppend) {
-      allFetchedValues.value = [...allFetchedValues.value, ...newValues];
-    } else {
-      allFetchedValues.value = newValues;
-    }
-
-    fieldValuesState.value.values = [...allFetchedValues.value];
-    fieldValuesState.value.hasMore = newValues.length >= pageSize;
-    fieldValuesState.value.isLoading = false;
-  } catch (err) {
-    console.error("Failed to process field values response:", err);
-    fieldValuesState.value.errMsg = "Failed to fetch field values";
-    fieldValuesState.value.isLoading = false;
-  }
-};
-
-const handleStreamError = (payload: any, _err: any) => {
-  fieldValuesState.value.isLoading = false;
-  fieldValuesState.value.errMsg = "Failed to fetch field values";
-  if (payload.traceId === activeTraceId.value) {
-    activeTraceId.value = null;
-  }
-  $q.notify({
-    type: "negative",
-    message: `Error while fetching values for ${props.row.name}`,
-  });
-};
-
-const handleStreamComplete = (payload: any, _traceId: string) => {
-  fieldValuesState.value.isLoading = false;
-  if (payload.traceId === activeTraceId.value) {
-    activeTraceId.value = null;
-  }
-};
-
-const handleStreamReset = (payload: any, _response: any) => {
-  allFetchedValues.value = [];
-  fieldValuesState.value = { isLoading: true, values: [], hasMore: false, errMsg: "" };
-  fetchValues(currentFrom.value, currentKeyword.value);
+  fetchFieldValues(fetchPayload);
 };
 
 const openFilterCreator = (event: any, { ftsKey }: any) => {
@@ -273,18 +182,18 @@ const openFilterCreator = (event: any, { ftsKey }: any) => {
     return;
   }
 
-  allFetchedValues.value = [];
   currentFrom.value = 0;
   currentKeyword.value = "";
-  fieldValuesState.value = { isLoading: true, values: [], hasMore: false, errMsg: "" };
-
+  cancelFieldStream(props.row.name);
+  resetFieldValues(props.row.name, true);
   fetchValues(0, "");
 };
 
 const handleSearchFieldValues = (_fieldName: string, term: string) => {
   currentKeyword.value = term;
   currentFrom.value = 0;
-  allFetchedValues.value = [];
+  cancelFieldStream(props.row.name);
+  resetFieldValues(props.row.name, true);
   fetchValues(0, term);
 };
 
@@ -328,43 +237,15 @@ const handleAddMultipleSearchTerms = (
 };
 
 const handleBeforeHide = () => {
-  cancelActiveStream();
+  cancelFieldStream(props.row.name);
   fieldValuesPanelRef.value?.reset();
-  allFetchedValues.value = [];
   currentFrom.value = 0;
   currentKeyword.value = "";
-  fieldValuesState.value = { isLoading: false, values: [], hasMore: false, errMsg: "" };
+  resetFieldValues(props.row.name);
 };
 </script>
 
 <style lang="scss">
-.field-type-container {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  margin-right: 0.3rem;
-  margin-left: 0.2rem;
-  flex-shrink: 0;
-  vertical-align: middle;
-}
-
-.field-expand-icon {
-  position: absolute;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.field-expansion-header:hover .field-type-badge {
-  opacity: 0;
-}
-
-.field-expansion-header:hover .field-expand-icon {
-  opacity: 1;
-}
-
 .q-expansion-item {
   .field_overlay {
     visibility: hidden;
