@@ -2436,8 +2436,8 @@ export class AlertsPage {
      */
     verifyPutRequestNotDoubleEncoded(capturedRequest) {
         if (!capturedRequest?.body) {
-            testLogger.info('No PUT request body to verify');
-            return true;
+            testLogger.warn('No PUT request body to verify - returning false');
+            return false;  // Return false to fail test when body is missing
         }
         const hasDoubleEncoding = capturedRequest.body.includes('%252F') ||
                                   capturedRequest.body.includes('%253D') ||

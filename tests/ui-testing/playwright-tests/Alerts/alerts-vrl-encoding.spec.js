@@ -397,7 +397,9 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
       testLogger.info('API requires base64 format (new format only)');
       // This is still acceptable - just means no backward compatibility needed
     } else {
-      testLogger.info('Unexpected response', { status: resp.status, data: resp.data });
+      // Fail explicitly on unexpected API responses (e.g., 500 errors)
+      testLogger.error('Unexpected response', { status: resp.status, data: resp.data });
+      expect([200, 400]).toContain(resp.status);
     }
 
     // Cleanup
