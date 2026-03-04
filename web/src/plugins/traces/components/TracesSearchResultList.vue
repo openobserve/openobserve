@@ -153,8 +153,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <TraceTimestampCell :item="item" />
           </template>
 
-          <template #cell-service_operation="{ item }">
+          <template #cell-service="{ item }">
             <TraceServiceCell :item="item" />
+          </template>
+
+          <template #cell-operation_name="{ item }">
+            <span
+              class="text-caption ellipsis tw:text-[var(--o2-text-1)]!"
+              data-test="trace-row-operation-name"
+            >
+              {{ item.operation_name }}
+              <q-tooltip anchor="bottom middle" self="top middle">
+                {{ item.operation_name }}
+              </q-tooltip>
+            </span>
           </template>
 
           <template #cell-duration="{ item }">
