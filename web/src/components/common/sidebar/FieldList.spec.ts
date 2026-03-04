@@ -15,13 +15,64 @@ vi.mock('@/services/stream', () => ({
   },
 }));
 
-// Mock zincutils
-vi.mock('@/utils/zincutils', () => ({
-  formatLargeNumber: vi.fn((num) => num.toString()),
-  getImageURL: vi.fn(() => 'test-image-url'),
-  useLocalOrganization: vi.fn(),
-  useLocalCurrentUser: vi.fn(),
+// Shared mocks accessible in both the vi.mock factory and test callbacks.
+// vi.hoisted ensures they exist before vi.mock factories run.
+const fieldValuesMocks = vi.hoisted(() => ({
+  fetchFieldValues: vi.fn() as any,
+  cancelFieldStream: vi.fn(),
+  // Assigned by the factory once the module is first imported:
+  _setFieldState: null as
+    | ((fieldName: string, patch: Record<string, any>) => void)
+    | null,
+  _reset: null as (() => void) | null,
 }));
+
+// Mock useFieldValuesStream so it bridges to the existing streamService.fieldValues mock.
+vi.mock("@/composables/useFieldValuesStream", async () => {
+  const { ref } = await import("vue");
+  const fieldValuesRef = ref<Record<string, any>>({});
+
+  fieldValuesMocks._reset = () => {
+    fieldValuesRef.value = {};
+  };
+
+  fieldValuesMocks._setFieldState = (fieldName, patch) => {
+    if (fieldValuesRef.value[fieldName]) {
+      fieldValuesRef.value[fieldName] = {
+        ...fieldValuesRef.value[fieldName],
+        ...patch,
+      };
+    }
+  };
+
+  const resetFieldValues = (fieldName: string, isLoading = false) => {
+    fieldValuesRef.value[fieldName] = {
+      values: [],
+      isLoading,
+      hasMore: false,
+      errMsg: "",
+    };
+  };
+
+  return {
+    default: () => ({
+      fieldValues: fieldValuesRef,
+      fetchFieldValues: fieldValuesMocks.fetchFieldValues,
+      cancelFieldStream: fieldValuesMocks.cancelFieldStream,
+      resetFieldValues,
+    }),
+  };
+});
+
+// Mock zincutils
+vi.mock('@/utils/zincutils', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    formatLargeNumber: vi.fn((num) => num.toString()),
+    getImageURL: vi.fn(() => 'test-image-url'),
+  };
+});
 
 // Mock quasar
 vi.mock('quasar', async () => {
@@ -76,11 +127,12 @@ describe('FieldList.vue Comprehensive Coverage', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    
+    fieldValuesMocks._reset?.();
+
     mockStreamService = vi.mocked(streamService.fieldValues);
     mockNotify = vi.fn();
     mockWriteText = vi.fn();
-    
+
     const { useQuasar } = await import('quasar');
     vi.mocked(useQuasar).mockReturnValue({
       notify: mockNotify,
@@ -91,6 +143,37 @@ describe('FieldList.vue Comprehensive Coverage', () => {
         writeText: mockWriteText.mockResolvedValue(undefined),
       },
     });
+
+    // Wire fetchFieldValues to the streamService mock so existing test setup
+    // (mockStreamService.mockResolvedValue / mockRejectedValue) keeps working.
+    fieldValuesMocks.fetchFieldValues.mockImplementation(
+      async (payload: any) => {
+        const fieldName = payload.fields[0];
+        try {
+          const response = await (streamService.fieldValues as any)(payload);
+          const hits = response?.data?.hits ?? [];
+          const values: any[] = [];
+          hits.forEach((hit: any) => {
+            (hit.values ?? []).forEach((v: any) => {
+              values.push({
+                key: v.zo_sql_key != null ? String(v.zo_sql_key) : "null",
+                count: String(v.zo_sql_num),
+              });
+            });
+          });
+          fieldValuesMocks._setFieldState?.(fieldName, {
+            values,
+            isLoading: false,
+          });
+        } catch {
+          fieldValuesMocks._setFieldState?.(fieldName, { isLoading: false });
+          mockNotify?.({
+            type: "negative",
+            message: `Error while fetching values for ${fieldName}`,
+          });
+        }
+      },
+    );
   });
 
   afterEach(() => {
@@ -338,15 +421,16 @@ describe('FieldList.vue Comprehensive Coverage', () => {
 
       await vm.openFilterCreator(mockEvent, { name: 'test_field', ftsKey: false });
 
-      expect(mockStreamService).toHaveBeenCalledWith({
-        org_identifier: 'test-org',
-        stream_name: 'test-stream',
-        start_time: '2023-01-01',
-        end_time: '2023-01-02',
-        fields: ['test_field'],
-        size: 10,
-        type: 'logs',
-      });
+      expect(mockStreamService).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fields: ["test_field"],
+          stream_name: "test-stream",
+          start_time: "2023-01-01",
+          end_time: "2023-01-02",
+          stream_type: "logs",
+          size: 10,
+        }),
+      );
     });
 
     it('should use custom stream name if provided', async () => {
