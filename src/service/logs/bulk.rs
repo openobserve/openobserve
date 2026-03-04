@@ -313,7 +313,6 @@ pub async fn ingest(
             "",
         ])
         .inc();
-
     Ok(bulk_res)
 }
 
