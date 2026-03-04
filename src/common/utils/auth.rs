@@ -570,6 +570,45 @@ impl FromRequest for AuthExtractor {
                             path_columns[1]
                         )
                     }
+                } else if path_columns[1].eq("alerts")
+                    && path_columns[2].eq("deduplication")
+                    && path_columns[3].eq("config")
+                {
+                    // Convert GET to LIST, POST/DELETE to PUT for consistency with other settings
+                    // endpoints
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    } else if method.eq("POST") || method.eq("DELETE") {
+                        method = "PUT".to_string();
+                    }
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("settings")
+                            .map_or("settings", |model| model.key),
+                        path_columns[0]
+                    )
+                }
+                // alerts/deduplication/semantic-groups require settings permissions
+                else if path_columns[1].eq("alerts")
+                    && path_columns[2].eq("deduplication")
+                    && path_columns[3].eq("semantic-groups")
+                {
+                    // Convert GET to LIST, POST to PUT for consistency with other settings
+                    // endpoints
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    } else if method.eq("POST") {
+                        method = "PUT".to_string();
+                    }
+                    // This will be checked as settings:{org_id} with appropriate permission
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("settings")
+                            .map_or("settings", |model| model.key),
+                        path_columns[0]
+                    )
                 }
                 // this is for specific sub-items like specific alert, destination etc.
                 // and sub-items such as schema, stream settings, or enabling/triggering reports
@@ -635,26 +674,6 @@ impl FromRequest for AuthExtractor {
                             .get(path_columns[2])
                             .map_or(path_columns[2], |model| model.key),
                         path_columns[3]
-                    )
-                } else if path_columns[1].eq("alerts")
-                    && path_columns[2].eq("deduplication")
-                    && (path_columns[3].eq("semantic-groups") || path_columns[3].eq("config"))
-                {
-                    // alerts/deduplication/config and semantic-groups require settings permissions
-                    // Convert GET to LIST, POST/DELETE to PUT for consistency with other settings
-                    // endpoints
-                    if method.eq("GET") {
-                        method = "LIST".to_string();
-                    } else if method.eq("POST") || method.eq("DELETE") {
-                        method = "PUT".to_string();
-                    }
-                    // This will be checked as settings:{org_id} with appropriate permission
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get("settings")
-                            .map_or("settings", |model| model.key),
-                        path_columns[0]
                     )
                 } else if method.eq("POST") && path_columns[1].eq("enrichment_tables") {
                     format!(
