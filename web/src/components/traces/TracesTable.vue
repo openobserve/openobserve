@@ -185,8 +185,10 @@ const props = withDefaults(
     sortBy?: string;
     /** Active sort direction */
     sortOrder?: "asc" | "desc";
+    /** Fixed row height in px, used by the virtualizer. Default: 40 */
+    rowHeight?: number;
   }>(),
-  { loading: false },
+  { loading: false, rowHeight: 40 },
 );
 
 const emit = defineEmits<{
@@ -212,15 +214,13 @@ const allRows = computed(() => table.getRowModel().rows);
 // ─────────────────────────────────────────────────────────────────────────────
 // Virtual scroll
 // ─────────────────────────────────────────────────────────────────────────────
-const ROW_HEIGHT = 52; // matches the fixed row height in CSS
-
 const scrollerRef = ref<HTMLElement | null>(null);
 
 const rowVirtualizer = useVirtualizer(
   computed(() => ({
     count: allRows.value.length,
     getScrollElement: () => scrollerRef.value,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => props.rowHeight,
     overscan: 10,
   })),
 );
