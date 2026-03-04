@@ -180,6 +180,7 @@ async function cleanup(page, alertId) {
 test.describe("VRL Encoding Tests @vrl @alerts", () => {
   let pm;
   let createdAlertId;
+  let putCapture; // Track PUT request capture for cleanup
 
   test.beforeEach(async ({ page }) => {
     pm = new PageManager(page);
@@ -423,8 +424,8 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     const getResp = await getAlertByName(page, ALERT_NAME);
     createdAlertId = getResp.alertId;
 
-    // Setup PUT request capture using page object
-    const getCapturedRequest = pm.alertsPage.setupPutRequestCapture();
+    // Setup PUT request capture using page object (returns { getCaptured, dispose })
+    putCapture = pm.alertsPage.setupPutRequestCapture();
 
     // Navigate to alerts and edit
     await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
@@ -446,7 +447,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     expect(submitted).toBe(true);
 
     // Verify PUT request using page object
-    const capturedRequest = getCapturedRequest();
+    const capturedRequest = putCapture.getCaptured();
     expect(capturedRequest).toBeTruthy();
 
     testLogger.info('PUT Request Body (first 500 chars)', {
@@ -466,6 +467,11 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
 
   // Cleanup in case test fails
   test.afterEach(async ({ page }) => {
+    // Dispose PUT request listener if it wasn't already disposed
+    if (putCapture) {
+      putCapture.dispose();
+      putCapture = null;
+    }
     if (createdAlertId) {
       testLogger.info('Cleaning up after test failure...');
       await cleanup(page, createdAlertId);

@@ -2326,10 +2326,12 @@ export class AlertsPage {
         }).catch(() => []);
         testLogger.info('All editor contents', { editors: JSON.stringify(allEditorContents) });
 
-        // If we found VRL content in any editor, try to get it
+        // Return first non-SQL editor content (VRL editors are in fnEditor-dialog)
+        // Avoid hardcoded test-specific strings to keep page object reusable
         for (const editor of allEditorContents) {
-            if (editor.text?.includes('.test_field') || editor.text?.includes('hello world') ||
-                editor.text?.includes('.encoded_chars') || editor.text?.includes('VRL')) {
+            // Skip SQL editors - VRL is typically in fnEditor-dialog
+            if (editor.parent === 'fnEditor-dialog' ||
+                (editor.text?.startsWith('.') && !editor.text?.includes('SELECT'))) {
                 testLogger.info('Found VRL content in editor', { parent: editor.parent, content: editor.text });
                 return editor.text;
             }
@@ -2410,11 +2412,13 @@ export class AlertsPage {
     /**
      * Setup request interception for PUT requests on alerts
      * Uses self-removing listener to prevent memory leaks
-     * @returns {Function} Callback to get captured request
+     * @returns {{getCaptured: Function, dispose: Function}} Object with getCaptured getter and dispose cleanup
      */
     setupPutRequestCapture() {
         let capturedRequest = null;
+        let disposed = false;
         const requestHandler = (request) => {
+            if (disposed) return;
             if (request.method() === 'PUT' && request.url().includes('/alerts/')) {
                 capturedRequest = {
                     url: request.url(),
@@ -2423,10 +2427,20 @@ export class AlertsPage {
                 testLogger.info('Captured PUT request', { url: request.url() });
                 // Remove listener after capturing to prevent accumulation
                 this.page.off('request', requestHandler);
+                disposed = true;
             }
         };
         this.page.on('request', requestHandler);
-        return () => capturedRequest;
+        return {
+            getCaptured: () => capturedRequest,
+            dispose: () => {
+                if (!disposed) {
+                    this.page.off('request', requestHandler);
+                    disposed = true;
+                    testLogger.info('Disposed PUT request listener');
+                }
+            }
+        };
     }
 
     /**
