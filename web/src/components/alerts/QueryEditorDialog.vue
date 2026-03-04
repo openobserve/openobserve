@@ -696,8 +696,7 @@ const updatePromqlQuery = (value: string) => {
 
 const updateVrlFunction = (value: string) => {
   vrlFunctionContent.value = value;
-  const encoded = b64EncodeUnicode(value);
-  emit("update:vrlFunction", encoded);
+  emit("update:vrlFunction", value);
 };
 
 const onBlurQueryEditor = debounce(() => {
