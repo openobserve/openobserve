@@ -323,52 +323,6 @@ export default defineComponent({
 
     // ─── Filter ──────────────────────────────────────────────────────────
 
-    const expandedRows: Ref<Record<string, boolean>> = ref({});
-    // Per-field pagination state
-    const currentFrom: Ref<Record<string, number>> = ref({});
-    const currentKeyword: Ref<Record<string, string>> = ref({});
-
-    const defaultValuesCount = computed(
-      () => store.state.zoConfig?.query_values_default_num || 10,
-    );
-
-    const filteredFieldsCount = computed(() => {
-      if (!filterFieldValue.value) return (props.fields as any[]).length;
-      return filterFieldFn(props.fields as any[], filterFieldValue.value)
-        .length;
-    });
-
-    const visiblePages = computed(() => {
-      const pages: number[] = [];
-      const page = pagination.value.page;
-      const total = Math.max(
-        1,
-        Math.ceil(filteredFieldsCount.value / pagination.value.rowsPerPage),
-      );
-      if (total <= 3) {
-        for (let i = 1; i <= total; i++) pages.push(i);
-      } else {
-        let start = Math.max(1, page - 1);
-        let end = Math.min(total, start + 2);
-        if (end === total) start = Math.max(1, end - 2);
-        for (let i = start; i <= end; i++) pages.push(i);
-      }
-      return pages;
-    });
-
-    const setPage = (page: number) => {
-      pagination.value.page = page;
-    };
-
-    const {
-      fieldValues,
-      fetchFieldValues,
-      cancelFieldStream,
-      resetFieldValues,
-    } = useFieldValuesStream();
-
-    // ─── Filter ──────────────────────────────────────────────────────────
-
     const filterFieldFn = (rows: any, terms: any) => {
       const filtered = [];
       if (terms !== "") {
