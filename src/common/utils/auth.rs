@@ -378,8 +378,19 @@ impl FromRequest for AuthExtractor {
                     path_columns[2]
                 )
             } else if url_len == 3 {
+                // Special case for /{org_id}/alerts/history - use alert_folders
+                if path_columns[1].eq("alerts") && path_columns[2].eq("history") {
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    }
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS.get("alert_folders").unwrap().key,
+                        path_columns[1] // org_id
+                    )
+                }
                 // Handle /v2 alert apis
-                if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
+                else if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
                     if method.eq("GET") {
                         method = "LIST".to_string();
                     }
@@ -525,13 +536,23 @@ impl FromRequest for AuthExtractor {
                 // Handle /v2 alert apis
                 if path_columns[0].eq(V2_API_PREFIX) {
                     if path_columns[2].eq("alerts") {
-                        format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(path_columns[2])
-                                .map_or(path_columns[2], |model| model.key),
-                            path_columns[3]
-                        )
+                        if method.eq("POST") && path_columns[3].eq("generate_sql") {
+                            format!(
+                                "{}:{}",
+                                OFGA_MODELS
+                                    .get(path_columns[2])
+                                    .map_or(path_columns[2], |model| model.key),
+                                path_columns[1]
+                            )
+                        } else {
+                            format!(
+                                "{}:{}",
+                                OFGA_MODELS
+                                    .get(path_columns[2])
+                                    .map_or(path_columns[2], |model| model.key),
+                                path_columns[3]
+                            )
+                        }
                     } else {
                         if method.eq("GET") {
                             method = "LIST".to_string();
@@ -549,6 +570,45 @@ impl FromRequest for AuthExtractor {
                             path_columns[1]
                         )
                     }
+                } else if path_columns[1].eq("alerts")
+                    && path_columns[2].eq("deduplication")
+                    && path_columns[3].eq("config")
+                {
+                    // Convert GET to LIST, POST/DELETE to PUT for consistency with other settings
+                    // endpoints
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    } else if method.eq("POST") || method.eq("DELETE") {
+                        method = "PUT".to_string();
+                    }
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("settings")
+                            .map_or("settings", |model| model.key),
+                        path_columns[0]
+                    )
+                }
+                // alerts/deduplication/semantic-groups require settings permissions
+                else if path_columns[1].eq("alerts")
+                    && path_columns[2].eq("deduplication")
+                    && path_columns[3].eq("semantic-groups")
+                {
+                    // Convert GET to LIST, POST to PUT for consistency with other settings
+                    // endpoints
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    } else if method.eq("POST") {
+                        method = "PUT".to_string();
+                    }
+                    // This will be checked as settings:{org_id} with appropriate permission
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("settings")
+                            .map_or("settings", |model| model.key),
+                        path_columns[0]
+                    )
                 }
                 // this is for specific sub-items like specific alert, destination etc.
                 // and sub-items such as schema, stream settings, or enabling/triggering reports
@@ -636,6 +696,22 @@ impl FromRequest for AuthExtractor {
                         path_columns[2]
                     )
                 }
+            } else if method.eq("POST")
+                && path_columns.get(1) == Some(&"alerts")
+                && path_columns.get(2) == Some(&"deduplication")
+                && path_columns.get(3) == Some(&"semantic-groups")
+            {
+                // POST to semantic-groups/preview-diff (5 parts) requires settings permissions
+                // Convert POST to PUT for consistency with other settings endpoints
+                method = "PUT".to_string();
+                // This will be checked as settings:{org_id} with PUT permission
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get("settings")
+                        .map_or("settings", |model| model.key),
+                    path_columns[0]
+                )
             } else if method.eq("PUT") || method.eq("DELETE") || method.eq("PATCH") {
                 // this block is for all other urls
                 // specifically checking PUT /org_id/streams/stream_name/delete_fields
@@ -669,6 +745,19 @@ impl FromRequest for AuthExtractor {
                             path_columns[4]
                         )
                     }
+                } else if path_columns[0].eq(V2_API_PREFIX)
+                    && path_columns[2].eq("alerts")
+                    && path_columns[url_len - 1].eq("trigger")
+                {
+                    // For v2/default/alerts/3ATPoRfPdc0n1mEcORhMHV4h56n/trigger api to trigger
+                    // destination
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[2])
+                            .map_or(path_columns[2], |model| model.key),
+                        path_columns[3]
+                    )
                 }
                 //  this is specifically for enabling alerts
                 else if path_columns[url_len - 1].eq("enable") {
