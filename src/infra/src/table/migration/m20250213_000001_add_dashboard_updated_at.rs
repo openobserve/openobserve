@@ -35,35 +35,19 @@ impl MigrationTrait for Migration {
 
 // Add the updated_at column to the dashboards table.
 async fn add_updated_at_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Dashboards::Table)
-                    .add_column(
-                        ColumnDef::new(Dashboards::UpdatedAt)
-                            .big_integer()
-                            .not_null()
-                            .default(0),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    } else {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Dashboards::Table)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(Dashboards::UpdatedAt)
-                            .big_integer()
-                            .not_null()
-                            .default(0),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    }
+    manager
+        .alter_table(
+            Table::alter()
+                .table(Dashboards::Table)
+                .add_column_if_not_exists(
+                    ColumnDef::new(Dashboards::UpdatedAt)
+                        .big_integer()
+                        .not_null()
+                        .default(0),
+                )
+                .to_owned(),
+        )
+        .await?;
 
     Ok(())
 }

@@ -23,7 +23,6 @@ use once_cell::sync::Lazy;
 
 use crate::errors::Result;
 
-pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
@@ -31,7 +30,6 @@ static CLIENT: Lazy<Box<dyn PipelineTable>> = Lazy::new(connect);
 
 pub fn connect() -> Box<dyn PipelineTable> {
     match config::get_config().common.meta_store.as_str().into() {
-        MetaStore::MySQL => Box::<mysql::MySqlPipelineTable>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresPipelineTable>::default(),
         _ => Box::<sqlite::SqlitePipelineTable>::default(),
     }

@@ -42,7 +42,7 @@ test.describe("Alerts Import/Export", () => {
 
     // Refresh page to ensure newly created stream appears in dropdowns
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   });
 
   test('Import/Export Alert Functionality', {

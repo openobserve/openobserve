@@ -16,9 +16,9 @@
 /// Migration configuration
 #[derive(Debug, Clone)]
 pub struct MigrationConfig {
-    /// Source database type: sqlite, mysql, postgresql
+    /// Source database type: sqlite, postgresql
     pub from: String,
-    /// Target database type: sqlite, mysql, postgresql
+    /// Target database type: sqlite, postgresql
     pub to: String,
     /// Batch size for each migration batch
     pub batch_size: u64,
@@ -94,18 +94,18 @@ impl MigrationConfig {
 
     /// Validate configuration
     pub fn validate(&self) -> Result<(), anyhow::Error> {
-        let valid_dbs = ["sqlite", "mysql", "postgresql", "postgres"];
+        let valid_dbs = ["sqlite", "postgresql", "postgres"];
 
         if !valid_dbs.contains(&self.from.as_str()) {
             return Err(anyhow::anyhow!(
-                "Invalid source database type: {}. Valid options: sqlite, mysql, postgresql",
+                "Invalid source database type: {}. Valid options: sqlite, postgresql",
                 self.from
             ));
         }
 
         if !valid_dbs.contains(&self.to.as_str()) {
             return Err(anyhow::anyhow!(
-                "Invalid target database type: {}. Valid options: sqlite, mysql, postgresql",
+                "Invalid target database type: {}. Valid options: sqlite, postgresql",
                 self.to
             ));
         }
@@ -150,9 +150,9 @@ mod tests {
 
     #[test]
     fn test_migration_config_new() {
-        let config = MigrationConfig::new("SQLite", "MySQL");
+        let config = MigrationConfig::new("SQLite", "PostgreSQL");
         assert_eq!(config.from, "sqlite");
-        assert_eq!(config.to, "mysql");
+        assert_eq!(config.to, "postgresql");
         assert_eq!(config.batch_size, 1000);
     }
 
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_with_tables_trims_whitespace() {
-        let config = MigrationConfig::new("sqlite", "mysql")
+        let config = MigrationConfig::new("sqlite", "postgresql")
             .with_tables(Some(" users , orders , products ".to_string()));
 
         assert_eq!(
@@ -197,8 +197,8 @@ mod tests {
 
     #[test]
     fn test_with_exclude_trims_whitespace() {
-        let config =
-            MigrationConfig::new("sqlite", "mysql").with_exclude(Some(" logs , temp ".to_string()));
+        let config = MigrationConfig::new("sqlite", "postgresql")
+            .with_exclude(Some(" logs , temp ".to_string()));
 
         assert_eq!(
             config.exclude,
@@ -208,21 +208,21 @@ mod tests {
 
     #[test]
     fn test_with_tables_none() {
-        let config = MigrationConfig::new("sqlite", "mysql").with_tables(None);
+        let config = MigrationConfig::new("sqlite", "postgresql").with_tables(None);
         assert!(config.tables.is_none());
     }
 
     #[test]
     fn test_validate_valid_config() {
-        let config = MigrationConfig::new("sqlite", "mysql");
+        let config = MigrationConfig::new("sqlite", "postgresql");
         assert!(config.validate().is_ok());
     }
 
     #[test]
     fn test_validate_all_valid_db_types() {
         // Test all valid source types
-        for from in &["sqlite", "mysql", "postgresql", "postgres"] {
-            for to in &["sqlite", "mysql", "postgresql", "postgres"] {
+        for from in &["sqlite", "postgresql", "postgres"] {
+            for to in &["sqlite", "postgresql", "postgres"] {
                 if from != to {
                     let config = MigrationConfig::new(from, to);
                     assert!(
@@ -238,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_validate_invalid_source_db() {
-        let config = MigrationConfig::new("invalid", "mysql");
+        let config = MigrationConfig::new("invalid", "postgresql");
         let result = config.validate();
         assert!(result.is_err());
         assert!(
@@ -277,7 +277,7 @@ mod tests {
 
     #[test]
     fn test_validate_incremental_without_since() {
-        let config = MigrationConfig::new("sqlite", "mysql").with_incremental(true, None);
+        let config = MigrationConfig::new("sqlite", "postgresql").with_incremental(true, None);
         let result = config.validate();
         assert!(result.is_err());
         assert!(
@@ -291,13 +291,13 @@ mod tests {
     #[test]
     fn test_validate_incremental_with_since() {
         let config =
-            MigrationConfig::new("sqlite", "mysql").with_incremental(true, Some(1234567890));
+            MigrationConfig::new("sqlite", "postgresql").with_incremental(true, Some(1234567890));
         assert!(config.validate().is_ok());
     }
 
     #[test]
     fn test_validate_zero_batch_size() {
-        let config = MigrationConfig::new("sqlite", "mysql").with_batch_size(0);
+        let config = MigrationConfig::new("sqlite", "postgresql").with_batch_size(0);
         let result = config.validate();
         assert!(result.is_err());
         assert!(
@@ -310,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_validate_non_zero_batch_size() {
-        let config = MigrationConfig::new("sqlite", "mysql").with_batch_size(1);
+        let config = MigrationConfig::new("sqlite", "postgresql").with_batch_size(1);
         assert!(config.validate().is_ok());
     }
 }

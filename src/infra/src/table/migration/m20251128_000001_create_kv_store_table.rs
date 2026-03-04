@@ -83,18 +83,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        let binary_type = super::get_binary_type();
-        collapsed_eq!(
-            &create_table_stmt().to_string(MysqlQueryBuilder),
-            &format!(
-                r#"CREATE TABLE IF NOT EXISTS `kv_store` ( `org_id` varchar(256) NOT NULL, `key` varchar(256) NOT NULL, `value` {} NOT NULL, `created_at` bigint NOT NULL, `updated_at` bigint NOT NULL, PRIMARY KEY (`org_id`, `key`) )"#,
-                binary_type
-            )
-        );
-    }
-
-    #[test]
     fn sqlite() {
         let binary_type = super::get_binary_type();
         collapsed_eq!(

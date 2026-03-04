@@ -279,6 +279,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Index name where data will be written in Elasticsearch
               </template>
             </q-input>
+
+            <!-- StringSeparated Separator field - only shown when output format is stringseparated -->
+            <q-input
+              v-if="formData.output_format === 'stringseparated'"
+              data-test="add-destination-separator-input"
+              v-model="formData.separator"
+              :label="t('alert_destinations.separator') + ' *'"
+              :placeholder="t('alert_destinations.separator_placeholder')"
+              class="no-border showLabelOnTop q-mt-sm"
+              borderless
+              dense
+              flat
+              stack-label
+              :rules="[
+                (val: any) =>
+                  (val !== null && val !== undefined && val !== '') ||
+                  'Separator is required for StringSeparated format',
+              ]"
+              tabindex="0"
+            >
+              <template v-slot:hint>
+                {{ t('alert_destinations.separator_hint') }}
+              </template>
+            </q-input>
           </div>
 
           <!-- Destination-specific Metadata Section -->
@@ -415,6 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:hint> Hostname for Datadog logs </template>
               </q-input>
             </template>
+
           </div>
 
           <div class="q-gutter-sm">
@@ -648,6 +673,7 @@ const outputFormats = [
   { label: "NDJSON", value: "ndjson" },
   { label: "NestedEvent", value: "nestedevent" },
   { label: "ESBulk", value: "esbulk" },
+  { label: "String Separated", value: "stringseparated" },
 ];
 const destinationTypes = [
   {
@@ -710,6 +736,7 @@ const formData: Ref<DestinationData> = ref({
   output_format: "json",
   destination_type: "openobserve",
   esbulk_index: "",
+  separator: "",
 });
 
 // OpenObserve specific fields
@@ -861,13 +888,24 @@ const populateFormForEdit = (destination: any) => {
       formData.value.output_format = "esbulk";
       formData.value.esbulk_index =
         destination.output_format.esbulk.index || "default";
+      formData.value.separator = "";
+    } else if (
+      typeof destination.output_format === "object" &&
+      destination.output_format.stringseparated
+    ) {
+      formData.value.output_format = "stringseparated";
+      formData.value.separator =
+        destination.output_format.stringseparated.separator || "";
+      formData.value.esbulk_index = "";
     } else if (typeof destination.output_format === "string") {
       formData.value.output_format = destination.output_format;
       formData.value.esbulk_index = "";
+      formData.value.separator = "";
     }
   } else {
     formData.value.output_format = "json";
     formData.value.esbulk_index = "";
+    formData.value.separator = "";
   }
 
   // Use destination_type_name from backend, fallback to destination_type or default
@@ -978,9 +1016,9 @@ watch(
   },
 );
 
-const isValidDestination = computed(
-  () => formData.value.name && formData.value.url && formData.value.method,
-);
+const isValidDestination = computed(() => {
+  return !!(formData.value.name && formData.value.url && formData.value.method);
+});
 
 // Default URL endpoints for different destination types (shown as hint)
 const defaultUrlEndpoint = computed(() => {
@@ -1071,6 +1109,15 @@ const canProceedStep2 = computed(() => {
     return !!(
       formData.value.metadata?.ddsource?.trim() &&
       formData.value.metadata?.ddtags?.trim()
+    );
+  }
+
+  // Additional validation for StringSeparated format
+  if (formData.value.output_format === "stringseparated") {
+    return !!(
+      formData.value.separator !== null &&
+      formData.value.separator !== undefined &&
+      formData.value.separator !== ""
     );
   }
 
@@ -1214,17 +1261,28 @@ const createDestination = () => {
     if (header["key"] && header["value"]) headers[header.key] = header.value;
   });
 
-  // Merge URL + URL endpoint for all destination types
+  // Merge URL + URL endpoint
   const fullUrl = formData.value.url + (formData.value.url_endpoint || "");
 
   // Handle output format - for esbulk, format as JSON object with index
+  // For stringseparated, format as JSON object with separator
+  // For all other formats (json, nestedevent, etc.), keep as string
   let outputFormat: any = formData.value.output_format;
-  if (outputFormat === "esbulk" && formData.value.esbulk_index) {
+  if (formData.value.output_format === "esbulk") {
     outputFormat = {
       esbulk: {
         index: formData.value.esbulk_index,
       },
     };
+  } else if (outputFormat === "stringseparated" && formData.value.separator) {
+    outputFormat = {
+      stringseparated: {
+        separator: formData.value.separator,
+      },
+    };
+  } else {
+    // Keep output_format as string for json, nestedevent, and other formats
+    outputFormat = formData.value.output_format;
   }
 
   const payload: any = {
@@ -1334,6 +1392,7 @@ const resetForm = () => {
     output_format: "json",
     destination_type: defaultDestinationType,
     esbulk_index: "",
+    separator: "",
   };
   // Reset OpenObserve specific fields
   openobserveOrg.value = "default";

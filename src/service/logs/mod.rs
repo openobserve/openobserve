@@ -26,7 +26,7 @@ use config::{
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
-        stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
+        stream::{StreamParams, StreamPartition, StreamType},
     },
     metrics,
     utils::{
@@ -38,7 +38,7 @@ use config::{
 };
 use infra::{
     errors::{Error, Result},
-    schema::{SchemaCache, unwrap_partition_time_level},
+    schema::{SchemaCache, get_partition_time_level},
 };
 
 #[cfg(feature = "cloud")]
@@ -331,11 +331,9 @@ async fn write_logs(
     let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
-    let mut partition_time_level = PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str());
+    let partition_time_level = get_partition_time_level(StreamType::Logs);
     if stream_schema.has_partition_keys {
         partition_keys = stream_settings.partition_keys;
-        partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, StreamType::Logs);
     }
 
     // Start get stream alerts

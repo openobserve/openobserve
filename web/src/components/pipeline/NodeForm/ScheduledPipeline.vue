@@ -120,77 +120,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               horizontal
             >
               <template #before>
-                <!-- fieldlist section -->
-                <span
-                  @click.stop="expandState.buildQuery = !expandState.buildQuery"
+                <!-- fieldlist section — flex column so FieldList fills remaining height -->
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    height: 100%;
+                    overflow: hidden;
+                  "
                 >
-                  <FullViewContainer
-                    name="query"
-                    v-model:is-expanded="expandState.buildQuery"
-                    :label="t('pipeline.buildQuery')"
-                    class="tw:mt-1"
-                  />
-                </span>
-                <div class="q-pt-sm" v-show="expandState.buildQuery">
-                  <div>
-                    <q-select
-                      v-model="selectedStreamType"
-                      :options="streamTypes"
-                      option-label="label"
-                      option-value="value"
-                      :label="t('alerts.streamType') + ' *'"
-                      :popup-content-style="{ textTransform: 'lowercase' }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="no-case full-width q-mb-xs o2-custom-select-dashboard"
-                      stack-label
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      borderless
-                      input-debounce="300"
-                      @update:model-value="getStreamList"
+                  <span
+                    @click.stop="
+                      expandState.buildQuery = !expandState.buildQuery
+                    "
+                  >
+                    <FullViewContainer
+                      name="query"
+                      v-model:is-expanded="expandState.buildQuery"
+                      :label="t('pipeline.buildQuery')"
+                      class="tw:mt-1"
                     />
+                  </span>
+                  <div
+                    v-show="expandState.buildQuery"
+                    style="
+                      flex: 1;
+                      min-height: 0;
+                      display: flex;
+                      flex-direction: column;
+                      padding-top: 8px;
+                    "
+                  >
+                    <div style="flex-shrink: 0">
+                      <q-select
+                        v-model="selectedStreamType"
+                        :options="streamTypes"
+                        option-label="label"
+                        option-value="value"
+                        :label="t('alerts.streamType') + ' *'"
+                        :popup-content-style="{ textTransform: 'lowercase' }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="no-case full-width q-mb-xs o2-custom-select-dashboard"
+                        stack-label
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input
+                        borderless
+                        input-debounce="300"
+                        @update:model-value="getStreamList"
+                      />
 
-                    <q-select
-                      v-model="selectedStreamName"
-                      :options="filteredStreams"
-                      option-label="label"
-                      option-value="value"
-                      :label="t('alerts.stream_name')"
-                      :popup-content-style="{ textTransform: 'lowercase' }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-my-xs no-case full-width o2-custom-select-dashboard"
-                      stack-label
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      borderless
-                      input-debounce="300"
-                      @update:model-value="getStreamFields"
-                      @filter="filterStreams"
-                      @popup-show="getStreamList"
-                      map-options
-                      emit-value
-                    />
+                      <q-select
+                        v-model="selectedStreamName"
+                        :options="filteredStreams"
+                        option-label="label"
+                        option-value="value"
+                        :label="t('alerts.stream_name')"
+                        :popup-content-style="{ textTransform: 'lowercase' }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-my-xs no-case full-width o2-custom-select-dashboard"
+                        stack-label
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input
+                        borderless
+                        input-debounce="300"
+                        @update:model-value="getStreamFields"
+                        @filter="filterStreams"
+                        @popup-show="getStreamList"
+                        map-options
+                        emit-value
+                      />
+                    </div>
+
+                    <!-- FieldList grows to fill remaining height and scrolls internally -->
+                    <div
+                      style="flex: 1; min-height: 0; overflow: hidden"
+                      class="pipeline-field-list-wrapper"
+                    >
+                      <FieldList
+                        :fields="streamFields"
+                        :stream-name="selectedStreamName"
+                        :stream-type="selectedStreamType"
+                        @event-emitted="handleSidebarEvent"
+                        :time-stamp="{
+                          startTime: dateTime.startTime,
+                          endTime: dateTime.endTime,
+                        }"
+                        :hideIncludeExlcude="false"
+                        :hideCopyValue="false"
+                        :hideAddSearchTerm="true"
+                      />
+                    </div>
                   </div>
-
-                  <FieldList
-                    :fields="streamFields"
-                    :stream-name="selectedStreamName"
-                    :stream-type="selectedStreamType"
-                    @event-emitted="handleSidebarEvent"
-                    :time-stamp="{
-                      startTime: dateTime.startTime,
-                      endTime: dateTime.endTime,
-                    }"
-                    :hideIncludeExlcude="true"
-                    :hideCopyValue="false"
-                    :hideAddSearchTerm="true"
-                  />
                 </div>
               </template>
               <template #after>
@@ -222,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex justify-start items-center text-bold q-mb-sm q-mt-md o2-input"
                     >
                       <div style="width: 130px">
-                        {{ t('pipeline.trigger') }}
+                        {{ t("pipeline.trigger") }}
                         <q-icon
                           :name="outlinedInfo"
                           size="17px"
@@ -294,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="scheduled-pipeline-aggregation-title"
                         style="width: 172px"
                       >
-                        {{ t('pipeline.aggregation') }}
+                        {{ t("pipeline.aggregation") }}
                       </div>
                       <q-toggle
                         data-test="scheduled-pipeline-aggregation-toggle"
@@ -349,7 +375,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :input-debounce="400"
                                 @filter="filterFields"
                                 :rules="[
-                                  (val: any) => !!val || t('pipeline.fieldRequired'),
+                                  (val: any) =>
+                                    !!val || t('pipeline.fieldRequired'),
                                 ]"
                                 style="width: 200px"
                                 @update:model-value="updateTrigger"
@@ -528,7 +555,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="text-red-8 q-pt-xs absolute"
                             style="font-size: 11px; line-height: 12px"
                           >
-                            {{ t('pipeline.fieldRequired') }}
+                            {{ t("pipeline.fieldRequired") }}
                           </div>
                         </template>
                         <template v-else>
@@ -550,7 +577,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 hide-selected
                                 fill-input
                                 :rules="[
-                                  (val: any) => !!val || t('pipeline.fieldRequired'),
+                                  (val: any) =>
+                                    !!val || t('pipeline.fieldRequired'),
                                 ]"
                                 style="
                                   width: 88px;
@@ -609,7 +637,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="text-red-8 q-pt-xs absolute"
                             style="font-size: 11px; line-height: 12px"
                           >
-                            {{ t('pipeline.fieldRequired') }}
+                            {{ t("pipeline.fieldRequired") }}
                           </div>
                         </template>
                       </div>
@@ -852,7 +880,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-red-8 q-pt-xs"
                           style="font-size: 11px; line-height: 12px"
                         >
-                          {{ cronJobError || t('pipeline.fieldRequired') }}
+                          {{ cronJobError || t("pipeline.fieldRequired") }}
                         </div>
                       </div>
                     </div>
@@ -1049,7 +1077,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               data-test="logs-search-field-list-collapse-btn"
               :icon="collapseFields ? 'chevron_right' : 'chevron_left'"
-              :title="collapseFields ? 'Collapse Fields' : 'Open Fields'"
+              :title="
+                collapseFields
+                  ? t('search.collapseFields')
+                  : t('search.openFields')
+              "
               dense
               size="20px"
               round
@@ -1076,27 +1108,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <FullViewContainer
                       name="query"
                       v-model:is-expanded="expandState.query"
-                      :label="tab === 'sql' ? t('pipeline.sqlQuery') : t('pipeline.promqlQuery')"
+                      :label="
+                        tab === 'sql'
+                          ? t('pipeline.sqlQuery')
+                          : t('pipeline.promqlQuery')
+                      "
                       class="tw:mt-1"
                     />
                   </span>
-                  <query-editor
+                  <UnifiedQueryEditor
                     v-show="expandState.query"
                     data-test="scheduled-pipeline-sql-editor"
                     ref="pipelineEditorRef"
-                    editor-id="pipeline-query-editor"
-                    :debounceTime="300"
-                    class="monaco-editor"
-                    v-model:query="query"
+                    :languages="tab === 'promql' ? ['promql'] : ['sql']"
+                    :default-language="tab === 'promql' ? 'promql' : 'sql'"
+                    :query="query"
+                    :disable-ai="!selectedStreamName"
+                    :disable-ai-reason="t('search.selectStreamForAI')"
                     :class="
                       query == '' && queryEditorPlaceholderFlag
                         ? 'empty-query'
                         : ''
                     "
                     @update:query="updateQueryValue"
-                    @focus="focusQueryEditor"
-                    @blur="onBlurQueryEditor"
-                    style="height: calc(100vh - 190px) !important"
+                    @run-query="runQuery"
+                    editor-height="calc(100vh - 190px)"
                   />
                 </div>
 
@@ -1151,17 +1187,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                    {{ 
-                      notificationMsgValue
-                     }}
+                      {{ notificationMsgValue }}
                     </h6>
                     <h6
                       v-else
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary"
-size="md" />
+                      <q-icon name="info" color="primary" size="md" />
                       {{ t("search.applySearch") }}
                     </h6>
                   </div>
@@ -1180,9 +1213,7 @@ size="md" />
 
               <div
                 class="scheduled-pipeline-footer tw:sticky tw:bottom-0 tw:px-4 tw:py-3 tw:z-10"
-                :class="
-                  store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
-                "
+                :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
               >
                 <div class="flex justify-end">
                   <q-btn
@@ -1210,7 +1241,9 @@ size="md" />
                   <q-btn
                     data-test="stream-routing-query-save-btn"
                     :label="
-                      validatingSqlQuery ? t('pipeline.validating') : t('pipeline.validateAndClose')
+                      validatingSqlQuery
+                        ? t('pipeline.validating')
+                        : t('pipeline.validateAndClose')
                     "
                     class="no-border q-ml-md o2-primary-button tw:h-[36px]"
                     no-caps
@@ -1307,9 +1340,11 @@ import config from "../../../aws-exports";
 import useAiChat from "@/composables/useAiChat";
 import { onBeforeUnmount } from "vue";
 import { debounce } from "lodash-es";
+import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
+import { contextRegistry } from "@/composables/contextProviders";
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
+const UnifiedQueryEditor = defineAsyncComponent(
+  () => import("@/components/QueryEditor.vue"),
 );
 
 const props = defineProps([
@@ -1469,9 +1504,10 @@ const tabOptions = computed(() => [
     label: t("alerts.promql"),
     value: "promql",
     disabled: selectedStreamType.value !== "metrics",
-    tooltipLabel: selectedStreamType.value !== "metrics"
-      ? "Promql is only available for metrics stream type"
-      : "",
+    tooltipLabel:
+      selectedStreamType.value !== "metrics"
+        ? t("pipeline.promqlOnlyForMetrics")
+        : "",
   },
 ]);
 
@@ -1535,7 +1571,7 @@ watch(
         updateQueryValue(query.value);
       }
     }
-  }
+  },
 );
 
 watch(
@@ -1553,12 +1589,59 @@ watch(
   },
 );
 
+// Watch for stream name changes and update context provider
+watch(selectedStreamName, (newStreamName) => {
+  const contextProvider = createPipelinesContextProvider(
+    pipelineObj,
+    store,
+    newStreamName,
+    selectedStreamType.value,
+    tab.value,
+  );
+  contextRegistry.register("pipelines", contextProvider);
+});
+
+// Watch for stream type changes and update context provider
+watch(selectedStreamType, (newStreamType) => {
+  const contextProvider = createPipelinesContextProvider(
+    pipelineObj,
+    store,
+    selectedStreamName.value,
+    newStreamType,
+    tab.value,
+  );
+  contextRegistry.register("pipelines", contextProvider);
+});
+
+// Watch for query type changes and update context provider
+watch(tab, (newTab) => {
+  const contextProvider = createPipelinesContextProvider(
+    pipelineObj,
+    store,
+    selectedStreamName.value,
+    selectedStreamType.value,
+    newTab,
+  );
+  contextRegistry.register("pipelines", contextProvider);
+});
+
 onBeforeMount(async () => {
   await importSqlParser();
 });
 
 onMounted(async () => {
   await getStreamList();
+
+  // Initialize context provider for AI queries
+  const contextProvider = createPipelinesContextProvider(
+    pipelineObj,
+    store,
+    selectedStreamName.value,
+    selectedStreamType.value,
+    tab.value,
+  );
+  contextRegistry.register("pipelines", contextProvider);
+  contextRegistry.setActive("pipelines");
 
   setTimeout(() => {
     if (tab.value === "sql" && query.value != "") {
@@ -1796,7 +1879,7 @@ function convertCronToMinutes(cronExpression: string) {
 
     return diffInMinutes;
   } catch (err) {
-    cronJobError.value = "Invalid cron expression";
+    cronJobError.value = t("pipeline.invalidCronExpression");
     return -1;
   }
 }
@@ -2014,7 +2097,7 @@ const validateInputs = (notify: boolean = true) => {
       notify &&
         q.notify({
           type: "negative",
-          message: "Threshold should not be empty",
+          message: t("pipeline.thresholdShouldNotBeEmpty"),
           timeout: 1500,
         });
       return false;
@@ -2032,7 +2115,7 @@ const validateInputs = (notify: boolean = true) => {
     notify &&
       q.notify({
         type: "negative",
-        message: "Threshold should not be empty",
+        message: t("pipeline.thresholdShouldNotBeEmpty"),
         timeout: 1500,
       });
     return false;
@@ -2058,7 +2141,7 @@ const validateFrequency = () => {
         return;
       }
     } catch (err) {
-      cronJobError.value = "Invalid cron expression";
+      cronJobError.value = t("pipeline.invalidCronExpression");
     }
   }
 
@@ -2174,15 +2257,26 @@ watch(
 
 const handleSidebarEvent = (event: string, value: any) => {
   if (pipelineEditorRef.value) {
-    let cursorIndex = pipelineEditorRef.value?.getCursorIndex();
+    const currentQuery: string = pipelineEditorRef.value.getValue() ?? "";
 
-    // Split the value by '=' and take the first part
-    const insertValue = value.split("=")[0].trim();
+    // For include/exclude expressions in SQL mode, append with WHERE / AND so the
+    // resulting query stays syntactically valid.
+    if (tab.value === "sql" && !value.endsWith("=''")) {
+      const trimmed = currentQuery.trimEnd().replace(/;$/, "").trimEnd();
+      const hasWhere = /\bwhere\b/i.test(trimmed);
+      const connector = trimmed ? (hasWhere ? " AND " : " WHERE ") : "";
+      const newQuery = trimmed + connector + value;
+      pipelineEditorRef.value.setValue(newQuery);
+      cursorPosition.value = newQuery.length - 1;
+      return;
+    }
 
-    // Add spaces before and after the value
+    // For bare field names (add button) or non-SQL modes: insert at cursor.
+    const insertValue = value.endsWith("=''")
+      ? value.split("=")[0].trim()
+      : value;
     const valueToInsert = ` ${insertValue} `;
-    // Get current query value
-    const currentQuery: any = pipelineEditorRef.value.getValue();
+    let cursorIndex = pipelineEditorRef.value?.getCursorIndex();
     if (cursorIndex != -1) {
       cursorPosition.value = cursorIndex;
     } else if (cursorIndex == -1 && cursorPosition.value == -1) {
@@ -2218,13 +2312,15 @@ const runQuery = async () => {
   notificationMsgValue.value = "";
   //check if datetime is present or not
   //else show the error message
-  if(!dateTime.value.startTime) {
-    notificationMsgValue.value = "The selected start time is  invalid. Please choose a valid time.";
+  if (!dateTime.value.startTime) {
+    notificationMsgValue.value =
+      "The selected start time is  invalid. Please choose a valid time.";
     return null;
   }
-  if(!dateTime.value.endTime){
-     notificationMsgValue.value = "The selected end time is  invalid. Please choose a valid time.";
-     return null;
+  if (!dateTime.value.endTime) {
+    notificationMsgValue.value =
+      "The selected end time is  invalid. Please choose a valid time.";
+    return null;
   }
   if (tab.value == "sql") {
     loading.value = true;
@@ -2254,11 +2350,11 @@ const runQuery = async () => {
         }
       })
       .catch((err: any) => {
-        if(err.response?.data){
-          notificationMsgValue.value = err.response?.data?.message || err.response?.data
-        }
-        else {
-          notificationMsgValue.value = "Error while getting results"
+        if (err.response?.data) {
+          notificationMsgValue.value =
+            err.response?.data?.message || err.response?.data;
+        } else {
+          notificationMsgValue.value = t("pipeline.errorGettingResults");
         }
       })
       .finally(() => {
@@ -2465,6 +2561,20 @@ defineExpose({
     overflow: hidden;
   }
 
+  // Propagate 100% height through every level of the FieldList component so the
+  // q-table fills its flex container and can scroll internally instead of
+  // overflowing the splitter pane with the traces-page viewport calculation.
+  .pipeline-field-list-wrapper {
+    .index-menu,
+    .index-table {
+      height: 100%;
+    }
+
+    .traces-field-table {
+      height: 100% !important;
+    }
+  }
+
   .q-table__control {
     width: 100%;
   }
@@ -2535,12 +2645,12 @@ defineExpose({
     }
   }
 }
-.o2-custom-splitter{
-    >.q-splitter__separator {
-      width: 0.625rem; // 10px
-      z-index: 999 !important;
-      height: 100%;
-      background: transparent;
-    }
+.o2-custom-splitter {
+  > .q-splitter__separator {
+    width: 0.625rem; // 10px
+    z-index: 999 !important;
+    height: 100%;
+    background: transparent;
+  }
 }
 </style>

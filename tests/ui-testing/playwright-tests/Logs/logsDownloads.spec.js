@@ -41,19 +41,19 @@ test.describe("Logs Downloads testcases", () => {
     pageManager = new PageManager(page);
 
     // Post-authentication stabilization wait
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Use existing ingestion function from logs page - ingest multiple times to ensure enough data
     testLogger.info('Ingesting data to ensure sufficient records for testing');
     await pageManager.logsPage.ingestLogs(process.env["ORGNAME"], "e2e_automate", logsdata);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Ingest additional data to ensure we have at least 10000 records
     for (let i = 0; i < 5; i++) {
       await pageManager.logsPage.ingestLogs(process.env["ORGNAME"], "e2e_automate", logsdata);
       await page.waitForLoadState('domcontentloaded');
     }
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -127,7 +127,7 @@ test.describe("Logs Downloads testcases", () => {
     await executeDownloadTest('Normal JSON Download', async () => {
       testLogger.debug('🔄 Refreshing for Normal JSON');
       await page.reload();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await setupLogsPage(page);
       await page.waitForTimeout(2000);
 
@@ -157,7 +157,7 @@ test.describe("Logs Downloads testcases", () => {
       await executeDownloadTest(`Custom Range ${range} CSV Download`, async () => {
         testLogger.debug(`🔄 Refreshing for Custom Range ${range} CSV`);
         await page.reload();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await setupLogsPage(page);
         await page.waitForTimeout(2000);
 
@@ -178,7 +178,7 @@ test.describe("Logs Downloads testcases", () => {
       await executeDownloadTest(`Custom Range ${range} JSON Download`, async () => {
         testLogger.debug(`🔄 Refreshing for Custom Range ${range} JSON`);
         await page.reload();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await setupLogsPage(page);
         await page.waitForTimeout(2000);
 
@@ -203,7 +203,7 @@ test.describe("Logs Downloads testcases", () => {
     await executeDownloadTest('SQL Mode LIMIT 2000 CSV Download', async () => {
       testLogger.debug('🔄 Refreshing for SQL Mode CSV');
       await page.reload();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await setupLogsPage(page);
       await setupSQLMode(page);
 
@@ -220,7 +220,7 @@ test.describe("Logs Downloads testcases", () => {
     await executeDownloadTest('SQL Mode LIMIT 2000 JSON Download', async () => {
       testLogger.debug('🔄 Refreshing for SQL Mode JSON');
       await page.reload();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await setupLogsPage(page);
       await setupSQLMode(page);
 

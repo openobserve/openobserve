@@ -323,7 +323,7 @@ pub async fn get_report(Path((org_id, name)): Path<(String, String)>) -> Respons
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a report", "category": "dashboards"}))
+        ("x-o2-mcp" = json!({"description": "Delete a report", "category": "dashboards", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_report(Path((org_id, name)): Path<(String, String)>) -> Response {

@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { Quasar } from "quasar";
+import DOMPurify from "dompurify";
 import HTMLRenderer from "./HTMLRenderer.vue";
 
 // Mock external dependencies
@@ -41,11 +42,16 @@ vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
   }),
 }));
 
-vi.mock("dompurify", () => ({
-  default: {
-    sanitize: vi.fn((content) => content), // Pass through for testing
-  },
-}));
+const addHookSpy = vi.spyOn(DOMPurify, "addHook");
+const sanitizeSpy = vi.spyOn(DOMPurify, "sanitize");
+
+const getAfterSanitizeAttributesHook = () => {
+  const hookCall = addHookSpy.mock.calls.find(
+    ([hookName]) => hookName === "afterSanitizeAttributes",
+  );
+
+  return hookCall ? hookCall[1] : undefined;
+};
 
 describe("HTMLRenderer", () => {
   let wrapper: VueWrapper<any>;
@@ -58,6 +64,16 @@ describe("HTMLRenderer", () => {
       },
     });
   };
+
+  beforeEach(() => {
+    if (typeof (DOMPurify as any).removeAllHooks === "function") {
+      (DOMPurify as any).removeAllHooks();
+    }
+
+    addHookSpy.mockClear();
+    sanitizeSpy.mockClear();
+    vi.clearAllMocks();
+  });
 
   afterEach(() => {
     if (wrapper) {
@@ -296,27 +312,23 @@ describe("HTMLRenderer", () => {
 
   describe("DOMPurify Integration", () => {
     it("should sanitize HTML content using DOMPurify", async () => {
-      const DOMPurify = (await import("dompurify")).default;
-      
       wrapper = createWrapper({
         htmlContent: "<script>alert('xss')</script><p>Safe content</p>"
       });
-      
-      expect(DOMPurify.sanitize).toHaveBeenCalled();
+
+      expect(sanitizeSpy).toHaveBeenCalled();
     });
 
     it("should sanitize content on every render", async () => {
-      const DOMPurify = (await import("dompurify")).default;
-      
       wrapper = createWrapper({
         htmlContent: "<p>Initial</p>"
       });
-      
-      const initialCallCount = DOMPurify.sanitize.mock.calls.length;
+
+      const initialCallCount = sanitizeSpy.mock.calls.length;
       
       await wrapper.setProps({ htmlContent: "<p>Updated</p>" });
-      
-      expect(DOMPurify.sanitize.mock.calls.length).toBeGreaterThan(initialCallCount);
+
+      expect(sanitizeSpy.mock.calls.length).toBeGreaterThan(initialCallCount);
     });
 
     it("should handle DOMPurify sanitization of processed variables", async () => {
@@ -324,9 +336,79 @@ describe("HTMLRenderer", () => {
         htmlContent: "<p>{{content}}</p>",
         variablesData: { content: "<script>alert('test')</script>Safe text" }
       });
-      
-      const DOMPurify = (await import("dompurify")).default;
-      expect(DOMPurify.sanitize).toHaveBeenCalled();
+
+      expect(sanitizeSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("Iframe Support", () => {
+    const createIframeNode = (attrs: Record<string, string>) => {
+      const attributes = new Map(Object.entries(attrs));
+
+      return {
+        nodeName: "IFRAME",
+        getAttribute: (name: string) => attributes.get(name) || null,
+        setAttribute: (name: string, value: string) => {
+          attributes.set(name, value);
+        },
+        removeAttribute: (name: string) => {
+          attributes.delete(name);
+        },
+        get attributes() {
+          return attributes;
+        },
+      };
+    };
+
+    it("should allow iframe tags and attributes through sanitizer", async () => {
+      wrapper = createWrapper({
+        htmlContent: "<iframe src=\"https://example.com\" allowfullscreen></iframe>",
+      });
+
+      expect(sanitizeSpy).toHaveBeenCalledWith(
+        "<iframe src=\"https://example.com\" allowfullscreen></iframe>",
+        expect.objectContaining({
+          ADD_TAGS: ["iframe"],
+          ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "loading", "csp"],
+        })
+      );
+    });
+
+    it("should enforce iframe hook restrictions", () => {
+      wrapper = createWrapper({
+        htmlContent: "<iframe src=\"http://example.com\" srcdoc=\"<p>X</p>\"></iframe>",
+      });
+
+      const afterSanitizeAttributesHook = getAfterSanitizeAttributesHook();
+      expect(afterSanitizeAttributesHook).toBeTypeOf("function");
+
+      const node = createIframeNode({
+        src: "http://example.com",
+        srcdoc: "<p>X</p>",
+      });
+
+      afterSanitizeAttributesHook?.(node);
+
+      expect(node.getAttribute("srcdoc")).toBeNull();
+      expect(node.getAttribute("src")).toBeNull();
+      expect(node.getAttribute("sandbox")).toBe("allow-scripts allow-same-origin");
+    });
+
+    it("should preserve https iframe src", () => {
+      wrapper = createWrapper({
+        htmlContent: "<iframe src=\"https://example.com\"></iframe>",
+      });
+
+      const afterSanitizeAttributesHook = getAfterSanitizeAttributesHook();
+
+      const node = createIframeNode({
+        src: "https://example.com",
+      });
+
+      afterSanitizeAttributesHook?.(node);
+
+      expect(node.getAttribute("src")).toBe("https://example.com");
+      expect(node.getAttribute("sandbox")).toBe("allow-scripts allow-same-origin");
     });
   });
 

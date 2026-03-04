@@ -93,21 +93,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_organizations_table_statement().to_string(MysqlQueryBuilder),
-            r#"
-                CREATE TABLE IF NOT EXISTS `organizations` (
-                `identifier` varchar(256) NOT NULL PRIMARY KEY,
-                `org_name` varchar(200) NOT NULL,
-                `org_type` smallint NOT NULL,
-                `created_at` bigint NOT NULL,
-                `updated_at` bigint NOT NULL
-            )"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         collapsed_eq!(
             &create_organizations_table_statement().to_string(SqliteQueryBuilder),

@@ -125,27 +125,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_re_table_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `re_patterns` ( 
-            `id` varchar(100) NOT NULL PRIMARY KEY, 
-            `org` varchar(100) NOT NULL, 
-            `name` varchar(256) NOT NULL,
-            `description` text NOT NULL,
-            `created_by` varchar(256) NOT NULL,
-            `created_at` bigint NOT NULL, 
-            `updated_at` bigint NOT NULL, 
-            `pattern` text NOT NULL 
-            )"#
-        );
-        assert_eq!(
-            &create_pattern_org_name_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `re_patterns_org_name_idx` ON `re_patterns` (`org`, `name`)"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         collapsed_eq!(
             &create_re_table_statement().to_string(SqliteQueryBuilder),

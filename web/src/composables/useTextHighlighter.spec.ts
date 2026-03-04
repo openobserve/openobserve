@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
+import { escapeHtml } from "@/utils/html";
 
 // Mock Vuex store
 const mockStore = {
@@ -177,26 +178,24 @@ describe("useTextHighlighter", () => {
 
   describe("escapeHtml", () => {
     it("should escape HTML entities", () => {
-      const result = textHighlighter.escapeHtml(
-        '<script>alert("xss")</script>',
-      );
+      const result = escapeHtml('<script>alert("xss")</script>');
       expect(result).toBe(
         "&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;",
       );
     });
 
     it("should escape ampersands", () => {
-      const result = textHighlighter.escapeHtml("Tom & Jerry");
+      const result = escapeHtml("Tom & Jerry");
       expect(result).toBe("Tom &amp; Jerry");
     });
 
     it("should handle empty string", () => {
-      const result = textHighlighter.escapeHtml("");
+      const result = escapeHtml("");
       expect(result).toBe("");
     });
 
     it("should handle string without special characters", () => {
-      const result = textHighlighter.escapeHtml("normal text");
+      const result = escapeHtml("normal text");
       expect(result).toBe("normal text");
     });
   });
@@ -320,71 +319,149 @@ describe("useTextHighlighter", () => {
       const colors = { numberValue: "#f57c00", stringValue: "#047857" };
 
       // Valid 1xx codes
-      expect(textHighlighter.getSingleSemanticColor("100", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("101", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("103", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("100", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("101", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("103", colors)).toBe(
+        "#f57c00",
+      );
 
       // Valid 2xx codes
-      expect(textHighlighter.getSingleSemanticColor("200", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("201", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("204", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("226", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("200", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("201", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("204", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("226", colors)).toBe(
+        "#f57c00",
+      );
 
       // Valid 3xx codes
-      expect(textHighlighter.getSingleSemanticColor("301", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("302", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("304", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("301", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("302", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("304", colors)).toBe(
+        "#f57c00",
+      );
 
       // Valid 4xx codes
-      expect(textHighlighter.getSingleSemanticColor("400", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("401", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("404", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("429", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("451", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("400", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("401", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("404", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("429", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("451", colors)).toBe(
+        "#f57c00",
+      );
 
       // Valid 5xx codes
-      expect(textHighlighter.getSingleSemanticColor("500", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("502", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("503", colors)).toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("511", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("500", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("502", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("503", colors)).toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("511", colors)).toBe(
+        "#f57c00",
+      );
     });
 
     it("should NOT detect invalid 3-digit numbers as status codes", () => {
       // Note: status_code maps to colors.numberValue in getColorForType
       const colors = { numberValue: "#f57c00", stringValue: "#047857" };
 
-      expect(textHighlighter.getSingleSemanticColor("147", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("189", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("256", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("147", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("189", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("256", colors)).not.toBe(
+        "#f57c00",
+      );
 
       // Invalid 1xx codes (only 100-103 are valid)
-      expect(textHighlighter.getSingleSemanticColor("104", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("199", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("104", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("199", colors)).not.toBe(
+        "#f57c00",
+      );
 
       // Invalid 2xx codes
-      expect(textHighlighter.getSingleSemanticColor("209", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("227", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("299", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("209", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("227", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("299", colors)).not.toBe(
+        "#f57c00",
+      );
 
       // Invalid 3xx codes
-      expect(textHighlighter.getSingleSemanticColor("309", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("399", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("309", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("399", colors)).not.toBe(
+        "#f57c00",
+      );
 
       // Invalid 4xx codes
-      expect(textHighlighter.getSingleSemanticColor("432", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("450", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("452", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("499", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("432", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("450", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("452", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("499", colors)).not.toBe(
+        "#f57c00",
+      );
 
       // Invalid 5xx codes
-      expect(textHighlighter.getSingleSemanticColor("512", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("599", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("512", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("599", colors)).not.toBe(
+        "#f57c00",
+      );
 
       // Completely out of range
-      expect(textHighlighter.getSingleSemanticColor("600", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("999", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("000", colors)).not.toBe("#f57c00");
-      expect(textHighlighter.getSingleSemanticColor("099", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("600", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("999", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("000", colors)).not.toBe(
+        "#f57c00",
+      );
+      expect(textHighlighter.getSingleSemanticColor("099", colors)).not.toBe(
+        "#f57c00",
+      );
     });
 
     it("should correctly detect status codes in context (address example)", () => {
@@ -754,7 +831,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should preserve all characters in complex log line", () => {
-      const text = "[90mstderr[2m | src/plugins/logs/QueryEditor.spec.ts[2m > [22m[2mshould mount";
+      const text =
+        "[90mstderr[2m | src/plugins/logs/QueryEditor.spec.ts[2m > [22m[2mshould mount";
       const result = textHighlighter.processTextWithHighlights(
         text,
         "",
@@ -944,7 +1022,8 @@ describe("useTextHighlighter", () => {
     };
 
     it("should handle JSON log entries", () => {
-      const jsonLog = '{"level":"error","message":"Database connection failed","timestamp":"2024-01-15T10:30:45Z"}';
+      const jsonLog =
+        '{"level":"error","message":"Database connection failed","timestamp":"2024-01-15T10:30:45Z"}';
       const result = textHighlighter.processTextWithHighlights(
         jsonLog,
         "match_all('error')",
@@ -958,7 +1037,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle stack trace logs", () => {
-      const stackTrace = "Error: Cannot read property 'foo' of undefined\n    at Object.<anonymous> (/app/src/index.js:42:15)";
+      const stackTrace =
+        "Error: Cannot read property 'foo' of undefined\n    at Object.<anonymous> (/app/src/index.js:42:15)";
       const result = textHighlighter.processTextWithHighlights(
         stackTrace,
         "match_all('Error')",
@@ -971,7 +1051,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle Kubernetes pod logs with timestamps", () => {
-      const k8sLog = "2024-01-15T10:30:45.123Z [INFO] kubernetes.io/pod/my-app-58d7b8c9f4-xz9jk: Started container";
+      const k8sLog =
+        "2024-01-15T10:30:45.123Z [INFO] kubernetes.io/pod/my-app-58d7b8c9f4-xz9jk: Started container";
       const result = textHighlighter.processTextWithHighlights(
         k8sLog,
         "",
@@ -985,7 +1066,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle HTTP access logs with multiple IPs", () => {
-      const accessLog = '192.168.1.1 - - [15/Jan/2024:10:30:45 +0000] "GET /api/v1/users HTTP/1.1" 200 1234 "https://example.com" "Mozilla/5.0"';
+      const accessLog =
+        '192.168.1.1 - - [15/Jan/2024:10:30:45 +0000] "GET /api/v1/users HTTP/1.1" 200 1234 "https://example.com" "Mozilla/5.0"';
       const result = textHighlighter.processTextWithHighlights(
         accessLog,
         "",
@@ -1000,7 +1082,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle Docker container logs with ANSI codes", () => {
-      const dockerLog = "\u001b[36mINFO\u001b[0m [2024-01-15 10:30:45] \u001b[33mWarning:\u001b[0m Disk usage at 85%";
+      const dockerLog =
+        "\u001b[36mINFO\u001b[0m [2024-01-15 10:30:45] \u001b[33mWarning:\u001b[0m Disk usage at 85%";
       const result = textHighlighter.processTextWithHighlights(
         dockerLog,
         "match_all('Warning')",
@@ -1014,7 +1097,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle multiline error logs", () => {
-      const multilineError = "ERROR: Failed to connect to database\nCaused by: Connection timeout\n    at DatabaseConnector.connect (db.js:123)";
+      const multilineError =
+        "ERROR: Failed to connect to database\nCaused by: Connection timeout\n    at DatabaseConnector.connect (db.js:123)";
       const result = textHighlighter.processTextWithHighlights(
         multilineError,
         "match_all('ERROR')",
@@ -1029,7 +1113,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle SQL query logs", () => {
-      const sqlLog = 'Query: SELECT * FROM users WHERE email = "user@example.com" AND status = "active" LIMIT 100';
+      const sqlLog =
+        'Query: SELECT * FROM users WHERE email = "user@example.com" AND status = "active" LIMIT 100';
       const result = textHighlighter.processTextWithHighlights(
         sqlLog,
         "match_all('SELECT')",
@@ -1044,7 +1129,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with mixed URLs and IPs", () => {
-      const mixedLog = "Request from 10.0.0.15 to https://api.example.com/v1/data forwarded to 172.16.0.10";
+      const mixedLog =
+        "Request from 10.0.0.15 to https://api.example.com/v1/data forwarded to 172.16.0.10";
       const result = textHighlighter.processTextWithHighlights(
         mixedLog,
         "",
@@ -1058,7 +1144,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle AWS Lambda logs with request IDs", () => {
-      const lambdaLog = "START RequestId: 8f9e4573-e55e-4d53-8f9e-4573e55e4d53 Version: $LATEST";
+      const lambdaLog =
+        "START RequestId: 8f9e4573-e55e-4d53-8f9e-4573e55e4d53 Version: $LATEST";
       const result = textHighlighter.processTextWithHighlights(
         lambdaLog,
         "match_all('START')",
@@ -1071,7 +1158,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with file paths and line numbers", () => {
-      const fileLog = "Error in /var/log/app/error.log at line 1523: Permission denied for /etc/config/app.conf";
+      const fileLog =
+        "Error in /var/log/app/error.log at line 1523: Permission denied for /etc/config/app.conf";
       const result = textHighlighter.processTextWithHighlights(
         fileLog,
         "match_all('Error')",
@@ -1089,9 +1177,10 @@ describe("useTextHighlighter", () => {
     it("should handle logs with timestamps in different formats", () => {
       const timestampLog1 = "2024-01-15 10:30:45.123 INFO Application started";
       const timestampLog2 = "[15/Jan/2024:10:30:45 +0000] Request completed";
-      const timestampLog3 = "Jan 15 10:30:45 server1 sshd[12345]: Connection established";
+      const timestampLog3 =
+        "Jan 15 10:30:45 server1 sshd[12345]: Connection established";
 
-      [timestampLog1, timestampLog2, timestampLog3].forEach(log => {
+      [timestampLog1, timestampLog2, timestampLog3].forEach((log) => {
         const result = textHighlighter.processTextWithHighlights(
           log,
           "",
@@ -1103,7 +1192,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with special characters and symbols", () => {
-      const symbolLog = "User@123 accessed /api/v1/users?filter=active&sort=desc with token: abc-123_XYZ.456";
+      const symbolLog =
+        "User@123 accessed /api/v1/users?filter=active&sort=desc with token: abc-123_XYZ.456";
       const result = textHighlighter.processTextWithHighlights(
         symbolLog,
         "",
@@ -1116,7 +1206,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with percentage and measurement values", () => {
-      const metricsLog = "CPU: 85.3%, Memory: 4.2GB/8GB, Disk: 123.45MB free, Network: 1.5Mbps";
+      const metricsLog =
+        "CPU: 85.3%, Memory: 4.2GB/8GB, Disk: 123.45MB free, Network: 1.5Mbps";
       const result = textHighlighter.processTextWithHighlights(
         metricsLog,
         "",
@@ -1143,7 +1234,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with IPv6 addresses", () => {
-      const ipv6Log = "Connection from 2001:0db8:85a3:0000:0000:8a2e:0370:7334 to server";
+      const ipv6Log =
+        "Connection from 2001:0db8:85a3:0000:0000:8a2e:0370:7334 to server";
       const result = textHighlighter.processTextWithHighlights(
         ipv6Log,
         "",
@@ -1155,7 +1247,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with environment variables", () => {
-      const envLog = "Starting application with NODE_ENV=production, PORT=8080, DATABASE_URL=postgres://localhost:5432/db";
+      const envLog =
+        "Starting application with NODE_ENV=production, PORT=8080, DATABASE_URL=postgres://localhost:5432/db";
       const result = textHighlighter.processTextWithHighlights(
         envLog,
         "match_all('production')",
@@ -1169,7 +1262,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with Git commit hashes", () => {
-      const gitLog = "Deployed commit 3a5f7b9c2e1d4f6a8b0c9e7d5f3a1b2c4e6f8a0b from branch main";
+      const gitLog =
+        "Deployed commit 3a5f7b9c2e1d4f6a8b0c9e7d5f3a1b2c4e6f8a0b from branch main";
       const result = textHighlighter.processTextWithHighlights(
         gitLog,
         "match_all('Deployed')",
@@ -1183,19 +1277,23 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with base64 encoded data", () => {
-      const base64Log = "Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0 expired";
+      const base64Log =
+        "Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0 expired";
       const result = textHighlighter.processTextWithHighlights(
         base64Log,
         "",
         mockColors,
       );
       expect(result).toContain("Token");
-      expect(result).toContain("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0");
+      expect(result).toContain(
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0",
+      );
       expect(result).toContain("expired");
     });
 
     it("should handle logs with curly brace objects", () => {
-      const braceLog = "Config loaded: {host: 'localhost', port: 3000, debug: true}";
+      const braceLog =
+        "Config loaded: {host: 'localhost', port: 3000, debug: true}";
       const result = textHighlighter.processTextWithHighlights(
         braceLog,
         "",
@@ -1209,7 +1307,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with parentheses in function calls", () => {
-      const funcLog = "Calling processData(userId=123, options={retry: true}) at 10:30:45";
+      const funcLog =
+        "Calling processData(userId=123, options={retry: true}) at 10:30:45";
       const result = textHighlighter.processTextWithHighlights(
         funcLog,
         "match_all('processData')",
@@ -1223,7 +1322,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with tabs and multiple spaces", () => {
-      const tabLog = "Level:\tERROR    Timestamp:\t2024-01-15    Message:\tConnection failed";
+      const tabLog =
+        "Level:\tERROR    Timestamp:\t2024-01-15    Message:\tConnection failed";
       const result = textHighlighter.processTextWithHighlights(
         tabLog,
         "match_all('ERROR')",
@@ -1251,7 +1351,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with escaped characters", () => {
-      const escapedLog = 'Message: "User said: \\"Hello World\\"\\n\\tNext line"';
+      const escapedLog =
+        'Message: "User said: \\"Hello World\\"\\n\\tNext line"';
       const result = textHighlighter.processTextWithHighlights(
         escapedLog,
         "",
@@ -1265,7 +1366,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with GraphQL queries", () => {
-      const graphqlLog = 'Query: { user(id: "123") { name email posts { title } } }';
+      const graphqlLog =
+        'Query: { user(id: "123") { name email posts { title } } }';
       const result = textHighlighter.processTextWithHighlights(
         graphqlLog,
         "match_all('user')",
@@ -1280,7 +1382,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with version numbers", () => {
-      const versionLog = "Application v2.13.5-beta.3 started on Node.js v18.12.0";
+      const versionLog =
+        "Application v2.13.5-beta.3 started on Node.js v18.12.0";
       const result = textHighlighter.processTextWithHighlights(
         versionLog,
         "",
@@ -1306,7 +1409,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with HTTP headers", () => {
-      const headerLog = "Headers: Content-Type: application/json, Authorization: Bearer token123, X-Request-ID: abc-def-ghi";
+      const headerLog =
+        "Headers: Content-Type: application/json, Authorization: Bearer token123, X-Request-ID: abc-def-ghi";
       const result = textHighlighter.processTextWithHighlights(
         headerLog,
         "match_all('Bearer')",
@@ -1321,7 +1425,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with mixed case and camelCase identifiers", () => {
-      const camelLog = "userService.getUserById(userId=123) returned user.firstName='John', user.lastName='Doe'";
+      const camelLog =
+        "userService.getUserById(userId=123) returned user.firstName='John', user.lastName='Doe'";
       const result = textHighlighter.processTextWithHighlights(
         camelLog,
         "match_all('getUserById')",
@@ -1377,7 +1482,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with boolean values", () => {
-      const boolLog = "Config: enabled=true, debug=false, verbose=TRUE, quiet=FALSE";
+      const boolLog =
+        "Config: enabled=true, debug=false, verbose=TRUE, quiet=FALSE";
       const result = textHighlighter.processTextWithHighlights(
         boolLog,
         "match_all('true')",
@@ -1391,7 +1497,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle extremely long single-line logs", () => {
-      const longLog = "Event: " + "data".repeat(500) + " processed successfully";
+      const longLog =
+        "Event: " + "data".repeat(500) + " processed successfully";
       const result = textHighlighter.processTextWithHighlights(
         longLog,
         "match_all('Event')",

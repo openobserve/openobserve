@@ -80,6 +80,16 @@ impl DeduplicationExec {
             Boundedness::Bounded,
         )
     }
+
+    /// Get the deduplication columns
+    pub fn deduplication_columns(&self) -> &[Column] {
+        &self.deduplication_columns
+    }
+
+    /// Get the max rows
+    pub fn max_rows(&self) -> usize {
+        self.max_rows
+    }
 }
 
 impl DisplayAs for DeduplicationExec {

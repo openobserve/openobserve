@@ -61,14 +61,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &delete_meta_folders_stmnt().to_string(MysqlQueryBuilder),
-            r#"DELETE FROM `meta` WHERE `module` = 'folders'"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         assert_eq!(
             &delete_meta_folders_stmnt().to_string(SqliteQueryBuilder),

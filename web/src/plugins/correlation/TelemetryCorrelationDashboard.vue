@@ -153,15 +153,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="loading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner-hourglass
-              color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+            <q-spinner color="primary" size="md" />
+            <div class="tw:text-sm tw:opacity-70">
               {{ t("correlation.loadingLogs") }}
             </div>
           </div>
@@ -182,15 +177,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="article"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noLogsFound") }}</div>
-            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-              {{ t("correlation.service", { service: serviceName }) }}
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+              {{ t("correlation.noLogsFound") }}
+            </div>
+            <div class="tw:text-sm tw:opacity-70">
+              {{ t("correlation.noLogsDescription") }}
             </div>
           </div>
         </q-tab-panel>
@@ -234,15 +225,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="loading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner-hourglass
-              color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+            <q-spinner color="primary" size="md" />
+            <div class="tw:text-sm tw:opacity-70">
               {{
                 t("correlation.loadingMetrics", {
                   count: selectedMetricStreams.length,
@@ -256,21 +242,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="error"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="error_outline"
-              size="3.75rem"
-              color="negative"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base tw:mb-2">
-              {{ t("correlation.failedToLoad") }}
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+              {{ t("correlation.metricsError") }}
             </div>
-            <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
+            <div class="tw:text-sm tw:opacity-70 tw:mb-4">
+              {{ error || t("correlation.metricsErrorDetails") }}
+            </div>
             <q-btn
-              outline
+              flat
               color="primary"
+              icon="refresh"
               :label="t('correlation.retryButton')"
-              class="tw:mt-4"
               @click="loadDashboard"
             />
           </div>
@@ -292,13 +274,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="info_outline"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noMetrics") }}</div>
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+              {{ t("correlation.noMetrics") }}
+            </div>
+            <div class="tw:text-sm tw:opacity-70">
+              {{ t("correlation.noMetricsDescription") }}
+            </div>
           </div>
         </q-tab-panel>
 
@@ -309,14 +290,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="tracesLoading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner-hourglass
-              color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.loadingTraces") }}</div>
+            <q-spinner color="primary" size="md" />
+            <div class="tw:text-sm tw:opacity-70">
+              {{ t("correlation.loadingTraces") }}
+            </div>
           </div>
 
           <!-- Error State -->
@@ -324,21 +303,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="tracesError"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="error_outline"
-              size="3.75rem"
-              color="negative"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base tw:mb-2">
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
               {{ t("correlation.tracesError") }}
             </div>
-            <div class="tw:text-sm tw:text-gray-500">{{ tracesError }}</div>
+            <div class="tw:text-sm tw:opacity-70 tw:mb-4">
+              {{ tracesError || t("correlation.tracesErrorDetails") }}
+            </div>
             <q-btn
-              outline
+              flat
               color="primary"
+              icon="refresh"
               :label="t('correlation.retryButton')"
-              class="tw:mt-4"
               @click="loadCorrelatedTraces"
             />
           </div>
@@ -361,6 +336,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :span-list-prop="traceSpanList"
               :start-time-prop="computedTraceStartTime"
               :end-time-prop="computedTraceEndTime"
+              :correlated-log-stream="
+                logStreams && logStreams[0] ? logStreams[0].stream_name : ''
+              "
               :show-back-button="false"
               :show-timeline="false"
               :show-log-stream-selector="false"
@@ -407,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:text-xs"
                   >
                     <q-tooltip>
-                      {{ t("correlation.viewInTracesTooltip") }}
+                      {{ t("correlation.viewInTraces") }}
                     </q-tooltip>
                   </q-btn>
                   <q-chip dense color="primary" text-color="white">
@@ -417,21 +395,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- Traces List with TraceBlock -->
-            <div
-              class="tw:p-3 tw:overflow-auto"
-              style="max-height: calc(100% - 4rem)"
-            >
-              <div class="tw:space-y-2">
-                <TraceBlock
-                  v-for="(trace, index) in tracesForDimensions"
-                  :key="trace.trace_id"
-                  :item="trace"
-                  :index="index"
-                  @click="openTraceInNewWindow(trace)"
-                  data-test="correlation-trace-block"
-                />
-              </div>
+            <!-- Traces List -->
+            <div style="height: calc(100% - 4rem)">
+              <TracesSearchResultList
+                :hits="tracesForDimensions"
+                :loading="false"
+                :show-header="false"
+                @row-click="openTraceInNewWindow"
+              />
             </div>
           </div>
 
@@ -440,17 +411,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="traceCorrelationMode !== null"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="search_off"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noTracesFound") }}</div>
-            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-              {{
-                t("correlation.noTracesDescription", { service: serviceName })
-              }}
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+              {{ t("correlation.noTracesFound") }}
+            </div>
+            <div class="tw:text-sm tw:opacity-70">
+              {{ t("correlation.noTracesDescription") }}
             </div>
           </div>
 
@@ -459,16 +424,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="account_tree"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
               {{ t("correlation.correlatedTraces") }}
             </div>
-            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
+            <div class="tw:text-sm tw:opacity-70">
               {{
                 t("correlation.correlatedTracesFor", { service: serviceName })
               }}
@@ -498,9 +457,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card
       v-model="activeTab"
       animated
-      class="correlation-content tw:flex-1 tw:overflow-auto"
+      class="correlation-content tw:flex-1"
+      style="display: flex; flex-direction: column; overflow: auto"
     >
-      <div v-if="activeTab == 'logs'" class="tw:p-0">
+      <div
+        v-if="activeTab == 'logs'"
+        style="display: flex; flex-direction: column; flex: 1; min-height: 0"
+      >
         <!-- Refresh Button -->
         <div
           v-if="logsDashboardData"
@@ -521,11 +484,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading State -->
         <div
           v-if="loading"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3"
+          style="flex: 1; min-height: 300px"
         >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
-          <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-          <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+          <q-spinner color="primary" size="md" />
+          <div class="tw:text-sm tw:opacity-70">
             {{ t("correlation.loadingLogs") }}
           </div>
         </div>
@@ -546,15 +509,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
-          <q-icon
-            name="article"
-            size="3.75rem"
-            color="grey-6"
-            class="tw:mb-4"
-          />
-          <div class="tw:text-base">{{ t("correlation.noLogsFound") }}</div>
-          <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-            {{ t("correlation.service", { service: serviceName }) }}
+          <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+            {{ t("correlation.noLogsFound") }}
+          </div>
+          <div class="tw:text-sm tw:opacity-70">
+            {{ t("correlation.noLogsDescription") }}
           </div>
         </div>
       </div>
@@ -593,15 +552,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="loading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner-hourglass
-              color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+            <q-spinner color="primary" size="md" />
+            <div class="tw:text-sm tw:opacity-70">
               {{
                 t("correlation.loadingMetrics", {
                   count: selectedMetricStreams.length,
@@ -615,21 +569,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="error"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="error_outline"
-              size="3.75rem"
-              color="negative"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base tw:mb-2">
-              {{ t("correlation.failedToLoad") }}
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+              {{ t("correlation.metricsError") }}
             </div>
-            <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
+            <div class="tw:text-sm tw:opacity-70 tw:mb-4">
+              {{ error || t("correlation.metricsErrorDetails") }}
+            </div>
             <q-btn
-              outline
+              flat
               color="primary"
+              icon="refresh"
               :label="t('correlation.retryButton')"
-              class="tw:mt-4"
               @click="loadDashboard"
             />
           </div>
@@ -650,13 +600,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon
-              name="info_outline"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noMetrics") }}</div>
+            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+              {{ t("correlation.noMetrics") }}
+            </div>
+            <div class="tw:text-sm tw:opacity-70">
+              {{ t("correlation.noMetricsDescription") }}
+            </div>
           </div>
         </div>
       </div>
@@ -711,6 +660,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :span-list-prop="traceSpanList"
             :start-time-prop="computedTraceStartTime"
             :end-time-prop="computedTraceEndTime"
+            :correlated-log-stream="
+              logStreams && logStreams[0] ? logStreams[0].stream_name : ''
+            "
             :show-back-button="false"
             :show-timeline="false"
             :show-log-stream-selector="false"
@@ -760,28 +712,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-xs"
                 >
                   <q-tooltip>
-                    {{ t("correlation.viewInTracesTooltip") }}
+                    {{ t("correlation.viewInTraces") }}
                   </q-tooltip>
                 </q-btn>
               </div>
             </div>
           </div>
 
-          <!-- Traces List with TraceBlock -->
-          <div
-            class="tw:p-3 tw:overflow-auto"
-            style="max-height: calc(100vh - 11rem)"
-          >
-            <div class="tw:space-y-2">
-              <TraceBlock
-                v-for="(trace, index) in tracesForDimensions"
-                :key="trace.trace_id"
-                :item="trace"
-                :index="index"
-                @click="openTraceInNewWindow(trace)"
-                data-test="correlation-trace-block"
-              />
-            </div>
+          <!-- Traces List -->
+          <div style="height: calc(100vh - 11rem)">
+            <TracesSearchResultList
+              :hits="tracesForDimensions"
+              :loading="false"
+              :show-header="false"
+              @row-click="openTraceInNewWindow"
+            />
           </div>
         </div>
 
@@ -915,7 +860,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
-import TraceBlock from "@/plugins/traces/TraceBlock.vue";
+import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1445,7 +1390,11 @@ const loadDashboard = async () => {
       // selectedMetricStreams.value.forEach(s => {
       //   console.log(`  ${s.stream_name}:`, s.filters);
       // });
-      const dashboard = generateDashboard(selectedMetricStreams.value, config);
+      const dashboard = generateDashboard(
+        selectedMetricStreams.value,
+        config,
+        store.state.theme,
+      );
       dashboardData.value = dashboard;
       dashboardRenderKey.value++;
     } else {
@@ -1534,7 +1483,11 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
         metricSchemas: newSchemas,
       };
 
-      const newDashboard = generateDashboard(streamsNeedingGeneration, config);
+      const newDashboard = generateDashboard(
+        streamsNeedingGeneration,
+        config,
+        store.state.theme,
+      );
       newPanels = newDashboard.tabs[0].panels;
     }
 
@@ -2047,17 +2000,28 @@ const openTraceInNewWindow = (trace) => {
 
   const org = store.state.selectedOrganization.identifier;
   const traceStream = props.traceStreams?.[0]?.stream_name || "default";
+  const logStream = props.logStreams?.[0]?.stream_name;
 
-  // Build the URL with sql_mode and just trace_id filter
+  const queryParams: any = {
+    stream: traceStream,
+    trace_id: targetTraceId,
+    from: trace?.trace_start_time
+      ? trace.trace_start_time - 10000000
+      : props.timeRange.startTime.toString(),
+    to: trace?.trace_end_time
+      ? trace.trace_end_time + 10000000
+      : props.timeRange.endTime.toString(),
+    org_identifier: org,
+  };
+
+  // Add log_stream parameter if available for auto-selection in trace details
+  if (logStream) {
+    queryParams.log_stream = logStream;
+  }
+
   const route = router.resolve({
     name: "traceDetails",
-    query: {
-      stream: traceStream,
-      trace_id: targetTraceId,
-      from: trace.trace_start_time - 10000000,
-      to: trace.trace_end_time + 10000000,
-      org_identifier: org,
-    },
+    query: queryParams,
   });
 
   // Open in new window/tab
@@ -2135,7 +2099,7 @@ const loadCorrelatedTraces = async () => {
       tracesForDimensions.value = await fetchTracesByDimensions();
     }
   } catch (err: any) {
-    tracesError.value = err.message || "Failed to load traces";
+    tracesError.value = err.message || t("correlation.tracesError");
     showErrorNotification(tracesError.value);
   } finally {
     tracesLoading.value = false;

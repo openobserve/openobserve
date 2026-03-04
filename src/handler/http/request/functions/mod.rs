@@ -156,7 +156,7 @@ pub async fn list_functions(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a function", "category": "functions"}))
+        ("x-o2-mcp" = json!({"description": "Delete a function", "category": "functions", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_function(Path((org_id, name)): Path<(String, String)>) -> Response {

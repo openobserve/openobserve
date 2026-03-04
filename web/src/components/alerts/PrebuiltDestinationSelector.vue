@@ -162,9 +162,9 @@ function getIconName(icon: string): string {
   .destination-card {
     position: relative;
     padding: 1.25rem 0.75rem;
-    border: 0.125rem solid #e0e0e0;
+    border: 0.125rem solid var(--o2-border-color);
     border-radius: 0.75rem;
-    background: #ffffff;
+    background: var(--o2-card-bg);
     cursor: pointer;
     transition: all 0.3s ease;
     min-height: 7.5rem;
@@ -174,16 +174,16 @@ function getIconName(icon: string): string {
     &:hover {
       transform: translateY(-0.125rem);
       box-shadow: 0 0.25rem 0.75rem rgba(25, 118, 210, 0.15);
-      border-color: #1976d2;
+      border-color: var(--q-primary);
     }
 
     &.selected {
-      border-color: #1976d2;
-      background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+      border-color: var(--q-primary);
+      background: color-mix(in srgb, var(--q-primary) 10%, var(--o2-card-bg));
       box-shadow: 0 0.25rem 1rem rgba(25, 118, 210, 0.2);
 
       .card-icon {
-        color: #1976d2;
+        color: var(--q-primary);
       }
     }
 
@@ -202,7 +202,7 @@ function getIconName(icon: string): string {
 
     .card-icon {
       margin-bottom: 0.5rem;
-      color: #666;
+      color: var(--o2-icon-color);
 
       .destination-logo {
         width: 1.5rem;
@@ -236,28 +236,10 @@ function getIconName(icon: string): string {
 
     .check-icon {
       position: absolute;
-      bottom: 0.5rem;
-      right: 0.5rem;
+      top: 0.375rem;
+      right: 0.375rem;
     }
   }
 }
 
-// Dark mode adjustments
-body.body--dark {
-  .destination-card {
-    background: #1e1e1e;
-    border-color: #424242;
-
-    &:hover {
-      box-shadow: 0 0.25rem 0.75rem rgba(25, 118, 210, 0.3);
-      border-color: #1976d2;
-    }
-
-    &.selected {
-      border-color: #1976d2;
-      background: linear-gradient(135deg, rgba(25, 118, 210, 0.2) 0%, #1e1e1e 100%);
-      box-shadow: 0 0.25rem 1rem rgba(25, 118, 210, 0.3);
-    }
-  }
-}
 </style>

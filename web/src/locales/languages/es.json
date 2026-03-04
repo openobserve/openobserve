@@ -112,7 +112,13 @@
     "id": "CARNÉ DE IDENTIDAD",
     "getStarted": "Comenzar",
     "reset": "Reiniciar",
-    "retry": "Reintentar"
+    "retry": "Reintentar",
+    "set": "+ Set",
+    "copy": "Copiar",
+    "copySuccess": "Copiado al portapapeles",
+    "copyError": "No se pudo copiar al portapapeles",
+    "goBack": "Regresar",
+    "stopGenerating": "Deja de generar"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -125,7 +131,7 @@
     "source": "Fuente",
     "noResult": "Sin resultados",
     "syntaxGuide": "Guía de sintaxis",
-    "rowsPerPage": "Registros por página",
+    "recordsPerPage": "Registros por página",
     "showing": "Mostrando",
     "of": "de",
     "rowDetail": "Detalles de la fila",
@@ -232,8 +238,10 @@
     "patternColumnHeader": "Patrón",
     "occurrenceColumnHeader": "Ocurrencia",
     "percentageColumnHeader": "Porcentaje",
+    "anomalyColumnHeader": "Anomalía",
     "actionsColumnHeader": "Acciones",
     "anomalyLabel": "ANOMALÍA",
+    "anomalyDetected": "Anomalía detectada",
     "includePatternInSearch": "Incluir patrón en la búsqueda",
     "excludePatternFromSearch": "Excluir patrón de la búsqueda",
     "showPatternDetails": "Mostrar detalles ({variables} variables, {ejemplos} ejemplos)",
@@ -307,7 +315,43 @@
     "show": "Mostrar",
     "editor": "Redactor",
     "webUrlNotConfigured": "La URL compartida está deshabilitada hasta que el administrador configure ZO_WEB_URL.",
-    "showHideColumns": "Mostrar/ocultar columnas"
+    "showHideColumns": "Mostrar/ocultar columnas",
+    "autoRefresh": "Actualización automática",
+    "createSavedView": "Crear vista guardada",
+    "listSavedViews": "Listar vistas guardadas",
+    "buildQuery": "Construir",
+    "enableSqlModeForBuild": "Habilite el modo SQL y seleccione una sola secuencia para usar el generador de consultas",
+    "applyToSearch": "Aplicar a la búsqueda",
+    "complexQueryDetected": "Se detectó una consulta compleja. Uso del modo personalizado.",
+    "searchDimension": "Dimensiones de búsqueda",
+    "nlpModeLabel": "Modo de lenguaje natural",
+    "generateSQL": "Generar SQL",
+    "generateQuery": "Pregúntale a AI",
+    "askAI": "Pregúntale a AI",
+    "generateSQLTooltip": "Generar una consulta SQL desde lenguaje natural (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Pídele a la IA que te ayude con tu consulta",
+    "askAITooltip": "Pídele a la IA que te ayude con tu consulta",
+    "generating": "Generando...",
+    "nlQueryGenerationFailed": "No se pudo generar la consulta. Por favor, inténtelo de nuevo.",
+    "nlQueryGenerationSuccess": "¡Consulta generada correctamente!",
+    "askAIPlaceholder": "Pídele a la IA que te ayude con tu consulta...",
+    "askAIFunctionPlaceholder": "Pídele a la IA que te ayude con tu función...",
+    "enterPrompt": "Introduzca un mensaje para generar una consulta",
+    "enterFunctionPrompt": "Introduzca un mensaje para generar la función",
+    "analyzingQuery": "Analizando la consulta...",
+    "generatingQuery": "Generando consulta...",
+    "queryGeneratedSuccess": "¡Consulta generada correctamente!",
+    "queryGenerationStopped": "Se detuvo la generación de consultas.",
+    "queryGenerationFailed": "No se pudo generar la consulta.",
+    "fetchingResults": "Obteniendo resultados de búsqueda...",
+    "noResultsFound": "No se han encontrado resultados",
+    "errorFetchingResults": "Error al obtener los resultados",
+    "somethingWentWrong": "Algo salió mal",
+    "selectStreamForAI": "Selecciona primero una transmisión para usar la IA",
+    "collapseFields": "Campos colapsados",
+    "openFields": "Campos abiertos",
+    "aiBarSuccessPlaceholder": "¿Qué le gustaría hacer a continuación?",
+    "nlpModeDisabledForVisualization": "El modo de lenguaje natural no se puede deshabilitar durante la visualización con varias transmisiones"
   },
   "menu": {
     "home": "Inicio",
@@ -952,7 +996,10 @@
     "jsType": "JavaScript (ES 2023)",
     "vrlfunction": "Función VRL",
     "jsFunctionHint": "Utilice el objeto `fila` para acceder a los campos de registro y modificarlos. Ejemplo: row.new_field = row.existing_field + 'processed';",
-    "vrlFunctionHint": "Usa el `.` para representar el evento actual. Ejemplo: .new_field = .existing_field + 'procesado'"
+    "vrlFunctionHint": "Usa el `.` para representar el evento actual. Ejemplo: .new_field = .existing_field + 'procesado'",
+    "askAIFunctionPlaceholder": "Pídele a la IA que te ayude con tu función...",
+    "enterFunctionPrompt": "Introduzca un mensaje para generar la función",
+    "jsErrorDetails": "Detalles del error de JavaScript"
   },
   "confirmDialog": {
     "cancel": "Cancelar",
@@ -1403,7 +1450,27 @@
     "noColumnsOrdered": "No hay columnas ordenadas",
     "columnsDefaultOrder": "Las columnas se mostrarán en su orden predeterminado",
     "moveUp": "Muévete hacia arriba",
-    "moveDown": "Muévete hacia abajo"
+    "moveDown": "Muévete hacia abajo",
+    "panelTimeSettings": "Configuración de tiempo del panel",
+    "panelTimeEnabled": "Permitir tiempo a nivel de panel",
+    "useGlobalTime": "Usa la hora global",
+    "useIndividualTime": "Usa el tiempo individual",
+    "panelTimeGlobalHint": "El panel realizará un seguimiento del tiempo global del panel de control. Los cambios en la hora global actualizarán este panel.",
+    "panelTimeIndividualHint": "El panel utilizará su propio intervalo de tiempo. Configure la hora con el selector de fechas que aparece a continuación. Los cambios de hora globales no afectarán a este panel.",
+    "panelTimeRange": "Rango de tiempo del panel",
+    "panelTimeRangeTooltip": "Este intervalo de tiempo solo se aplica a este panel. Otros paneles utilizarán sus propias horas configuradas o la hora global del panel de control.",
+    "panelTimeSettingsTooltip": "Configure la forma en que este panel determina su intervalo de tiempo. Puede usar el intervalo de tiempo del panel de control o establecer uno personalizado para este panel.",
+    "panelTimeMode": "Fuente de rango de tiempo (al cargar el tablero)",
+    "useDefaultTimeTooltip": "Cuando esté activado, este panel utilizará la duración predeterminada configurada como intervalo de tiempo al cargar el panel, en lugar del tiempo global del panel.",
+    "defaultDuration": "Duración predeterminada",
+    "connectNullValuesTooltip": "Conecte los puntos de datos de los valores faltantes con una línea.",
+    "toggleFunctionEditor": "Alternar editor de funciones",
+    "useSavedFunction": "Usar la función Guardado",
+    "showQueryResults": "Mostrar los resultados de la consulta",
+    "hideQueryResults": "Ocultar los resultados de la consulta",
+    "vrlExtractionTooltip": "Para usar los campos VRL extraídos en el gráfico, escriba una función VRL y haga clic en el botón Aplicar. Los campos se extraerán, lo que le permitirá usarlos para crear el gráfico.",
+    "errorFetchingFunctions": "Error al recuperar las funciones",
+    "functionAppliedSuccess": "La función {name} se aplicó correctamente."
   },
   "panel": {
     "header": "Panel",
@@ -1482,7 +1549,10 @@
     "SQL": "SQL",
     "builder": "Constructor",
     "custom": "Personalizado",
-    "sqlBuilder": "Constructor SQL"
+    "sqlBuilder": "Constructor SQL",
+    "generatedSql": "SQL generado",
+    "enterCustomSql": "Introduzca su consulta SQL personalizada...",
+    "customSql": "SQL personalizado"
   },
   "home": {
     "streams": "Transmisiones",
@@ -1891,7 +1961,114 @@
     "msteams": "Equipos de Microsoft",
     "pagerduty": "Pager Duty",
     "opsgenie": "Opsgenia",
-    "servicenow": "ServiceNow"
+    "servicenow": "ServiceNow",
+    "saveAlert": "Guardar alerta",
+    "aggregation_threshold": "Alerta si hay algún grupo",
+    "thresholdDynamic": {
+      "alertMeWhen": "Avisarme cuando",
+      "metricTypes": {
+        "resultsPassedFilter": "los resultados superaron los filtros",
+        "distinctGroupsAffected": "distintos grupos se ven afectados",
+        "metricsMatchCriteria": "las métricas coinciden con los criterios",
+        "matchingLogsFound": "registros coincidentes encontrados",
+        "groupsPassFilter": "los grupos superan los criterios de filtro",
+        "distinctGroups": "grupos distintos encontrados",
+        "resultRows": "filas de resultados devueltas",
+        "timeSeries": "se encontró una serie temporal activa",
+        "matchingRecords": "registros coincidentes encontrados",
+        "groupsWithHaving": "condiciones de coincidencia de grupos",
+        "uniqueGroups": "grupos únicos",
+        "events": "condiciones de coincidencia de eventos",
+        "aggregatedValue": "condiciones de partido"
+      },
+      "contextLabels": {
+        "groupedBy": "Agrupados por:",
+        "havingConditions": "TENER condiciones:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Nombre de alerta",
+      "sqlQuery": "Consulta SQL",
+      "promqlQuery": "Consulta ProMQL",
+      "conditions": "Condiciones",
+      "copy": "Copiar",
+      "noCondition": "Sin condición",
+      "noDescription": "Sin descripción",
+      "evaluationHistory": "Historial de evaluación",
+      "loadingHistory": "Cargando historial...",
+      "noHistoryAvailable": "No hay ningún historial de evaluación disponible para esta alerta",
+      "results": "Resultados"
+    },
+    "historyTable": {
+      "timestamp": "Marca de tiempo",
+      "status": "Estado",
+      "evaluationTime": "Evaluación (es)",
+      "queryTime": "Consulta (ms)",
+      "error": "Error"
+    },
+    "back": "Atrás",
+    "continue": "Continuar",
+    "wouldTrigger": "DESENCADENARÍA",
+    "wouldNotTrigger": "NO SE ACTIVARÍA",
+    "queryBuilder": "Constructor",
+    "groupByHelp": {
+      "description": "Agrupe los datos agregados por campos específicos para crear alertas independientes para cada valor único.",
+      "example": "Ejemplo: agrupe por «nombre de host» para recibir alertas individuales por servidor o por «status_code» para realizar un seguimiento de los errores por separado."
+    },
+    "conditions": {
+      "condition": "Condición",
+      "conditionGroup": "Grupo de condiciones",
+      "addConditionTooltip": "Agregar una nueva condición a este grupo",
+      "addConditionGroupTooltip": "Agregar un grupo de condiciones anidadas (profundidad máxima: 2)",
+      "maxDepthReachedTooltip": "Se ha alcanzado la profundidad máxima de anidación"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Alerta configurada para",
+      "currentWindow": "Ventana actual",
+      "cycle": "Ciclo",
+      "cycleTooltip": "Compare los resultados con los del mismo tiempo del ciclo anterior.",
+      "runningFor": "Se ejecuta durante {período} en el intervalo de cada {frecuencia}",
+      "currentWindowCannotBeDeleted": "No se puede eliminar la ventana actual",
+      "comparingWith": "Comparando con",
+      "referenceWindow": "Ventana de referencia",
+      "timeFrame": "Marco temporal",
+      "timeFrameTooltip": "Intervalo de tiempo para su consulta.",
+      "comparingText": "Comparar el resultado de la consulta de la ventana actual con el resultado de la consulta del {offset} anterior.",
+      "addComparisonWindow": "Agregar ventana de comparación",
+      "goToConditions": "Ir a Condiciones",
+      "goToConditionsTooltip": "Haga clic en «Ir a condiciones» para verificar los eventos en las ventanas de comparación seleccionadas"
+    },
+    "alertSettings": {
+      "cronSchedule": "Calendario de Cron",
+      "addNewDestination": "Agregar nuevo destino",
+      "cooldownTooltip": "Si la alerta se activa, ¿cuánto tiempo debe esperar antes de enviar otra notificación? Por ejemplo, si la alerta se activa a las 16:00 y la notificación de silencio está configurada en 10 minutos, no se enviará otra notificación hasta las 16:10 p. m., incluso si la alerta persiste después de 1 minuto. Esto se hace para evitar enviar notificaciones no deseadas al usuario.",
+      "thresholdTooltip": "Define cuándo debe activarse la alerta en función del recuento de eventos o del valor agregado. Ejemplo: si se establece en «> 100\", la alerta se activa cuando el recuento supera los 100 eventos.",
+      "periodTooltip": "Período durante el que debe ejecutarse la consulta. Por ejemplo, 10 minutos significa que, siempre que se ejecute la consulta, utilizará los últimos 10 minutos de datos.",
+      "frequencyTooltipMinutes": "Con qué frecuencia se debe ejecutar la tarea. Por ejemplo, cada 5 minutos.",
+      "frequencyTooltipCron": "Formato cron estándar de UNIX con 5 campos separados por un espacio: [Minuto 0-59] [Hora 0-23] [Día del mes 1-31] [Mes 1-12 o enero-diciembre] [Día de la semana 0-7 o '1L-7L', 0 y 7 para el domingo].",
+      "timezoneWarning": "Advertencia: La zona horaria que se muestra es aproximada. Verifica y selecciona la zona horaria correcta manualmente.",
+      "destinationsTooltip": "Seleccione uno o más destinos para enviar notificaciones de alerta.",
+      "templateTooltip": "Opcional: seleccione una plantilla para usarla en todos los destinos de esta alerta. Las plantillas permiten personalizar el formato de los mensajes de alerta. Si no se selecciona, cada destino utilizará su propia plantilla configurada."
+    },
+    "advanced": {
+      "addVariable": "Agregar variable",
+      "variablesTooltip": "Las variables se utilizan para pasar datos de la alerta al destino.",
+      "rowTemplateTooltip": "La plantilla de fila se utiliza para dar formato al mensaje de alerta.",
+      "templateType": "Tipo de plantilla:"
+    },
+    "addConditions": "Agregar condiciones",
+    "sqlEditor": "Editor SQL",
+    "promqlEditor": "Editor ProMQL",
+    "vrlEditor": "Editor VRL",
+    "generateVRL": "Generar VRL",
+    "applyVRL": "Aplicar VRL",
+    "runQuery": "Ejecutar consulta",
+    "onStream": "en",
+    "streamLabel": "corriente",
+    "noStreamSelected": "No se ha seleccionado ninguna transmisión",
+    "resultsIncludeAllWindows": "Los resultados incluyen todas las adiciones de ventanas múltiples",
+    "runQueryForOutput": "Haga clic en Ejecutar consulta para ver el resultado",
+    "applyVRLForOutput": "Haga clic en Aplicar VRL para ver la salida combinada"
   },
   "alert_templates": {
     "header": "Plantillas",
@@ -1942,7 +2119,10 @@
     "customWebhook": "Personalizado (Webhook)",
     "customEmail": "Personalizado (correo electrónico)",
     "customAction": "Personalizado (acción)",
-    "custom": "Personalizado"
+    "custom": "Personalizado",
+    "separator": "Separador",
+    "separator_placeholder": "Introduzca un separador (p. ej., |,\\n,\\ t, espacio)",
+    "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)"
   },
   "metrics": {
     "searchMetric": "Buscar una métrica",
@@ -2144,7 +2324,6 @@
       "groupsLabel": "grupos",
       "noMatchingGroups": "No hay grupos coincidentes",
       "fqnFormulaTitle": "Fórmula de identidad",
-      "fqnFormulaTooltip": "Muestra cómo se calculará la identidad del servicio. Las dimensiones de alcance (azul) se concatenan con '/'. La primera dimensión de carga de trabajo no nula (verde) se convierte en el nombre del servicio.",
       "scopeDimension": "Dimensión de alcance",
       "workloadDimension": "Dimensión de carga de trabajo",
       "noFormulaConfigured": "No hay fórmula de identidad configurada. Agregue dimensiones arriba.",
@@ -2301,7 +2480,54 @@
     "errorSavingPipeline": "Error al guardar la canalización",
     "cancelChangesConfirm": "¿Estás seguro de que deseas cancelar los cambios?",
     "cancel": "Cancelar",
-    "dragDropNodesHere": "Arrastra y suelta los nodos aquí"
+    "dragDropNodesHere": "Arrastra y suelta los nodos aquí",
+    "llmEvaluation": "Evaluación de LLM",
+    "nodeName": "Nombre del nodo",
+    "samplingConfig": "Configuración de muestreo",
+    "enableSampling": "Habilitar el muestreo",
+    "samplingRate": "Frecuencia de muestreo",
+    "samplingRateHelp": "Muestre un porcentaje de las trazas para reducir los costos de evaluación (0% = deshabilitado, 100% = evaluar todo)",
+    "samplingStrategy": "Estrategia de muestreo",
+    "randomSampling": "Aleatorio",
+    "randomSamplingDesc": "Muestreo no determinista: trazas diferentes cada vez",
+    "hashSampling": "Basado en hash (recomendado)",
+    "hashSamplingDesc": "Muestreo uniforme por trace_id: siempre se muestrean las mismas trazas",
+    "llmEvaluationInfo": "Configuración de evaluación de LLM",
+    "llmEvaluationInfoText": "Evalúa las trazas mediante LLM Judge. El muestreo reduce los costos al procesar solo un porcentaje de las trazas. La estrategia de hash garantiza un muestreo consistente para un monitoreo confiable.",
+    "llmEvaluationNodeSaved": "El nodo de evaluación de LLM se guardó correctamente",
+    "llmJudgeConfig": "Configuración de jueces de LLM",
+    "enableLlmJudge": "Habilitar LLM-as-Judge",
+    "enableLlmJudgeHelp": "Cuando está habilitada, utiliza un LLM para evaluar la calidad de la respuesta con puntuaciones de dimensiones detalladas. Es más completo, pero cuesta fichas de LLM.",
+    "llmSpanIdentifier": "Identificador de intervalo de LLM",
+    "llmSpanIdentifierLabel": "Campo para identificar los períodos de LLM",
+    "llmSpanIdentifierHelp": "Seleccione el campo del flujo de origen que identifica los períodos de LLM. Solo se evaluarán los intervalos en los que este campo esté presente y no esté vacío.",
+    "noFieldsFound": "No se encontró ningún campo",
+    "save": "Guardar",
+    "llmEvaluationNodeTitle": "Nodo de evaluación de LLM",
+    "samplingLabel": "Muestreo",
+    "samplingAllTraces": "Todos los rastros (100%)",
+    "samplingOfTraces": "de huellas",
+    "nameLabel": "Nombre",
+    "llmEvaluationDescription": "Evalúa los seguimientos y escribe los resultados en un flujo de registros independiente",
+    "llmEvaluationEnableToggle": "Habilite la evaluación de LLM para este flujo de trazas",
+    "llmEvaluationEnableHelp": "Crea una canalización en tiempo real que evalúa los seguimientos de LLM y escribe los resultados en un flujo de registros independiente.",
+    "llmSpanIdentifierFieldHelp": "Campo que identifica los períodos de LLM (por ejemplo, gen_ai_system)",
+    "llmEvaluationSamplingRateLabel": "Frecuencia de muestreo: {percentage}%",
+    "llmEvaluationSamplingHelp": "Porcentaje de trazas a evaluar",
+    "llmEvaluationOutputStreamName": "Nombre del flujo de salida",
+    "llmEvaluationOutputStreamHelp": "Los resultados de la evaluación se escribirán en esta secuencia de registros",
+    "llmEvaluationRemoveWarning": "Para eliminar una canalización de evaluación de LLM existente, adminístrela desde la página Canalizaciones.",
+    "llmEvaluationPipelineExists": "Ya existe una canalización llamada «{streamName}» para este flujo de trazas. Administre desde la página Pipelines.",
+    "llmEvaluationPipelineDescription": "Proceso de evaluación de LLM para el flujo de trazas {streamName}",
+    "llmEvaluationCreatedSuccess": "El proceso de evaluación de LLM «{streamName}» se creó correctamente.",
+    "llmEvaluationCreationFailed": "No se pudo crear la canalización de evaluación de LLM.",
+    "promqlOnlyForMetrics": "PromQL solo está disponible para el tipo de flujo de métricas",
+    "invalidCronExpression": "Expresión cron no válida",
+    "thresholdShouldNotBeEmpty": "El umbral no debe estar vacío",
+    "errorGettingResults": "Error al obtener los resultados",
+    "discardChangesTitle": "Descartar cambios",
+    "deleteNodeTitle": "Eliminar nodo",
+    "deleteNodeLlmEvalConfirm": "¿Está seguro de que desea eliminar este nodo de evaluación de LLM?"
   },
   "reports": {
     "header": "Informes",
@@ -2360,7 +2586,18 @@
     "timeRangeUpdated": "El intervalo de tiempo seleccionado no incluía este seguimiento. El intervalo de tiempo se actualizó para que coincida con la marca de tiempo del rastreo.",
     "fetchingMoreTraces": "Buscando más rastros...",
     "showErrorOnly": "Mostrar solo error",
-    "openInTraces": "Abrir en Traces"
+    "openInTraces": "Abrir en Traces",
+    "errorRetrievingTraces": "Se ha producido un error al recuperar los rastros.",
+    "fetchingTraces": "Agárrate fuerte, estamos buscando tus rastros.",
+    "noTracesFoundAdjust": "No se han encontrado rastros. Por favor, ajusta los filtros e inténtalo de nuevo.",
+    "tracesTitle": "HUELLAS",
+    "tracesFound": "Rastros encontrados",
+    "error": "ERROR",
+    "errors": "ERRORES",
+    "success": "ÉXITO",
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "spanColorPalettePreview": "Vista previa de la paleta de colores Span"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -2598,7 +2835,8 @@
     "showLegends": "Mostrar leyendas"
   },
   "alert_list": {
-    "alert_details": "Detalles de la alerta"
+    "alert_details": "Detalles de la alerta",
+    "alert_history": "Historial de alertas"
   },
   "latencyInsights": {
     "title": "Perspectivas",
@@ -2751,7 +2989,14 @@
       }
     },
     "viewInTraces": "Ver en Traces",
-    "viewInTracesTooltip": "Abra la página de seguimientos con el panel de métricas RED y todos los seguimientos correlacionados"
+    "viewInTracesTooltip": "Abra la página de seguimientos con el panel de métricas RED y todos los seguimientos correlacionados",
+    "exportToJson": "Exportar a JSON",
+    "noLogsDescription": "No se han encontrado registros para esta correlación en el intervalo de tiempo seleccionado.",
+    "tracesErrorDetails": "Se ha producido un error al obtener los datos de seguimiento. Vuelva a intentarlo.",
+    "metricsError": "No se pueden cargar las métricas",
+    "metricsErrorDetails": "Se ha producido un error al obtener los datos de las métricas. Por favor, inténtalo de nuevo.",
+    "noMetricsDescription": "No se han encontrado métricas para esta correlación en el intervalo de tiempo seleccionado.",
+    "errorRetrievingTraces": "Se ha producido un error al recuperar los rastros."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",
@@ -2800,5 +3045,10 @@
     "invalidFormat": "Formato no válido",
     "mustBeGreaterThan": "Debe ser mayor que {value}",
     "mustBeLessThan": "Debe ser inferior a {value}"
+  },
+  "nlMode": {
+    "toggle": "Modo de lenguaje natural",
+    "noAdditionalOptions": "Sin opciones adicionales",
+    "generateVRL": "Generar VRL"
   }
 }

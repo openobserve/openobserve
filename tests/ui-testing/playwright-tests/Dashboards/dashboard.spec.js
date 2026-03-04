@@ -58,10 +58,7 @@ test.describe("dashboard UI testcases", () => {
 
     //create a new dashboard and duplicate it
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-
-    await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
-      timeout: 30000,
-    });
+    // Toast is already validated inside createDashboard() and auto-dismisses before we get here
     await pm.dashboardCreate.backToDashboardList();
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
@@ -200,10 +197,9 @@ test.describe("dashboard UI testcases", () => {
     // await page.locator(".cm-line").first().click();
 
     // Focus on the first line of the editor
-    await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".monaco-editor")
+      .getByRole('code')
       .click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
@@ -557,9 +553,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Create Dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await expect(page.getByText("Dashboard added successfully.")).toHaveText(
-      "Dashboard added successfully."
-    );
+    // Toast is already validated inside createDashboard() and auto-dismisses before we get here
 
     // Add Panel
     await pm.dashboardCreate.addPanel();

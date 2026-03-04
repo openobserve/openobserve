@@ -206,28 +206,6 @@ mod tests {
     }
 
     #[test]
-    fn duplicates_mysql() {
-        let sql = FolderCount::select_statement()
-            .build(DbBackend::MySql)
-            .to_string();
-        collapsed_eq!(
-            &sql,
-            r#"
-                SELECT
-                `folders`.`org`,
-                `folders`.`type`,
-                `folders`.`name`,
-                COUNT(`folders`.`id`) AS `count`
-                FROM `folders` 
-                GROUP BY 
-                `folders`.`org`,
-                `folders`.`type`,
-                `folders`.`name`
-            "#
-        );
-    }
-
-    #[test]
     fn duplicates_sqlite() {
         let sql = FolderCount::select_statement()
             .build(DbBackend::Sqlite)

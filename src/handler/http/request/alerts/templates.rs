@@ -242,7 +242,7 @@ pub async fn list_templates(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete alert template", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Delete alert template", "category": "alerts", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_template(Path((org_id, name)): Path<(String, String)>) -> Response {

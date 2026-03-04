@@ -20,7 +20,6 @@ use once_cell::sync::Lazy;
 
 use crate::errors::Result;
 
-pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
@@ -30,7 +29,6 @@ pub fn connect() -> Box<dyn SchemaHistory> {
     match config::get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteSchemaHistory>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteSchemaHistory>::default(),
-        MetaStore::MySQL => Box::<mysql::MysqlSchemaHistory>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresSchemaHistory>::default(),
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -105,8 +105,11 @@ async fn initialize_usage_stream_schema(org_id: &str) -> Result<()> {
 
     // Infer Arrow schema from the JSON (uses OpenObserve's schema inference)
     // Pass as iterator of a single map
-    let expected_schema =
-        config::utils::schema::infer_json_schema_from_map(std::iter::once(json_map), stream_type)?;
+    let expected_schema = config::utils::schema::infer_json_schema_from_map(
+        stream_name,
+        stream_type,
+        std::iter::once(json_map),
+    )?;
 
     if infra::schema::get(org_id, stream_name, stream_type)
         .await

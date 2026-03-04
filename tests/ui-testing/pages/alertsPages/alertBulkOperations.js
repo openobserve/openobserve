@@ -24,7 +24,7 @@ export class AlertBulkOperations {
      */
     async selectMultipleAlerts(alertNames) {
         // Wait for page to stabilize
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         for (const alertName of alertNames) {
@@ -151,11 +151,11 @@ export class AlertBulkOperations {
 
         await this.commonActions.scrollAndFindOption(targetFolderName, 'folder');
 
-        // Click move button and verify success message
+        // Click move button and verify success message.
+        // The toast auto-dismisses after only 2s, so do NOT wait for networkidle
+        // between the click and the toast check — it would burn the toast's lifetime.
         await this.page.locator(this.locators.moveButton).click();
-        await this.page.waitForLoadState('networkidle');
 
-        // The success message is the authoritative confirmation that the move succeeded
         await expect(this.page.getByText(this.locators.alertsMovedMessage)).toBeVisible({ timeout: 15000 });
         testLogger.info('Move operation confirmed via success message');
 
@@ -175,7 +175,7 @@ export class AlertBulkOperations {
     async deleteAllAlertsInFolder() {
         testLogger.info('Starting to delete all alerts in current folder');
 
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         let totalDeleted = 0;
@@ -201,7 +201,7 @@ export class AlertBulkOperations {
                 totalDeleted++;
             }
 
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(1000);
         }
 

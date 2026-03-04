@@ -31,7 +31,9 @@ use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::check_permissions,
-    crate::handler::http::request::search::utils::check_stream_permissions,
+    crate::handler::http::request::search::utils::{
+        StreamPermissionResourceType, check_stream_permissions,
+    },
 };
 
 use crate::{
@@ -328,7 +330,7 @@ pub async fn update_alert(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete an alert by ID", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Delete an alert by ID", "category": "alerts", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
@@ -748,6 +750,7 @@ pub async fn generate_sql(
             &org_id,
             &user_email.user_id,
             &stream_type,
+            StreamPermissionResourceType::Search,
         )
         .await
         {

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -32,9 +32,7 @@ use datafusion::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
-    schema::{
-        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
-    },
+    schema::{get_partition_time_level, get_stream_setting_index_fields, unwrap_stream_settings},
 };
 use itertools::Itertools;
 use promql_parser::label::{MatchOp, Matchers};
@@ -96,8 +94,7 @@ pub(crate) async fn create_context(
 
     // get partition time level
     let stream_settings = stream_settings.unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+    let partition_time_level = get_partition_time_level(stream_type);
 
     // rewrite partition filters
     let partition_keys: HashMap<&String, &StreamPartition> = stream_settings

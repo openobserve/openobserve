@@ -43,7 +43,7 @@ export class UserPage {
         
         // Now safely interact with the element
         await roleField.dblclick({ force: true });
-        await this.page.waitForLoadState("networkidle");
+        await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
         await roleField.pressSequentially(role, { delay: 100 });
         await this.page.getByRole('option', { name: role }).click({ force: true });
       }
@@ -64,7 +64,7 @@ export class UserPage {
         await this.page.locator(editButtonSelector).click();
         await this.page.goto(process.env["ZO_BASE_URL"] + "/web/iam/users?action=update&org_identifier=default&email=" + email);
         await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Wait for edit form elements to be available
         await this.page.waitForSelector('[data-test="user-first-name-field"]', { state: 'visible', timeout: 15000 });

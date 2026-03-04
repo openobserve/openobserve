@@ -242,7 +242,8 @@ describe("sqlUtils", () => {
       expect(fields[0]).toEqual({
         column: "level",
         alias: "log_level",
-        aggregationFunction: null
+        aggregationFunction: null,
+        streamAlias: null
       });
     });
 
@@ -273,7 +274,8 @@ describe("sqlUtils", () => {
       expect(fields[0]).toEqual({
         column: "id",
         alias: "count_id",
-        aggregationFunction: "count"
+        aggregationFunction: "count",
+        streamAlias: null
       });
     });
 
@@ -308,7 +310,8 @@ describe("sqlUtils", () => {
       expect(fields[0]).toEqual({
         column: "_timestamp",
         alias: "time_bucket",
-        aggregationFunction: "histogram"
+        aggregationFunction: "histogram",
+        streamAlias: null
       });
     });
 
@@ -597,12 +600,12 @@ describe("sqlUtils", () => {
   describe("getFieldsFromQuery", () => {
     it("should return default fields when parser throws error", async () => {
       const result = await getFieldsFromQuery("invalid sql", "_timestamp");
-      
+
       expect(result).toEqual({
         fields: [
           {
             column: "_timestamp",
-            alias: "x_axis_1", 
+            alias: "x_axis_1",
             aggregationFunction: "histogram"
           },
           {
@@ -616,7 +619,8 @@ describe("sqlUtils", () => {
           logicalOperator: "AND",
           conditions: []
         },
-        streamName: null
+        streamName: null,
+        joins: []
       });
     });
 
@@ -1664,7 +1668,8 @@ describe("sqlUtils", () => {
         {
           column: "level",
           alias: "log_level",
-          aggregationFunction: null
+          aggregationFunction: null,
+          streamAlias: null
         }
       ]);
     });
@@ -1687,7 +1692,8 @@ describe("sqlUtils", () => {
         {
           column: "id",
           alias: "count_id",
-          aggregationFunction: "count"
+          aggregationFunction: "count",
+          streamAlias: null
         }
       ]);
     });
@@ -1710,7 +1716,8 @@ describe("sqlUtils", () => {
         {
           column: "_timestamp",
           alias: "time_hist",
-          aggregationFunction: "histogram"
+          aggregationFunction: "histogram",
+          streamAlias: null
         }
       ]);
     });
@@ -1737,7 +1744,8 @@ describe("sqlUtils", () => {
         {
           column: "response_time",
           alias: "p50_response",
-          aggregationFunction: "approx_percentile_cont"
+          aggregationFunction: "approx_percentile_cont",
+          streamAlias: null
         }
       ]);
     });
@@ -1764,7 +1772,8 @@ describe("sqlUtils", () => {
         {
           column: "response_time",
           alias: "p90_response",
-          aggregationFunction: "approx_percentile_cont"
+          aggregationFunction: "approx_percentile_cont",
+          streamAlias: null
         }
       ]);
     });
@@ -1791,7 +1800,8 @@ describe("sqlUtils", () => {
         {
           column: "response_time",
           alias: "p95_response",
-          aggregationFunction: "approx_percentile_cont"
+          aggregationFunction: "approx_percentile_cont",
+          streamAlias: null
         }
       ]);
     });
@@ -1818,7 +1828,8 @@ describe("sqlUtils", () => {
         {
           column: "response_time",
           alias: "p99_response",
-          aggregationFunction: "approx_percentile_cont"
+          aggregationFunction: "approx_percentile_cont",
+          streamAlias: null
         }
       ]);
     });
@@ -1868,7 +1879,8 @@ describe("sqlUtils", () => {
         {
           column: timeField,
           alias: timeField,
-          aggregationFunction: null
+          aggregationFunction: null,
+          streamAlias: null
         }
       ]);
     });
@@ -1886,9 +1898,65 @@ describe("sqlUtils", () => {
         {
           column: "level",
           alias: "level",
-          aggregationFunction: null
+          aggregationFunction: null,
+          streamAlias: null
         }
       ]);
+    });
+
+    it("should handle CASE/WHEN expressions as raw fields with parser", () => {
+      // Mock parser that can reconstruct the CASE expression
+      const mockParser = {
+        sqlify: (_ast: any) => {
+          // Simplified mock - return a SQL string containing the CASE expression
+          return "SELECT CASE WHEN `level` = 'ERROR' THEN 'Bad' ELSE 'Good' END FROM temp";
+        }
+      };
+
+      const parsedAst = {
+        columns: [
+          {
+            expr: {
+              type: "case",
+              // The actual AST structure for CASE is complex, but extractFields
+              // only checks the type and passes the expr to the parser
+              args: []
+            },
+            as: "status_category"
+          }
+        ]
+      };
+
+      const result = extractFields(parsedAst, timeField, mockParser);
+      expect(result).toEqual([
+        {
+          column: "",
+          alias: "status_category",
+          aggregationFunction: null,
+          streamAlias: null,
+          type: "raw",
+          rawQuery: "CASE WHEN \"level\" = 'ERROR' THEN 'Bad' ELSE 'Good' END"
+        }
+      ]);
+    });
+
+    it("should not set type raw for CASE/WHEN when parser is not provided", () => {
+      const parsedAst = {
+        columns: [
+          {
+            expr: {
+              type: "case",
+              args: []
+            },
+            as: "status_category"
+          }
+        ]
+      };
+
+      // When parser is not provided, CASE expressions don't get processed as raw
+      const result = extractFields(parsedAst, timeField);
+      expect(result[0].type).toBeUndefined();
+      expect(result[0].rawQuery).toBeUndefined();
     });
   });
 
@@ -1948,9 +2016,9 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         type: "condition",
         values: [],
-        column: "level",
+        column: { field: "level", streamAlias: null },
         operator: "=",
-        value: "'ERROR'",
+        value: "ERROR",
         logicalOperator: "AND",
         filterType: "condition"
       });
@@ -1967,9 +2035,9 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         type: "condition",
         values: [],
-        column: "level",
+        column: { field: "level", streamAlias: null },
         operator: "<>",
-        value: "'DEBUG'",
+        value: "DEBUG",
         logicalOperator: "AND",
         filterType: "condition"
       });
@@ -1991,7 +2059,7 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         type: "list",
         values: ["ERROR", "WARN"],
-        column: "level",
+        column: { field: "level", streamAlias: null },
         operator: null,
         value: null,
         logicalOperator: "AND",
@@ -2015,7 +2083,7 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         type: "condition",
         values: [],
-        column: "level",
+        column: { field: "level", streamAlias: null },
         operator: "NOT IN",
         value: "'DEBUG','INFO'",
         logicalOperator: "AND",
@@ -2033,7 +2101,7 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         type: "condition",
         values: [],
-        column: "message",
+        column: { field: "message", streamAlias: null },
         operator: "Is Null",
         value: null,
         logicalOperator: "AND",
@@ -2051,7 +2119,7 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         type: "condition",
         values: [],
-        column: "message",
+        column: { field: "message", streamAlias: null },
         operator: "Is Not Null",
         value: null,
         logicalOperator: "AND",
@@ -2070,7 +2138,7 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         type: "condition",
         values: [],
-        column: "message",
+        column: { field: "message", streamAlias: null },
         operator: "Contains",
         value: "error",
         logicalOperator: "AND",
@@ -2089,7 +2157,7 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         type: "condition",
         values: [],
-        column: "message",
+        column: { field: "message", streamAlias: null },
         operator: "Starts With",
         value: "error",
         logicalOperator: "AND",
@@ -2108,7 +2176,7 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         type: "condition",
         values: [],
-        column: "message",
+        column: { field: "message", streamAlias: null },
         operator: "Ends With",
         value: "error",
         logicalOperator: "AND",
@@ -2127,7 +2195,7 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         type: "condition",
         values: [],
-        column: "message",
+        column: { field: "message", streamAlias: null },
         operator: "Not Contains",
         value: "debug",
         logicalOperator: "AND",
@@ -2150,7 +2218,7 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         type: "condition",
         values: [],
-        column: "message",
+        column: { field: "message", streamAlias: null },
         operator: "str_match",
         value: "error",
         logicalOperator: "AND",
@@ -2246,7 +2314,7 @@ describe("sqlUtils", () => {
       };
       const result = convertWhereToFilter(where);
       expect(result.type).toBe("condition");
-      expect(result.column).toBe("level");
+      expect(result.column).toEqual({ field: "level", streamAlias: null });
     });
 
     it("should convert array conditions to group", () => {
@@ -2285,7 +2353,7 @@ describe("sqlUtils", () => {
       };
       const result = extractFilters(parsedAst);
       expect(result.type).toBe("condition");
-      expect(result.column).toBe("level");
+      expect(result.column).toEqual({ field: "level", streamAlias: null });
     });
 
     it("should handle AST without where clause", () => {
@@ -2346,13 +2414,14 @@ describe("sqlUtils", () => {
 
     it("should extract fields, filters, and stream name from query", async () => {
       const result = await getFieldsFromQuery("SELECT level AS log_level FROM logs WHERE level = 'ERROR'");
-      
+
       expect(result.streamName).toBe("logs");
       expect(result.fields).toEqual([
         {
           column: "level",
           alias: "log_level",
-          aggregationFunction: null
+          aggregationFunction: null,
+          streamAlias: null
         }
       ]);
       expect(result.filters.filterType).toBe("group");
@@ -2370,9 +2439,9 @@ describe("sqlUtils", () => {
       mockAstify.mockImplementation(() => {
         throw new Error("Parse error");
       });
-      
+
       const result = await getFieldsFromQuery("invalid query", "_timestamp");
-      
+
       expect(result.fields).toEqual([
         {
           column: "_timestamp",
@@ -2391,6 +2460,7 @@ describe("sqlUtils", () => {
         conditions: []
       });
       expect(result.streamName).toBe(null);
+      expect(result.joins).toEqual([]);
     });
 
     it("should use default time field when not provided", async () => {
@@ -2439,11 +2509,47 @@ describe("sqlUtils", () => {
       });
       
       const result = await getFieldsFromQuery("SELECT timestamp, COUNT(id) FROM events WHERE type = 'login' AND timestamp > '2023-01-01'");
-      
+
       expect(result.fields).toHaveLength(2);
       expect(result.fields[0].aggregationFunction).toBe(null);
       expect(result.fields[1].aggregationFunction).toBe("count");
       expect(result.streamName).toBe("events");
+    });
+
+    it("should handle CASE/WHEN expressions as raw fields", async () => {
+      // Mock sqlify to return a proper CASE expression SQL
+      mockSqlify.mockReturnValue("SELECT CASE WHEN `level` = 'ERROR' THEN 'Bad' ELSE 'Good' END FROM temp");
+
+      mockAstify.mockReturnValue({
+        from: [{ table: "logs" }],
+        columns: [
+          {
+            expr: {
+              type: "case",
+              // Simplified CASE structure for testing
+              args: {
+                when: [
+                  {
+                    cond: { type: "binary_expr", operator: "=", left: { type: "column_ref", column: "level" }, right: { type: "string", value: "ERROR" } },
+                    result: { type: "string", value: "Bad" }
+                  }
+                ],
+                else: { type: "string", value: "Good" }
+              }
+            },
+            as: "status_category"
+          }
+        ],
+        where: null
+      });
+
+      const result = await getFieldsFromQuery("SELECT CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END as status_category FROM logs");
+
+      expect(result.fields).toHaveLength(1);
+      expect(result.fields[0].type).toBe("raw");
+      expect(result.fields[0].rawQuery).toBeDefined();
+      expect(result.fields[0].alias).toBe("status_category");
+      expect(result.streamName).toBe("logs");
     });
   });
 

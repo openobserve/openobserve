@@ -133,17 +133,20 @@ self="top right" max-width="220px">
           no-caps
           v-if="!viewOnly && !simplifiedPanelView"
         >
-          <q-list dense>
+          <q-list dense class="panel-dropdown-list">
             <q-item
               v-if="!simplifiedPanelView"
               clickable
               v-close-popup="true"
               @click="onPanelModifyClick('EditPanel')"
             >
+              <q-item-section side>
+                <q-icon :name="outlinedEdit" size="xs" />
+              </q-item-section>
               <q-item-section>
                 <q-item-label
                   data-test="dashboard-edit-panel"
-                  class="q-pa-sm"
+                  class="q-px-sm"
                   >{{ t("panel.editPanel") }}</q-item-label
                 >
               </q-item-section>
@@ -154,10 +157,13 @@ self="top right" max-width="220px">
               v-close-popup="true"
               @click="onPanelModifyClick('EditLayout')"
             >
+              <q-item-section side>
+                <q-icon :name="outlinedDashboardCustomize" size="xs" />
+              </q-item-section>
               <q-item-section>
                 <q-item-label
                   data-test="dashboard-edit-layout"
-                  class="q-pa-sm"
+                  class="q-px-sm"
                   >{{ t("panel.editLayout") }}</q-item-label
                 >
               </q-item-section>
@@ -168,10 +174,13 @@ self="top right" max-width="220px">
               v-close-popup="true"
               @click="onPanelModifyClick('DuplicatePanel')"
             >
+              <q-item-section side>
+                <q-icon name="content_copy" size="xs" />
+              </q-item-section>
               <q-item-section>
                 <q-item-label
                   data-test="dashboard-duplicate-panel"
-                  class="q-pa-sm"
+                  class="q-px-sm"
                   >{{ t("panel.duplicate") }}</q-item-label
                 >
               </q-item-section>
@@ -181,10 +190,13 @@ self="top right" max-width="220px">
               v-close-popup="true"
               @click="onPanelModifyClick('DeletePanel')"
             >
+              <q-item-section side>
+                <q-icon name="delete_outline" size="xs" />
+              </q-item-section>
               <q-item-section>
                 <q-item-label
                   data-test="dashboard-delete-panel"
-                  class="q-pa-sm"
+                  class="q-px-sm"
                   >{{ t("panel.deletePanel") }}</q-item-label
                 >
               </q-item-section>
@@ -195,10 +207,13 @@ self="top right" max-width="220px">
               v-close-popup="true"
               @click="showViewPanel = true"
             >
+              <q-item-section side>
+                <q-icon name="manage_search" size="xs" />
+              </q-item-section>
               <q-item-section>
                 <q-item-label
                   data-test="dashboard-query-inspector-panel"
-                  class="q-pa-sm"
+                  class="q-px-sm"
                   >{{ t("panel.queryInspector") }}</q-item-label
                 >
               </q-item-section>
@@ -211,10 +226,13 @@ self="top right" max-width="220px">
                 PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)
               "
             >
+              <q-item-section side>
+                <q-icon :name="outlinedFileDownload" size="xs" />
+              </q-item-section>
               <q-item-section>
                 <q-item-label
                   data-test="dashboard-panel-download-as-csv-btn"
-                  class="q-pa-sm"
+                  class="q-px-sm"
                   >{{ t("panel.downloadAsCSV") }}</q-item-label
                 >
               </q-item-section>
@@ -227,10 +245,13 @@ self="top right" max-width="220px">
                 PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)
               "
             >
+              <q-item-section side>
+                <q-icon name="data_object" size="xs" />
+              </q-item-section>
               <q-item-section>
                 <q-item-label
                   data-test="dashboard-panel-download-as-json-btn"
-                  class="q-pa-sm"
+                  class="q-px-sm"
                   >{{ t("panel.downloadAsJSON") }}</q-item-label
                 >
               </q-item-section>
@@ -242,10 +263,13 @@ self="top right" max-width="220px">
               v-close-popup="true"
               @click="onLogPanel"
             >
+              <q-item-section side>
+                <q-icon name="search" size="xs" />
+              </q-item-section>
               <q-item-section>
                 <q-item-label
                   data-test="dashboard-move-to-logs-module"
-                  class="q-pa-sm"
+                  class="q-px-sm"
                   >{{ t("panel.goToLogs") }}</q-item-label
                 >
               </q-item-section>
@@ -256,10 +280,13 @@ self="top right" max-width="220px">
               v-close-popup="true"
               @click="onPanelModifyClick('Refresh')"
             >
+              <q-item-section side>
+                <q-icon name="cached" size="xs" />
+              </q-item-section>
               <q-item-section>
                 <q-item-label
                   data-test="dashboard-refresh-without-cache"
-                  class="q-pa-sm"
+                  class="q-px-sm"
                   >Refresh Cache & Reload</q-item-label
                 >
               </q-item-section>
@@ -270,10 +297,13 @@ self="top right" max-width="220px">
               v-close-popup="true"
               @click="onPanelModifyClick('MovePanel')"
             >
+              <q-item-section side>
+                <q-icon :name="outlinedDriveFileMove" size="xs" />
+              </q-item-section>
               <q-item-section>
                 <q-item-label
                   data-test="dashboard-move-to-another-panel"
-                  class="q-pa-sm"
+                  class="q-px-sm"
                   >{{ t("panel.moveToAnotherTab") }}</q-item-label
                 >
               </q-item-section>
@@ -284,10 +314,13 @@ self="top right" max-width="220px">
               v-close-popup="true"
               @click="onPanelModifyClick('CreateAlert')"
             >
+              <q-item-section side>
+                <q-icon :name="outlinedReportProblem" size="xs" />
+              </q-item-section>
               <q-item-section>
                 <q-item-label
                   data-test="dashboard-create-alert-from-panel"
-                  class="q-pa-sm"
+                  class="q-px-sm"
                   >{{ t("panel.createAlert") }}</q-item-label
                 >
               </q-item-section>
@@ -396,6 +429,11 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import {
   outlinedWarning,
   outlinedRunningWithErrors,
+  outlinedReportProblem,
+  outlinedDriveFileMove,
+  outlinedEdit,
+  outlinedDashboardCustomize,
+  outlinedFileDownload,
 } from "@quasar/extras/material-icons-outlined";
 import {
   symOutlinedClockLoader20,
@@ -885,6 +923,11 @@ export default defineComponent({
       deletePanelDialog,
       isCurrentlyHoveredPanel,
       outlinedWarning,
+      outlinedReportProblem,
+      outlinedDriveFileMove,
+      outlinedEdit,
+      outlinedDashboardCustomize,
+      outlinedFileDownload,
       symOutlinedClockLoader20,
       symOutlinedDataInfoAlert,
       outlinedRunningWithErrors,
@@ -1024,5 +1067,17 @@ export default defineComponent({
 
 .warning {
   color: var(--q-warning);
+}
+
+.panel-dropdown-list {
+  :deep(.q-item) {
+    align-items: center;
+  }
+  :deep(.q-item__section--side) {
+    padding-right: 6px;
+  }
+  :deep(.q-item__label) {
+    line-height: 1.1;
+  }
 }
 </style>

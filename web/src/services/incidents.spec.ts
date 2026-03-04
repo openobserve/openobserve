@@ -264,49 +264,4 @@ describe("incidents service", () => {
     });
   });
 
-  describe("extractTraceId", () => {
-    it("should extract trace_id from stable dimensions", () => {
-      const incident = {
-        stable_dimensions: {
-          trace_id: "abc123",
-        },
-      } as any;
-
-      const result = incidents.extractTraceId(incident);
-      expect(result).toBe("abc123");
-    });
-
-    it("should handle traceId variation", () => {
-      const incident = {
-        stable_dimensions: {
-          traceId: "xyz789",
-        },
-      } as any;
-
-      const result = incidents.extractTraceId(incident);
-      expect(result).toBe("xyz789");
-    });
-
-    it("should handle trace.id variation", () => {
-      const incident = {
-        stable_dimensions: {
-          "trace.id": "def456",
-        },
-      } as any;
-
-      const result = incidents.extractTraceId(incident);
-      expect(result).toBe("def456");
-    });
-
-    it("should return undefined when no trace_id found", () => {
-      const incident = {
-        stable_dimensions: {
-          service: "api-gateway",
-        },
-      } as any;
-
-      const result = incidents.extractTraceId(incident);
-      expect(result).toBeUndefined();
-    });
-  });
 });

@@ -1,4 +1,4 @@
-import { toZonedTime, format } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
 import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
@@ -176,12 +176,12 @@ export const convertTraceServiceMapData = (
       {
         type: "tree",
         data: data,
-        symbolSize: 20,
+        symbolSize: 30,
         initialTreeDepth: treeDepth,
         label: {
           position: "bottom",
           verticalAlign: "bottom",
-          distance: 25,
+          distance: 26,
           fontSize: 12,
         },
       },
@@ -193,21 +193,16 @@ export const convertTraceServiceMapData = (
 /**
  * Convert service graph data (nodes/edges) to ECharts tree format
  * @param graphData - Object containing nodes and edges arrays
- * @param layoutType - Layout orientation: 'horizontal' | 'vertical' | 'radial'
+ * @param layoutType - Layout orientation: 'horizontal' | 'vertical'
  * @param isDarkMode - Whether dark mode is active
  * @returns ECharts tree options
  */
 export const convertServiceGraphToTree = (
   graphData: { nodes: any[]; edges: any[] },
   layoutType: string = 'horizontal',
-  isDarkMode: boolean = true
+  isDarkMode: boolean = true,
+  edgeBaselines?: Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>
 ) => {
-  console.log('[convertServiceGraphToTree] Called with:', {
-    nodeCount: graphData.nodes.length,
-    edgeCount: graphData.edges.length,
-    layoutType
-  });
-
   // Build adjacency map for edges
   const edgesMap = new Map<string, any[]>();
   graphData.edges.forEach((edge: any) => {
@@ -230,6 +225,55 @@ export const convertServiceGraphToTree = (
   const nodesWithIncoming = new Set(graphData.edges.map((e: any) => e.to));
   const rootNodes = graphData.nodes.filter((n: any) => !nodesWithIncoming.has(n.id));
 
+  // --- Compute adaptive baselines from the full dataset ---
+  const percentile = (sorted: number[], p: number): number => {
+    if (sorted.length === 0) return 0;
+    const idx = (p / 100) * (sorted.length - 1);
+    const lo = Math.floor(idx);
+    const hi = Math.ceil(idx);
+    return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+  };
+
+  // Node error rates (from node-level data)
+  const allErrorRates = graphData.nodes
+    .map((n: any) => n.error_rate ?? (n.requests > 0 ? (n.errors / n.requests) * 100 : 0))
+    .filter((r: number) => r > 0)
+    .sort((a: number, b: number) => a - b);
+
+  // Edge P95 latencies in ms
+  const allLatenciesMs = graphData.edges
+    .map((e: any) => (e.p95_latency_ns ?? 0) / 1000000)
+    .filter((l: number) => l > 0)
+    .sort((a: number, b: number) => a - b);
+
+  const errP50 = percentile(allErrorRates, 50);
+  const errP75 = percentile(allErrorRates, 75);
+  const errP90 = percentile(allErrorRates, 90);
+
+  const latP50 = percentile(allLatenciesMs, 50);
+  const latP75 = percentile(allLatenciesMs, 75);
+  const latP90 = percentile(allLatenciesMs, 90);
+
+  const green = isDarkMode ? "#10b981" : "#52c41a";
+
+  // Node color: error rate relative to the tree's error baseline
+  const getNodeColor = (errRate: number): string => {
+    if (allErrorRates.length === 0 || errRate === 0) return green;
+    if (errRate >= errP90) return "#f5222d";  // Red — top 10%
+    if (errRate >= errP75) return "#faad14";  // Orange — top 25%
+    if (errRate >= errP50) return "#ffc069";  // Light orange — above median
+    return green;
+  };
+
+  // Edge color: latency relative to the tree's latency baseline
+  const getEdgeColor = (p95Ms: number): string => {
+    if (allLatenciesMs.length === 0 || p95Ms === 0) return isDarkMode ? "#4a5568" : "#d9d9d9";
+    if (p95Ms >= latP90) return "#f5222d";  // Red — top 10%
+    if (p95Ms >= latP75) return "#ff7875";  // Light red — top 25%
+    if (p95Ms >= latP50) return "#ffc069";  // Light orange — above median
+    return green; // Below median — healthy
+  };
+
   // Track all visited nodes across all trees to find orphaned components
   const globalVisited = new Set<string>();
 
@@ -248,62 +292,54 @@ export const convertServiceGraphToTree = (
       .map((edge: any) => buildTree(edge.to, new Set(visited), edge))
       .filter((child: any) => child !== null);
 
-    // Simple: show only incoming requests from parent in this tree path
+    // Direction-aware request count based on tree position
     let totalRequests: number;
-    let failedRequests: number;
-    let errorRate: number;
 
     if (incomingEdge) {
-      // Non-root: show incoming from parent
+      // Non-root: show traffic via this specific edge from parent
       totalRequests = incomingEdge.total_requests ?? 0;
-      failedRequests = incomingEdge.failed_requests ?? 0;
-      errorRate = incomingEdge.error_rate ?? 0;
     } else {
       // Root: sum of outgoing edges
       totalRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.total_requests ?? 0), 0);
-      failedRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.failed_requests ?? 0), 0);
 
-      // If no edges, use node's own metrics
+      // If no edges, fall back to node's own metrics
       if (totalRequests === 0 && node.requests !== undefined) {
         totalRequests = node.requests;
-        failedRequests = node.errors ?? 0;
-      }
-
-      errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
-
-      // If still no data, try node.error_rate directly
-      if (errorRate === 0 && node.error_rate !== undefined) {
-        errorRate = node.error_rate;
       }
     }
 
-    // Calculate connections count
-    const incomingEdges = incomingEdgesMap.get(nodeId) || [];
-    const connectionCount = incomingEdges.length + outgoingEdges.length;
+    // Node border: colored by this node's error rate relative to baseline
+    const nodeErrorRate = node.error_rate ?? (node.requests > 0 ? (node.errors / node.requests) * 100 : 0);
+    const borderColor = getNodeColor(nodeErrorRate);
 
-    // Border color based on error rate (theme-aware) - matches graph view
-    let borderColor: string;
-    if (isDarkMode) {
-      // Dark mode colors
-      borderColor = "#10b981"; // Green (healthy)
-      if (errorRate > 10) borderColor = "#ef4444"; // Red (critical)
-      else if (errorRate > 5) borderColor = "#f97316"; // Orange (warning)
-      else if (errorRate > 1) borderColor = "#fbbf24"; // Yellow (degraded)
+    // Edge line: colored by this edge's P95 latency vs 24h baseline (if available), else percentile-relative
+    const edgeP95Ms = incomingEdge ? (incomingEdge.p95_latency_ns || 0) / 1000000 : 0;
+    let edgeColor: string;
+    if (!incomingEdge) {
+      edgeColor = isDarkMode ? "#4a5568" : "#d9d9d9";
     } else {
-      // Light mode colors
-      borderColor = "#52c41a"; // Green (healthy)
-      if (errorRate > 10) borderColor = "#f5222d"; // Red (critical)
-      else if (errorRate > 5) borderColor = "#fa8c16"; // Orange (warning)
-      else if (errorRate > 1) borderColor = "#faad14"; // Yellow (degraded)
+      const bKey = `${incomingEdge.from}->${incomingEdge.to}`;
+      const baseline = edgeBaselines?.get(bKey);
+      if (baseline && baseline.p95_avg > 0) {
+        const ratio = (incomingEdge.p95_latency_ns || 0) / baseline.p95_avg;
+        edgeColor = ratio > 2.0 ? "#ff7875" : ratio > 1.5 ? "#ffc069" : "#52c41a";
+      } else {
+        edgeColor = getEdgeColor(edgeP95Ms);
+      }
     }
 
-    // Fixed size for tree view to prevent overlapping
-    const symbolSize = 45;
+    // Dynamic size based on request volume — matches graph view formula
+    const nodeRequests = node.requests ?? totalRequests;
+    const symbolSize = Math.max(40, Math.min(80, Math.log10(nodeRequests + 1) * 20));
 
     return {
       name: node.label || node.id,
       value: totalRequests,
       symbolSize: symbolSize,
+      lineStyle: {
+        color: edgeColor,
+        width: incomingEdge ? Math.max(1, Math.min(4, 1 + (totalRequests || 0) / 150)) : 1.5,
+      },
       itemStyle: {
         color: isDarkMode ? '#1a1f2e' : '#ffffff',
         borderColor: borderColor,
@@ -344,20 +380,25 @@ export const convertServiceGraphToTree = (
       },
       label: {
         show: true,
-        position: layoutType === 'vertical' ? 'top' : 'left',
+        position: 'inside',
         formatter: (params: any) => {
-          return `${params.name}\n${formatNumber(totalRequests)} req`;
+          return `{name|${params.name}}\n{requests|${formatNumber(totalRequests)} req}`;
         },
-      },
-      tooltip: {
-        formatter: (params: any) => {
-          return `
-            <strong>${params.name}</strong><br/>
-            Requests: ${formatNumber(totalRequests)}<br/>
-            Errors: ${failedRequests}<br/>
-            Error Rate: ${errorRate.toFixed(2)}%<br/>
-            Connections: ${connectionCount}
-          `;
+        rich: {
+          name: {
+            fontSize: 11,
+            fontWeight: '500',
+            color: isDarkMode ? '#e4e7eb' : '#333',
+            align: 'center',
+            lineHeight: 14,
+          },
+          requests: {
+            fontSize: 9,
+            fontWeight: 'normal',
+            color: isDarkMode ? '#9ca3af' : '#666',
+            align: 'center',
+            lineHeight: 12,
+          },
         },
       },
       children: children.length > 0 ? children : undefined,
@@ -365,21 +406,17 @@ export const convertServiceGraphToTree = (
   };
 
   // Start with root nodes
-  console.log('[convertServiceGraphToTree] Root nodes:', rootNodes.map((n: any) => n.id));
   let treeData = rootNodes.map((node: any) => buildTree(node.id)).filter((n: any) => n !== null);
-  console.log('[convertServiceGraphToTree] Trees from roots:', treeData.length);
-
+  
   // Find unvisited nodes (disconnected components or cycles)
   const unvisitedNodes = graphData.nodes.filter((n: any) => !globalVisited.has(n.id));
-  console.log('[convertServiceGraphToTree] Unvisited nodes:', unvisitedNodes.map((n: any) => n.id));
-
+  
   // Add unvisited nodes as separate root trees
   if (unvisitedNodes.length > 0) {
     const additionalTrees = unvisitedNodes
       .map((node: any) => buildTree(node.id))
       .filter((n: any) => n !== null);
     treeData = [...treeData, ...additionalTrees];
-    console.log('[convertServiceGraphToTree] Total trees after adding unvisited:', treeData.length);
   }
 
   // If still no tree data, create a flat structure
@@ -392,7 +429,7 @@ export const convertServiceGraphToTree = (
         data: graphData.nodes.map((node: any) => ({
           name: node.label || node.id,
           value: 0,
-          symbolSize: 45,
+          symbolSize: Math.max(40, Math.min(80, Math.log10((node.requests || 0) + 1) * 20)),
           itemStyle: {
             color: isDarkMode ? '#1a1f2e' : '#ffffff',
             borderColor: '#9E9E9E',
@@ -404,14 +441,12 @@ export const convertServiceGraphToTree = (
         layout: 'orthogonal',
         orient: layoutType === 'vertical' ? 'TB' : 'LR',
         initialTreeDepth: -1,
-        symbolSize: 45,
+        symbolSize: 50,
         roam: true, // Enable panning and zooming
         selectedMode: 'single', // Enable single node selection
         label: {
-          position: layoutType === 'vertical' ? 'bottom' : 'right',
-          verticalAlign: layoutType === 'vertical' ? 'top' : 'middle',
-          distance: 15,
-          fontSize: 12,
+          position: 'inside',
+          fontSize: 11,
         },
       }],
     };
@@ -431,39 +466,37 @@ export const convertServiceGraphToTree = (
   const options = {
     backgroundColor: 'transparent', // Make chart background transparent to match graph view
     tooltip: {
-      show: true,
-      trigger: 'item',
-      triggerOn: 'mousemove',
-      hideDelay: 0, // Hide immediately when mouse leaves
-      enterable: false, // Prevent mouse from entering tooltip
+      show: false, // Disabled — custom edge tooltips in ServiceGraph.vue handle this
     },
     series: [
       {
         type: 'tree',
         data: finalTreeData,
-        layout: layoutType === 'radial' ? 'radial' : 'orthogonal',
+        layout: 'orthogonal',
         orient: layoutType === 'vertical' ? 'TB' : 'LR',
+        // Maximize layout space so siblings spread further apart
+        left: layoutType === 'vertical' ? '1%' : '3%',
+        right: layoutType === 'vertical' ? '1%' : '3%',
+        top: layoutType === 'vertical' ? '3%' : '1%',
+        bottom: layoutType === 'vertical' ? '3%' : '1%',
         initialTreeDepth: -1,
         symbol: 'circle',
-        symbolSize: 45,
+        symbolSize: 50, // Default; each node overrides with dynamic size
         roam: true, // Enable panning and zooming
         selectedMode: 'single', // Enable single node selection
         label: {
-          position: layoutType === 'vertical' ? 'top' : 'left',
-          verticalAlign: layoutType === 'vertical' ? 'bottom' : 'middle',
-          distance: 15,
-          fontSize: 12,
-          rotate: 0, // Keep text horizontal, no rotation
+          position: 'inside',
+          fontSize: 11,
+          rotate: 0,
         },
         leaves: {
           label: {
-            position: layoutType === 'vertical' ? 'top' : 'left',
-            verticalAlign: layoutType === 'vertical' ? 'bottom' : 'middle',
-            distance: 15,
-            rotate: 0, // Keep text horizontal, no rotation
+            position: 'inside',
+            fontSize: 11,
+            rotate: 0,
           },
         },
-        expandAndCollapse: true,
+        expandAndCollapse: false, // Disable collapse on click - clicking only selects the node
         animationDuration: 550,
         animationDurationUpdate: 750,
       },
@@ -560,60 +593,46 @@ const computeForceLayout = (
 };
 
 /**
- * Convert service graph data to ECharts Graph format (force-directed/circular network)
+ * Convert service graph data to ECharts Graph format (force-directed network)
  */
 export const convertServiceGraphToNetwork = (
   graphData: { nodes: any[]; edges: any[] },
   layoutType: string = "force",
   cachedPositions?: Map<string, { x: number; y: number }>,
   isDarkMode: boolean = true,
-  selectedNodeId?: string
+  selectedNodeId?: string,
+  edgeBaselines?: Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>
 ) => {
-  // Validate layout type - graph view only supports 'force' and 'circular'
-  // Tree layouts ('horizontal', 'vertical', 'radial') should use convertServiceGraphToTree instead
-  const validLayouts = ['force', 'circular'];
-  const normalizedLayoutType = validLayouts.includes(layoutType) ? layoutType : 'force';
+  // Graph view only supports force-directed layout
+  // Tree layouts ('horizontal', 'vertical') should use convertServiceGraphToTree instead
+  const normalizedLayoutType = 'force';
 
   if (layoutType !== normalizedLayoutType) {
     console.warn(`[convertServiceGraphToNetwork] Invalid layout '${layoutType}' for graph view, defaulting to 'force'`);
   }
 
-  console.log('[convertServiceGraphToNetwork] VERSION: 2025-11-26-v4 - Fixed bidirectional edge overlap');
-  console.log('[convertServiceGraphToNetwork] Input:', {
-    nodeCount: graphData.nodes?.length || 0,
-    edgeCount: graphData.edges?.length || 0,
-    layoutType: normalizedLayoutType
-  });
-  // Build node metrics map (requests, errors, connections)
+  // Build node metrics map using each node's own data from backend (authoritative source)
   const nodeMetrics = new Map<string, { requests: number; errors: number; connections: number }>();
 
-  // Count connections for each node
-  const connectionCount = new Map<string, number>();
+  // Initialize metrics for all nodes using their own backend data
   graphData.nodes.forEach((node: any) => {
-    connectionCount.set(node.id, 0);
-  });
-
-  graphData.edges.forEach((edge: any) => {
-    connectionCount.set(edge.from, (connectionCount.get(edge.from) || 0) + 1);
-    connectionCount.set(edge.to, (connectionCount.get(edge.to) || 0) + 1);
-
-    // Update metrics for both source and target nodes
-    [edge.from, edge.to].forEach((nodeId: string) => {
-      if (!nodeMetrics.has(nodeId)) {
-        nodeMetrics.set(nodeId, { requests: 0, errors: 0, connections: 0 });
-      }
-      const metrics = nodeMetrics.get(nodeId)!;
-      metrics.requests += edge.total_requests || 0;
-      metrics.errors += edge.failed_requests || 0;
+    nodeMetrics.set(node.id, {
+      requests: node.requests || 0,
+      errors: node.errors || 0,
+      connections: 0, // Will be updated below
     });
   });
 
-  // Update connection counts in metrics
-  connectionCount.forEach((count, nodeId) => {
-    if (nodeMetrics.has(nodeId)) {
-      nodeMetrics.get(nodeId)!.connections = count;
-    } else {
-      nodeMetrics.set(nodeId, { requests: 0, errors: 0, connections: count });
+  // Count connections for each node
+  graphData.edges.forEach((edge: any) => {
+    const fromMetrics = nodeMetrics.get(edge.from);
+    const toMetrics = nodeMetrics.get(edge.to);
+
+    if (fromMetrics) {
+      fromMetrics.connections += 1;
+    }
+    if (toMetrics) {
+      toMetrics.connections += 1;
     }
   });
 
@@ -627,7 +646,7 @@ export const convertServiceGraphToNetwork = (
   });
 
   const nodes = validNodes.map((node: any) => {
-    const metrics = nodeMetrics.get(node.id) || { requests: 0, errors: 0 };
+    const metrics = nodeMetrics.get(node.id) || { requests: 0, errors: 0, connections: 0 };
     const errorRate = metrics.requests > 0 ? (metrics.errors / metrics.requests) * 100 : 0;
 
     // Border color based on error rate (theme-aware)
@@ -708,8 +727,7 @@ export const convertServiceGraphToNetwork = (
           <strong>${node.label || node.id}</strong><br/>
           Requests: ${formatNumber(metrics.requests)}<br/>
           Errors: ${formatNumber(metrics.errors)}<br/>
-          Error Rate: ${errorRate.toFixed(2)}%<br/>
-          Connections: ${connectionCount.get(node.id) || 0}
+          Error Rate: ${errorRate.toFixed(2)}%
         `,
       },
     };
@@ -729,10 +747,7 @@ export const convertServiceGraphToNetwork = (
   // Create a set of valid node IDs for edge validation
   const validNodeIds = new Set(nodes.map((n: any) => n.id));
 
-  console.log('[convertServiceGraphToNetwork] Valid node IDs:', Array.from(validNodeIds));
-
   // Prepare edges with arrows showing flow direction
-  // For circular layout, use curved lines; for force layout, use straight lines
   // Filter out any invalid edges and ensure all required fields are present
   const edgeMap = new Map<string, any>(); // Deduplicate edges by source-target pair
 
@@ -767,8 +782,6 @@ export const convertServiceGraphToNetwork = (
     }
   });
 
-  console.log('[convertServiceGraphToNetwork] Valid edges after dedup:', edgeMap.size);
-
   // Detect bidirectional edges and assign curvature direction
   // For bidirectional edges, one edge curves left, the other curves right
   const edgeCurvature = new Map<string, number>();
@@ -792,20 +805,11 @@ export const convertServiceGraphToNetwork = (
     }
   });
 
-  console.log('[convertServiceGraphToNetwork] Bidirectional pairs:', processedPairs.size);
-
-  const edges = Array.from(edgeMap.entries()).map(([edgeKey, edge]: [string, any], edgeIndex: number) => {
+  const edges = Array.from(edgeMap.entries()).map(([edgeKey, edge]: [string, any]) => {
     const errorRate = edge.total_requests > 0 ? (edge.failed_requests / edge.total_requests) * 100 : 0;
 
     // Get the assigned curvature for this edge
-    let curveness = edgeCurvature.get(edgeKey) || 0;
-
-    // For circular layout, override with circular-specific curveness
-    if (normalizedLayoutType === 'circular') {
-      // Vary curveness based on edge index to create visual separation
-      // Range from 0.3 to 0.6 (positive values should curve inward)
-      curveness = 0.3 + (edgeIndex % 4) * 0.1;
-    }
+    const curveness = edgeCurvature.get(edgeKey) || 0;
 
     // Format latency values
     const formatLatency = (ns: number) => {
@@ -818,18 +822,25 @@ export const convertServiceGraphToNetwork = (
     const p95 = formatLatency(edge.p95_latency_ns || 0);
     const p99 = formatLatency(edge.p99_latency_ns || 0);
 
-    // Determine color based on error rate AND latency (P95)
-    // Priority: errors first, then latency
+    // Edge color is latency-only (error rate belongs on nodes, not edges)
     const p95Ms = (edge.p95_latency_ns || 0) / 1000000;
+    const baselineKey = `${edge.from}->${edge.to}`;
+    const baseline = edgeBaselines?.get(baselineKey);
     let edgeColor;
-    if (errorRate > 5) {
-      edgeColor = "#f5222d"; // Red for high errors
-    } else if (errorRate > 1) {
-      edgeColor = "#faad14"; // Orange for medium errors
+    if (baseline && baseline.p95_avg > 0) {
+      // Baseline-relative coloring: compare current p95 to previous-slot weighted average
+      const ratio = (edge.p95_latency_ns || 0) / baseline.p95_avg;
+      if (ratio > 2.0) {
+        edgeColor = "#ff7875"; // >2x baseline
+      } else if (ratio > 1.5) {
+        edgeColor = "#ffc069"; // 1.5–2x baseline
+      } else {
+        edgeColor = "#52c41a"; // Within baseline
+      }
     } else if (p95Ms > 1000) {
-      edgeColor = "#ff7875"; // Light red for high latency (>1s)
+      edgeColor = "#ff7875"; // >1s absolute threshold
     } else if (p95Ms > 500) {
-      edgeColor = "#ffc069"; // Light orange for medium latency (>500ms)
+      edgeColor = "#ffc069"; // >500ms absolute threshold
     } else {
       edgeColor = "#52c41a"; // Green for healthy
     }
@@ -838,14 +849,8 @@ export const convertServiceGraphToNetwork = (
       source: edge.from,
       target: edge.to,
       value: edge.total_requests || 0,
-      tooltip: {
-        formatter: edge.from + ' → ' + edge.to + '<br/>' +
-          'Requests: ' + (edge.total_requests || 0) + '<br/>' +
-          'Errors: ' + (edge.failed_requests || 0) + ' (' + errorRate.toFixed(2) + '%)<br/>' +
-          'P50: ' + p50 + '<br/>' +
-          'P95: ' + p95 + '<br/>' +
-          'P99: ' + p99
-      },
+      // Edge tooltips are handled by the mini chart overlay — disable ECharts native tooltip
+      tooltip: { show: false },
       symbol: ['none', 'arrow'], // Arrow at target end
       symbolSize: [0, 12], // Smaller arrows for cleaner look
       lineStyle: {
@@ -866,12 +871,11 @@ export const convertServiceGraphToNetwork = (
     };
   });
 
-  // Determine if we should use force layout, circular layout, or fixed positions
+  // Determine if we should use force layout or fixed positions
   const hasPositions = cachedPositions && cachedPositions.size > 0;
 
   // For force layout without cached positions, compute layout with D3-force
   if (normalizedLayoutType === 'force' && !hasPositions) {
-    console.log('[convertServiceGraphToNetwork] Computing force layout with D3-force');
     const positionedNodes = computeForceLayout(nodes, graphData.edges, 800, 600);
 
     // Apply computed positions to nodes and mark them as fixed
@@ -883,44 +887,13 @@ export const convertServiceGraphToNetwork = (
         node.fixed = true; // Lock positions so ECharts doesn't re-layout
       }
     });
-
-    console.log('[convertServiceGraphToNetwork] Applied D3-force positions to', positionedNodes.length, 'nodes');
   }
 
-  // For circular layout, calculate positions manually on the periphery
-  if (normalizedLayoutType === 'circular' && !hasPositions) {
-    const nodeCount = nodes.length;
-    const nodeSize = 15; // Node diameter
-    const radius = 280; // Radius where node centers are positioned
-    const centerX = 0;
-    const centerY = 0;
-
-    nodes.forEach((node: any, index: number) => {
-      const angle = (2 * Math.PI * index) / nodeCount - Math.PI / 2; // Start from top
-      node.x = centerX + radius * Math.cos(angle);
-      node.y = centerY + radius * Math.sin(angle);
-      node.fixed = true;
-
-      // For circular layout, use small uniform nodes (chord diagram style)
-      node.symbolSize = nodeSize;
-
-      // Simplify styling for chord diagram - use solid colors without gradients
-      node.itemStyle = {
-        color: node.itemStyle.borderColor, // Use the border color as fill
-        borderColor: '#ffffff',
-        borderWidth: 2,
-        shadowBlur: 5,
-        shadowColor: 'rgba(0, 0, 0, 0.2)',
-      };
-    });
-
-    console.log('[convertServiceGraphToNetwork] Using circular layout with', nodeCount, 'nodes on periphery');
-  } else if (hasPositions) {
+  if (hasPositions) {
     console.log('[convertServiceGraphToNetwork] Using cached positions for', cachedPositions.size, 'nodes');
   }
 
-  // Use "none" layout when we have fixed positions (D3-force computed, circular, or cached)
-  // Always use "none" since we compute positions manually or use cached ones
+  // Use "none" layout when we have fixed positions (D3-force computed or cached)
   const layoutMode = "none";
 
   const options = {
@@ -956,13 +929,7 @@ export const convertServiceGraphToNetwork = (
         },
         animationDurationUpdate: 200,
         animationEasingUpdate: 'cubicOut',
-        label: normalizedLayoutType === 'circular' ? {
-          show: true,
-          position: 'top',
-          formatter: (params: any) => params.data.name,
-          fontSize: 11,
-          color: isDarkMode ? '#e4e7eb' : '#333', // Theme-aware text color
-        } : {
+        label: {
           show: true,
           position: 'inside',
           formatter: (params: any) => {
@@ -1014,11 +981,11 @@ export const convertServiceGraphToNetwork = (
           },
         },
         lineStyle: {
-          opacity: normalizedLayoutType === 'circular' ? 0.5 : 0.7,
+          opacity: 0.7,
           curveness: 'auto', // Let individual edges control curveness
         },
         edgeSymbol: ['none', 'arrow'],
-        edgeSymbolSize: [0, normalizedLayoutType === 'circular' ? 10 : 15],
+        edgeSymbolSize: [0, 15],
       },
     ],
   };

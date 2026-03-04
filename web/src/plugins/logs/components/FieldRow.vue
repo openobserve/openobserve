@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Simple field without expansion (FTS keys or fields without values) -->
   <div
     v-if="field.ftsKey || !field.isSchemaField || !field.showValues"
-    class="field-container flex content-center ellipsis q-pl-lg full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
+    class="field-container flex content-center ellipsis full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
+
     :title="field.name"
   >
     <div
@@ -29,6 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="ellipsis tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]!"
         style="display: inline-block"
       >
+        <FieldTypeBadge
+          :dataType="
+            field.name === timestampColumn ? 'timestamp' : field.dataType
+          "
+        />
         {{ field.name }}
       </div>
       <span class="float-right">
@@ -105,6 +111,7 @@ import {
   outlinedVisibility,
   outlinedVisibilityOff,
 } from "@quasar/extras/material-icons-outlined";
+import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 
 interface Props {
   field: any;

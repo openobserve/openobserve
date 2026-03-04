@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Change the column type for mysql db enrichment_tables table created_at column
+//! This migration was MySQL-only and is now a no-op.
 
 use sea_orm_migration::prelude::*;
 
@@ -22,58 +22,11 @@ pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
-    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        increase_data_column_size(manager).await?;
+    async fn up(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
         Ok(())
     }
 
     async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
-        // Reversing this migration is not supported.
         Ok(())
-    }
-}
-
-// Increase the data column size.
-async fn increase_data_column_size(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    if !matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
-        log::debug!("[Migration] Non-mysql db does not need this migration");
-        return Ok(());
-    }
-    manager
-        .alter_table(increase_data_column_size_statement())
-        .await?;
-    Ok(())
-}
-
-fn increase_data_column_size_statement() -> TableAlterStatement {
-    Table::alter()
-        .table(EnrichmentTables::Table)
-        .modify_column(
-            ColumnDef::new(EnrichmentTables::CreatedAt)
-                .big_integer()
-                .not_null()
-                .to_owned(),
-        )
-        .to_owned()
-}
-
-/// Identifiers used in queries on the enrichment tables table.
-#[derive(DeriveIden)]
-enum EnrichmentTables {
-    Table,
-    CreatedAt,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn mysql() {
-        let statement = increase_data_column_size_statement();
-        assert_eq!(
-            statement.to_string(MysqlQueryBuilder),
-            "ALTER TABLE `enrichment_tables` MODIFY COLUMN `created_at` bigint NOT NULL"
-        );
     }
 }

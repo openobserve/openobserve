@@ -149,7 +149,7 @@ async function createDashboardAndAddFirstPanel(page, pm, dashboardName) {
 
   // Reload page to ensure fresh streams list is loaded after ingestion
   testLogger.info("Reloading page to refresh streams list...");
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForTimeout(2000);
 
   await pm.dashboardCreate.addPanel();

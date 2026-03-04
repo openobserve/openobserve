@@ -139,7 +139,7 @@ pub async fn get_views(Path(path): Path<String>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a saved view", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Delete a saved view", "category": "search", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_view(Path(path): Path<(String, String)>) -> Response {

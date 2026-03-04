@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,7 @@ use arrow_flight::{
     flight_service_server::FlightService,
 };
 use config::{
-    PARQUET_BATCH_SIZE, cluster::LOCAL_NODE, datafusion::request::FlightSearchRequest,
+    cluster::LOCAL_NODE, datafusion::request::FlightSearchRequest, get_batch_size,
     meta::search::ScanStats,
 };
 use datafusion::{
@@ -141,6 +141,7 @@ impl FlightService for FlightServiceImpl {
                     _start.elapsed().as_millis(),
                 ),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight::do_get get_ctx_and_physical_plan".to_string())
                     .search_role("follower".to_string())
@@ -165,7 +166,7 @@ impl FlightService for FlightServiceImpl {
         // https://github.com/apache/datafusion/pull/11587
         // add coalesce batches exec to trigger StringView gc to reduce memory usage
         let physical_plan: Arc<dyn ExecutionPlan> =
-            Arc::new(CoalesceBatchesExec::new(physical_plan, PARQUET_BATCH_SIZE));
+            Arc::new(CoalesceBatchesExec::new(physical_plan, get_batch_size()));
 
         log::info!(
             "[trace_id {trace_id}] flight->search: executing stream, is super cluster: {is_super_cluster}"

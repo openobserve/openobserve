@@ -566,36 +566,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_models_mysql() -> Result<(), DbErr> {
-        let db = MockDatabase::new(DatabaseBackend::MySql)
-            .append_query_results([Vec::<dashboards::Model>::new()])
-            .into_connection();
-        let params = ListDashboardsParams {
-            org_id: "orgId".to_owned(),
-            folder_id: Some("folderId".to_owned()),
-            title_pat: Some("tItLePat".to_owned()),
-            page_size_and_idx: Some((100, 2)),
-        };
-        list_models(&db, params).await?;
-        assert_eq!(
-            db.into_transaction_log(),
-            vec![Transaction::from_sql_and_values(
-                DatabaseBackend::MySql,
-                r#"SELECT `dashboards`.`id` AS `A_id`, `dashboards`.`dashboard_id` AS `A_dashboard_id`, `dashboards`.`folder_id` AS `A_folder_id`, `dashboards`.`owner` AS `A_owner`, `dashboards`.`role` AS `A_role`, `dashboards`.`title` AS `A_title`, `dashboards`.`description` AS `A_description`, `dashboards`.`data` AS `A_data`, `dashboards`.`version` AS `A_version`, `dashboards`.`created_at` AS `A_created_at`, `dashboards`.`updated_at` AS `A_updated_at`, `folders`.`id` AS `B_id`, `folders`.`org` AS `B_org`, `folders`.`folder_id` AS `B_folder_id`, `folders`.`name` AS `B_name`, `folders`.`description` AS `B_description`, `folders`.`type` AS `B_type` FROM `dashboards` LEFT JOIN `folders` ON `dashboards`.`folder_id` = `folders`.`id` WHERE `folders`.`org` = ? AND `folders`.`type` = ? AND `folders`.`folder_id` = ? AND LOWER(`title`) LIKE ? ORDER BY `dashboards`.`title` ASC, `folders`.`name` ASC LIMIT ? OFFSET ?"#,
-                [
-                    "orgId".into(),
-                    0i16.into(),
-                    "folderId".into(),
-                    "%titlepat%".into(),
-                    100u64.into(),
-                    200u64.into()
-                ]
-            )]
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn list_models_sqlite() -> Result<(), DbErr> {
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
             .append_query_results([Vec::<dashboards::Model>::new()])

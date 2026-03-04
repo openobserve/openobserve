@@ -1,4 +1,3 @@
-use sea_orm::DbBackend;
 use sea_orm_migration::prelude::*;
 
 const RESOURCE_KEY: &str = "rkey_idx";
@@ -27,18 +26,9 @@ impl MigrationTrait for Migration {
                 .await?;
         }
 
-        match manager.get_database_backend() {
-            DbBackend::MySql => {
-                manager
-                    .create_index(create_ratelimit_resource_key_idx_stmnt_mysql())
-                    .await?;
-            }
-            _ => {
-                manager
-                    .create_index(create_ratelimit_resource_key_idx_stmnt())
-                    .await?;
-            }
-        }
+        manager
+            .create_index(create_ratelimit_resource_key_idx_stmnt())
+            .await?;
 
         Ok(())
     }
@@ -122,16 +112,6 @@ fn create_ratelimit_resource_key_idx_stmnt() -> IndexCreateStatement {
         .col(RateLimitRules::ApiGroupName)
         .col(RateLimitRules::ApiGroupOperation)
         .unique()
-        .to_owned()
-}
-
-fn create_ratelimit_resource_key_idx_stmnt_mysql() -> IndexCreateStatement {
-    sea_query::Index::create()
-        .name(RESOURCE_KEY)
-        .table(RateLimitRules::Table)
-        .col(RateLimitRules::Org)
-        .col(RateLimitRules::UserRole)
-        .col(RateLimitRules::UserId)
         .to_owned()
 }
 

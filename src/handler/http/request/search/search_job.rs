@@ -23,7 +23,8 @@ use config::meta::search::Request;
 #[cfg(feature = "enterprise")]
 use {
     crate::handler::http::request::search::{
-        query_manager::cancel_query_inner, utils::check_stream_permissions,
+        query_manager::cancel_query_inner,
+        utils::{StreamPermissionResourceType, check_stream_permissions},
     },
     crate::service::search_jobs::{get_result, merge_response},
     crate::{
@@ -106,7 +107,7 @@ pub async fn submit_job(
     {
         let cfg = get_config();
 
-        let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+        let http_span = if cfg.common.should_create_span() {
             tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone())
         } else {
             Span::none()
@@ -181,8 +182,14 @@ pub async fn submit_job(
 
         // Check permissions on stream
         for stream_name in stream_names.iter() {
-            if let Some(res) =
-                check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
+            if let Some(res) = check_stream_permissions(
+                stream_name,
+                &org_id,
+                &user_id,
+                &stream_type,
+                StreamPermissionResourceType::Search,
+            )
+            .await
             {
                 return res;
             }
@@ -531,7 +538,7 @@ pub async fn get_job_result(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a search job", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Delete a search job", "category": "search", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_job(
@@ -714,8 +721,14 @@ async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Optio
     let stream_type = StreamType::from(job.stream_type.as_str());
     let stream_names: Vec<String> = json::from_str(&job.stream_names).unwrap();
     for stream_name in stream_names.iter() {
-        if let Some(res) =
-            check_stream_permissions(stream_name, org_id, user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            stream_name,
+            org_id,
+            user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
         {
             return Some(res);
         }

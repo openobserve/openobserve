@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod mysql;
 mod postgres;
 mod sqlite;
 
 use async_trait::async_trait;
-pub use mysql::MysqlAdapter;
 pub use postgres::PostgresAdapter;
 pub use sqlite::SqliteAdapter;
 
@@ -114,6 +112,12 @@ pub trait DbAdapter: Send + Sync {
     /// Truncate a table
     async fn truncate_table(&self, table: &str) -> Result<(), anyhow::Error>;
 
+    /// Reset sequences for IDENTITY/SERIAL columns to max(col) after bulk insert.
+    /// No-op by default; only meaningful for databases that use sequences (e.g. PostgreSQL).
+    async fn sync_sequences(&self, _table: &str) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+
     /// Close the connection
     async fn close(&self) -> Result<(), anyhow::Error>;
 }
@@ -122,7 +126,6 @@ pub trait DbAdapter: Send + Sync {
 pub async fn create_adapter(db_type: &str) -> Result<Box<dyn DbAdapter>, anyhow::Error> {
     match db_type.to_lowercase().as_str() {
         "sqlite" => Ok(Box::new(SqliteAdapter::connect().await?)),
-        "mysql" => Ok(Box::new(MysqlAdapter::connect().await?)),
         "postgresql" | "postgres" => Ok(Box::new(PostgresAdapter::connect().await?)),
         _ => Err(anyhow::anyhow!("Unsupported database type: {}", db_type)),
     }

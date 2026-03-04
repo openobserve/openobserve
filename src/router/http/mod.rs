@@ -154,6 +154,7 @@ async fn resolve_target(path: &str, base_uri: &str) -> Result<ProxyTarget, Strin
     }
 
     let node = select_node(&nodes);
+    let path = format!("{}{}", base_uri, path);
     Ok(ProxyTarget {
         path: path.to_string(),
         full_url: format!("{}{}", node.http_addr, path),
@@ -470,10 +471,9 @@ async fn send_and_respond(
         Ok(r) => r,
         Err(e) => {
             log::error!(
-                "proxy request failed: {} -> {}, error: {:?}, took: {} ms",
+                "proxy request failed: {} -> {}, error: {e:?}, took: {} ms",
                 target.path,
                 target.node_addr,
-                e,
                 start.elapsed().as_millis()
             );
             return (
@@ -512,9 +512,27 @@ async fn send_and_respond(
     }
 
     if is_streaming {
+        let path_for_log = target.path.clone();
+        let node_for_log = target.node_addr.clone();
         let stream = resp
             .bytes_stream()
-            .map(|chunk| chunk.map_err(|e| std::io::Error::other(e.to_string())));
+            .map(move |chunk| -> Result<Bytes, std::io::Error> {
+                match chunk {
+                    Ok(bytes) => Ok(bytes),
+                    Err(e) => {
+                        log::error!(
+                            "proxy streaming error: {} -> {}, error: {e:?}",
+                            path_for_log,
+                            node_for_log,
+                        );
+                        let error_event = serde_json::json!({
+                            "type": "error",
+                            "error": format!("Stream interrupted: {e}")
+                        });
+                        Ok(Bytes::from(format!("data: {}\n\n", error_event)))
+                    }
+                }
+            });
         match builder.body(Body::from_stream(stream)) {
             Ok(r) => r,
             Err(e) => (
@@ -528,10 +546,9 @@ async fn send_and_respond(
             Ok(b) => b,
             Err(e) => {
                 log::error!(
-                    "proxy response failed: {} -> {}, error: {:?}, took: {} ms",
+                    "proxy response failed: {} -> {}, error: {e:?}, took: {} ms",
                     target.path,
                     target.node_addr,
-                    e,
                     start.elapsed().as_millis()
                 );
                 return (

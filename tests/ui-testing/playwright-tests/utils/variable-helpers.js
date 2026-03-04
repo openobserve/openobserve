@@ -14,56 +14,157 @@ import testLogger from './test-logger.js';
  * @returns {Promise<Object>} - {success, actualCount, calls, timedOut}
  */
 export async function monitorVariableAPICalls(page, options = {}) {
-  const { expectedCount = 1, timeout = 15000 } = options;
+  const { expectedCount = 1, timeout = 15000, matchFn = null } = options;
   const startTime = Date.now();
   const apiCalls = [];
+  const handledRequests = new Set(); // Track request objects handled by requestHandler
+  let matchedCount = 0;
+  let resolved = false;
 
   return new Promise((resolve) => {
-    const responseHandler = async (response) => {
-      const url = response.url();
+    const doResolve = (result) => {
+      if (resolved) return;
+      resolved = true;
+      page.off('request', requestHandler);
+      page.off('response', responseHandler);
+      resolve(result);
+    };
 
-      if (url.includes('_values_stream') || url.includes('/values')) {
-        try {
-          const body = await response.text();
-          const status = response.status();
+    // Helper: extract stream/field from URL and POST body
+    const parseCallInfo = (url, postDataStr) => {
+      const streamMatch = url.match(/\/api\/[^/]+\/([^/]+)\/_values_stream/);
+      const fieldsMatch = url.match(/[?&]fields=([^&]+)/);
+      let stream = streamMatch ? decodeURIComponent(streamMatch[1]) : null;
+      let field = fieldsMatch ? decodeURIComponent(fieldsMatch[1]) : null;
 
-          const callInfo = {
-            url,
-            status,
-            timestamp: Date.now(),
-            duration: Date.now() - startTime,
-            completed: body.includes('[[DONE]]') || body.includes('"type":"end"'),
-            hasData: body.length > 0,
-          };
-
-          apiCalls.push(callInfo);
-
-          testLogger.info(`Variable API call ${apiCalls.length}/${expectedCount}: ${status} - ${callInfo.completed ? 'Completed' : 'Incomplete'}`);
-
-          if (callInfo.completed && apiCalls.length >= expectedCount) {
-            page.off('response', responseHandler);
-            resolve({
-              success: true,
-              actualCount: apiCalls.length,
-              calls: apiCalls,
-              timedOut: false,
-              totalDuration: Date.now() - startTime
-            });
+      let requestBody = null;
+      try {
+        if (postDataStr) {
+          requestBody = JSON.parse(postDataStr);
+          if (!stream && requestBody.stream_name) {
+            stream = requestBody.stream_name;
           }
-        } catch (error) {
-          testLogger.debug(`Error reading response body: ${error.message}`);
+          if (!field && requestBody.fields && requestBody.fields.length > 0) {
+            field = requestBody.fields.join(',');
+          }
+        }
+      } catch (_e) { /* POST body might not be JSON */ }
+
+      return { stream, field, requestBody };
+    };
+
+    const processCall = (callInfo) => {
+      apiCalls.push(callInfo);
+      const matches = matchFn ? matchFn(callInfo) : true;
+
+      testLogger.info(
+        `Variable API call ${apiCalls.length} (matched=${matchedCount}/${expectedCount}): ` +
+        `status=${callInfo.status} stream=${callInfo.stream} field=${callInfo.field} ` +
+        `matches=${matches} source=${callInfo.source}`
+      );
+
+      if (callInfo.completed && matches) {
+        matchedCount++;
+        if (matchedCount >= expectedCount) {
+          doResolve({
+            success: true,
+            actualCount: apiCalls.length,
+            matchedCount,
+            calls: apiCalls,
+            timedOut: false,
+            totalDuration: Date.now() - startTime
+          });
         }
       }
     };
 
+    // Primary listener: 'request' event fires immediately when fetch() is called.
+    // This reliably captures SSE/streaming requests (text/event-stream) where the
+    // 'response' event may never fire or response.text() hangs indefinitely.
+    const requestHandler = (request) => {
+      if (resolved) return;
+      const url = request.url();
+
+      if (url.includes('_values_stream') || url.includes('/values')) {
+        try {
+          const { stream, field, requestBody } = parseCallInfo(url, request.postData());
+
+          // Mark this request as handled so responseHandler won't double-count it
+          handledRequests.add(request);
+
+          processCall({
+            url,
+            status: 0, // Not yet known from request alone
+            stream,
+            field,
+            requestBody,
+            timestamp: Date.now(),
+            duration: Date.now() - startTime,
+            completed: true, // Request was sent — sufficient for cascade verification
+            hasData: true,
+            source: 'request',
+          });
+        } catch (error) {
+          testLogger.debug(`Error processing request for ${url}: ${error.message}`);
+        }
+      }
+    };
+
+    // Secondary listener: only fires for requests NOT already handled by requestHandler.
+    // This covers edge cases where the request event was missed.
+    const responseHandler = async (response) => {
+      if (resolved) return;
+      const url = response.url();
+
+      if (url.includes('_values_stream') || url.includes('/values')) {
+        // Skip if requestHandler already processed this same request object
+        if (handledRequests.has(response.request())) return;
+
+        try {
+          const status = response.status();
+          let body = '';
+          try {
+            body = await Promise.race([
+              response.text(),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Body read timeout')), 5000)
+              )
+            ]);
+          } catch (_bodyErr) {
+            return;
+          }
+
+          const { stream, field, requestBody } = parseCallInfo(
+            url, response.request().postData()
+          );
+
+          processCall({
+            url,
+            status,
+            stream,
+            field,
+            requestBody,
+            timestamp: Date.now(),
+            duration: Date.now() - startTime,
+            completed: body.includes('[[DONE]]') || body.includes('"type":"end"'),
+            hasData: body.length > 0,
+            source: 'response',
+          });
+        } catch (error) {
+          testLogger.debug(`Error processing response for ${url}: ${error.message}`);
+        }
+      }
+    };
+
+    page.on('request', requestHandler);
     page.on('response', responseHandler);
 
     setTimeout(() => {
-      page.off('response', responseHandler);
-      testLogger.warn(`Variable API monitoring timed out: ${apiCalls.length}/${expectedCount} calls completed`);
-      resolve({
-        success: apiCalls.length >= expectedCount,
+      testLogger.warn(`Variable API monitoring timed out: ${apiCalls.length} calls, ${matchedCount}/${expectedCount} matched`);
+      doResolve({
+        success: matchedCount >= expectedCount,
         actualCount: apiCalls.length,
+        matchedCount,
         calls: apiCalls,
         timedOut: true,
         totalDuration: timeout

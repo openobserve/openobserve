@@ -69,9 +69,8 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
         .to_owned();
 
     let (sql, values) = match backend {
-        sea_orm::DatabaseBackend::MySql => select_query.build(MysqlQueryBuilder),
         sea_orm::DatabaseBackend::Postgres => select_query.build(PostgresQueryBuilder),
-        sea_orm::DatabaseBackend::Sqlite => select_query.build(SqliteQueryBuilder),
+        _ => select_query.build(SqliteQueryBuilder),
     };
     let statement = Statement::from_sql_and_values(backend, sql, values);
     log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] select_query: {statement}");
@@ -106,9 +105,8 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
 
         let backend = db.get_database_backend();
         let (sql, values) = match backend {
-            sea_orm::DatabaseBackend::MySql => report_query.build(MysqlQueryBuilder),
             sea_orm::DatabaseBackend::Postgres => report_query.build(PostgresQueryBuilder),
-            sea_orm::DatabaseBackend::Sqlite => report_query.build(SqliteQueryBuilder),
+            _ => report_query.build(SqliteQueryBuilder),
         };
         let statement = Statement::from_sql_and_values(backend, sql, values);
         log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] report_query to get id: {statement}");
@@ -137,9 +135,8 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
                 .and_where(Expr::col(ScheduledJobs::ModuleKey).eq(report_name))
                 .to_owned();
             let (sql, values) = match backend {
-                sea_orm::DatabaseBackend::MySql => update_query.build(MysqlQueryBuilder),
                 sea_orm::DatabaseBackend::Postgres => update_query.build(PostgresQueryBuilder),
-                sea_orm::DatabaseBackend::Sqlite => update_query.build(SqliteQueryBuilder),
+                _ => update_query.build(SqliteQueryBuilder),
             };
             let statement = Statement::from_sql_and_values(backend, sql, values);
             log::debug!(

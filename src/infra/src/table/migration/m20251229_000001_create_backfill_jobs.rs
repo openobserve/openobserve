@@ -179,34 +179,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_table_stmt().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `backfill_jobs` (
-                `id` varchar(27) NOT NULL PRIMARY KEY,
-                `org` varchar(256) NOT NULL,
-                `pipeline_id` varchar(256) NOT NULL,
-                `start_time` bigint NOT NULL,
-                `end_time` bigint NOT NULL,
-                `chunk_period_minutes` bigint NULL,
-                `delay_between_chunks_secs` bigint NULL,
-                `delete_before_backfill` bool NOT NULL DEFAULT FALSE,
-                `created_at` bigint NOT NULL
-            )"#
-        );
-
-        collapsed_eq!(
-            &create_backfill_jobs_org_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE INDEX `backfill_jobs_org_idx` ON `backfill_jobs` (`org`)"#
-        );
-
-        collapsed_eq!(
-            &create_backfill_jobs_pipeline_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE INDEX `backfill_jobs_pipeline_idx` ON `backfill_jobs` (`pipeline_id`)"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         collapsed_eq!(
             &create_table_stmt().to_string(SqliteQueryBuilder),

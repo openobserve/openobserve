@@ -34,74 +34,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </h2>
         </div>
-        <q-btn
-          flat
-          dense
-          round
-          icon="cancel"
-          size="sm"
-          @click="handleClose"
-          data-test="service-graph-side-panel-close-btn"
-          class="close-btn"
-        />
+        <div class="panel-header-actions">
+          <q-btn
+            unelevated
+            no-caps
+            dense
+            size="sm"
+            label="Show telemetry"
+            icon="manage_search"
+            @click="handleShowTelemetry"
+            data-test="service-graph-side-panel-show-telemetry-btn"
+            class="telemetry-btn"
+            :loading="correlationLoading"
+          />
+          <q-btn
+            flat
+            dense
+            round
+            icon="cancel"
+            size="sm"
+            @click="handleClose"
+            data-test="service-graph-side-panel-close-btn"
+            class="close-btn"
+          />
+        </div>
       </div>
 
       <!-- Content Scrollable Area -->
       <div class="panel-content">
-        <!-- Action Buttons Section -->
-        <div class="panel-section actions-section">
-          <q-btn
-          v-if="false"
-            outline
-            no-caps
-            size="sm"
-            label="📋 View Logs"
-            @click="handleViewLogs"
-            data-test="service-graph-side-panel-view-logs-btn"
-            class="action-btn"
-            :disable="true"
-          >
-            <q-tooltip>
-              View Logs is currently disabled
-            </q-tooltip>
-          </q-btn>
-          <q-btn
-            outline
-            no-caps
-            size="sm"
-            label="🔍 View Traces"
-            @click="handleViewTraces"
-            data-test="service-graph-side-panel-view-traces-btn"
-            class="action-btn"
-            :disable="isAllStreamsSelected"
-          >
-            <q-tooltip v-if="isAllStreamsSelected">
-              Please select a specific stream to view traces
-            </q-tooltip>
-          </q-btn>
-        </div>
-
         <!-- Metrics Section -->
         <div
           class="panel-section metrics-section"
           data-test="service-graph-side-panel-metrics"
         >
-          <div class="section-title">Metrics</div>
-          <div class="metrics-grid">
-            <div class="metric-card" data-test="service-graph-side-panel-request-rate">
-              <div class="metric-label">Request Rate</div>
-              <div class="metric-value">
-                {{ serviceMetrics.requestRateValue }}
-                <span class="metric-unit">req/min</span>
+
+          <!-- Request Rate Card (Full Width - Combined Metrics) -->
+          <div class="metric-card metric-card-full" data-test="service-graph-side-panel-request-rate">
+            <div class="metric-single-line">
+              <div class="metric-total">
+                <span class="total-label">Requests:</span>
+                <span class="total-value">{{ serviceMetrics.requestRateValue }}</span>
+                <span class="total-unit">/min</span>
+              </div>
+              <div class="metric-divider"></div>
+              <div class="metric-inline incoming">
+                <q-icon name="arrow_forward" size="12px" />
+                <span class="inline-value">{{ formatNumber(serviceMetrics.incomingRequests) }}</span>
+                <q-tooltip>Incoming Requests (requests coming into this service)</q-tooltip>
+              </div>
+              <div class="metric-divider"></div>
+              <div class="metric-inline outgoing">
+                <span class="inline-value">{{ formatNumber(serviceMetrics.outgoingRequests) }}</span>
+                <q-icon name="arrow_forward" size="12px" />
+                <q-tooltip>Outgoing Requests (requests going out from this service)</q-tooltip>
               </div>
             </div>
-            <div class="metric-card" data-test="service-graph-side-panel-error-rate">
-              <div class="metric-label">Error Rate</div>
-              <div class="metric-value">{{ serviceMetrics.errorRate }}</div>
+
+            <!-- Horizontal Divider -->
+            <div class="metric-horizontal-divider"></div>
+
+            <!-- Error Rate and Latency Percentiles (Bottom Rows) -->
+            <div class="metric-bottom-row">
+              <div class="metric-inline-item error-rate-card" :class="getErrorRateClass()" data-test="service-graph-side-panel-error-rate">
+                <q-icon name="error_outline" size="14px" />
+                <span class="metric-label">Error Rate:</span>
+                <span class="metric-value">{{ serviceMetrics.errorRate }}</span>
+              </div>
+              <div class="metric-row-divider"></div>
+              <div class="metric-inline-item latency-card" :class="getLatencyClass(serviceMetrics.p95Latency)" data-test="service-graph-side-panel-p95-latency">
+                <q-icon name="speed" size="14px" />
+                <span class="metric-label">P95 Latency:</span>
+                <span class="metric-value">{{ serviceMetrics.p95Latency }}</span>
+              </div>
             </div>
-            <div class="metric-card" data-test="service-graph-side-panel-p95-latency">
-              <div class="metric-label">P95 Latency</div>
-              <div class="metric-value">{{ serviceMetrics.p95Latency }}</div>
+            <div class="metric-horizontal-divider"></div>
+            <div class="metric-bottom-row">
+              <div class="metric-inline-item latency-card" :class="getLatencyClass(serviceMetrics.p50Latency)" data-test="service-graph-side-panel-p50-latency">
+                <q-icon name="speed" size="14px" />
+                <span class="metric-label">P50:</span>
+                <span class="metric-value">{{ serviceMetrics.p50Latency }}</span>
+              </div>
+              <div class="metric-row-divider"></div>
+              <div class="metric-inline-item latency-card" :class="getLatencyClass(serviceMetrics.p99Latency)" data-test="service-graph-side-panel-p99-latency">
+                <q-icon name="speed" size="14px" />
+                <span class="metric-label">P99:</span>
+                <span class="metric-value">{{ serviceMetrics.p99Latency }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -238,18 +256,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </transition>
+
+  <!-- Telemetry Correlation Dialog (reuses the same component as "show related" on logs page) -->
+  <TelemetryCorrelationDashboard
+    v-if="showTelemetryDialog && correlationData"
+    mode="dialog"
+    :service-name="correlationData.serviceName"
+    :matched-dimensions="correlationData.matchedDimensions"
+    :additional-dimensions="correlationData.additionalDimensions"
+    :log-streams="correlationData.logStreams"
+    :metric-streams="correlationData.metricStreams"
+    :trace-streams="correlationData.traceStreams"
+    :time-range="telemetryTimeRange"
+    @close="showTelemetryDialog = false"
+  />
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, watch, type PropType } from 'vue';
+import { defineComponent, computed, ref, watch, defineAsyncComponent, type PropType } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useQuasar } from 'quasar';
 import searchService from '@/services/search';
+import { getGroupedServices, correlate as correlateStreams } from '@/services/service_streams';
 import { escapeSingleQuotes } from '@/utils/zincutils';
+
+const TelemetryCorrelationDashboard = defineAsyncComponent(
+  () => import('@/plugins/correlation/TelemetryCorrelationDashboard.vue')
+);
 
 export default defineComponent({
   name: 'ServiceGraphSidePanel',
+  components: {
+    TelemetryCorrelationDashboard,
+  },
   props: {
     selectedNode: {
       type: Object as PropType<any>,
@@ -272,11 +312,103 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['close', 'view-logs', 'view-traces'],
+  emits: ['close'],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const $q = useQuasar();
+
+    // Metrics Correlation State
+    const showTelemetryDialog = ref(false);
+    const correlationLoading = ref(false);
+    const correlationError = ref<string | null>(null);
+    const correlationData = ref<{
+      serviceName: string;
+      matchedDimensions: Record<string, string>;
+      additionalDimensions: Record<string, string>;
+      logStreams: any[];
+      metricStreams: any[];
+      traceStreams: any[];
+    } | null>(null);
+
+    const telemetryTimeRange = computed(() => ({
+      startTime: props.timeRange.startTime,
+      endTime: props.timeRange.endTime,
+    }));
+
+    const fetchCorrelatedStreams = async (force = false) => {
+      if (!props.selectedNode) return;
+      if (!force && correlationData.value) return;
+
+      correlationLoading.value = true;
+      correlationError.value = null;
+
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        const serviceName = props.selectedNode.name
+          || props.selectedNode.label
+          || props.selectedNode.id;
+
+        // Step 1: Find the service's FQN from _grouped
+        const groupedResponse = await getGroupedServices(org);
+        const groups = groupedResponse.data?.groups || [];
+
+        let fqn = '';
+        for (const group of groups) {
+          if (group.services.some((s: any) => s.service_name === serviceName)) {
+            fqn = group.fqn;
+            break;
+          }
+        }
+
+        if (!fqn) {
+          correlationError.value = 'Service not found in service registry.';
+          correlationData.value = null;
+          return;
+        }
+
+        // Step 2: Send FQN to _correlate — it resolves field names per stream
+        const correlateResponse = await correlateStreams(org, {
+          source_stream: props.streamFilter || 'default',
+          source_type: 'traces',
+          available_dimensions: { 'service-fqn': fqn },
+        });
+
+        const data = correlateResponse.data;
+        if (!data) {
+          correlationError.value = 'No correlated streams found.';
+          correlationData.value = null;
+          return;
+        }
+
+        correlationData.value = {
+          serviceName: data.service_name,
+          matchedDimensions: data.matched_dimensions || {},
+          additionalDimensions: data.additional_dimensions || {},
+          logStreams: data.related_streams?.logs || [],
+          metricStreams: data.related_streams?.metrics || [],
+          traceStreams: data.related_streams?.traces || [],
+        };
+      } catch (err: any) {
+        if (err.response?.status === 403) {
+          correlationError.value = 'Service Discovery is an enterprise feature.';
+        } else {
+          correlationError.value = err.message || 'Failed to load service streams.';
+        }
+        correlationData.value = null;
+      } finally {
+        correlationLoading.value = false;
+      }
+    };
+
+    // Reset correlation data when node changes
+    watch(
+      () => props.selectedNode?.id,
+      () => {
+        correlationData.value = null;
+        correlationError.value = null;
+      }
+    );
 
     // Recent Traces State
     const recentTraces = ref<any[]>([]);
@@ -327,42 +459,56 @@ export default defineComponent({
       if (!props.selectedNode || !props.graphData) {
         return {
           requestRate: 'N/A',
+          requestRateValue: 'N/A',
+          totalRequests: 0,
+          incomingRequests: 0,
+          outgoingRequests: 0,
           errorRate: 'N/A',
+          p50Latency: 'N/A',
           p95Latency: 'N/A',
+          p99Latency: 'N/A',
         };
       }
 
-      const outgoingEdges = props.graphData.edges.filter(
-        (edge: any) => edge.from === props.selectedNode.id
+      // Get total request count - handle both graph view (uses 'value') and tree view (uses 'requests')
+      const totalRequests = props.selectedNode.value || props.selectedNode.requests || 0;
+
+      // Calculate incoming requests (sum of all edges TO this node)
+      const incomingEdges = props.graphData.edges.filter(
+        (edge: any) => edge.to === props.selectedNode.id
       );
-
-      // Debug: Log outgoing edges for selected node
-      console.log(`[ServiceMetrics] ${props.selectedNode.id} outgoing edges:`, {
-        count: outgoingEdges.length,
-        edges: outgoingEdges.map(e => ({
-          to: e.to,
-          p95_latency_ns: e.p95_latency_ns,
-          total_requests: e.total_requests
-        }))
-      });
-
-      const totalRequests = outgoingEdges.reduce(
+      const incomingRequests = incomingEdges.reduce(
         (sum: number, edge: any) => sum + (edge.total_requests || 0),
         0
       );
 
-      // Use node's own error_rate instead of calculating from edges
-      const errorRate = props.selectedNode.error_rate || 0;
+      // Calculate outgoing requests (sum of all edges FROM this node)
+      const outgoingEdges = props.graphData.edges.filter(
+        (edge: any) => edge.from === props.selectedNode.id
+      );
+      const outgoingRequests = outgoingEdges.reduce(
+        (sum: number, edge: any) => sum + (edge.total_requests || 0),
+        0
+      );
 
-      // Fix P95 latency: handle case when no outgoing edges
+      // Get errors and calculate error rate
+      const errors = props.selectedNode.errors || 0;
+      const errorRate = totalRequests > 0 ? (errors / totalRequests) * 100 : 0;
+
+      // Calculate latency percentiles from incoming edges
+      let p50Latency = 0;
       let p95Latency = 0;
-      if (outgoingEdges.length > 0) {
-        p95Latency = Math.max(
-          ...outgoingEdges.map((edge: any) => edge.p95_latency_ns || 0)
+      let p99Latency = 0;
+      if (incomingEdges.length > 0) {
+        p50Latency = Math.max(
+          ...incomingEdges.map((edge: any) => edge.p50_latency_ns || 0)
         );
-        console.log(`[ServiceMetrics] P95 latency calculated:`, p95Latency, 'ns');
-      } else {
-        console.log(`[ServiceMetrics] No outgoing edges, showing N/A`);
+        p95Latency = Math.max(
+          ...incomingEdges.map((edge: any) => edge.p95_latency_ns || 0)
+        );
+        p99Latency = Math.max(
+          ...incomingEdges.map((edge: any) => edge.p99_latency_ns || 0)
+        );
       }
 
       // Format request rate value without unit
@@ -378,8 +524,13 @@ export default defineComponent({
       return {
         requestRate: formatRequestRate(totalRequests),
         requestRateValue: requestRateValue,
+        totalRequests: totalRequests,
+        incomingRequests: incomingRequests,
+        outgoingRequests: outgoingRequests,
         errorRate: errorRate.toFixed(2) + '%',
-        p95Latency: outgoingEdges.length > 0 ? formatLatency(p95Latency) : 'N/A',
+        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : 'N/A',
+        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : 'N/A',
+        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : 'N/A',
       };
     });
 
@@ -470,6 +621,17 @@ export default defineComponent({
         return (requests / 1000).toFixed(1) + 'K req/min';
       }
       return requests + ' req/min';
+    };
+
+    // Helper: Format Number (without unit)
+    const formatNumber = (num: number): string => {
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+      }
+      if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+      }
+      return num.toString();
     };
 
     // Helper: Format Latency
@@ -581,12 +743,18 @@ export default defineComponent({
       emit('close');
     };
 
-    const handleViewLogs = () => {
-      emit('view-logs');
-    };
-
-    const handleViewTraces = () => {
-      emit('view-traces');
+    const handleShowTelemetry = async () => {
+      await fetchCorrelatedStreams();
+      if (correlationData.value) {
+        showTelemetryDialog.value = true;
+      } else if (correlationError.value) {
+        $q.notify({
+          type: 'warning',
+          message: correlationError.value,
+          timeout: 3000,
+          position: 'bottom',
+        });
+      }
     };
 
     const handleNavigateToDashboard = () => {
@@ -601,6 +769,8 @@ export default defineComponent({
           trace_id: trace.traceId,
           stream: props.streamFilter || 'default',
           org_identifier: store.state.selectedOrganization.identifier,
+          from: props.timeRange.startTime,
+          to: props.timeRange.endTime,
         }
       });
     };
@@ -635,6 +805,34 @@ export default defineComponent({
       }
     };
 
+    // Get color class for error rate card
+    const getErrorRateClass = (): string => {
+      const errorRateStr = serviceMetrics.value.errorRate;
+      if (errorRateStr === 'N/A') return 'status-unknown';
+
+      const errorRate = parseFloat(errorRateStr);
+      if (errorRate < 1) return 'status-healthy';
+      if (errorRate < 5) return 'status-warning';
+      return 'status-critical';
+    };
+
+    // Get color class for latency card
+    const getLatencyClass = (latencyStr: string): string => {
+      if (latencyStr === 'N/A') return 'status-unknown';
+
+      // Parse latency value (could be "125ms" or "1.5s")
+      let latencyMs = 0;
+      if (latencyStr.endsWith('ms')) {
+        latencyMs = parseFloat(latencyStr);
+      } else if (latencyStr.endsWith('s')) {
+        latencyMs = parseFloat(latencyStr) * 1000;
+      }
+
+      if (latencyMs < 100) return 'status-healthy';
+      if (latencyMs < 500) return 'status-warning';
+      return 'status-critical';
+    };
+
     return {
       upstreamServices,
       downstreamServices,
@@ -643,9 +841,16 @@ export default defineComponent({
       isAllStreamsSelected,
       getHealthColor,
       getHealthText,
+      formatNumber,
+      getErrorRateClass,
+      getLatencyClass,
       handleClose,
-      handleViewLogs,
-      handleViewTraces,
+      handleShowTelemetry,
+      // Telemetry Correlation
+      showTelemetryDialog,
+      correlationLoading,
+      correlationData,
+      telemetryTimeRange,
       // Recent Traces
       recentTraces,
       loadingTraces,
@@ -712,7 +917,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: 12px 16px;
   border-bottom: 1px solid #2d3548;
   background: #1a1f2e;
   flex-shrink: 0;
@@ -770,6 +975,29 @@ export default defineComponent({
     }
   }
 
+  .panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .telemetry-btn {
+    background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
+    color: #fff !important;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: all 0.2s;
+
+    &:hover {
+      filter: brightness(1.1);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+    }
+  }
+
   .close-btn {
     flex-shrink: 0;
     width: 24px;
@@ -817,11 +1045,11 @@ export default defineComponent({
   display: flex;
   gap: 8px;
   padding: 0;
-  margin-bottom: 20px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
 
   .action-btn {
-    flex: 1;
+    width: 35%;
     padding: 8px 16px;
     font-size: 13px;
     font-weight: 500;
@@ -835,6 +1063,23 @@ export default defineComponent({
       border-color: #3b82f6;
       transform: translateY(-1px);
     }
+
+  }
+}
+
+.view-traces-btn {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
+  border-radius: 4px;
+  padding: 0px 12px;
+  min-width: 90px;
+  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+
+  &:hover {
+    opacity: 0.8;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
   }
 }
 
@@ -854,8 +1099,8 @@ export default defineComponent({
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  background: #0f1419; 
-  padding: 20px; 
+  background: #0f1419;
+  padding: 0px 12px 8px 12px; 
 
   
   &::-webkit-scrollbar {
@@ -895,19 +1140,30 @@ export default defineComponent({
 
 .panel-section {
   padding: 0;
-  margin-bottom: 24px; 
+  margin-bottom: 12px;
 
   &:last-child {
     margin-bottom: 0;
   }
 
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .section-header-actions {
+    display: flex;
+    gap: 6px;
+  }
+
   .section-title {
-    font-size: 14px; 
+    font-size: 14px;
     font-weight: 600;
     text-transform: none;
     letter-spacing: 0;
-    margin-bottom: 12px; 
-    color: #e4e7eb; 
+    color: #e4e7eb;
   }
 }
 
@@ -917,143 +1173,429 @@ export default defineComponent({
 
 
 .metrics-section {
-  .metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px; 
-    margin-bottom: 24px;
+  // Full-width card for total requests (single line)
+  .metric-card-full {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #242938 0%, #1f2937 100%);
+    border: 1px solid #374151;
+    margin-bottom: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
-    .metric-card {
-      padding: 12px; 
-      border-radius: 8px; 
-      text-align: center;
-      background: #242938; 
-      border: 1px solid #2d3548; 
-      transition: all 0.2s ease;
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(99, 102, 241, 0.3);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
 
-      &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-      }
+    .metric-single-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
 
-      .metric-label {
-        font-size: 11px; 
-        font-weight: 600;
-        text-transform: none; // Use proper case from template
-        letter-spacing: 0;
-        margin-bottom: 6px;
-        color: #9ca3af; 
-      }
+      .metric-total {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02));
+        border: 1px solid rgba(99, 102, 241, 0.15);
 
-      .metric-value {
-        font-size: 20px; 
-        font-weight: 700;
-        color: #e4e7eb; 
-        letter-spacing: -0.01em;
-        margin-bottom: 4px;
-        white-space: nowrap; // Prevent wrapping to multiple lines
+        .total-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #a5b4fc;
+        }
 
-        &.green { color: #10b981; } 
-        &.yellow { color: #fbbf24; } 
-        &.orange { color: #f97316; } 
-        &.red { color: #ef4444; } 
+        .total-value {
+          font-size: 16px;
+          font-weight: 800;
+          color: #e0e7ff;
+          letter-spacing: -0.02em;
+        }
 
-        .metric-unit {
-          font-size: 11px; // Smaller unit text
+        .total-unit {
+          font-size: 10px;
           font-weight: 500;
-          color: #9ca3af; 
-          margin-left: 4px;
+          color: #a5b4fc;
         }
       }
 
-      
-      .metric-sparkline {
+      .metric-divider {
+        width: 1px;
         height: 20px;
-        background: linear-gradient(to right,
-          transparent 0%,
-          rgba(59, 130, 246, 0.1) 20%,
-          rgba(59, 130, 246, 0.2) 50%,
-          rgba(59, 130, 246, 0.1) 80%,
-          transparent 100%);
-        border-radius: 2px;
-        margin-top: 6px;
+        background: #374151;
+      }
+
+      .metric-inline {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+        flex: 1;
+
+        &.incoming {
+          color: #a5b4fc;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.02));
+          border: 1px solid rgba(99, 102, 241, 0.15);
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.05));
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
+          }
+        }
+
+        &.outgoing {
+          color: #a5b4fc;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.02));
+          border: 1px solid rgba(99, 102, 241, 0.15);
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.05));
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
+          }
+        }
+
+        .inline-value {
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+        }
+      }
+    }
+
+    // Horizontal divider between top and bottom rows
+    .metric-horizontal-divider {
+      width: 100%;
+      height: 1px;
+      background: #374151;
+      margin: 10px 0 8px 0;
+    }
+
+    // Bottom row for error rate and p95 latency
+    .metric-bottom-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .metric-inline-item {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+
+        // Status-based styling
+        &.status-healthy {
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.02));
+          border: 1px solid rgba(16, 185, 129, 0.15);
+
+          .q-icon {
+            color: #10b981;
+          }
+
+          .metric-value {
+            color: #10b981;
+          }
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04));
+            box-shadow: 0 0 6px rgba(16, 185, 129, 0.15);
+          }
+        }
+
+        &.status-warning {
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(251, 191, 36, 0.02));
+          border: 1px solid rgba(251, 191, 36, 0.15);
+
+          .q-icon {
+            color: #fbbf24;
+          }
+
+          .metric-value {
+            color: #fbbf24;
+          }
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(251, 191, 36, 0.04));
+            box-shadow: 0 0 6px rgba(251, 191, 36, 0.15);
+          }
+        }
+
+        &.status-critical {
+          background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.02));
+          border: 1px solid rgba(239, 68, 68, 0.15);
+
+          .q-icon {
+            color: #ef4444;
+          }
+
+          .metric-value {
+            color: #ef4444;
+          }
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.04));
+            box-shadow: 0 0 6px rgba(239, 68, 68, 0.15);
+          }
+        }
+
+        &.status-unknown {
+          background: linear-gradient(135deg, rgba(107, 114, 128, 0.08), rgba(107, 114, 128, 0.02));
+          border: 1px solid rgba(107, 114, 128, 0.15);
+
+          .q-icon {
+            color: #6b7280;
+          }
+
+          .metric-value {
+            color: #9ca3af;
+          }
+        }
+
+        .metric-label {
+          font-size: 11px;
+          font-weight: 600;
+          color: #9ca3af;
+          white-space: nowrap;
+        }
+
+        .metric-value {
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+        }
+      }
+
+      .metric-row-divider {
+        width: 1px;
+        height: 20px;
+        background: #374151;
       }
     }
   }
+
 }
 
-.body--light .metrics-section .metrics-grid .metric-card {
-  background: #ffffff;
-  border-color: #e0e0e0;
+.body--light .metrics-section {
+  .metric-card-full {
+    background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+    border-color: #d1d5db;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 
-  &:hover {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  }
+    &:hover {
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.3);
+    }
 
-  .metric-label {
-    color: rgba(0, 0, 0, 0.6);
-  }
+    .metric-single-line {
+      .metric-total {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.03));
+        border-color: rgba(99, 102, 241, 0.2);
 
-  .metric-value {
-    color: #202124;
+        .total-label {
+          color: #6366f1;
+        }
 
-    &.green { color: #059669; }
-    &.yellow { color: #d97706; }
-    &.orange { color: #ea580c; }
-    &.red { color: #dc2626; }
+        .total-value {
+          color: #4338ca;
+        }
 
-    .metric-unit {
-      color: rgba(0, 0, 0, 0.6);
+        .total-unit {
+          color: #6366f1;
+        }
+      }
+
+      .metric-divider {
+        background: #d1d5db;
+      }
+
+      .metric-inline {
+        &.incoming {
+          color: #6366f1;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02));
+          border-color: rgba(99, 102, 241, 0.2);
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(99, 102, 241, 0.04));
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.15);
+          }
+        }
+
+        &.outgoing {
+          color: #6366f1;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02));
+          border-color: rgba(99, 102, 241, 0.2);
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(99, 102, 241, 0.04));
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.15);
+          }
+        }
+      }
+    }
+
+    .metric-horizontal-divider {
+      background: #d1d5db;
+    }
+
+    .metric-bottom-row {
+      .metric-inline-item {
+        &.status-healthy {
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.01));
+          border-color: rgba(16, 185, 129, 0.2);
+
+          .q-icon {
+            color: #059669;
+          }
+
+          .metric-value {
+            color: #059669;
+          }
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.03));
+            box-shadow: 0 0 6px rgba(16, 185, 129, 0.12);
+          }
+        }
+
+        &.status-warning {
+          background: linear-gradient(135deg, rgba(217, 119, 6, 0.06), rgba(217, 119, 6, 0.01));
+          border-color: rgba(217, 119, 6, 0.2);
+
+          .q-icon {
+            color: #d97706;
+          }
+
+          .metric-value {
+            color: #d97706;
+          }
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(217, 119, 6, 0.1), rgba(217, 119, 6, 0.03));
+            box-shadow: 0 0 6px rgba(217, 119, 6, 0.12);
+          }
+        }
+
+        &.status-critical {
+          background: linear-gradient(135deg, rgba(220, 38, 38, 0.06), rgba(220, 38, 38, 0.01));
+          border-color: rgba(220, 38, 38, 0.2);
+
+          .q-icon {
+            color: #dc2626;
+          }
+
+          .metric-value {
+            color: #dc2626;
+          }
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(220, 38, 38, 0.03));
+            box-shadow: 0 0 6px rgba(220, 38, 38, 0.12);
+          }
+        }
+
+        &.status-unknown {
+          background: linear-gradient(135deg, rgba(107, 114, 128, 0.06), rgba(107, 114, 128, 0.01));
+          border-color: rgba(107, 114, 128, 0.2);
+
+          .q-icon {
+            color: #6b7280;
+          }
+
+          .metric-value {
+            color: #6b7280;
+          }
+        }
+
+        .metric-label {
+          color: rgba(0, 0, 0, 0.6);
+        }
+      }
+
+      .metric-row-divider {
+        background: #d1d5db;
+      }
     }
   }
+
 }
 
 
 .services-section {
+  .section-title {
+    margin-bottom: 8px;
+  }
+
   .service-list {
     display: flex;
     flex-direction: column;
-    gap: 8px; 
+    padding: 4px 12px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #242938 0%, #1f2937 100%);
+    border: 1px solid #374151;
+    gap: 0;
+    max-height: 200px;
+    overflow-y: auto;
+
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+    }
 
     .service-list-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 12px; 
-      border-radius: 6px;
-      background: #242938; 
-      border: 1px solid #2d3548; 
-      transition: all 0.2s ease;
-      cursor: pointer;
+      padding: 8px 0;
+      border-bottom: 1px solid #2d3548;
 
-      &:hover {
-        background: #1a1f2e; 
-        border-color: #3b82f6; 
+      &:last-child {
+        border-bottom: none;
       }
 
       .service-item-name {
-        font-size: 13px; 
+        font-size: 13px;
         font-weight: 500;
         flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        color: #e4e7eb; 
+        color: #e4e7eb;
       }
 
       .service-item-health {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 12px;
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-size: 11px;
         font-weight: 600;
         flex-shrink: 0;
 
         &::before {
           content: '●';
-          font-size: 12px;
+          font-size: 10px;
         }
 
         &.healthy {
@@ -1082,45 +1624,56 @@ export default defineComponent({
   .empty-state {
     text-align: left;
     padding: 0;
-    color: #9ca3af; 
+    color: #9ca3af;
     font-size: 13px;
     font-style: normal;
   }
 }
 
 .body--light .services-section {
-  .service-list .service-list-item {
-    background: #ffffff;
-    border-color: #e0e0e0;
+  .service-list {
+    background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+    border-color: #d1d5db;
 
-    &:hover {
-      background: #f8f9fa;
-      border-color: #3b82f6;
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
     }
 
-    .service-item-name {
-      color: #202124;
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.3);
+      }
     }
 
-    .service-item-health {
-      &.healthy {
-        background: rgba(16, 185, 129, 0.08);
-        color: #059669;
+    .service-list-item {
+      border-color: #e5e7eb;
+
+      .service-item-name {
+        color: #202124;
       }
 
-      &.degraded {
-        background: rgba(251, 191, 36, 0.08);
-        color: #d97706;
-      }
+      .service-item-health {
+        &.healthy {
+          background: rgba(16, 185, 129, 0.08);
+          color: #059669;
+        }
 
-      &.critical {
-        background: rgba(239, 68, 68, 0.08);
-        color: #dc2626;
-      }
+        &.degraded {
+          background: rgba(251, 191, 36, 0.08);
+          color: #d97706;
+        }
 
-      &.warning {
-        background: rgba(249, 115, 22, 0.08);
-        color: #ea580c;
+        &.critical {
+          background: rgba(239, 68, 68, 0.08);
+          color: #dc2626;
+        }
+
+        &.warning {
+          background: rgba(249, 115, 22, 0.08);
+          color: #ea580c;
+        }
       }
     }
   }

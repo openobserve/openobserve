@@ -19,6 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex justify-start items-center header-bg bg-grey-2 trace-header-container"
     :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
     data-test="trace-header"
+    :style="
+      isSidebarOpen && {
+        width: splitterWidth + 'px',
+      }
+    "
   >
     <div
       class="tw:relative flex justify-start items-center no-wrap row q-px-sm trace-header-left"
@@ -44,7 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         width: `calc(100% - ${splitterWidth}px)`,
       }"
       data-test="trace-header-tics"
-      v-if="baseTracePosition && baseTracePosition.tics?.length"
+      v-if="
+        !isSidebarOpen && baseTracePosition && baseTracePosition.tics?.length
+      "
     >
       <div
         class="col-3 text-caption q-pl-md"
@@ -106,6 +113,10 @@ export default defineComponent({
     splitterWidth: {
       type: Number,
       default: 0,
+    },
+    isSidebarOpen: {
+      type: Boolean,
+      default: false,
     },
   },
   methods: {

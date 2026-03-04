@@ -184,12 +184,18 @@ const localConfig = ref<DeduplicationConfig>({
   grouping: undefined, // Grouping removed
 });
 
+const sanitizeTimeWindow = (val: any): number | undefined => {
+  if (val == null || val === "") return undefined;
+  const num = Number(val);
+  return isNaN(num) ? undefined : num;
+};
+
 const emitUpdate = () => {
   // Always emit as enabled
   emit("update:modelValue", {
     enabled: true,
     fingerprint_fields: localConfig.value.fingerprint_fields,
-    time_window_minutes: localConfig.value.time_window_minutes,
+    time_window_minutes: sanitizeTimeWindow(localConfig.value.time_window_minutes),
     grouping: undefined,
   });
 };

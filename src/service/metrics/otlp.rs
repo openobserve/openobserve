@@ -32,7 +32,7 @@ use config::{
         otlp::OtlpRequestType,
         promql::*,
         self_reporting::usage::UsageType,
-        stream::{PartitioningDetails, StreamParams, StreamType},
+        stream::{StreamParams, StreamPartition, StreamType},
     },
     metrics,
     utils::{
@@ -42,7 +42,7 @@ use config::{
         time::now_micros,
     },
 };
-use infra::schema::{SchemaCache, unwrap_partition_time_level};
+use infra::schema::{SchemaCache, get_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
@@ -153,7 +153,7 @@ pub async fn handle_otlp_request(
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
-    let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
+    let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
 
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
@@ -467,10 +467,11 @@ pub async fn handle_otlp_request(
 
     for (local_metric_name, json_data) in json_data_by_stream {
         // get partition keys
-        let partition_det = stream_partitioning_map.get(&local_metric_name).unwrap();
-        let partition_keys = partition_det.partition_keys.clone();
-        let partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
+        let partition_keys = stream_partitioning_map
+            .get(&local_metric_name)
+            .cloned()
+            .unwrap_or_default();
+        let partition_time_level = get_partition_time_level(StreamType::Metrics);
 
         for val_map in json_data {
             let timestamp = val_map

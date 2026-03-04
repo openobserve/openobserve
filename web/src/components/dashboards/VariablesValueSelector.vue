@@ -238,6 +238,31 @@ export default defineComponent({
       values: [],
     });
 
+    // Cached lookup map for resolveVariableValue — rebuilt only when the reactive
+    // sources (global/tab/current-scope variable values) actually change.
+    // Avoids iterating all variable arrays on every stream/field resolution call.
+    const resolvedVarLookup = computed((): Record<string, any> => {
+      const lookup: Record<string, any> = {};
+      if (useManager && manager) {
+        (manager.variablesData.global || []).forEach((v: any) => {
+          lookup[v.name] = v.value;
+        });
+        if (props.tabId && manager.variablesData.tabs?.[props.tabId]) {
+          manager.variablesData.tabs[props.tabId].forEach((v: any) => {
+            lookup[v.name] = v.value;
+          });
+        }
+        variablesData.values.forEach((v: any) => {
+          lookup[v.name] = v.value;
+        });
+      } else {
+        variablesData.values.forEach((v: any) => {
+          lookup[v.name] = v.value;
+        });
+      }
+      return lookup;
+    });
+
 // ================== FOR DEBUGGING PURPOSES ONLY ==================
     // watch for changes in variablesData.values
     let previousValues: any[] = [];
@@ -437,6 +462,20 @@ export default defineComponent({
       variableObject.isVariableLoadingPending = false;
       resetVariableState(variableObject);
       removeTraceId(variableObject.name, request.traceId);
+
+      // Mark as done on error so manager's isLoading resolves and panels are not blocked
+      if (!variableObject.isVariablePartialLoaded) {
+        variableObject.isVariablePartialLoaded = true;
+        if (useManager && manager) {
+          const variableKey = getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          );
+          manager.onVariablePartiallyLoaded(variableKey);
+        }
+      }
     };
 
     const handleSearchReset = (data: any) => {
@@ -525,8 +564,11 @@ export default defineComponent({
 
           const hits = response.content.results.hits;
 
+          // Resolve field name for searching in response
+          const resolvedFieldName = resolveVariableValue(variableObject.query_data.field);
+
           const fieldHit = hits.find(
-            (field: any) => field.field === variableObject.query_data.field,
+            (field: any) => field.field === resolvedFieldName,
           );
 
           variableLog(
@@ -742,6 +784,37 @@ export default defineComponent({
         reset: handleSearchReset,
       });
     };
+    // Helper function to resolve variable references in a string.
+    // Uses the cached resolvedVarLookup computed (scope precedence: global → tab → current).
+    const resolveVariableValue = (value: string): string => {
+      if (!value || typeof value !== 'string') return value ?? "";
+
+      const varLookup = resolvedVarLookup.value;
+
+      // Replace all variable references ($variableName) with their resolved values.
+      // Using replace callback avoids regex exec loop risks and handles
+      // special replacement patterns ($1, $&, etc.) safely.
+      return value.replace(
+        /\$([a-zA-Z0-9_-]+)/g,
+        (fullMatch, varName) => {
+          if (varName in varLookup) {
+            let varValue = varLookup[varName];
+
+            // Handle array values (multi-select)
+            // Stream and field must be single tokens, use first element only
+            if (Array.isArray(varValue)) {
+              varValue = String(varValue[0] ?? '');
+            }
+
+            return varValue ?? '';
+          }
+
+          // Keep original reference if variable not found
+          return fullMatch;
+        },
+      );
+    };
+
     const fetchFieldValuesWithWebsocket = (
       variableObject: any,
       queryContext: string,
@@ -770,13 +843,17 @@ export default defineComponent({
       // Reset first response flag when starting a new fetch
       variableFirstResponseProcessed.value[variableObject.name] = false;
 
+      // Resolve variable references in stream and field
+      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
+      const resolvedField = resolveVariableValue(variableObject.query_data.field);
+
       const payload = {
-        fields: [variableObject.query_data.field],
+        fields: [resolvedField],
         size: variableObject.query_data.max_record_size || 10,
         no_count: true,
         start_time: startTime,
         end_time: endTime,
-        stream_name: variableObject.query_data.stream,
+        stream_name: resolvedStream,
         stream_type: variableObject.query_data.stream_type || "logs",
         use_cache: (window as any).use_cache ?? true,
         sql: queryContext || "",
@@ -792,7 +869,6 @@ export default defineComponent({
       };
       try {
         // Log the payload and trace id for debugging
-
         // Start new streaming connection
         initializeStreamingConnection(wsPayload, variableObject);
         addTraceId(variableObject.name, wsPayload.traceId);
@@ -1934,14 +2010,14 @@ export default defineComponent({
         }
         case "custom": {
           handleCustomVariable(variableObject);
-          finalizePartialVariableLoading(variableObject, true);
+          finalizePartialVariableLoading(variableObject, true, isInitialLoad);
           finalizeVariableLoading(variableObject, true);
           return true;
         }
         case "constant":
         case "textbox":
         case "dynamic_filters": {
-          finalizePartialVariableLoading(variableObject, true);
+          finalizePartialVariableLoading(variableObject, true, isInitialLoad);
           finalizeVariableLoading(variableObject, true);
           return true;
         }
@@ -2011,12 +2087,16 @@ export default defineComponent({
       const timestamp_column =
         store.state.zoConfig.timestamp_column || "_timestamp";
 
+      // Resolve variable references in stream and field names for SQL query
+      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
+      const resolvedField = resolveVariableValue(variableObject.query_data.field);
+
       let dummyQuery: string;
 
       if (searchText) {
-        dummyQuery = `SELECT ${timestamp_column} FROM "${variableObject.query_data.stream}" WHERE str_match(${variableObject.query_data.field}, '${escapeSingleQuotes(searchText.trim())}')`;
+        dummyQuery = `SELECT ${timestamp_column} FROM "${resolvedStream}" WHERE str_match(${resolvedField}, '${escapeSingleQuotes(searchText.trim())}')`;
       } else {
-        dummyQuery = `SELECT ${timestamp_column} FROM "${variableObject.query_data.stream}"`;
+        dummyQuery = `SELECT ${timestamp_column} FROM "${resolvedStream}"`;
       }
 
       // Construct the filter from the query data
@@ -2102,16 +2182,20 @@ export default defineComponent({
       variableObject: any,
       queryContext: string,
     ) => {
+      // Resolve variable references in stream and field names
+      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
+      const resolvedField = resolveVariableValue(variableObject.query_data.field);
+
       const payload = {
         org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
-        stream_name: variableObject.query_data.stream, // Name of the stream
+        stream_name: resolvedStream, // Resolved stream name
         start_time: new Date(
           props.selectedTimeDate?.start_time?.toISOString(),
         ).getTime(), // Start time in milliseconds
         end_time: new Date(
           props.selectedTimeDate?.end_time?.toISOString(),
         ).getTime(), // End time in milliseconds
-        fields: [variableObject.query_data.field], // Fields to fetch
+        fields: [resolvedField], // Resolved field name
         size: variableObject.query_data.max_record_size || 10, // Maximum number of records
         type: variableObject.query_data.stream_type, // Type of the stream
         query_context: queryContext, // Encoded query context
@@ -2252,7 +2336,6 @@ export default defineComponent({
       if (success) {
         // Update loading states
         variableObject.isLoading = false;
-        variableObject.isVariablePartialLoaded = true;
         variableObject.isVariableLoadingPending = false;
 
         // Update global loading state
@@ -2260,6 +2343,22 @@ export default defineComponent({
           (val: { isLoading: any; isVariableLoadingPending: any }) =>
             val.isLoading || val.isVariableLoadingPending,
         );
+
+        // Notify manager only on first load (atomic check-and-set to prevent race conditions)
+        // Only notify if variable was NOT already partially loaded
+        if (useManager && manager && !variableObject.isVariablePartialLoaded) {
+          variableObject.isVariablePartialLoaded = true;
+          const variableKey = getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          );
+          manager.onVariablePartiallyLoaded(variableKey);
+        } else {
+          // Variable was already loaded, just update the flag
+          variableObject.isVariablePartialLoaded = true;
+        }
 
         // Don't load child variables on dropdown open events
         // Load child variables if any

@@ -2816,6 +2816,35 @@ class APICleanup {
             return false;
         }
     }
+
+    /**
+     * Clean up test screenshots matching given prefixes from the screenshots directory.
+     * @param {string[]} prefixes - File name prefixes to match for deletion
+     * @param {string} screenshotDir - Absolute path to the screenshots directory
+     */
+    async cleanupScreenshots(prefixes = [], screenshotDir) {
+        const fs = require('fs/promises');
+        const path = require('path');
+
+        try {
+            await fs.access(screenshotDir);
+        } catch {
+            return;
+        }
+
+        const allFiles = await fs.readdir(screenshotDir);
+        const files = allFiles.filter(f =>
+            prefixes.some(prefix => f.startsWith(prefix))
+        );
+
+        for (const file of files) {
+            await fs.unlink(path.join(screenshotDir, file));
+        }
+
+        if (files.length > 0) {
+            testLogger.info(`Cleaned up ${files.length} screenshot(s)`, { prefixes });
+        }
+    }
 }
 
 module.exports = APICleanup;

@@ -85,7 +85,7 @@ class SchemaLoadPage {
             await this.page.locator(alternativeSelector).first().click();
         }
         
-        await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
         testLogger.debug('Stream selected successfully', { streamName });
     }
 
@@ -202,7 +202,7 @@ class SchemaLoadPage {
         await exploreButton.click();
         
         // Extended timeout for large schema exploration
-        await this.page.waitForLoadState('networkidle', { timeout: 60000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 60000 }).catch(() => {});
         await this.page.waitForLoadState('domcontentloaded');
     }
 

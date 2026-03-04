@@ -19,6 +19,7 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
+pub mod evaluation;
 pub mod input_output;
 pub mod metadata;
 pub mod model;
@@ -31,6 +32,7 @@ pub mod tool;
 pub mod usage;
 pub mod utils;
 
+pub use evaluation::EvaluationExtractor;
 pub use input_output::InputOutputExtractor;
 pub use metadata::MetadataExtractor;
 pub use model::ModelExtractor;

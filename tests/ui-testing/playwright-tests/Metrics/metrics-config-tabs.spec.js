@@ -19,7 +19,7 @@ test.describe("Metrics Config Tabs Tests", () => {
 
     // Navigate to metrics page
     await pm.metricsPage.gotoMetricsPage();
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Execute a query first so we have results to work with
     await pm.metricsPage.executeQuery('up');

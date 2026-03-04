@@ -260,7 +260,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         // Navigate to alerts page - refresh to ensure new stream appears
         await pm.commonActions.navigateToAlerts();
         await page.reload();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
         // Create scheduled alert with deduplication for validation

@@ -518,22 +518,12 @@ fn build_scope_conflict_sql(
             }
             checks
         }
-        sea_orm::DatabaseBackend::Sqlite => {
+        _ => {
             let mut checks = Vec::new();
             for (key, value) in scope_filters {
                 params.push(value.clone().into());
                 checks.push(format!(
                     "(json_extract(dimensions, '$.{key}') IS NOT NULL AND json_extract(dimensions, '$.{key}') != ?)"
-                ));
-            }
-            checks
-        }
-        sea_orm::DatabaseBackend::MySql => {
-            let mut checks = Vec::new();
-            for (key, value) in scope_filters {
-                params.push(value.clone().into());
-                checks.push(format!(
-                    "(JSON_EXTRACT(dimensions, '$.{key}') IS NOT NULL AND JSON_EXTRACT(dimensions, '$.{key}') != ?)"
                 ));
             }
             checks

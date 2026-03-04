@@ -39,35 +39,19 @@ impl MigrationTrait for Migration {
 
 // Add the is_local_region column to the enrichment_table_urls table.
 async fn add_is_local_region_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(EnrichmentTableUrls::Table)
-                    .add_column(
-                        ColumnDef::new(EnrichmentTableUrls::IsLocalRegion)
-                            .boolean()
-                            .not_null()
-                            .default(true),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    } else {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(EnrichmentTableUrls::Table)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(EnrichmentTableUrls::IsLocalRegion)
-                            .boolean()
-                            .not_null()
-                            .default(true),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    }
+    manager
+        .alter_table(
+            Table::alter()
+                .table(EnrichmentTableUrls::Table)
+                .add_column_if_not_exists(
+                    ColumnDef::new(EnrichmentTableUrls::IsLocalRegion)
+                        .boolean()
+                        .not_null()
+                        .default(true),
+                )
+                .to_owned(),
+        )
+        .await?;
 
     Ok(())
 }

@@ -119,6 +119,7 @@ pub async fn search(
                     files.len(),
                 ),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("storage inverted index reduced file_list num".to_string())
                     .search_role("follower".to_string())
@@ -212,6 +213,7 @@ pub async fn search(
                 cache_start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("storage load files".to_string())
                 .search_role("follower".to_string())
@@ -272,6 +274,7 @@ pub async fn search(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("storage create tables".to_string())
                 .search_role("follower".to_string())
@@ -490,6 +493,7 @@ pub async fn tantivy_search(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("tantivy load files".to_string())
                 .search_role("follower".to_string())
@@ -675,6 +679,7 @@ pub async fn tantivy_search(
                 search_start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("tantivy search".to_string())
                 .search_role("follower".to_string())
@@ -720,6 +725,7 @@ async fn search_tantivy_index(
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult)> {
     let file_account = parquet_file.account.clone();
+    // TODO: this convert happen two times, once before cache_files and once in search_tantivy_index
     let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",

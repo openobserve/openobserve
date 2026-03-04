@@ -16,7 +16,10 @@
 use config::{get_config, meta::stream::StreamType};
 #[cfg(feature = "enterprise")]
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
-use utoipa::{Modify, OpenApi, openapi::security::SecurityScheme};
+use utoipa::{
+    Modify, OpenApi,
+    openapi::security::{Http, HttpAuthScheme, SecurityScheme},
+};
 
 use crate::{common::meta, handler::http::request};
 
@@ -109,7 +112,6 @@ use crate::{common::meta, handler::http::request};
         request::dashboards::update_dashboard,
         request::dashboards::list_dashboards,
         request::dashboards::get_dashboard,
-        request::dashboards::export_dashboard,
         request::dashboards::delete_dashboard,
         request::dashboards::move_dashboard,
         request::dashboards::move_dashboards,
@@ -166,6 +168,7 @@ use crate::{common::meta, handler::http::request};
         request::mcp::oauth_authorization_server_metadata,
         request::pipeline::save_pipeline,
         request::pipeline::list_pipelines,
+        request::pipeline::get_pipeline,
         request::pipeline::list_streams_with_pipeline,
         request::pipeline::delete_pipeline,
         request::pipeline::update_pipeline,
@@ -241,7 +244,6 @@ use crate::{common::meta, handler::http::request};
             config::meta::stream::StreamPartition,
             config::meta::stream::StreamPartitionType,
             config::meta::stream::StreamStats,
-            config::meta::stream::PartitionTimeLevel,
             config::meta::stream::UpdateStreamSettings,
             config::meta::dashboards::Dashboard,
             config::meta::dashboards::v1::AxisItem,
@@ -459,6 +461,10 @@ impl Modify for SecurityAddon {
             SecurityScheme::ApiKey(utoipa::openapi::security::ApiKey::Header(
                 utoipa::openapi::security::ApiKeyValue::new("Authorization"),
             )),
+        );
+        components.add_security_scheme(
+            "BasicAuth",
+            SecurityScheme::Http(Http::new(HttpAuthScheme::Basic)),
         );
     }
 }

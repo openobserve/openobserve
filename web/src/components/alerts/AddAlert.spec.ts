@@ -2801,6 +2801,7 @@ describe("AddAlert Component", () => {
         }
       });
 
+      await flushPromises();
       await nextTick();
 
       // The column field should be automatically added during created() lifecycle
@@ -2848,6 +2849,7 @@ describe("AddAlert Component", () => {
         }
       });
 
+      await flushPromises();
       await nextTick();
 
       // All missing fields should be initialized with defaults
@@ -2897,6 +2899,7 @@ describe("AddAlert Component", () => {
         }
       });
 
+      await flushPromises();
       await nextTick();
 
       // Should add column but preserve existing operator and value

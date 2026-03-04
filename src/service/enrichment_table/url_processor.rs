@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -1827,9 +1827,12 @@ async fn save_enrichment_batch(
     // For first batch, validate schema compatibility
     if is_first_batch {
         let value_iter = record_vals.iter().take(1).cloned().collect::<Vec<_>>();
-        let inferred_schema =
-            infer_json_schema_from_map(value_iter.into_iter(), StreamType::EnrichmentTables)
-                .map_err(|e| anyhow!("Error inferring schema: {}", e))?;
+        let inferred_schema = infer_json_schema_from_map(
+            &stream_name,
+            StreamType::EnrichmentTables,
+            value_iter.into_iter(),
+        )
+        .map_err(|e| anyhow!("Error inferring schema: {}", e))?;
 
         let db_schema = stream_schema_map
             .get(&stream_name)

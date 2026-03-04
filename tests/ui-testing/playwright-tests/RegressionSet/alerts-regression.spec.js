@@ -33,7 +33,7 @@ test.describe("Alerts Regression Bugs", () => {
     try {
       // Navigate to base to get auth context
       await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${process.env.ORGNAME || 'default'}`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
       // Ingest metrics data
       await ingestMetricsData(page);
@@ -107,7 +107,7 @@ test.describe("Alerts Regression Bugs", () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Alerts regression test setup completed');
   });
 
@@ -132,11 +132,11 @@ test.describe("Alerts Regression Bugs", () => {
 
     const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
     await page.goto(alertsUrl);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Reload to ensure destinations are fetched (fixes deployed env caching issues)
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // ========== PART 1: UI Element Visibility Tests ==========
     testLogger.info('PART 1: Testing UI element visibility');
@@ -220,7 +220,7 @@ test.describe("Alerts Regression Bugs", () => {
       testLogger.info(`Testing operator: ${operator}`);
 
       await page.goto(alertsUrl);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
       // ✅ COVERAGE: P0 (>=) + P1 (<=) - Alert can be saved with PromQL mode
       const alertName = await pm.alertsPage.createScheduledAlertWithPromQL(
@@ -267,7 +267,7 @@ test.describe("Alerts Regression Bugs", () => {
 
     // First create a PromQL alert with specific values
     await page.goto(alertsUrl);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     const alertName = await pm.alertsPage.createScheduledAlertWithPromQL(
       METRICS_STREAM,
@@ -281,7 +281,7 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Navigate back to alerts page and find the alert
     await page.goto(alertsUrl);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Search for the alert using page object
     await pm.alertsPage.searchAlert(alertName);
@@ -338,7 +338,7 @@ test.describe("Alerts Regression Bugs", () => {
 
     try {
       await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${process.env.ORGNAME || 'default'}`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
       await cleanupAlertDestination(page, cleanupPm);
       await cleanupAlertTemplate(page, cleanupPm);
@@ -418,7 +418,7 @@ async function createAlertDestination(page, pm) {
   try {
     // Navigate to Settings > Destinations using homePage
     await pm.homePage.navigateToAlertDestinations();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Check if destination already exists
     const existingDest = page.locator(`text=${destinationName}`);
@@ -477,7 +477,7 @@ async function createAlertTemplate(page, pm) {
   try {
     // Navigate to Settings > Templates using homePage
     await pm.homePage.navigateToTemplates();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Check if template already exists
     const existingTemplate = page.locator(`text=${templateName}`);
@@ -513,7 +513,7 @@ async function cleanupAlertDestination(page, pm) {
   try {
     // Navigate to Settings > Destinations using homePage
     await pm.homePage.navigateToAlertDestinations();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     const deleteBtn = page.locator(`[data-test="alert-destination-list-${destinationName}-delete-destination"]`);
     if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -536,7 +536,7 @@ async function cleanupAlertTemplate(page, pm) {
   try {
     // Navigate to Settings > Templates using homePage
     await pm.homePage.navigateToTemplates();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     const deleteBtn = page.locator(`[data-test="alert-template-list-${templateName}-delete-template"]`);
     if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {

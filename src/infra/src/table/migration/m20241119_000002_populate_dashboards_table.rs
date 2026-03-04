@@ -80,23 +80,9 @@ impl MetaDashboard {
     {
         let backend = db.get_database_backend();
         let sql = match backend {
-            sea_orm::DatabaseBackend::MySql => {
-                r#"
-                    SELECT 
-                        f.id AS folder_id,
-                        SUBSTRING_INDEX(m.key2,'/', -1) AS dashboard_id,
-                        m.value AS value
-                    FROM meta AS m
-                    JOIN folders f ON
-                        SUBSTRING_INDEX(m.key2,'/', 1) = f.folder_id AND
-                        m.key1 = f.org
-                    WHERE m.module = 'dashboard'
-                    ORDER BY m.id ASC
-                "#
-            }
             sea_orm::DatabaseBackend::Postgres => {
                 r#"
-                    SELECT 
+                    SELECT
                         f.id AS folder_id,
                         SPLIT_PART(m.key2, '/', 2) AS dashboard_id,
                         m.value AS value
@@ -108,9 +94,9 @@ impl MetaDashboard {
                     ORDER BY m.id ASC
                 "#
             }
-            sea_orm::DatabaseBackend::Sqlite => {
+            _ => {
                 r#"
-                    SELECT 
+                    SELECT
                         f.id AS folder_id,
                         SUBSTR(m.key2, INSTR(m.key2, '/') + 1) AS dashboard_id,
                         m.value AS value

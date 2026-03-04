@@ -30,14 +30,11 @@ pub struct ServiceGraphSnapshot {
     /// Source trace stream name
     pub trace_stream_name: String,
 
-    /// Client service name (initiator)
-    pub client_service: String,
+    /// Client service name (initiator); None for entry-point services
+    pub client_service: Option<String>,
 
     /// Server service name (receiver)
     pub server_service: String,
-
-    /// Connection type: "standard", "database", "messaging", "virtual"
-    pub connection_type: String,
 
     /// Total requests (cumulative counter)
     pub total_requests: u64,
@@ -94,7 +91,8 @@ pub struct ServiceNode {
 /// Edge in service graph
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ServiceEdge {
-    pub from: String,
+    /// Source service; None for entry-point services
+    pub from: Option<String>,
     pub to: String,
     pub total_requests: u64,
     pub failed_requests: u64,
@@ -102,5 +100,29 @@ pub struct ServiceEdge {
     pub p50_latency_ns: u64,
     pub p95_latency_ns: u64,
     pub p99_latency_ns: u64,
-    pub connection_type: String,
+    /// Baseline Pxx from the previous time slot (same duration, one slot older).
+    /// None when this edge had no data in the previous slot.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub baseline_p50_latency_ns: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub baseline_p95_latency_ns: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub baseline_p99_latency_ns: Option<u64>,
+}
+
+/// One time-series data point in an edge latency trend
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct EdgeTrendDataPoint {
+    pub timestamp: i64,
+    pub p50_latency_ns: u64,
+    pub p95_latency_ns: u64,
+    pub p99_latency_ns: u64,
+    pub total_requests: u64,
+    pub failed_requests: u64,
+}
+
+/// Response for the edge latency history endpoint.
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct EdgeTrendResponse {
+    pub data_points: Vec<EdgeTrendDataPoint>,
 }

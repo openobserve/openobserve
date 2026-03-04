@@ -32,7 +32,7 @@ use config::{
 };
 use infra::{
     errors::{Error, Result},
-    schema::{SchemaCache, unwrap_partition_time_level},
+    schema::{SchemaCache, get_partition_time_level},
 };
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -267,8 +267,11 @@ impl Metadata for DistinctValues {
                 }
             }
 
-            let inferred_schema =
-                infer_json_schema_from_map(items.iter().map(|(v, _)| v), stream_type)?;
+            let inferred_schema = infer_json_schema_from_map(
+                &distinct_stream_name,
+                stream_type,
+                items.iter().map(|(v, _)| v),
+            )?;
             let schema = if is_new || get_schema_changes(&db_schema, &inferred_schema).0 {
                 match db::schema::merge(
                     &org_id,
@@ -305,7 +308,7 @@ impl Metadata for DistinctValues {
                 let hour_key = ingestion::get_write_partition_key(
                     timestamp,
                     &vec![],
-                    unwrap_partition_time_level(None, StreamType::Metadata),
+                    get_partition_time_level(StreamType::Metadata),
                     data,
                     Some(schema_key),
                 );

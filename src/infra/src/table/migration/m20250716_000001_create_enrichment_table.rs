@@ -140,30 +140,6 @@ mod tests {
     }
 
     #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_enrichment_tables_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `enrichment_tables` ( 
-                `id` bigint AUTO_INCREMENT PRIMARY KEY,
-                `org` varchar(256) NOT NULL,
-                `name` varchar(256) NOT NULL,
-                `data` binary(1) NOT NULL,
-                `created_at` bigint UNSIGNED NOT NULL
-            )"#
-        );
-
-        collapsed_eq!(
-            &create_enrichment_tables_index_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE INDEX `enrichment_table_org_name_idx` ON `enrichment_tables` (`org`, `name`)"#
-        );
-
-        collapsed_eq!(
-            &create_enrichment_tables_index_statement_created_at().to_string(MysqlQueryBuilder),
-            r#"CREATE INDEX `enrichment_table_created_at_idx` ON `enrichment_tables` (`created_at`)"#
-        );
-    }
-
-    #[test]
     fn sqlite() {
         collapsed_eq!(
             &create_enrichment_tables_statement().to_string(SqliteQueryBuilder),

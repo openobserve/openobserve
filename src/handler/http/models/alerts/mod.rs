@@ -133,6 +133,11 @@ pub struct Alert {
     /// Optional deduplication configuration to prevent alert spam.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deduplication: Option<DeduplicationConfig>,
+
+    /// When true, this alert routes notifications through the incident system
+    /// instead of sending direct alert notifications.
+    #[serde(default)]
+    pub creates_incident: bool,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -384,6 +389,7 @@ pub enum SearchEventType {
     DerivedStream,
     SearchJob,
     Download,
+    Insights,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
@@ -434,6 +440,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             updated_at: alert.updated_at.map(|t| t.timestamp()),
             last_edited_by: alert.last_edited_by,
             deduplication: alert.deduplication,
+            creates_incident: alert.creates_incident,
         }
     }
 }
@@ -568,6 +575,7 @@ impl From<meta_search::SearchEventType> for SearchEventType {
             meta_search::SearchEventType::DerivedStream => Self::DerivedStream,
             meta_search::SearchEventType::SearchJob => Self::SearchJob,
             meta_search::SearchEventType::Download => Self::Download,
+            meta_search::SearchEventType::Insights => Self::Insights,
         }
     }
 }
@@ -613,6 +621,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.tz_offset = value.tz_offset;
         alert.owner = value.owner;
         alert.deduplication = value.deduplication;
+        alert.creates_incident = value.creates_incident;
 
         alert
     }
@@ -748,6 +757,7 @@ impl From<SearchEventType> for meta_search::SearchEventType {
             SearchEventType::DerivedStream => Self::DerivedStream,
             SearchEventType::SearchJob => Self::SearchJob,
             SearchEventType::Download => Self::Download,
+            SearchEventType::Insights => Self::Insights,
         }
     }
 }

@@ -23,7 +23,9 @@ use std::{
 
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::{
-    META_ORG_ID, get_config,
+    META_ORG_ID,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::triggers::{Trigger, TriggerModule, TriggerStatus},
     utils::size::bytes_to_human_readable,
 };
@@ -181,7 +183,7 @@ async fn main() -> Result<(), anyhow::Error> {
             log::set_max_level(LevelFilter::from_str(&cfg.log.level).unwrap_or(LevelFilter::Info))
         })?;
         None
-    } else if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+    } else if cfg.common.should_create_span() {
         log::info!("OpenTelemetry tracing enabled - initializing tracer provider");
         tracer_provider = Some(enable_tracing()?);
         log::info!("Tracer provider initialized successfully");
@@ -458,7 +460,9 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     // init http server
-    if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
+    if !cfg.common.tracing_enabled
+        && (cfg.common.tracing_search_enabled || cfg.common.search_inspector_enabled)
+    {
         if let Err(e) = init_http_server_without_tracing().await {
             log::error!("HTTP server runs failed: {e}");
         }
@@ -969,6 +973,146 @@ impl<P: opentelemetry_sdk::trace::SpanProcessor> opentelemetry_sdk::trace::SpanP
     }
 }
 
+/// Custom SpanExporter that ingests traces directly into the _meta org.
+/// This is used by the search inspector feature to ensure search profiling
+/// traces are always available in the _meta org, regardless of where the user's
+/// OTLP endpoint points.
+///
+/// Handles both single-node and multi-node deployments:
+/// - Ingester nodes: calls `handle_otlp_request` directly
+/// - Non-ingester nodes (e.g. queriers): forwards via gRPC to an ingester
+#[derive(Debug)]
+struct MetaOrgTraceExporter {
+    resource: opentelemetry_proto::transform::common::tonic::ResourceAttributesWithSchema,
+}
+
+impl MetaOrgTraceExporter {
+    fn new(
+        resource: opentelemetry_proto::transform::common::tonic::ResourceAttributesWithSchema,
+    ) -> Self {
+        Self { resource }
+    }
+}
+
+impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
+    fn export(
+        &self,
+        batch: Vec<opentelemetry_sdk::trace::SpanData>,
+    ) -> impl std::future::Future<Output = opentelemetry_sdk::error::OTelSdkResult> + Send {
+        // Convert SpanData to ExportTraceServiceRequest synchronously
+        // so we don't hold a borrow on &self across await points
+        let resource_spans =
+            opentelemetry_proto::transform::trace::tonic::group_spans_by_resource_and_scope(
+                batch,
+                &self.resource,
+            );
+        let request = opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest {
+            resource_spans,
+        };
+
+        async move {
+            if LOCAL_NODE.is_ingester() {
+                // Ingest directly on ingester nodes
+                match openobserve::service::traces::handle_otlp_request(
+                    META_ORG_ID,
+                    request,
+                    config::meta::otlp::OtlpRequestType::HttpJson,
+                    None,
+                    openobserve::common::meta::ingestion::IngestUser::SystemJob(
+                        openobserve::common::meta::ingestion::SystemJobType::SelfReporting,
+                    ),
+                )
+                .await
+                {
+                    Ok(resp) if resp.status().is_success() => {
+                        log::debug!("[SEARCH-INSPECTOR] Successfully ingested traces to _meta org");
+                        Ok(())
+                    }
+                    Ok(resp) => {
+                        log::error!(
+                            "[SEARCH-INSPECTOR] Error ingesting traces to _meta org: status={}",
+                            resp.status()
+                        );
+                        Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                            format!("Failed to ingest traces: status={}", resp.status()),
+                        ))
+                    }
+                    Err(e) => {
+                        log::error!("[SEARCH-INSPECTOR] Error ingesting traces to _meta org: {e}");
+                        Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                            format!("Failed to ingest traces: {e}"),
+                        ))
+                    }
+                }
+            } else {
+                // Forward to an ingester node via gRPC
+                let cfg = get_config();
+                let token = match config::meta::cluster::get_internal_grpc_token()
+                    .parse::<tonic::metadata::MetadataValue<_>>()
+                {
+                    Ok(token) => token,
+                    Err(e) => {
+                        log::error!("[SEARCH-INSPECTOR] Failed to parse internal gRPC token: {e}");
+                        return Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                            format!("Failed to parse gRPC token: {e}"),
+                        ));
+                    }
+                };
+
+                let (_addr, channel) =
+                    match openobserve::service::grpc::get_ingester_channel().await {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::error!("[SEARCH-INSPECTOR] Failed to get ingester channel: {e}");
+                            return Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                                format!("No ingester available: {e}"),
+                            ));
+                        }
+                    };
+
+                let client = opentelemetry_proto::tonic::collector::trace::v1::trace_service_client::TraceServiceClient::with_interceptor(
+                    channel,
+                    move |mut req: tonic::Request<()>| {
+                        req.metadata_mut().insert("authorization", token.clone());
+                        Ok(req)
+                    },
+                );
+
+                let org_header_key: MetadataKey<_> = cfg.grpc.org_header_key.parse().unwrap();
+                let mut grpc_request = tonic::Request::new(request);
+                grpc_request.metadata_mut().insert(
+                    org_header_key,
+                    META_ORG_ID
+                        .parse::<tonic::metadata::MetadataValue<_>>()
+                        .unwrap(),
+                );
+
+                match client
+                    .send_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .export(grpc_request)
+                    .await
+                {
+                    Ok(_) => {
+                        log::debug!(
+                            "[SEARCH-INSPECTOR] Successfully forwarded traces to ingester for _meta org"
+                        );
+                        Ok(())
+                    }
+                    Err(e) => {
+                        log::error!("[SEARCH-INSPECTOR] Error forwarding traces to ingester: {e}");
+                        Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                            format!("Failed to forward traces to ingester: {e}"),
+                        ))
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyhow::Error> {
     let cfg = get_config();
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
@@ -1166,6 +1310,50 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
         }
     }
 
+    // Build resource attributes (base + extra envs)
+    let mut resource_attrs = vec![
+        KeyValue::new("service.name", cfg.common.node_role.to_string()),
+        KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
+        KeyValue::new("service.version", config::VERSION),
+    ];
+    for env_name in cfg
+        .common
+        .tracing_extra_envs
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        if let Ok(val) = std::env::var(env_name)
+            && !val.is_empty()
+        {
+            resource_attrs.push(KeyValue::new(env_name.to_lowercase(), val));
+        }
+    }
+
+    // If search inspector is enabled, add a span processor that ingests traces
+    // directly into the _meta org. This ensures search profiling data is always
+    // available in _meta regardless of where the user's OTLP endpoint points.
+    if cfg.common.search_inspector_enabled {
+        let resource = Resource::builder()
+            .with_attributes(resource_attrs.clone())
+            .build();
+        let resource_attrs =
+            opentelemetry_proto::transform::common::tonic::ResourceAttributesWithSchema::from(
+                &resource,
+            );
+        let meta_exporter = MetaOrgTraceExporter::new(resource_attrs);
+        let meta_processor =
+            opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                meta_exporter,
+                opentelemetry_sdk::runtime::Tokio,
+            )
+            .build();
+        tracer_builder = tracer_builder.with_span_processor(meta_processor);
+        log::info!(
+            "Search inspector OTLP exporter configured - traces will be ingested to _meta org"
+        );
+    }
+
     // Add UUID v7 ID generator and resource attributes
     tracer_builder = tracer_builder.with_id_generator({
         #[cfg(feature = "enterprise")]
@@ -1178,16 +1366,8 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
         }
     });
 
-    // Store the tracer provider before installing batch processor
-    let tracer = tracer_builder.with_resource(
-        Resource::builder()
-            .with_attributes(vec![
-                KeyValue::new("service.name", cfg.common.node_role.to_string()),
-                KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-                KeyValue::new("service.version", config::VERSION),
-            ])
-            .build(),
-    );
+    let tracer =
+        tracer_builder.with_resource(Resource::builder().with_attributes(resource_attrs).build());
 
     // build
     let tracer = tracer.build();
@@ -1310,7 +1490,6 @@ pub fn create_action_server_router() -> axum::Router {
     use openobserve::handler::http::{request::action_server, router::cors_layer};
 
     let cfg = get_config();
-    let base_uri = &cfg.common.base_uri;
 
     // Create action server routes with authentication
     // Routes match action_manager.rs expected URLs: /api/{org_id}/v1/job[/{id}]
@@ -1331,11 +1510,7 @@ pub fn create_action_server_router() -> axum::Router {
         .layer(cors_layer());
 
     // Nest under base URI and set request body size limit
-    let router = if base_uri.is_empty() || base_uri == "/" {
-        Router::new().nest("/api", api_routes)
-    } else {
-        Router::new().nest(&format!("{}/api", base_uri), api_routes)
-    };
+    let router = Router::new().nest(&format!("{}/api", cfg.common.base_uri), api_routes);
 
     // Set request body size limit (equivalent to actix-web's PayloadConfig)
     router.layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit))

@@ -59,6 +59,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
         <q-btn
+          data-test="correlation-semanticfieldgroup-export-json-btn"
+          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
+          no-caps
+          flat
+          :label="t('correlation.exportToJson')"
+          :disable="localGroups.length === 0"
+          @click="exportGroups"
+        />
+        <q-btn
           data-test="correlation-semanticfieldgroup-import-json-btn"
           class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
           :class="
@@ -338,6 +352,17 @@ const removeGroupByFilter = (filteredIndex: number) => {
 
     emitUpdate();
   }
+};
+
+const exportGroups = () => {
+  const json = JSON.stringify(localGroups.value, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `semantic-groups-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 };
 
 const navigateToImport = () => {

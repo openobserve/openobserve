@@ -380,7 +380,7 @@ export class MetricsPage {
         }
 
         // Click on the Monaco editor to focus it
-        await editorContainer.locator('.monaco-editor').click();
+        await editorContainer.getByRole('code').click();
         await this.page.waitForTimeout(100);
 
         // Use platform-specific key combo for select all
@@ -401,7 +401,9 @@ export class MetricsPage {
 
     async waitForMetricsResults() {
         // Wait for results to load after query execution
-        await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        // networkidle never resolves on OpenObserve (persistent WebSocket/RUM);
+        // keep timeout short so iterative query tests don't exceed the 5-min CI limit
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     }
 
     // Query type switching methods
@@ -473,9 +475,9 @@ export class MetricsPage {
 
         if (!editorContainer) {
             editorContainer = this.page.locator('.monaco-editor').first();
-        }
+    }
 
-        await editorContainer.locator('.monaco-editor').click();
+        await editorContainer.getByRole('code').click();
         const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
         await this.page.keyboard.press(selectAllKey);
         await this.page.keyboard.press('Delete');

@@ -1,4 +1,5 @@
 @import 'variables';
+@import 'field-type-badge';
 
 html, body {
   margin: 0 !important;
@@ -559,6 +560,11 @@ body {
   &.o2-row-md{
     th, td {
       height: 36px !important;
+    }
+  }
+  &.o2-row-sm{
+    th, td {
+      height: 20px !important;
     }
   }
   th,td {

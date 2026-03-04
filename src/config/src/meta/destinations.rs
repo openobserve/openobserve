@@ -149,6 +149,9 @@ pub enum HTTPOutputFormat {
     ESBulk {
         index: String,
     },
+    StringSeparated {
+        separator: String,
+    },
 }
 
 impl HTTPOutputFormat {
@@ -158,6 +161,8 @@ impl HTTPOutputFormat {
             Self::NDJSON => "application/x-ndjson",
             Self::NestedEvent => "application/x-ndjson",
             Self::ESBulk { .. } => "application/x-ndjson",
+            // this is not a json anymore, the handler must process it as a string
+            Self::StringSeparated { .. } => "text/plain",
         }
     }
 
@@ -205,6 +210,12 @@ impl HTTPOutputFormat {
                 temp.push(b'\n');
                 temp
             }
+            Self::StringSeparated { separator } => data
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(separator)
+                .into_bytes(),
         }
     }
 }

@@ -44,7 +44,7 @@ use futures::StreamExt;
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::unwrap_partition_time_level,
+    schema::get_partition_time_level,
 };
 use ingester::WAL_PARQUET_METADATA;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -83,8 +83,7 @@ pub async fn search_parquet(
         infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
             .await
             .unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
+    let partition_time_level = get_partition_time_level(query.stream_type);
     let files = get_file_list(
         query.clone(),
         &stream_settings.partition_keys,
@@ -182,6 +181,7 @@ pub async fn search_parquet(
                 scan_stats.compressed_size
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:parquet load".to_string())
                 .search_role("follower".to_string())
@@ -237,6 +237,7 @@ pub async fn search_parquet(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:parquet create tables".to_string())
                 .search_role("follower".to_string())
@@ -338,6 +339,7 @@ pub async fn search_memtable(
                 scan_stats.compressed_size,
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:memtable load".to_string())
                 .search_role("follower".to_string())
@@ -404,7 +406,7 @@ pub async fn search_memtable(
         let batch_num = record_batches.len();
         let mut merge_groupes = Vec::new();
         let mut current_group = Vec::new();
-        let group_limit = config::PARQUET_BATCH_SIZE;
+        let group_limit = config::get_batch_size();
         let mut group_size = 0;
         for batch in record_batches {
             if group_size > 0 && group_size + batch.num_rows() > group_limit {
@@ -467,6 +469,7 @@ pub async fn search_memtable(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:memtable create tables".to_string())
                 .search_role("follower".to_string())

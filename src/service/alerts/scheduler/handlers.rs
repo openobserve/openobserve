@@ -680,12 +680,19 @@ async fn handle_alert_triggers(
                             _ => None,
                         };
 
+                    let semantic_groups =
+                        crate::service::db::system_settings::get_semantic_field_groups(
+                            &new_trigger.org,
+                        )
+                        .await;
+
                     if let Some(first_row) = data.first() {
                         crate::service::alerts::deduplication::calculate_fingerprint(
                             &alert,
                             first_row,
                             dedup_config,
                             org_config.as_ref(),
+                            &semantic_groups,
                         )
                     } else {
                         alert.get_unique_key()
@@ -836,65 +843,58 @@ async fn handle_alert_triggers(
         //     );
         // }
 
-        // [ENTERPRISE] Correlate alert to incident for unified incident management
+        // True when incident correlation ran and handled the notification internally
+        // (either sent it for a new incident/alert type, or suppressed it for a repeat).
+        // When false, the direct send_notification() call below fires instead.
         #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::common::config::get_config()
-            .incidents
-            .enabled
+        let incident_handled_notification = if alert.creates_incident
+            && o2_enterprise::enterprise::common::config::get_config()
+                .incidents
+                .enabled
             && let Some(first_row) = data.first()
         {
-            // Extract service name from result labels (used for topology enrichment)
-            let service_name = first_row
-                .get("service.name")
-                .or_else(|| first_row.get("service_name"))
-                .and_then(json::Value::as_str);
-
-            // Extract trace_id for trace-based correlation
-            let trace_id = first_row
-                .get("trace_id")
-                .or_else(|| first_row.get("traceId"))
-                .or_else(|| first_row.get("TraceId"))
-                .and_then(json::Value::as_str);
-
             match crate::service::alerts::incidents::correlate_alert_to_incident(
                 &alert,
                 first_row,
+                &data,
                 triggered_at,
-                service_name,
-                trace_id,
             )
             .await
             {
-                Ok(Some((incident_id, discovered_service_name))) => {
+                Ok(Some(outcome)) => {
                     log::info!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{} correlated to incident {} (service: {})",
                         &new_trigger.org,
                         &alert.name,
-                        incident_id,
-                        discovered_service_name
+                        outcome.incident_id(),
+                        outcome.service_name(),
                     );
-
-                    // Note: Topology enrichment now happens automatically in
-                    // find_or_create_incident when dimensions change or
-                    // topology is missing. The enrichment is triggered
-                    // during incident creation or when new dimensions are discovered.
-                    // No need to spawn enrichment here anymore.
+                    // Notification was handled inside correlate_alert_to_incident
+                    // (sent for new incidents/alert types, suppressed for repeats).
+                    true
                 }
                 Ok(None) => {
                     log::debug!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] No incident correlation for alert {}/{}",
                         &new_trigger.org,
-                        &alert.name
+                        &alert.name,
                     );
+                    false
                 }
                 Err(e) => {
                     log::error!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Error correlating alert to incident: {e}"
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error in incident correlation, falling back to direct notification: {e}"
                     );
-                    // Don't fail alert processing if incident correlation fails
+                    // Fall through to direct notification — don't silently lose the notification.
+                    false
                 }
             }
-        }
+        } else {
+            false
+        };
+
+        #[cfg(not(feature = "enterprise"))]
+        let incident_handled_notification = false;
 
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
@@ -922,91 +922,105 @@ async fn handle_alert_triggers(
             trigger_data_stream.dedup_suppressed = Some(false);
         }
 
-        // No grouping - send individual notification
-        match alert
-            .send_notification(
-                &data,
-                trigger_results.end_time,
-                Some(start_time),
-                triggered_at,
-            )
-            .await
-        {
-            Ok((success_msg, err_msg)) => {
-                let success_msg = success_msg.trim().to_owned();
-                let err_msg = err_msg.trim().to_owned();
-                if !err_msg.is_empty() {
-                    log::error!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Some notifications for alert {}/{} could not be sent: {err_msg}",
-                        &new_trigger.org,
-                        &new_trigger.module_key
-                    );
-                    trigger_data_stream.error = Some(err_msg);
-                } else {
-                    log::info!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert notification sent, org: {}, module_key: {}",
-                        &new_trigger.org,
-                        &new_trigger.module_key
-                    );
-                }
-                trigger_data_stream.success_response = Some(success_msg);
-                // Notification was sent successfully, store the last used end_time in the triggers
-                trigger_data.period_end_time = if should_store_last_end_time {
-                    Some(trigger_results.end_time)
-                } else {
-                    None
-                };
-                new_trigger.data = json::to_string(&trigger_data).unwrap();
-                // Notification is already sent to some destinations,
-                // hence in case of partial errors, no need to retry
-                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-            }
-            Err(e) => {
-                log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] Error sending alert notification: org: {}, module_key: {}",
-                    &new_trigger.org,
-                    &new_trigger.module_key
-                );
-                if trigger.retries + 1 >= max_retries {
-                    // It has been tried the maximum time, just update the
-                    // next_run_at to the next expected trigger time
-                    log::debug!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] This alert trigger: {}/{} has reached maximum retries",
-                        &new_trigger.org,
-                        &new_trigger.module_key
-                    );
-                    // Alert could not be sent for multiple times, in the next run
-                    // if the same start time used for alert evaluation, the extended
-                    // timerange may contain huge amount of data, which may cause issues.
-                    // E.g. the alert was supposed to run at 11:00am with period of 30min,
-                    // but it could not be sent for multiple times, in the next run at
-                    // 11:31am (say), the alert will be checked from 10:30am (as start time
-                    // still not changed) to 11:31am. This may create issues if the data is huge.
-                    // To avoid that, we need to empty the data. So, in the next run, the period
-                    // will be used to evaluate the alert.
-                    trigger_data.period_end_time = None;
+        if incident_handled_notification {
+            // Notification was handled (sent or suppressed) inside correlate_alert_to_incident.
+            // Still advance the trigger state so the scheduler moves forward normally.
+            trigger_data.period_end_time = if should_store_last_end_time {
+                Some(trigger_results.end_time)
+            } else {
+                None
+            };
+            new_trigger.data = json::to_string(&trigger_data).unwrap();
+            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        } else {
+            // Direct notification — creates_incident=false, or incident correlation errored.
+            match alert
+                .send_notification(
+                    &data,
+                    trigger_results.end_time,
+                    Some(start_time),
+                    triggered_at,
+                )
+                .await
+            {
+                Ok((success_msg, err_msg)) => {
+                    let success_msg = success_msg.trim().to_owned();
+                    let err_msg = err_msg.trim().to_owned();
+                    if !err_msg.is_empty() {
+                        log::error!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Some notifications for alert {}/{} could not be sent: {err_msg}",
+                            &new_trigger.org,
+                            &new_trigger.module_key
+                        );
+                        trigger_data_stream.error = Some(err_msg);
+                    } else {
+                        log::info!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Alert notification sent, org: {}, module_key: {}",
+                            &new_trigger.org,
+                            &new_trigger.module_key
+                        );
+                    }
+                    trigger_data_stream.success_response = Some(success_msg);
+                    // Notification was sent successfully, store the last used end_time in the
+                    // triggers
+                    trigger_data.period_end_time = if should_store_last_end_time {
+                        Some(trigger_results.end_time)
+                    } else {
+                        None
+                    };
                     new_trigger.data = json::to_string(&trigger_data).unwrap();
-                    trigger_data_stream.next_run_at = new_trigger.next_run_at;
+                    // Notification is already sent to some destinations,
+                    // hence in case of partial errors, no need to retry
                     db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                } else {
-                    let trigger_data = json::to_string(&trigger_data).unwrap();
-                    // Otherwise update its status and data only
-                    db::scheduler::update_status(
-                        &new_trigger.org,
-                        new_trigger.module,
-                        &new_trigger.module_key,
-                        db::scheduler::TriggerStatus::Waiting,
-                        trigger.retries + 1,
-                        Some(&trigger_data),
-                        true,
-                        &query_trace_id,
-                    )
-                    .await?;
-                    trigger_data_stream.next_run_at = now;
                 }
-                trigger_data_stream.status = TriggerDataStatus::Failed;
-                trigger_data_stream.error =
-                    Some(format!("error sending notification for alert: {e}"));
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error sending alert notification: org: {}, module_key: {}",
+                        &new_trigger.org,
+                        &new_trigger.module_key
+                    );
+                    if trigger.retries + 1 >= max_retries {
+                        // It has been tried the maximum time, just update the
+                        // next_run_at to the next expected trigger time
+                        log::debug!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] This alert trigger: {}/{} has reached maximum retries",
+                            &new_trigger.org,
+                            &new_trigger.module_key
+                        );
+                        // Alert could not be sent for multiple times, in the next run
+                        // if the same start time used for alert evaluation, the extended
+                        // timerange may contain huge amount of data, which may cause issues.
+                        // E.g. the alert was supposed to run at 11:00am with period of 30min,
+                        // but it could not be sent for multiple times, in the next run at
+                        // 11:31am (say), the alert will be checked from 10:30am (as start time
+                        // still not changed) to 11:31am. This may create issues if the data is
+                        // huge. To avoid that, we need to empty the data.
+                        // So, in the next run, the period will be used to
+                        // evaluate the alert.
+                        trigger_data.period_end_time = None;
+                        new_trigger.data = json::to_string(&trigger_data).unwrap();
+                        trigger_data_stream.next_run_at = new_trigger.next_run_at;
+                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                    } else {
+                        let trigger_data = json::to_string(&trigger_data).unwrap();
+                        // Otherwise update its status and data only
+                        db::scheduler::update_status(
+                            &new_trigger.org,
+                            new_trigger.module,
+                            &new_trigger.module_key,
+                            db::scheduler::TriggerStatus::Waiting,
+                            trigger.retries + 1,
+                            Some(&trigger_data),
+                            true,
+                            &query_trace_id,
+                        )
+                        .await?;
+                        trigger_data_stream.next_run_at = now;
+                    }
+                    trigger_data_stream.status = TriggerDataStatus::Failed;
+                    trigger_data_stream.error =
+                        Some(format!("error sending notification for alert: {e}"));
+                }
             }
         }
     } else {

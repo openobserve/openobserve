@@ -190,8 +190,6 @@ describe("RealUserMonitoring.vue", () => {
             "q-spinner-hourglass": {
               template: '<div class="q-spinner-hourglass">Loading...</div>',
             },
-            "q-btn": true,
-            "q-icon": true,
             AppTabs: true,
           },
         },
@@ -221,8 +219,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
             "q-spinner-hourglass": true,
             "q-btn": {
               template: '<button @click="$attrs.onClick"><slot /></button>',
@@ -249,8 +245,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
             "q-spinner-hourglass": true,
             "q-btn": {
               template: '<button @click="$attrs.onClick"><slot /></button>',
@@ -278,6 +272,7 @@ describe("RealUserMonitoring.vue", () => {
       mockGetStream.mockImplementation((streamName) => {
         if (streamName === "_rumdata") {
           return Promise.resolve({
+            name: "_rumdata",
             schema: [
               { name: "service_name", type: "Utf8" },
               { name: "rum_type", type: "Utf8" },
@@ -286,6 +281,7 @@ describe("RealUserMonitoring.vue", () => {
         }
         if (streamName === "_sessionreplay") {
           return Promise.resolve({
+            name: "_sessionreplay",
             schema: [
               { name: "session_id", type: "Utf8" },
               { name: "event_type", type: "Utf8" },
@@ -308,8 +304,6 @@ describe("RealUserMonitoring.vue", () => {
             "q-btn": true,
             "q-icon": true,
             "q-spinner-hourglass": true,
-            "q-btn": true,
-            "q-icon": true,
             AppTabs: {
               template:
                 '<div class="app-tabs"><slot v-for="tab in tabs" :name="tab.value" /></div>',
@@ -396,8 +390,6 @@ describe("RealUserMonitoring.vue", () => {
             "q-btn": true,
             "q-icon": true,
             "q-spinner-hourglass": true,
-            "q-btn": true,
-            "q-icon": true,
             AppTabs: true,
           },
         },
@@ -416,6 +408,7 @@ describe("RealUserMonitoring.vue", () => {
       mockGetStream.mockImplementation((streamName) => {
         if (streamName === "_rumdata") {
           return Promise.resolve({
+            name: "_rumdata",
             schema: [{ name: "service_name", type: "Utf8" }],
           });
         }
@@ -518,6 +511,7 @@ describe("RealUserMonitoring.vue", () => {
       mockGetStream.mockImplementation((streamName) => {
         if (streamName === "_sessionreplay") {
           return Promise.resolve({
+            name: "_sessionreplay",
             schema: [{ name: "session_id", type: "Utf8" }],
           });
         }
@@ -552,6 +546,7 @@ describe("RealUserMonitoring.vue", () => {
       mockGetStream.mockImplementation((streamName) => {
         if (streamName === "_rumdata") {
           return Promise.resolve({
+            name: "_rumdata",
             schema: [{ name: "service_name", type: "Utf8" }],
           });
         }
@@ -597,8 +592,6 @@ describe("RealUserMonitoring.vue", () => {
             "q-btn": true,
             "q-icon": true,
             "q-spinner-hourglass": true,
-            "q-btn": true,
-            "q-icon": true,
             AppTabs: true,
           },
         },

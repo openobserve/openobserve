@@ -153,9 +153,11 @@ impl TryFrom<alerts::Model> for MetaAlert {
             let mut dedup_config: MetaDeduplicationConfig =
                 serde_json::from_value(dedup_config_json)?;
             dedup_config.enabled = true;
-            dedup_config.time_window_minutes = value.dedup_time_window_minutes.map(|v| v as i64);
+            dedup_config.time_window_minutes = value.dedup_time_window_minutes;
             alert.deduplication = Some(dedup_config);
         }
+
+        alert.creates_incident = value.creates_incident;
 
         Ok(alert)
     }
@@ -671,7 +673,7 @@ fn update_mutable_fields(
     let (dedup_enabled, dedup_time_window_minutes, dedup_config) =
         if let Some(mut dedup) = alert.deduplication {
             let dedup_enabled = dedup.enabled;
-            let time_window = dedup.time_window_minutes.map(|v| v as i32);
+            let time_window = dedup.time_window_minutes;
             // Remove time_window_minutes from the config before serializing to avoid redundancy
             dedup.time_window_minutes = None;
 
@@ -717,6 +719,7 @@ fn update_mutable_fields(
     alert_am.dedup_enabled = Set(dedup_enabled);
     alert_am.dedup_time_window_minutes = Set(dedup_time_window_minutes);
     alert_am.dedup_config = Set(dedup_config);
+    alert_am.creates_incident = Set(alert.creates_incident);
     Ok(())
 }
 

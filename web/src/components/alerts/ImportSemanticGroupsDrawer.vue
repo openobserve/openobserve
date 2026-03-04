@@ -577,6 +577,9 @@ const handleApply = () => {
     .map((m) => m.proposed);
   mergedGroups.push(...selectedModificationGroups);
 
+  // Capture count before clearing state
+  const changeCount = selectedAdditions.value.length + selectedModifications.value.length;
+
   // Emit the merged groups to parent
   emit("apply", mergedGroups);
 
@@ -586,7 +589,7 @@ const handleApply = () => {
   emit("close");
 
   q.notify({
-    message: `Applied ${selectedAdditions.value.length + selectedModifications.value.length} changes`,
+    message: `Applied ${changeCount} changes`,
     color: "positive",
     position: "bottom",
     timeout: 2000,

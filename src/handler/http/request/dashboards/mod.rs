@@ -114,7 +114,7 @@ impl From<DashboardError> for Response {
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
         ("x-o2-mcp" = json!({
-            "description": "Create a dashboard with visualization panels. LAYOUT: 192-column grid with {x, y, w, h, i} where x=column(0-191), y=row, w=width, h=height, i=panel_id. Common widths: full=192, half=96, third=64. PANEL QUERIES: Each panel query needs 'fields' with x/y/z arrays populated EVEN when customQuery=true. AXIS RULES: x=dimension/time field, y=metric field(s), z=only for heatmaps(color intensity)/stacked-charts(breakdown field)/geo-maps(value). For most charts (line/area/bar/pie), leave z=[]. Use SELECT aliases as column values. Example: 'SELECT histogram(_timestamp) as ts, COUNT(*) as cnt' needs x=[{label:'ts',alias:'ts',column:'ts',aggregationFunction:null}], y=[{label:'cnt',alias:'cnt',column:'cnt',aggregationFunction:null}], z=[].",
+            "description": "Create a dashboard with visualization panels. LAYOUT: 192-column grid with {x, y, w, h, i} where x=column(0-191), y=row, w=width, h=height, i=panel_id. Common widths: full=192, half=96, third=64. PANEL QUERIES: Each panel query needs 'fields' with x/y/z arrays populated EVEN when customQuery=true. AXIS RULES: x=dimension/time field, y=metric field(s), z=only for heatmaps(color intensity)/stacked-charts(breakdown field)/geo-maps(value). For most charts (line/area/bar/pie), leave z=[]. Use SELECT aliases as column values. Example: 'SELECT histogram(_timestamp) as ts, COUNT(*) as cnt' needs x=[{label:'ts',alias:'ts',column:'ts',aggregationFunction:null}], y=[{label:'cnt',alias:'cnt',column:'cnt',aggregationFunction:null}], z=[]. FILTER: The 'filter' field in 'fields' MUST be an object (NOT an array). Use: {type:'list',values:[],logicalOperator:'AND',filterType:'list'} for no filters.",
             "category": "dashboards"
         }))
     )
@@ -269,42 +269,6 @@ pub async fn get_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>)
     MetaHttpResponse::json(resp_body)
 }
 
-/// ExportDashboard
-#[utoipa::path(
-    get,
-    path = "/{org_id}/dashboards/{dashboard_id}/export",
-    context_path = "/api",
-    tag = "Dashboards",
-    operation_id = "ExportDashboard",
-    summary = "Export dashboard",
-    description = "Exports a dashboard configuration in a portable format that can be imported into other organizations or instances",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("dashboard_id" = String, Path, description = "Dashboard ID"),
-        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located. Used for RBAC permission checks in enterprise version"),
-    ),
-    responses(
-        (status = StatusCode::OK, body = inline(DashboardResponseBody)),
-        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
-        (status = StatusCode::FORBIDDEN, description = "Unauthorized Access", body = ()),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Export dashboard as JSON", "category": "dashboards"}))
-    )
-)]
-pub async fn export_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
-    let dashboard = match dashboards::get_dashboard(&org_id, &dashboard_id).await {
-        Ok(dashboard) => dashboard,
-        Err(err) => return err.into(),
-    };
-    let resp_body: DashboardResponseBody = dashboard.into();
-    MetaHttpResponse::json(resp_body)
-}
-
 /// DeleteDashboard
 #[utoipa::path(
     delete,
@@ -330,7 +294,7 @@ pub async fn export_dashboard(Path((org_id, dashboard_id)): Path<(String, String
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID", "category": "dashboards"}))
+        ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID", "category": "dashboards", "requires_confirmation": true}))
     )
 )]
 pub async fn delete_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {

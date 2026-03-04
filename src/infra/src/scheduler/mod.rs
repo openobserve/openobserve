@@ -16,13 +16,12 @@
 use async_trait::async_trait;
 use config::meta::{
     meta_store::MetaStore,
-    triggers::{Trigger, TriggerId, TriggerModule, TriggerStatus},
+    triggers::{Trigger, TriggerModule, TriggerStatus},
 };
 use once_cell::sync::Lazy;
 
 use crate::errors::Result;
 
-pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
@@ -31,7 +30,6 @@ pub const TRIGGERS_KEY: &str = "/triggers/";
 
 pub fn connect() -> Box<dyn Scheduler> {
     match config::get_config().common.meta_store.as_str().into() {
-        MetaStore::MySQL => Box::<mysql::MySqlScheduler>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresScheduler>::default(),
         _ => Box::<sqlite::SqliteScheduler>::default(),
     }

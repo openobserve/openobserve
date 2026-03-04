@@ -17,7 +17,7 @@ test.describe("Logs Regression Bugs", () => {
     pm = new PageManager(page);
 
     // Post-authentication stabilization wait
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Data ingestion for logs page testing
     await ingestTestData(page);
@@ -191,7 +191,7 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.fillSavedViewSearchInput(savedViewA);
     await page.waitForTimeout(1000);
     await pm.logsPage.clickSavedViewByText(savedViewA);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // Verify stream A field is present
@@ -204,7 +204,7 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.fillSavedViewSearchInput(savedViewB);
     await page.waitForTimeout(1000);
     await pm.logsPage.clickSavedViewByText(savedViewB);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // Verify stream B field is present
@@ -356,7 +356,7 @@ test.describe("Logs Regression Bugs", () => {
     await page.waitForTimeout(2000);
 
     // Get initial pagination text (shows total count) - using POM method
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(1000); // Extra wait for pagination to update
 
     const initialPaginationText = await pm.logsPage.getPaginationText();
@@ -375,7 +375,7 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`Entered search term: "${searchTerm}"`);
 
     // Wait for table filtering to complete
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(500); // Small buffer for UI update
 
     // Get pagination text after search - using POM method
@@ -1152,7 +1152,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Click refresh button to load data
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Wait for logs table to be visible
     await pm.logsPage.expectLogsTableVisible();
@@ -1203,14 +1203,320 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('✓ Bug #9724 verification complete: Log detail sidebar opens with JSON tab by default');
   });
 
-  test.afterEach(async ({ page }) => {
-    testLogger.info('Logs regression test completed');
+  // ============================================================================
+  // Query Inspector: readonly flag in buildSearch to avoid mutating logs state
+  // Feature: Query inspector should not modify the original logs state
+  // ============================================================================
+  test('should not mutate logs state when using query inspector @queryInspector @P1 @regression @main', async ({ page }) => {
+    testLogger.info('Test: Query inspector should not mutate logs state');
 
-    // Note: Test data cleanup is handled implicitly through time-based filtering.
-    // Tests use recent time ranges (Last 1 hour, Last 15 min) which naturally
-    // exclude old test data. For Bug #9475, test data is ingested with unique
-    // timestamps each run, preventing false positives from previous runs.
-    // Future improvement: Consider using unique stream names per test run
-    // (e.g., `e2e_automate_${Date.now()}`) for complete isolation.
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(2000);
+
+    // Set time range and run initial query
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForTimeout(3000);
+
+    // Capture initial logs state (first N row texts as array)
+    await pm.logsPage.waitForLogsTable(10000);
+    const initialRowTexts = await pm.logsPage.getLogsTableRowTexts(5);
+    expect(initialRowTexts.length, 'Initial table should have rows before opening query inspector').toBeGreaterThan(0);
+    testLogger.info(`Initial rows captured: ${initialRowTexts.length}`);
+
+    // Store initial row count
+    const initialRowCount = await pm.logsPage.getLogRowCount();
+    testLogger.info(`Initial row count: ${initialRowCount}`);
+
+    // Open query inspector/show query toggle
+    await pm.logsPage.clickShowQueryToggle();
+    await page.waitForTimeout(1000);
+    testLogger.info('Opened query inspector');
+
+    // Interact with query inspector - view the query
+    await pm.logsPage.waitForQueryEditorVisible(5000);
+
+    // Click on query editor (readonly interaction)
+    await pm.logsPage.clickQueryEditor();
+    await page.waitForTimeout(500);
+
+    // Close query inspector
+    await pm.logsPage.clickShowQueryToggle();
+    await page.waitForTimeout(1000);
+
+    // PRIMARY ASSERTION 1: Logs table should still be visible after query inspector interaction
+    await pm.logsPage.expectLogsTableVisible();
+    testLogger.info('✓ Logs table remains visible after query inspector interaction');
+
+    // PRIMARY ASSERTION 2: Compare same-index rows to detect mutation
+    const finalRowTexts = await pm.logsPage.getLogsTableRowTexts(5);
+    expect(finalRowTexts.length, 'Logs table should have rows after query inspector').toBeGreaterThan(0);
+
+    // Compare same-index rows to detect reordering or content mutation
+    const rowsToCompare = Math.min(initialRowTexts.length, finalRowTexts.length);
+    let sameIndexMatches = 0;
+    for (let i = 0; i < rowsToCompare; i++) {
+      if (initialRowTexts[i] === finalRowTexts[i]) {
+        sameIndexMatches++;
+      }
+    }
+    // Most rows at same index should match (some tolerance for streaming)
+    const matchRatio = sameIndexMatches / rowsToCompare;
+    expect(matchRatio, `Row content was mutated. Only ${sameIndexMatches}/${rowsToCompare} rows match at same index`).toBeGreaterThanOrEqual(0.8);
+    testLogger.info(`✓ Content integrity: ${sameIndexMatches}/${rowsToCompare} rows match at same index (${Math.round(matchRatio * 100)}%)`);
+
+    // Also verify row count didn't decrease
+    const finalRowCount = await pm.logsPage.getLogRowCount();
+    expect(finalRowCount).toBeGreaterThanOrEqual(initialRowCount);
+    testLogger.info(`✓ Row count preserved: initial=${initialRowCount}, final=${finalRowCount}`);
+
+    testLogger.info('✓ PRIMARY CHECK PASSED: Query inspector does not mutate logs state (readonly flag working)');
+  });
+
+  // ============================================================================
+  // Sorting Logs: Sort logs when response has order_by_metadata
+  // Feature: Logs should be correctly sorted when API response contains order_by_metadata
+  // ============================================================================
+  test('should sort logs correctly when response has order_by_metadata @sorting @P1 @regression @main', async ({ page }) => {
+    testLogger.info('Test: Logs sorting with order_by_metadata');
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(2000);
+
+    // Turn off quick mode if enabled
+    await pm.logsPage.ensureQuickModeState(false);
+
+    // Set time range
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
+
+    // Run query
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForTimeout(5000);
+
+    // Wait for results
+    await pm.logsPage.waitForLogsTable(15000);
+
+    // Get timestamps from visible log rows to verify sorting
+    const timestampCount = await pm.logsPage.getTimestampCellCount();
+    testLogger.info(`Found ${timestampCount} timestamp cells`);
+
+    // GUARD ASSERTION: Must have at least 2 timestamps to verify sorting - fail fast if not enough data
+    expect(timestampCount).toBeGreaterThanOrEqual(2);
+
+    const timestamps = await pm.logsPage.getTimestampCellValues(5);
+    testLogger.info(`First ${timestamps.length} timestamps: ${JSON.stringify(timestamps)}`);
+
+    // PRIMARY ASSERTION: Timestamps should be in descending order (newest first) by default
+    // Logs with order_by_metadata should maintain proper sort order
+
+    // Helper to parse timestamps in OpenObserve's format "MMM DD, YYYY HH:mm:ss.SSS Z" or similar
+    // Falls back to native Date.parse if the format doesn't match
+    const MONTH_MAP = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+    const parseTimestamp = (str) => {
+      if (!str || typeof str !== 'string') return NaN;
+      // Try native Date.parse first (handles ISO 8601 and common formats)
+      const native = new Date(str).getTime();
+      if (!isNaN(native)) return native;
+      // Try to parse "MMM DD, YYYY HH:mm:ss[.SSS] [+/-]ZZZZ" format
+      // Example: "Jan 15, 2024 10:30:45.123 +0000" or "Jan 15, 2024 10:30:45 +0000"
+      const match = str.match(/^(\w{3})\s+(\d{1,2}),\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?\s*([+-]\d{4})?/);
+      if (match) {
+        const [, mon, day, year, hour, min, sec, ms, tz] = match;
+        const month = MONTH_MAP[mon];
+        if (month !== undefined) {
+          const date = new Date(Date.UTC(+year, month, +day, +hour, +min, +sec, ms ? +ms.slice(0, 3) : 0));
+          // Adjust for timezone offset if present (e.g., +0000, -0500)
+          if (tz) {
+            const tzHours = parseInt(tz.slice(0, 3), 10);
+            const tzMins = parseInt(tz.slice(0, 1) + tz.slice(3), 10);
+            date.setUTCMinutes(date.getUTCMinutes() - tzHours * 60 - tzMins);
+          }
+          return date.getTime();
+        }
+      }
+      return NaN;
+    };
+
+    let isDescending = true;
+    let validTimestampCount = 0;
+    const nanIndices = new Set(); // Track indices to avoid duplicates
+    for (let i = 1; i < timestamps.length; i++) {
+      const prev = parseTimestamp(timestamps[i - 1]);
+      const curr = parseTimestamp(timestamps[i]);
+      // Collect NaN timestamp indices (use Set to avoid duplicates when same index is prev and curr)
+      if (isNaN(prev)) nanIndices.add(i - 1);
+      if (isNaN(curr)) nanIndices.add(i);
+      if (isNaN(prev) || isNaN(curr)) {
+        testLogger.warn(`Timestamp parsing failed: "${timestamps[i-1]}" -> ${prev}, "${timestamps[i]}" -> ${curr}`);
+        continue; // Skip this comparison but continue checking others
+      }
+      validTimestampCount++;
+      if (prev < curr) {
+        isDescending = false;
+        testLogger.warn(`Sort order broken at index ${i}: ${timestamps[i-1]} > ${timestamps[i]}`);
+        break;
+      }
+    }
+    // Convert to array with values for error message
+    const nanTimestamps = [...nanIndices].map(idx => ({ index: idx, value: timestamps[idx] }));
+
+    // ASSERTION: No timestamps should be unparseable (fail with descriptive message)
+    expect(nanTimestamps.length, `Unparseable timestamps: ${JSON.stringify(nanTimestamps)}`).toBe(0);
+
+    // ASSERTION: Must have at least 2 timestamps to verify sorting
+    expect(timestamps.length).toBeGreaterThanOrEqual(2);
+    // ASSERTION: At least one valid timestamp comparison must have been made
+    expect(validTimestampCount).toBeGreaterThanOrEqual(1);
+
+    // PRIMARY ASSERTION: Logs must be sorted in descending order (newest first)
+    expect(isDescending).toBe(true);
+    testLogger.info(`✓ Logs are correctly sorted in descending order (${validTimestampCount} comparisons made)`);
+
+    // PRIMARY ASSERTION: Results should be displayed
+    const resultText = await pm.logsPage.getSearchResultText();
+    expect(resultText).toBeTruthy();
+    testLogger.info(`✓ Results displayed: ${resultText?.substring(0, 50)}`);
+
+    testLogger.info('✓ PRIMARY CHECK PASSED: Logs sorting works with order_by_metadata');
+  });
+
+  // ============================================================================
+  // Logs Expand: Last log should maintain highlighting when expanding
+  // Feature: When expanding a log entry, the last log should not lose its highlighting
+  // ============================================================================
+  test('should maintain highlighting on last log when expanding log entries @expand @highlight @P1 @regression @main', async ({ page }) => {
+    testLogger.info('Test: Last log highlighting on expand');
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(2000);
+
+    // Turn off quick mode if enabled
+    await pm.logsPage.ensureQuickModeState(false);
+
+    // Set time range and run query
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForTimeout(5000);
+
+    // Wait for logs table
+    await pm.logsPage.waitForLogsTable(15000);
+
+    // Get all log rows
+    const rowCount = await pm.logsPage.getLogRowCount();
+    testLogger.info(`Found ${rowCount} log rows`);
+
+    if (rowCount < 2) {
+      testLogger.warn('Not enough log rows to test highlighting - skipping');
+      test.skip(true, 'Not enough log rows');
+      return;
+    }
+
+    // Expand first log row using the expand menu to trigger highlighting
+    await pm.logsPage.clickFirstExpandMenu();
+    await page.waitForTimeout(1000);
+    testLogger.info('Expanded first log row');
+
+    // Close the dialog/detail panel that opens (press Escape or click outside)
+    await pm.logsPage.pressEscapeToCloseDialog();
+    await page.waitForTimeout(500);
+
+    // Click on the last visible log row to select/highlight it
+    const lastRow = pm.logsPage.getLastRow();
+    await lastRow.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+
+    // Get the expand menu for last row and click it
+    await pm.logsPage.clickLastExpandMenu();
+    await page.waitForTimeout(1000);
+    testLogger.info('Expanded last log row');
+
+    // Check if the log detail panel shows for last row
+    const isPanelVisible = await pm.logsPage.isLogDetailPanelVisible();
+    testLogger.info(`Log detail panel visible: ${isPanelVisible}`);
+
+    // Close the detail panel
+    await pm.logsPage.pressEscapeToCloseDialog();
+    await page.waitForTimeout(500);
+
+    // Capture the last row's visual state AFTER closing (closed-but-still-highlighted state)
+    // This is the persistent highlight state we expect to survive when expanding a different row
+    const lastRowClasses = await lastRow.getAttribute('class') || '';
+    testLogger.info(`Last row baseline state (closed but highlighted) - classes: ${lastRowClasses}`);
+
+    // Now expand first row again - this is when the bug would cause last row to lose highlighting
+    const firstRowExpandMenu = pm.logsPage.getFirstRowExpandMenu();
+    await firstRowExpandMenu.click();
+    await page.waitForTimeout(1000);
+    testLogger.info('Expanded first log row again');
+
+    // PRIMARY ASSERTION 1: Last row should still be visible
+    await pm.logsPage.expectVisible(lastRow);
+    testLogger.info('✓ Last row is still visible after expanding another log');
+
+    // Check last row's visual state after expanding a different row
+    const lastRowFinalClasses = await lastRow.getAttribute('class') || '';
+    testLogger.info(`Last row final state - classes: ${lastRowFinalClasses}`);
+
+    // PRIMARY ASSERTION 2: Last row should retain its original styling classes
+    // Compare that the classes from before expansion are still present
+    expect(lastRowFinalClasses).toBeTruthy();
+    // Filter out generic/transient table classes that don't indicate highlighting state
+    const ignoredClasses = new Set(['table-row', 'q-tr', 'cursor-pointer']);
+    const originalClassSet = new Set(lastRowClasses.split(/\s+/).filter(c => c && !ignoredClasses.has(c)));
+    const finalClassSet = new Set(lastRowFinalClasses.split(/\s+/).filter(c => c && !ignoredClasses.has(c)));
+
+    // Log class differences for debugging
+    const missingClasses = [...originalClassSet].filter(cls => !finalClassSet.has(cls));
+    const addedClasses = [...finalClassSet].filter(cls => !originalClassSet.has(cls));
+    testLogger.info(`Class comparison: original=${originalClassSet.size}, final=${finalClassSet.size}`);
+    if (missingClasses.length > 0) testLogger.info(`Missing classes: ${missingClasses.join(', ')}`);
+    if (addedClasses.length > 0) testLogger.info(`Added classes: ${addedClasses.join(', ')}`);
+
+    // Look for specific highlight/selection-related classes (known patterns in the app)
+    const highlightPatterns = ['selected', 'highlight', 'active', 'bg-'];
+    const originalHighlightClasses = [...originalClassSet].filter(cls =>
+      highlightPatterns.some(pattern => cls.toLowerCase().includes(pattern))
+    );
+
+    // Guard: Ensure we have meaningful classes to verify (prevents vacuous pass)
+    expect(originalClassSet.size, 'Row should have selection/styling classes after being clicked and closed').toBeGreaterThan(0);
+
+    // If the row has specific highlight classes, verify they're preserved
+    if (originalHighlightClasses.length > 0) {
+      const preservedHighlightClasses = originalHighlightClasses.filter(cls => finalClassSet.has(cls));
+      expect(preservedHighlightClasses.length,
+        `Row lost highlight classes after expanding different row. Lost: ${originalHighlightClasses.filter(c => !finalClassSet.has(c)).join(', ')}`
+      ).toBe(originalHighlightClasses.length);
+      testLogger.info(`✓ Row preserved ${preservedHighlightClasses.length} highlight classes: ${preservedHighlightClasses.join(', ')}`);
+    } else {
+      // No specific highlight classes, but row has other styling - verify those are preserved
+      const classesPreserved = [...originalClassSet].every(cls => finalClassSet.has(cls));
+      expect(classesPreserved, `Last row lost classes after expanding different row. Missing: ${missingClasses.join(', ')}`).toBe(true);
+      testLogger.info(`✓ Last row preserved all ${originalClassSet.size} styling classes`);
+    }
+
+    // Close the expanded row
+    await pm.logsPage.pressEscapeToCloseDialog();
+    await page.waitForTimeout(500);
+
+    // PRIMARY ASSERTION 3: Table should still have rows (streaming may add/remove, but table intact)
+    const finalRowCount = await pm.logsPage.getLogRowCount();
+    expect(finalRowCount).toBeGreaterThan(0);
+    testLogger.info(`✓ Table remains intact with ${finalRowCount} rows`);
+
+    testLogger.info('✓ PRIMARY CHECK PASSED: Last log maintains highlighting on expand');
+  });
+
+  test.afterEach(async () => {
+    testLogger.info('Logs regression test completed');
   });
 });

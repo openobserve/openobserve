@@ -141,7 +141,7 @@ pub async fn search(
         log::info!("[trace_id {trace_id}] Query hit full cache");
     }
 
-    let search_role = "cache".to_string();
+    let search_role = "leader".to_string();
 
     // Result caching check ends, start search
     let cache_took = start.elapsed().as_millis() as usize;
@@ -197,6 +197,7 @@ pub async fn search(
                     c_resp.deltas
                 ),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("cacher:search deltas".to_string())
                     .search_role(search_role.clone())
@@ -299,6 +300,7 @@ pub async fn search(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("summary".to_string())
                 .search_role(search_role)
@@ -307,6 +309,9 @@ pub async fn search(
                     req.query.start_time.to_string(),
                     req.query.end_time.to_string()
                 ))
+                .scan_size(res.scan_size as usize)
+                .scan_records(res.scan_records as usize)
+                .data_records(res.hits.len())
                 .duration(start.elapsed().as_millis() as usize)
                 .build()
         )
@@ -1064,7 +1069,7 @@ pub fn apply_vrl_to_response(
         match program {
             Some(program) => {
                 if apply_over_hits {
-                    let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -1074,6 +1079,9 @@ pub fn apply_vrl_to_response(
                         org_id,
                         &[stream_name.to_string()],
                     );
+                    if let Some(e) = err {
+                        log::error!("Error applying vrl function: {e}");
+                    }
                     ret_val
                         .as_array()
                         .unwrap()
@@ -1084,11 +1092,12 @@ pub fn apply_vrl_to_response(
                         })
                         .collect()
                 } else {
-                    local_res
+                    let mut error = "".to_string();
+                    let res = local_res
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
@@ -1098,10 +1107,17 @@ pub fn apply_vrl_to_response(
                                 org_id,
                                 &[stream_name.to_string()],
                             );
+                            if let Some(e) = err {
+                                error = e;
+                            }
                             (!ret_val.is_null())
                                 .then_some(config::utils::flatten::flatten(ret_val).unwrap())
                         })
-                        .collect()
+                        .collect();
+                    if !error.is_empty() {
+                        log::error!("Error applying vrl function: {error}");
+                    }
+                    res
                 }
             }
             None => local_res.hits,

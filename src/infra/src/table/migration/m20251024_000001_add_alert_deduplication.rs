@@ -99,28 +99,6 @@ async fn add_dedup_columns(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
                     .to_owned(),
             )
             .await?;
-    } else if matches!(db_backend, sea_orm::DbBackend::MySql) {
-        // MySQL doesn't support IF NOT EXISTS in ALTER TABLE
-        // But it supports multiple column additions
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Alerts::Table)
-                    .add_column(
-                        ColumnDef::new(Alerts::DedupEnabled)
-                            .boolean()
-                            .not_null()
-                            .default(false),
-                    )
-                    .add_column(
-                        ColumnDef::new(Alerts::DedupTimeWindowMinutes)
-                            .integer()
-                            .null(),
-                    )
-                    .add_column(ColumnDef::new(Alerts::DedupConfig).json().null())
-                    .to_owned(),
-            )
-            .await?;
     } else {
         // PostgreSQL supports both IF NOT EXISTS and multiple columns
         manager

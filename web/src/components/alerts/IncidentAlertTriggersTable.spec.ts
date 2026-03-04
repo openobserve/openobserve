@@ -75,8 +75,13 @@ function createMockI18n() {
         alerts: {
           incidents: {
             correlationServiceDiscovery: "Service Discovery",
-            correlationManualExtraction: "Manual Extraction",
-            correlationTemporal: "Temporal",
+            correlationScopeMatch: "Scope Match",
+            correlationWorkloadMatch: "Workload Match",
+            correlationAlertId: "Alert ID",
+            correlationServiceDiscoveryTooltip: "Correlated using pre-computed service identity from service discovery",
+            correlationScopeMatchTooltip: "Correlated by matching environment scope (cluster, region, namespace)",
+            correlationWorkloadMatchTooltip: "Correlated by matching workload identity (service, deployment)",
+            correlationAlertIdTooltip: "No matching dimensions found — isolated by alert ID",
           },
         },
       },
@@ -264,24 +269,15 @@ describe("IncidentAlertTriggersTable", () => {
       expect(badge.text()).toBe("Service Discovery");
     });
 
-    it("should display manual_extraction badge with correct color", () => {
+    it("should display scope_match badge with correct color", () => {
       const mockAlert = createMockAlert({
-        correlation_reason: "manual_extraction",
+        correlation_reason: "scope_match",
       });
       wrapper = mountComponent({ triggers: [mockAlert] });
 
       const badge = findByTestId(wrapper, "correlation-reason-badge");
       expect(badge.exists()).toBe(true);
-      expect(badge.text()).toBe("Manual Extraction");
-    });
-
-    it("should display temporal badge with correct color", () => {
-      const mockAlert = createMockAlert({ correlation_reason: "temporal" });
-      wrapper = mountComponent({ triggers: [mockAlert] });
-
-      const badge = findByTestId(wrapper, "correlation-reason-badge");
-      expect(badge.exists()).toBe(true);
-      expect(badge.text()).toBe("Temporal");
+      expect(badge.text()).toContain("Scope Match");
     });
 
     it("should handle unknown correlation reason", () => {

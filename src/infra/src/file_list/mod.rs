@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,6 @@ use once_cell::sync::Lazy;
 
 use crate::errors::{Error, Result};
 
-pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
@@ -39,7 +38,6 @@ pub fn connect_default() -> Box<dyn FileList> {
     match get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteFileList>::default(),
-        MetaStore::MySQL => Box::<mysql::MysqlFileList>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresFileList>::default(),
     }
 }
@@ -50,6 +48,7 @@ pub fn connect_local_cache() -> Box<dyn FileList> {
 
 #[async_trait]
 pub trait FileList: Sync + Send + 'static {
+    async fn health_check(&self) -> Result<()>;
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
     async fn add(&self, account: &str, file: &str, meta: &FileMeta) -> Result<i64>;
@@ -202,6 +201,10 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         date_range: (String, String),
     ) -> Result<StreamStats>;
+}
+
+pub async fn health_check() -> Result<()> {
+    CLIENT.health_check().await
 }
 
 pub async fn create_table() -> Result<()> {
@@ -611,13 +614,13 @@ fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
 }
 
 pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
-    let mut level = super::schema::unwrap_partition_time_level(None, stream_type);
-    if stream_type == StreamType::Metrics
-        && PartitionTimeLevel::from(get_config().limit.metrics_query_retention.as_str())
-            == PartitionTimeLevel::Daily
-    {
-        level = PartitionTimeLevel::Daily;
-    }
+    let cfg = get_config();
+    let level = match stream_type {
+        StreamType::Logs => PartitionTimeLevel::from(cfg.limit.logs_query_retention.as_str()),
+        StreamType::Traces => PartitionTimeLevel::from(cfg.limit.traces_query_retention.as_str()),
+        StreamType::Metrics => PartitionTimeLevel::from(cfg.limit.metrics_query_retention.as_str()),
+        _ => PartitionTimeLevel::Hourly,
+    };
     let ts = level.duration();
     if ts > 0 {
         time_end + second_micros(ts)
@@ -660,8 +663,6 @@ pub struct FileRecord {
     pub index_size: i64,
     #[sqlx(default)]
     pub flattened: bool,
-    #[sqlx(default)]
-    pub created_at: i64,
     #[sqlx(default)]
     pub updated_at: i64,
 }

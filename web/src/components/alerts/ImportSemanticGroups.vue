@@ -563,8 +563,30 @@ const handleImport = () => {
   // This is handled by the file upload
 };
 
-const handleJsonUpdate = (jsonArray: any[]) => {
-  // Not used in this component since we handle file upload directly
+const handleJsonUpdate = async (jsonArray: any[]) => {
+  if (!jsonArray || jsonArray.length === 0) return;
+
+  isImporting.value = true;
+  try {
+    // Validate groups
+    for (const group of jsonArray) {
+      if (!group.id || !group.display || !Array.isArray(group.fields)) {
+        throw new Error("Invalid semantic group format");
+      }
+    }
+
+    importedGroups.value = jsonArray;
+    await previewDiff(jsonArray);
+  } catch (error: any) {
+    q.notify({
+      message: `Invalid JSON: ${error.message}`,
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+  } finally {
+    isImporting.value = false;
+  }
 };
 </script>
 

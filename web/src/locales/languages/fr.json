@@ -112,7 +112,13 @@
     "id": "IDENTIFIANT",
     "getStarted": "Commencez",
     "reset": "Réinitialiser",
-    "retry": "Réessayez"
+    "retry": "Réessayez",
+    "set": "+ Ensemble",
+    "copy": "Copier",
+    "copySuccess": "Copié dans le presse-papiers",
+    "copyError": "Impossible de copier dans le presse-papiers",
+    "goBack": "Retourner",
+    "stopGenerating": "Arrêtez de générer"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -125,7 +131,7 @@
     "source": "_source",
     "noResult": "Aucun résultat",
     "syntaxGuide": "Guide de syntaxe",
-    "rowsPerPage": "Enregistrements par page",
+    "recordsPerPage": "Enregistrements par page",
     "showing": "Montrant",
     "of": "de",
     "rowDetail": "Détails de la source",
@@ -232,8 +238,10 @@
     "patternColumnHeader": "Motif",
     "occurrenceColumnHeader": "Événement",
     "percentageColumnHeader": "Pourcentage",
+    "anomalyColumnHeader": "Anomalie",
     "actionsColumnHeader": "Actions",
     "anomalyLabel": "ANOMALIE",
+    "anomalyDetected": "Anomalie détectée",
     "includePatternInSearch": "Inclure un motif dans la recherche",
     "excludePatternFromSearch": "Exclure le modèle de la recherche",
     "showPatternDetails": "Afficher les détails ({variables} variables, {exemples} exemples)",
@@ -307,7 +315,43 @@
     "show": "Afficher",
     "editor": "Rédacteur",
     "webUrlNotConfigured": "L'URL de partage est désactivée jusqu'à ce que ZO_WEB_URL soit configuré par votre administrateur.",
-    "showHideColumns": "Afficher/masquer les colonnes"
+    "showHideColumns": "Afficher/masquer les colonnes",
+    "autoRefresh": "Actualisation automatique",
+    "createSavedView": "Créer une vue enregistrée",
+    "listSavedViews": "Répertorier les vues enregistrées",
+    "buildQuery": "Construisez",
+    "enableSqlModeForBuild": "Activez le mode SQL et sélectionnez un seul flux pour utiliser le générateur de requêtes",
+    "applyToSearch": "Appliquer à la recherche",
+    "complexQueryDetected": "Requête complexe détectée. Utilisation du mode personnalisé.",
+    "searchDimension": "Dimensions de recherche",
+    "nlpModeLabel": "Mode langage naturel",
+    "generateSQL": "Générer du code SQL",
+    "generateQuery": "Demandez à AI",
+    "askAI": "Demandez à AI",
+    "generateSQLTooltip": "Générer une requête SQL à partir du langage naturel (Ctrl/Cmd + Enter)",
+    "generateQueryTooltip": "Demandez à AI de l'aide pour votre requête",
+    "askAITooltip": "Demandez à AI de l'aide pour votre requête",
+    "generating": "Génération de...",
+    "nlQueryGenerationFailed": "Impossible de générer la requête. Veuillez réessayer.",
+    "nlQueryGenerationSuccess": "Requête générée avec succès !",
+    "askAIPlaceholder": "Demandez à AI de l'aide pour répondre à votre requête...",
+    "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
+    "enterPrompt": "Entrez une invite pour générer une requête",
+    "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
+    "analyzingQuery": "Analyse de la requête...",
+    "generatingQuery": "Génération d'une requête...",
+    "queryGeneratedSuccess": "Requête générée avec succès !",
+    "queryGenerationStopped": "La génération de requêtes a été arrêtée.",
+    "queryGenerationFailed": "La génération de la requête a échoué.",
+    "fetchingResults": "Récupération des résultats de recherche...",
+    "noResultsFound": "Aucun résultat n'a été trouvé",
+    "errorFetchingResults": "Erreur lors de la récupération des résultats",
+    "somethingWentWrong": "Quelque chose s'est mal passé",
+    "selectStreamForAI": "Sélectionnez d'abord un flux pour utiliser l'IA",
+    "collapseFields": "Effondrer les champs",
+    "openFields": "Champs ouverts",
+    "aiBarSuccessPlaceholder": "Qu'aimerais-tu faire ensuite ?",
+    "nlpModeDisabledForVisualization": "Le mode langage naturel ne peut pas être désactivé lors de la visualisation avec plusieurs flux"
   },
   "menu": {
     "home": "Accueil",
@@ -952,7 +996,10 @@
     "jsType": "JavaScript (ES 2023)",
     "vrlfunction": "Fonction VRL",
     "jsFunctionHint": "Utilisez l'objet row pour accéder aux champs du journal et les modifier. Exemple : row.new_field = row.existing_field + « traité » ;",
-    "vrlFunctionHint": "Utilisez le «. » pour représenter l'événement en cours. Exemple : .new_field = .existing_field + « traité »"
+    "vrlFunctionHint": "Utilisez le «. » pour représenter l'événement en cours. Exemple : .new_field = .existing_field + « traité »",
+    "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
+    "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
+    "jsErrorDetails": "Détails de l'erreur JavaScript"
   },
   "confirmDialog": {
     "cancel": "Annuler",
@@ -1403,7 +1450,27 @@
     "noColumnsOrdered": "Aucune colonne ordonnée",
     "columnsDefaultOrder": "Les colonnes seront affichées dans leur ordre par défaut",
     "moveUp": "Monter",
-    "moveDown": "Déplacer vers le bas"
+    "moveDown": "Déplacer vers le bas",
+    "panelTimeSettings": "Réglages de l'heure du panneau",
+    "panelTimeEnabled": "Laisser passer du temps au niveau du panneau",
+    "useGlobalTime": "Utiliser l'heure mondiale",
+    "useIndividualTime": "Utilisez le temps individuel",
+    "panelTimeGlobalHint": "Le panneau suivra l'heure globale du tableau de bord. Les modifications apportées à l'heure mondiale mettront à jour ce panneau.",
+    "panelTimeIndividualHint": "Le panneau utilisera sa propre plage de temps. Réglez l'heure à l'aide du sélecteur de date ci-dessous. Les changements d'heure globaux n'affecteront pas ce panneau.",
+    "panelTimeRange": "Plage horaire du panneau",
+    "panelTimeRangeTooltip": "Cette plage de temps s'applique uniquement à ce panneau. Les autres panneaux utiliseront leurs propres heures configurées ou l'heure globale du tableau de bord.",
+    "panelTimeSettingsTooltip": "Configurez la façon dont ce panneau détermine son intervalle de temps. Vous pouvez utiliser la plage horaire du tableau de bord ou en définir une personnalisée pour ce panneau.",
+    "panelTimeMode": "Source de plage horaire (lors du chargement du tableau de bord)",
+    "useDefaultTimeTooltip": "Lorsqu'il est activé, ce panneau utilise la durée par défaut configurée comme plage de temps lors du chargement du tableau de bord, au lieu de l'heure globale du tableau de bord.",
+    "defaultDuration": "Durée par défaut",
+    "connectNullValuesTooltip": "Connectez les points de données entre les valeurs manquantes à l'aide d'une ligne.",
+    "toggleFunctionEditor": "Éditeur de fonctions Toggle",
+    "useSavedFunction": "Utiliser la fonction enregistrée",
+    "showQueryResults": "Afficher les résultats de la requête",
+    "hideQueryResults": "Masquer les résultats de la requête",
+    "vrlExtractionTooltip": "Pour utiliser les champs VRL extraits dans le graphique, écrivez une fonction VRL et cliquez sur le bouton Appliquer. Les champs seront extraits, ce qui vous permettra de les utiliser pour créer le graphique.",
+    "errorFetchingFunctions": "Erreur lors de la récupération des fonctions",
+    "functionAppliedSuccess": "La fonction {name} a été appliquée avec succès."
   },
   "panel": {
     "header": "Panneau",
@@ -1482,7 +1549,10 @@
     "SQL": "SQL",
     "builder": "Constructeur",
     "custom": "Personnalisé",
-    "sqlBuilder": "Générateur SQL"
+    "sqlBuilder": "Générateur SQL",
+    "generatedSql": "SQL généré",
+    "enterCustomSql": "Entrez votre requête SQL personnalisée...",
+    "customSql": "SQL personnalisé"
   },
   "home": {
     "streams": "Ruisseaux",
@@ -1891,7 +1961,114 @@
     "msteams": "Microsoft Teams",
     "pagerduty": "Tâche du téléavertisseur",
     "opsgenie": "Opsgénie",
-    "servicenow": "ServiceNow"
+    "servicenow": "ServiceNow",
+    "saveAlert": "Enregistrer l'alerte",
+    "aggregation_threshold": "Alerter s'il y a des groupes",
+    "thresholdDynamic": {
+      "alertMeWhen": "Avertissez-moi quand",
+      "metricTypes": {
+        "resultsPassedFilter": "les résultats ont passé les filtres",
+        "distinctGroupsAffected": "des groupes distincts sont touchés",
+        "metricsMatchCriteria": "les métriques correspondent aux critères",
+        "matchingLogsFound": "journaux correspondants trouvés",
+        "groupsPassFilter": "les groupes répondent aux critères de filtrage",
+        "distinctGroups": "groupes distincts trouvés",
+        "resultRows": "lignes de résultats renvoyées",
+        "timeSeries": "série chronologique active trouvée",
+        "matchingRecords": "enregistrements correspondants trouvés",
+        "groupsWithHaving": "conditions des matchs de groupe",
+        "uniqueGroups": "groupes uniques",
+        "events": "conditions de match des événements",
+        "aggregatedValue": "conditions du match"
+      },
+      "contextLabels": {
+        "groupedBy": "Regroupés par :",
+        "havingConditions": "CONDITIONS D'UTILISATION :"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Nom de l'alerte",
+      "sqlQuery": "Requête SQL",
+      "promqlQuery": "Requête ProMQL",
+      "conditions": "Conditions",
+      "copy": "Copier",
+      "noCondition": "Aucune condition",
+      "noDescription": "Aucune description",
+      "evaluationHistory": "Historique de l'évaluation",
+      "loadingHistory": "Historique de chargement...",
+      "noHistoryAvailable": "Aucun historique d'évaluation disponible pour cette alerte",
+      "results": "Résultats"
+    },
+    "historyTable": {
+      "timestamp": "Horodatage",
+      "status": "État",
+      "evaluationTime": "Évaluation (s)",
+      "queryTime": "Requête (ms)",
+      "error": "Erreur"
+    },
+    "back": "Retour",
+    "continue": "Continuer",
+    "wouldTrigger": "DÉCLENCHERAIT",
+    "wouldNotTrigger": "NE DÉCLENCHERAIT PAS",
+    "queryBuilder": "Constructeur",
+    "groupByHelp": {
+      "description": "Regroupez les données agrégées par champs spécifiques afin de créer des alertes distinctes pour chaque valeur unique.",
+      "example": "Exemple : regroupez par « nom d'hôte » pour obtenir des alertes individuelles par serveur, ou par « status_code » pour suivre les erreurs séparément."
+    },
+    "conditions": {
+      "condition": "État",
+      "conditionGroup": "Groupe de conditions",
+      "addConditionTooltip": "Ajouter une nouvelle condition à ce groupe",
+      "addConditionGroupTooltip": "Ajouter un groupe de conditions imbriqué (profondeur maximale : 2)",
+      "maxDepthReachedTooltip": "Profondeur de nidification maximale atteinte"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Alerte définie pour",
+      "currentWindow": "Fenêtre actuelle",
+      "cycle": "Cycle",
+      "cycleTooltip": "Comparez les résultats avec ceux du cycle précédent à la même période.",
+      "runningFor": "Courir pendant {période} dans l'intervalle de chaque {fréquence}",
+      "currentWindowCannotBeDeleted": "La fenêtre actuelle ne peut pas être supprimée",
+      "comparingWith": "Comparaison avec",
+      "referenceWindow": "Fenêtre de référence",
+      "timeFrame": "Échéancier",
+      "timeFrameTooltip": "Plage de temps pour votre requête.",
+      "comparingText": "Comparaison du résultat de la requête de la fenêtre en cours avec le résultat de la requête du {offset} précédent.",
+      "addComparisonWindow": "Ajouter une fenêtre de comparaison",
+      "goToConditions": "Accédez aux conditions",
+      "goToConditionsTooltip": "Cliquez sur « Accéder aux conditions » pour vérifier les événements pour les fenêtres de comparaison sélectionnées"
+    },
+    "alertSettings": {
+      "cronSchedule": "Calendrier Cron",
+      "addNewDestination": "Ajouter une nouvelle destination",
+      "cooldownTooltip": "Si l'alerte se déclenche, combien de temps doit-elle attendre avant d'envoyer une autre notification ? Par exemple, si l'alerte se déclenche à 16 h 00 et que la notification de silence est réglée sur 10 minutes, elle n'enverra pas d'autre notification avant 16 h 10, même si l'alerte est toujours là après 1 minute. Cela permet d'éviter de spammer l'utilisateur avec des notifications.",
+      "thresholdTooltip": "Définit le moment où l'alerte doit se déclencher en fonction du nombre d'événements ou de la valeur agrégée. Exemple : si elle est réglée sur « > 100 », l'alerte se déclenche lorsque le nombre dépasse 100 événements.",
+      "periodTooltip": "Période pendant laquelle la requête doit être exécutée. Par exemple, 10 minutes signifient que chaque fois que la requête sera exécutée, elle utilisera les 10 dernières minutes de données.",
+      "frequencyTooltipMinutes": "À quelle fréquence la tâche doit-elle être exécutée. Par exemple toutes les 5 minutes.",
+      "frequencyTooltipCron": "Format cron UNIX standard avec 5 champs séparés par des espaces : [Minute 0-59] [Heure 0-23] [Jour du mois 1-31] [Mois 1-12 ou JANVIER-DÉCEMBRE] [Jour de la semaine 0-7 ou « 1L-7L », 0 et 7 pour le dimanche].",
+      "timezoneWarning": "Avertissement : Le fuseau horaire affiché est approximatif. Vérifiez et sélectionnez manuellement le fuseau horaire correct.",
+      "destinationsTooltip": "Sélectionnez une ou plusieurs destinations pour envoyer des notifications d'alerte.",
+      "templateTooltip": "Facultatif : sélectionnez un modèle à utiliser pour toutes les destinations de cette alerte. Les modèles vous permettent de personnaliser le format des messages d'alerte. Si cette option n'est pas sélectionnée, chaque destination utilisera son propre modèle configuré."
+    },
+    "advanced": {
+      "addVariable": "Ajouter une variable",
+      "variablesTooltip": "Les variables sont utilisées pour transmettre les données de l'alerte à la destination.",
+      "rowTemplateTooltip": "Le modèle de ligne est utilisé pour mettre en forme le message d'alerte.",
+      "templateType": "Type de modèle :"
+    },
+    "addConditions": "Ajouter des conditions",
+    "sqlEditor": "Éditeur SQL",
+    "promqlEditor": "Éditeur ProMQL",
+    "vrlEditor": "Éditeur VRL",
+    "generateVRL": "Générer VRL",
+    "applyVRL": "Appliquer VRL",
+    "runQuery": "Exécuter une requête",
+    "onStream": "sur",
+    "streamLabel": "flux",
+    "noStreamSelected": "Aucun flux sélectionné",
+    "resultsIncludeAllWindows": "Les résultats incluent tous les ajouts multi-fenêtres",
+    "runQueryForOutput": "Cliquez sur Exécuter la requête pour voir le résultat",
+    "applyVRLForOutput": "Cliquez sur Appliquer VRL pour voir la sortie combinée"
   },
   "alert_templates": {
     "header": "Modèles",
@@ -1942,7 +2119,10 @@
     "customWebhook": "Personnalisé (Webhook)",
     "customEmail": "Personnalisé (e-mail)",
     "customAction": "Personnalisé (Action)",
-    "custom": "Personnalisé"
+    "custom": "Personnalisé",
+    "separator": "Séparateur",
+    "separator_placeholder": "Entrez un séparateur (par exemple, |,\\n, \\ t, espace)",
+    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)"
   },
   "metrics": {
     "searchMetric": "Rechercher une métrique",
@@ -2146,7 +2326,6 @@
       "groupsLabel": "groupes",
       "noMatchingGroups": "Aucun groupe correspondant",
       "fqnFormulaTitle": "Formule d'identité",
-      "fqnFormulaTooltip": "Montre comment l'identité de service sera calculée. Les dimensions de portée (bleu) sont concaténées avec '/'. La première dimension de charge de travail non nulle (vert) devient le nom du service.",
       "scopeDimension": "Dimension de portée",
       "workloadDimension": "Dimension de charge de travail",
       "noFormulaConfigured": "Aucune formule d'identité configurée. Ajoutez des dimensions ci-dessus.",
@@ -2303,7 +2482,54 @@
     "errorSavingPipeline": "Erreur lors de l'enregistrement du pipeline",
     "cancelChangesConfirm": "Êtes-vous sûr de vouloir annuler les modifications ?",
     "cancel": "Annuler",
-    "dragDropNodesHere": "Faites glisser et déposez les nœuds ici"
+    "dragDropNodesHere": "Faites glisser et déposez les nœuds ici",
+    "llmEvaluation": "Évaluation LLM",
+    "nodeName": "Nom du nœud",
+    "samplingConfig": "Configuration d'échantillonnage",
+    "enableSampling": "Activer l'échantillonnage",
+    "samplingRate": "Fréquence d'échantillonnage",
+    "samplingRateHelp": "Échantillonnez un pourcentage de traces pour réduire les coûts d'évaluation (0 % = désactivé, 100 % = tout évaluer)",
+    "samplingStrategy": "Stratégie d'échantillonnage",
+    "randomSampling": "Aléatoire",
+    "randomSamplingDesc": "Échantillonnage non déterministe - traces différentes à chaque fois",
+    "hashSampling": "Basé sur le hachage (recommandé)",
+    "hashSamplingDesc": "Échantillonnage cohérent par trace_id : les mêmes traces sont toujours échantillonnées",
+    "llmEvaluationInfo": "Configuration de l'évaluation LLM",
+    "llmEvaluationInfoText": "Évalue les traces à l'aide du juge LLM. L'échantillonnage réduit les coûts en ne traitant qu'un pourcentage des traces. La stratégie de hachage garantit un échantillonnage cohérent pour une surveillance fiable.",
+    "llmEvaluationNodeSaved": "Le nœud d'évaluation LLM a été enregistré avec succès",
+    "llmJudgeConfig": "Configuration du juge LLM",
+    "enableLlmJudge": "Activer LLM-as-Judge",
+    "enableLlmJudgeHelp": "Lorsque cette option est activée, utilise un LLM pour évaluer la qualité des réponses à l'aide de scores dimensionnels détaillés. Plus complet mais coûte des jetons LLM.",
+    "llmSpanIdentifier": "Identifiant LLM Span",
+    "llmSpanIdentifierLabel": "Champ permettant d'identifier les durées de LLM",
+    "llmSpanIdentifierHelp": "Sélectionnez le champ du flux source qui identifie les spans LLM. Seules les étendues où ce champ est présent et non vide seront évaluées.",
+    "noFieldsFound": "Aucun champ n'a été trouvé",
+    "save": "Enregistrer",
+    "llmEvaluationNodeTitle": "Nœud d'évaluation LLM",
+    "samplingLabel": "L'échantillonnage",
+    "samplingAllTraces": "Toutes les traces (100 %)",
+    "samplingOfTraces": "de traces",
+    "nameLabel": "Nom",
+    "llmEvaluationDescription": "Évalue les traces et écrit les résultats dans un flux de journaux distinct",
+    "llmEvaluationEnableToggle": "Activer l'évaluation LLM pour ce flux de traces",
+    "llmEvaluationEnableHelp": "Crée un pipeline en temps réel qui évalue les traces LLM et écrit les résultats dans un flux de journaux distinct.",
+    "llmSpanIdentifierFieldHelp": "Champ qui identifie les étendues LLM (par exemple gen_ai_system)",
+    "llmEvaluationSamplingRateLabel": "Taux d'échantillonnage : {percentage} %",
+    "llmEvaluationSamplingHelp": "Pourcentage de traces à évaluer",
+    "llmEvaluationOutputStreamName": "Nom du flux de sortie",
+    "llmEvaluationOutputStreamHelp": "Les résultats de l'évaluation seront enregistrés dans ce flux de journaux.",
+    "llmEvaluationRemoveWarning": "Pour supprimer un pipeline d'évaluation LLM existant, gérez-le depuis la page Pipelines.",
+    "llmEvaluationPipelineExists": "Un pipeline nommé « {streamName} » existe déjà pour ce flux de traces. Gérez-le depuis la page Pipelines.",
+    "llmEvaluationPipelineDescription": "Pipeline d'évaluation LLM pour le flux de traces {streamName}",
+    "llmEvaluationCreatedSuccess": "Le pipeline d'évaluation LLM « {streamName} » a été créé avec succès.",
+    "llmEvaluationCreationFailed": "Impossible de créer le pipeline d'évaluation LLM.",
+    "promqlOnlyForMetrics": "ProMQL n'est disponible que pour le type de flux de métriques",
+    "invalidCronExpression": "Expression cron non valide",
+    "thresholdShouldNotBeEmpty": "Le seuil ne doit pas être vide",
+    "errorGettingResults": "Erreur lors de l'obtention des résultats",
+    "discardChangesTitle": "Ignorer les modifications",
+    "deleteNodeTitle": "Supprimer le nœud",
+    "deleteNodeLlmEvalConfirm": "Êtes-vous sûr de vouloir supprimer ce nœud d'évaluation LLM ?"
   },
   "reports": {
     "header": "Rapports",
@@ -2362,7 +2588,18 @@
     "timeRangeUpdated": "La plage de temps sélectionnée n'incluait pas cette trace. La plage horaire a été mise à jour pour correspondre à l'horodatage de la trace.",
     "fetchingMoreTraces": "À la recherche de nouvelles traces...",
     "showErrorOnly": "Afficher uniquement l'erreur",
-    "openInTraces": "Ouvrir dans Traces"
+    "openInTraces": "Ouvrir dans Traces",
+    "errorRetrievingTraces": "Une erreur s'est produite lors de la récupération des traces.",
+    "fetchingTraces": "Tiens bon, on va chercher tes traces.",
+    "noTracesFoundAdjust": "Aucune trace n'a été trouvée. Veuillez ajuster les filtres et réessayer.",
+    "tracesTitle": "TRACES",
+    "tracesFound": "Traces trouvées",
+    "error": "ERREUR",
+    "errors": "ERREURS",
+    "success": "SUCCÈS",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier",
+    "spanColorPalettePreview": "Aperçu de la palette de couleurs Span"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -2600,7 +2837,8 @@
     "showLegends": "Afficher les légendes"
   },
   "alert_list": {
-    "alert_details": "Détails de l'alerte"
+    "alert_details": "Détails de l'alerte",
+    "alert_history": "Historique des alertes"
   },
   "latencyInsights": {
     "title": "Perspectives",
@@ -2753,7 +2991,14 @@
       }
     },
     "viewInTraces": "Afficher dans Traces",
-    "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées"
+    "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées",
+    "exportToJson": "Exporter au format JSON",
+    "noLogsDescription": "Aucun journal n'a été trouvé pour cette corrélation dans la plage de temps sélectionnée.",
+    "tracesErrorDetails": "Une erreur s'est produite lors de la récupération des données de trace. Veuillez réessayer.",
+    "metricsError": "Impossible de charger les métriques",
+    "metricsErrorDetails": "Une erreur s'est produite lors de la récupération des données des métriques. Veuillez réessayer.",
+    "noMetricsDescription": "Aucune métrique n'a été trouvée pour cette corrélation dans la plage de temps sélectionnée.",
+    "errorRetrievingTraces": "Une erreur s'est produite lors de la récupération des traces."
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",
@@ -2802,5 +3047,10 @@
     "invalidFormat": "Format non valide",
     "mustBeGreaterThan": "Doit être supérieur à {value}",
     "mustBeLessThan": "Doit être inférieur à {value}"
+  },
+  "nlMode": {
+    "toggle": "Mode langage naturel",
+    "noAdditionalOptions": "Aucune option supplémentaire",
+    "generateVRL": "Générer VRL"
   }
 }

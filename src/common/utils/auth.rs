@@ -255,13 +255,14 @@ where
 
     #[cfg(feature = "enterprise")]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        use config::{get_config, meta::stream::StreamType};
+        use config::meta::stream::StreamType;
         use hashbrown::HashMap;
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::utils::http::{get_folder, get_stream_type_from_request};
 
         let start = std::time::Instant::now();
+        let cfg = config::get_config();
 
         // Parse query string
         let query_string = parts.uri.query().unwrap_or("");
@@ -274,9 +275,7 @@ where
 
         let mut method = parts.method.to_string();
         let local_path = parts.uri.path().to_string();
-        let path = match local_path
-            .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
-        {
+        let path = match local_path.strip_prefix(format!("{}/api/", cfg.common.base_uri).as_str()) {
             Some(path) => path,
             None => local_path.strip_prefix("/").unwrap_or(&local_path),
         };
@@ -761,6 +760,15 @@ where
                         .map_or(path_columns[1], |model| model.key),
                     path_columns[0]
                 )
+            } else if method.eq("POST") && path.ends_with("alerts/destinations/test") {
+                // Test destination API RBAC control
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
+                    path_columns[0]
+                )
             } else {
                 // Handles the backfill job creation, which is considered an UPDATE
                 // to the pipeline from the rbac perspective.
@@ -955,7 +963,7 @@ where
             && auth_header
                 .to_str()
                 .unwrap()
-                .eq(&get_config().grpc.internal_grpc_token)
+                .eq(&cfg.grpc.internal_grpc_token)
         {
             return Ok(AuthExtractor {
                 auth: auth_header.to_str().unwrap().to_string(),
@@ -1034,6 +1042,7 @@ where
             // service_streams APIs are org-level, not stream-specific
             || path.contains("/service_streams/_analytics")
             || path.contains("/service_streams/_correlate")
+            || (url_len == 5 && path.ends_with("/patterns/extract"))
             {
                 return Ok(AuthExtractor {
                     auth: auth_str.to_owned(),

@@ -67,6 +67,10 @@ pub enum DestinationError {
     TemplateCreationFailed(String),
     #[error("Failed to retrieve template: {0}")]
     TemplateRetrievalFailed(String),
+    #[error("Email send failed: {0}")]
+    EmailSendFailed(String),
+    #[error("LLM Evaluation destinations are only supported for pipelines, not alerts")]
+    NotSupportedAlertDestinationType,
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {

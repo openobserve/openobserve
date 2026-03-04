@@ -172,6 +172,12 @@ async fn run_migration(config: MigrationConfig, mode: MigrationMode) -> Result<(
             return Err(e);
         }
 
+        // Reset sequences so the next INSERT gets an ID > max(id)
+        if let Err(e) = target.sync_sequences(table).await {
+            print_error(table, &format!("sequence sync failed: {}", e));
+            return Err(e);
+        }
+
         stats.duration_ms = table_start.elapsed().as_millis() as u64;
     }
 
@@ -473,7 +479,7 @@ mod tests {
     #[test]
     fn test_filter_tables_meta_mode() {
         let all_tables = create_test_tables();
-        let config = MigrationConfig::new("sqlite", "mysql");
+        let config = MigrationConfig::new("sqlite", "postgresql");
 
         let result = filter_tables(&all_tables, MigrationMode::Meta, &config);
 
@@ -496,7 +502,7 @@ mod tests {
     #[test]
     fn test_filter_tables_file_list_mode() {
         let all_tables = create_test_tables();
-        let config = MigrationConfig::new("sqlite", "mysql");
+        let config = MigrationConfig::new("sqlite", "postgresql");
 
         let result = filter_tables(&all_tables, MigrationMode::FileList, &config);
 
@@ -519,8 +525,8 @@ mod tests {
     #[test]
     fn test_filter_tables_with_include_filter() {
         let all_tables = create_test_tables();
-        let config =
-            MigrationConfig::new("sqlite", "mysql").with_tables(Some("users,config".to_string()));
+        let config = MigrationConfig::new("sqlite", "postgresql")
+            .with_tables(Some("users,config".to_string()));
 
         let result = filter_tables(&all_tables, MigrationMode::Meta, &config);
 
@@ -533,7 +539,7 @@ mod tests {
     fn test_filter_tables_with_exclude_filter() {
         let all_tables = create_test_tables();
         let config =
-            MigrationConfig::new("sqlite", "mysql").with_exclude(Some("users".to_string()));
+            MigrationConfig::new("sqlite", "postgresql").with_exclude(Some("users".to_string()));
 
         let result = filter_tables(&all_tables, MigrationMode::Meta, &config);
 
@@ -545,7 +551,7 @@ mod tests {
     #[test]
     fn test_filter_tables_sorted() {
         let all_tables = vec!["zebra".to_string(), "alpha".to_string(), "beta".to_string()];
-        let config = MigrationConfig::new("sqlite", "mysql");
+        let config = MigrationConfig::new("sqlite", "postgresql");
 
         let result = filter_tables(&all_tables, MigrationMode::Meta, &config);
 

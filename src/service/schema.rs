@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -46,7 +46,7 @@ use serde_json::{Map, Value};
 use super::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
 use crate::{
     common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution},
-    service::{db, traces::otel::attributes::O2_LLM_PREFIX},
+    service::db,
 };
 
 pub(crate) fn get_upto_discard_error() -> anyhow::Error {
@@ -91,7 +91,7 @@ pub async fn check_for_schema(
 
     // get infer schema
     let value_iter = record_vals.into_iter();
-    let inferred_schema = infer_json_schema_from_map(value_iter, stream_type)?;
+    let inferred_schema = infer_json_schema_from_map(stream_name, stream_type, value_iter)?;
 
     // fast path
     if schema.schema().fields.eq(&inferred_schema.fields) {
@@ -301,14 +301,8 @@ pub(crate) async fn handle_diff_schema(
         {
             Err(e) => {
                 log::error!(
-                    "handle_diff_schema [{}/{}/{}] with hash {}, start_dt {}, error: {}, retrying...{}",
-                    org_id,
-                    stream_type,
-                    stream_name,
+                    "handle_diff_schema [{org_id}/{stream_type}/{stream_name}] with hash {}, start_dt {record_ts}, error: {e}, retrying...{retries}",
                     inferred_schema.hash_key(),
-                    record_ts,
-                    e,
-                    retries
                 );
                 err = Some(e);
                 retries += 1;
@@ -323,14 +317,8 @@ pub(crate) async fn handle_diff_schema(
     }
     if let Some(e) = err {
         log::error!(
-            "handle_diff_schema [{}/{}/{}] with hash {}, start_dt {}, abort after retry {} times, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
+            "handle_diff_schema [{org_id}/{stream_type}/{stream_name}] with hash {}, start_dt {record_ts}, abort after retry {retries} times, error: {e}",
             inferred_schema.hash_key(),
-            record_ts,
-            retries,
-            e
         );
         return Err(e);
     }
@@ -475,11 +463,7 @@ pub(crate) async fn handle_diff_schema(
     stream_schema_map.insert(stream_name.to_string(), final_schema);
 
     log::debug!(
-        "handle_diff_schema end for [{}/{}/{}] start_dt: {}, elapsed: {} ms",
-        org_id,
-        stream_type,
-        stream_name,
-        record_ts,
+        "handle_diff_schema end for [{org_id}/{stream_type}/{stream_name}] start_dt: {record_ts}, elapsed: {} ms",
         start.elapsed().as_millis()
     );
 
@@ -565,10 +549,15 @@ pub fn check_schema_for_defined_schema_fields(
             fields.insert("end_time".to_string());
             fields.insert("duration".to_string());
             fields.insert("events".to_string());
-            // Automatically include all fields with _o2_llm_ prefix from the schema
+            // Automatically include all OTEL Gen-AI and LLM evaluation fields from the schema
             for field in schema.fields() {
-                if field.name().starts_with(O2_LLM_PREFIX) {
-                    fields.insert(field.name().to_string());
+                let name = field.name();
+                if name.starts_with("gen_ai.")
+                    || name.starts_with("llm.")
+                    || name == "user.id"
+                    || name == "session.id"
+                {
+                    fields.insert(name.to_string());
                 }
             }
         }
@@ -714,6 +703,6 @@ mod tests {
         record_val.push(record.as_object().unwrap());
         let stream_type = StreamType::Logs;
         let value_iter = record_val.into_iter();
-        infer_json_schema_from_map(value_iter, stream_type).unwrap();
+        infer_json_schema_from_map("test", stream_type, value_iter).unwrap();
     }
 }

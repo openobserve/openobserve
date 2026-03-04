@@ -295,7 +295,7 @@ pub async fn delete_all_for_table(org: &str, table_name: &str) -> Result<(), err
 /// Atomically claims stale jobs that are stuck in Processing status
 ///
 /// This function is used for stale job recovery in both single-node (SQLite) and distributed
-/// deployments (PostgreSQL/MySQL). The implementation varies by database backend.
+/// deployments (PostgreSQL). The implementation varies by database backend.
 ///
 /// # How it works
 ///
@@ -307,10 +307,10 @@ pub async fn delete_all_for_table(org: &str, table_name: &str) -> Result<(), err
 ///
 /// Since SQLite is single-node, only one ingester exists, so no distributed coordination needed.
 ///
-/// ## PostgreSQL/MySQL (distributed)
+/// ## PostgreSQL (distributed)
 /// 1. Uses database-level atomic UPDATE with subquery
 /// 2. Only ONE ingester successfully claims each job (database ensures atomicity)
-/// 3. Returns the claimed jobs via RETURNING (PostgreSQL) or separate SELECT (MySQL)
+/// 3. Returns the claimed jobs via RETURNING
 ///
 /// Multiple ingesters can run this simultaneously - database ensures proper distribution.
 ///
@@ -386,25 +386,6 @@ pub async fn claim_stale_jobs(
                 pending_status, now, processing_status, stale_threshold_timestamp, limit
             )
         }
-        sea_orm::DatabaseBackend::MySql => {
-            // MySQL supports UPDATE with subquery
-            format!(
-                r#"
-                UPDATE enrichment_table_urls
-                SET status = {}, updated_at = {}
-                WHERE (org, name) IN (
-                    SELECT org, name
-                    FROM (
-                        SELECT org, name
-                        FROM enrichment_table_urls
-                        WHERE status = {} AND updated_at < {} AND is_local_region = true
-                        LIMIT {}
-                    ) AS subquery
-                )
-                "#,
-                pending_status, now, processing_status, stale_threshold_timestamp, limit
-            )
-        }
         _ => {
             return Err(errors::Error::Message(format!(
                 "Unsupported database backend: {:?}",
@@ -413,44 +394,13 @@ pub async fn claim_stale_jobs(
         }
     };
 
-    // MySQL doesn't support RETURNING, so we need separate UPDATE and SELECT
-    if backend == sea_orm::DatabaseBackend::MySql {
-        // Execute UPDATE
-        let result = client.execute(Statement::from_string(backend, sql)).await?;
+    // PostgreSQL supports RETURNING
+    let models = Entity::find()
+        .from_raw_sql(Statement::from_string(backend, sql))
+        .all(client)
+        .await?;
 
-        if result.rows_affected() == 0 {
-            return Ok(vec![]);
-        }
-
-        // SELECT the jobs we just updated
-        let select_sql = format!(
-            r#"
-            SELECT id, org, name, url, status, error_message, created_at, updated_at,
-                   total_bytes_fetched, total_records_processed, retry_count,
-                   append_data, last_byte_position, supports_range, is_local_region
-            FROM enrichment_table_urls
-            WHERE status = {} AND updated_at = {} AND is_local_region = true
-            ORDER BY updated_at DESC
-            LIMIT {}
-            "#,
-            pending_status, now, limit
-        );
-
-        let models = Entity::find()
-            .from_raw_sql(Statement::from_string(backend, select_sql))
-            .all(client)
-            .await?;
-
-        Ok(models.into_iter().map(|model| model.into()).collect())
-    } else {
-        // PostgreSQL supports RETURNING
-        let models = Entity::find()
-            .from_raw_sql(Statement::from_string(backend, sql))
-            .all(client)
-            .await?;
-
-        Ok(models.into_iter().map(|model| model.into()).collect())
-    }
+    Ok(models.into_iter().map(|model| model.into()).collect())
 }
 
 #[cfg(test)]

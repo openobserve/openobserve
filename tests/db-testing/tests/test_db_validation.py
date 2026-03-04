@@ -87,9 +87,9 @@ class TestDataIngestion:
 class TestTantivyIndexing:
     """Test Tantivy index creation and validation."""
 
-    def test_tantivy_indexes_created(self, ingest_test_data, db_cursor, test_org):
+    def test_tantivy_indexes_updated(self, ingest_test_data, db_cursor, test_org):
         """
-        Test that Tantivy indexes are created with non-zero index_size.
+        Test that Tantivy indexes are updated with non-zero index_size.
 
         This test:
         1. Ingests data with 'log' field (full text search enabled by default)
@@ -137,12 +137,12 @@ class TestTantivyIndexing:
             WHERE org = %s
             AND stream = %s
             AND deleted = false
-            ORDER BY created_at
+            ORDER BY updated_at
         """, (test_org, stream_full_path))
 
         results = db_cursor.fetchall()
 
-        # Verify that files were created
+        # Verify that files were updated
         assert len(results) > 0, f"No files found in file_list for stream '{stream_name}'"
         print(f"Found {len(results)} files in file_list for stream '{stream_name}'")
 

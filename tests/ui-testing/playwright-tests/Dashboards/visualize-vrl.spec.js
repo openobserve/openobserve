@@ -54,7 +54,7 @@ test.describe("VRL visualization support testcases", () => {
 
     const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"] ?? "defaultorg"}`;
     await page.goto(logsUrl);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
     const pm = new PageManager(page);
     await pm.logsVisualise.logsApplyQueryButton();
@@ -621,7 +621,7 @@ test.describe("VRL visualization support testcases", () => {
     const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
     if (await vrlEditor.first().isVisible().catch(() => false)) {
       await vrlEditor.first().click();
-      await page.locator("#fnEditor").locator(".inputarea").fill("");
+      await page.locator('[data-test="logs-vrl-function-editor"]').locator(".inputarea").fill("");
     }
 
     // Apply query without VRL
@@ -762,14 +762,18 @@ test.describe("VRL visualization support testcases", () => {
     await expect(vrlEditor.first()).toBeVisible();
 
     // Verify editor is ready to accept input
-    const editorInput = page.locator("#fnEditor").locator(".inputarea");
+    const editorInput = page.locator('[data-test="logs-vrl-function-editor"]')
+      .locator(".inputarea")
+      .first();
     await expect(editorInput).toBeVisible();
 
     // Add VRL function and verify it's entered correctly
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
 
     // Verify the VRL content was entered
-    const editorContent = page.locator("#fnEditor");
+    const editorContent = page.locator('[data-test="logs-vrl-function-editor"]')
+      .locator(".inputarea")
+      .first();
     await expect(editorContent).toBeVisible();
   });
 

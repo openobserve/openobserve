@@ -41,19 +41,20 @@ export class StreamAssociationPage {
     const targetUrl = `${baseUrl}/web/streams?org_identifier=${orgName}`;
     testLogger.info(`Navigating to Streams page with org: ${orgName}`);
     await this.page.goto(targetUrl);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async searchForStream(streamName) {
     testLogger.info(`Searching for stream: ${streamName}`);
     await this.searchStreamInput.click();
     await this.searchStreamInput.fill(streamName);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async openStreamDetail(streamName) {
     testLogger.info(`Opening stream detail for: ${streamName}`);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Find the cell with stream name
     const streamCell = this.page.getByRole('cell', { name: streamName }).first();

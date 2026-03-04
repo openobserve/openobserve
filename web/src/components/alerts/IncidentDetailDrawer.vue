@@ -214,6 +214,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Overview"
           />
           <q-tab
+            name="activity"
+            label="Activity"
+          />
+          <q-tab
             name="incidentAnalysis"
             :label="t('alerts.incidents.incidentAnalysis')"
           />
@@ -405,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Content with vertical timeline -->
-                  <div class="tw:flex tw:flex-col tw:gap-6 tw:p-4 tw:overflow-y-auto tw:relative">
+                  <div class="tw:flex tw:flex-col tw:gap-6 tw:px-4 tw:py-2 tw:overflow-y-auto tw:relative">
                     <!-- Vertical line -->
                     <div
                       class="tw:absolute tw:w-0.5"
@@ -476,6 +480,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  <!-- Show Full Activity Button -->
+                  <div class="tw:border-t tw:border-gray-200 dark:tw:border-gray-700 tw:p-2 tw:flex tw:justify-end">
+                    <q-btn
+                      flat
+                      dense
+                      no-caps
+                      size="sm"
+                      color="primary"
+                      @click="activeTab = 'activity'"
+                      data-test="incident-timeline-show-full-activity"
+                    >
+                      <span class="tw:text-xs">Show Full Activity</span>
+                    </q-btn>
                   </div>
                 </div>
                 <!-- Incident Details (66.67% width) -->
@@ -709,7 +728,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
-                  height: (incidentDetails?.topology_context?.nodes?.length && triggers.length > 0)
+                  height: (sortedAlertsByTriggerCount?.length)
                     ? 'calc(35% - 5.6px)'
                     : 'calc(65% - 2px)',
                   minHeight: 0,
@@ -828,6 +847,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+
+        <!-- Activity Tab Content -->
+        <IncidentTimeline
+          v-if="activeTab === 'activity'"
+          :org-id="store.state.selectedOrganization.identifier"
+          :incident-id="incidentDetails?.id || ''"
+          :visible="activeTab === 'activity'"
+          :refresh-trigger="timelineRefreshTrigger"
+        />
 
         <!-- Incident Analysis Tab Content -->
         <IncidentRCAAnalysis
@@ -1010,26 +1038,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Logs Tab Content -->
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
-          <!-- Refresh Button (shown when logs data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.logStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedLogs') }}</span>
-            <q-btn
-              flat
-              dense
-              size="sm"
-              icon="refresh"
-              color="primary"
-              @click="refreshCorrelation"
-              :disable="correlationLoading"
-            >
-              <q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip>
-            </q-btn>
-          </div>
-
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
+          <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
-            <div class="tw-text-base">Loading correlated logs...</div>
           </div>
 
           <!-- Error/No Data State -->
@@ -1070,8 +1081,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :fts-fields="ftsFields"
               :time-range="telemetryTimeRange"
               :hide-view-related-button="true"
-              :hide-search-term-actions="false"
-              :hide-dimension-filters="false"
+              :hide-search-term-actions="true"
+              :hide-dimension-filters="true"
+              :hide-reset-filters-button="true"
               @sendToAiChat="handleSendToAiChat"
             />
           </div>
@@ -1246,6 +1258,7 @@ import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
+import IncidentTimeline from "./IncidentTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { contextRegistry, createIncidentsContextProvider } from '@/composables/contextProviders';
@@ -1259,6 +1272,7 @@ export default defineComponent({
     IncidentAlertTriggersTable,
     IncidentTableOfContents,
     IncidentRCAAnalysis,
+    IncidentTimeline,
     CustomChartRenderer,
   },
   emits: ['close', 'status-updated', 'sendToAiChat'],
@@ -1313,6 +1327,9 @@ export default defineComponent({
 
     // Tab management
     const activeTab = ref("overview");
+
+    // Counter to trigger timeline refresh (prop-based approach)
+    const timelineRefreshTrigger = ref(0);
 
     // Alert Triggers tab - selected alert for detail view
     const selectedAlertIndex = ref(-1);
@@ -1583,7 +1600,7 @@ export default defineComponent({
         correlationError.value =
           error?.response?.data?.message ||
           error?.message ||
-          "Failed to load correlated telemetry";
+          t("correlation.failedToLoad");
       } finally {
         correlationLoading.value = false;
       }
@@ -1592,8 +1609,6 @@ export default defineComponent({
     // Build fallback correlation using first alert's stream schema
     const buildFallbackCorrelation = async (org: string, incident: Incident) => {
       try {
-        console.log("[Fallback Correlation] Building local correlation from first alert's stream");
-
         // Get first alert to determine source stream
         const firstAlert = alerts.value?.[0];
         if (!firstAlert) {
@@ -1618,11 +1633,6 @@ export default defineComponent({
           : (schema.schema || schema.fields || []);
         const schemaFields = new Set(schemaFieldsArray.map((f: any) => f.name));
 
-        console.log("[Fallback Correlation] Incident dimensions:", incident.stable_dimensions);
-        console.log("[Fallback Correlation] Using schema type:", schema.uds_schema && schema.uds_schema.length > 0 ? 'uds_schema (user-defined)' : 'schema (full)');
-        console.log("[Fallback Correlation] Total schema fields:", schemaFields.size);
-        console.log("[Fallback Correlation] Schema fields:", Array.from(schemaFields).filter(f => !f.startsWith('_')).slice(0, 30));
-
         // Step 3: Get semantic groups to resolve dimension names to field patterns
         const semanticGroupsResponse = await serviceStreamsApi.getSemanticGroups(org);
         const semanticGroups = semanticGroupsResponse.data;
@@ -1631,30 +1641,19 @@ export default defineComponent({
 
         // Step 4: For each dimension, find the matching schema field
         for (const [dimId, dimValue] of Object.entries(incident.stable_dimensions)) {
-          console.log(`[Fallback Correlation] Processing dimension: ${dimId} = ${dimValue}`);
-
           let matchedField = null;
 
           // Get semantic group
           const group = semanticGroups.find((g: any) => g.id === dimId);
 
           if (group && group.fields && group.fields.length > 0) {
-            console.log(`[Fallback Correlation] Semantic group fields for ${dimId}:`, group.fields);
-            console.log(`[Fallback Correlation] Checking which fields exist in schema...`);
-
             // Check each field from semantic group
             for (const fieldName of group.fields) {
               const existsInSchema = schemaFields.has(fieldName);
-              console.log(`  - ${fieldName}: ${existsInSchema ? '✅ EXISTS' : '❌ not in schema'}`);
-
               if (existsInSchema && !matchedField) {
                 matchedField = fieldName;
                 // Don't break - keep logging all fields for debugging
               }
-            }
-
-            if (matchedField) {
-              console.log(`[Fallback Correlation] ✅ Selected field from semantic group: ${matchedField}`);
             }
           } else {
             console.warn(`[Fallback Correlation] No semantic group found for: ${dimId}`);
@@ -1664,8 +1663,7 @@ export default defineComponent({
           if (!matchedField) {
             console.warn(`[Fallback Correlation] Semantic group failed, scanning schema fields directly...`);
             const dimParts = dimId.split('-');
-            console.log(`[Fallback Correlation] Looking for fields matching parts:`, dimParts);
-
+            
             const schemaFieldsArray = Array.from(schemaFields).filter(f => !f.startsWith('_'));
             for (const schemaField of schemaFieldsArray) {
               const fieldLower = schemaField.toLowerCase();
@@ -1673,7 +1671,6 @@ export default defineComponent({
 
               if (allPartsMatch) {
                 matchedField = schemaField;
-                console.log(`[Fallback Correlation] ✅ Found via pattern match: ${schemaField}`);
                 break;
               }
             }
@@ -1681,10 +1678,6 @@ export default defineComponent({
 
           if (matchedField) {
             filters[matchedField] = dimValue;
-            console.log(`[Fallback Correlation] ✅✅✅ FINAL: ${dimId} → ${matchedField} = ${dimValue}`);
-          } else {
-            console.error(`[Fallback Correlation] ❌❌❌ FAILED to find field for: ${dimId}`);
-            console.error(`[Fallback Correlation] Schema fields:`, Array.from(schemaFields).filter(f => !f.startsWith('_')).slice(0, 30));
           }
         }
 
@@ -1692,11 +1685,6 @@ export default defineComponent({
           console.warn("[Fallback Correlation] No dimensions could be mapped to stream fields");
           return;
         }
-
-        console.log("[Fallback Correlation] Mapped filters:", filters);
-        console.log("[Fallback Correlation] Schema fields:", Array.from(schemaFields));
-        console.log("[Fallback Correlation] Stream type:", streamType);
-
         // Build StreamInfo object
         const streamInfo = {
           stream_name: streamName,
@@ -1724,10 +1712,6 @@ export default defineComponent({
             correlation_method: "frontend-fallback"
           }
         };
-
-        console.log("[Fallback Correlation] Built correlation data:", correlationData.value);
-        console.log("[Fallback Correlation] Log streams:", correlationData.value.logStreams);
-        console.log("[Fallback Correlation] Filters being passed:", correlationData.value.logStreams[0]?.filters);
       } catch (fallbackError) {
         console.error("[Fallback Correlation] Failed to build fallback:", fallbackError);
         // Don't set error - let tabs show "No correlated X found"
@@ -2128,6 +2112,11 @@ export default defineComponent({
         // Mark data as stale so incident list will refresh when navigating back
         store.dispatch('incidents/setShouldRefresh', true);
         emit("status-updated");
+
+        // Refresh events in timeline if Activity tab is active
+        if (activeTab.value === 'activity') {
+          timelineRefreshTrigger.value++;
+        }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
         $q.notify({
@@ -2191,6 +2180,11 @@ export default defineComponent({
         });
         // Mark data as stale so incident list will refresh
         store.dispatch('incidents/setShouldRefresh', true);
+
+        // Refresh events in timeline if Activity tab is active
+        if (activeTab.value === 'activity') {
+          timelineRefreshTrigger.value++;
+        }
       } catch (error: any) {
         console.error("Failed to update title:", error);
         $q.notify({
@@ -2351,6 +2345,11 @@ export default defineComponent({
         });
         // Mark data as stale so incident list will refresh
         store.dispatch('incidents/setShouldRefresh', true);
+
+        // Refresh events in timeline if Activity tab is active
+        if (activeTab.value === 'activity') {
+          timelineRefreshTrigger.value++;
+        }
       } catch (error: any) {
         console.error("Failed to update status:", error);
         $q.notify({
@@ -2813,6 +2812,7 @@ export default defineComponent({
       hasExistingRca,
       isDarkMode,
       activeTab,
+      timelineRefreshTrigger,
       tableOfContents,
       expandedSections,
       formattedRcaContent,

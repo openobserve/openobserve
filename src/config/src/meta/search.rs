@@ -953,6 +953,7 @@ pub enum SearchEventType {
     DerivedStream,
     SearchJob,
     Download,
+    Insights,
 }
 
 impl<'de> Deserialize<'de> for SearchEventType {
@@ -994,6 +995,7 @@ impl std::fmt::Display for SearchEventType {
             Self::DerivedStream => write!(f, "derived_stream"),
             Self::SearchJob => write!(f, "search_job"),
             Self::Download => write!(f, "download"),
+            Self::Insights => write!(f, "insights"),
         }
     }
 }
@@ -1012,8 +1014,9 @@ impl TryFrom<&str> for SearchEventType {
             "derived_stream" | "derivedstream" => Ok(Self::DerivedStream),
             "search_job" | "searchjob" => Ok(Self::SearchJob),
             "download" => Ok(Self::Download),
+            "insights" => Ok(Self::Insights),
             _ => Err(format!(
-                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`"
+                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`, `insights`"
             )),
         }
     }
@@ -1318,6 +1321,8 @@ pub struct PaginationQuery {
 pub struct ValuesRequest {
     pub fields: Vec<String>,
     #[serde(default)]
+    pub keyword: String,
+    #[serde(default)]
     pub from: Option<i64>,
     #[serde(default)]
     pub size: Option<i64>,
@@ -1355,10 +1360,36 @@ pub struct HashFileResponse {
     pub files: HashMap<String, HashMap<String, String>>,
 }
 
+/// Logical operator for HAVING conditions
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum LogicalOperator {
+    And,
+    Or,
+}
+
+/// Tree structure representing HAVING clause conditions
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum HavingNode {
+    Condition {
+        expression: String,    // "count(*)" or "avg(field)"
+        alias: Option<String>, // "error_count" if aliased in SELECT
+        operator: String,      // ">", "<", ">=", etc.
+        value: String,         // "3", "500", etc.
+    },
+    LogicalOp {
+        operator: LogicalOperator,   // AND or OR
+        conditions: Vec<HavingNode>, // Recursive tree
+    },
+}
+
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct ResultSchemaResponse {
     pub projections: Vec<String>,
     pub group_by: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub having: Option<HavingNode>,
     pub timeseries_field: Option<String>,
 }
 
@@ -2767,6 +2798,7 @@ mod tests {
     #[test]
     fn test_values_request() {
         let request = ValuesRequest {
+            keyword: "test_keyword".to_string(),
             fields: vec!["field1".to_string(), "field2".to_string()],
             from: None,
             size: Some(100),

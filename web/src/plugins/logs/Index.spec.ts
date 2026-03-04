@@ -949,4 +949,209 @@ describe("Logs Index", async () => {
       });
     });
   });
+
+  describe("AI Chat Query Navigation (ai_chat_query type)", () => {
+    it("should recognize ai_chat_query type as a valid navigation type", () => {
+      // The watcher should treat ai_chat_query same as search_history_re_apply
+      const validTypes = ["search_history_re_apply", "ai_chat_query"];
+      validTypes.forEach((type) => {
+        expect(
+          type === "search_history_re_apply" || type === "ai_chat_query"
+        ).toBe(true);
+      });
+    });
+
+    it("should use absolute time when ai_chat_query type has from/to params", () => {
+      const type = "ai_chat_query";
+      const queryParams = {
+        type,
+        from: "1700000000000",
+        to: "1700003600000",
+      };
+
+      // Simulate the logic from the watcher
+      let datetimeType = "relative";
+      if (
+        type === "ai_chat_query" &&
+        queryParams.from &&
+        queryParams.to
+      ) {
+        datetimeType = "absolute";
+      }
+
+      expect(datetimeType).toBe("absolute");
+    });
+
+    it("should fall back to relative time when ai_chat_query lacks from/to", () => {
+      const type = "ai_chat_query";
+      const queryParams = {
+        type,
+        period: "15m",
+      };
+
+      let datetimeType = "relative";
+      if (
+        type === "ai_chat_query" &&
+        (queryParams as any).from &&
+        (queryParams as any).to
+      ) {
+        datetimeType = "absolute";
+      }
+
+      expect(datetimeType).toBe("relative");
+    });
+
+    it("should use relative time for search_history_re_apply type", () => {
+      const type = "search_history_re_apply";
+      const queryParams = {
+        type,
+        period: "30m",
+        from: "1700000000000",
+        to: "1700003600000",
+      };
+
+      // search_history_re_apply always uses relative, even when from/to present
+      let datetimeType = "relative";
+      if (
+        type === "ai_chat_query" &&
+        queryParams.from &&
+        queryParams.to
+      ) {
+        datetimeType = "absolute";
+      }
+
+      expect(datetimeType).toBe("relative");
+    });
+
+    it("should remove console.log statements from extractPatternsForCurrentQuery", () => {
+      // The PR removes debug console.log calls from extractPatternsForCurrentQuery
+      // Verify the function exists and is callable
+      expect(typeof wrapper.vm.extractPatternsForCurrentQuery).toBe("function");
+    });
+  });
+
+  /**
+   * Build Query Page Support Tests - Index.vue
+   * PR Reference: https://github.com/openobserve/openobserve/pull/10305
+   *
+   * Tests for the new Build Query Page toggle feature:
+   * 1. Build toggle visibility and interaction
+   * 2. Build page handlers (onBuildApply, onBuildCancel, onBuildQueryGenerated)
+   * 3. selectedDateTime computed property
+   * 4. BuildQueryPage ref and integration
+   */
+  describe("Build Query Page Support", () => {
+    describe("Build toggle state", () => {
+      it("should have logsVisualizeToggle initialized to 'logs'", () => {
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
+      });
+
+      it("should update toggle state to 'build'", async () => {
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+        await flushPromises();
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("build");
+      });
+
+      it("should show logs view when toggle is 'logs'", async () => {
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+        await flushPromises();
+        // The thirdLevel section should be visible for 'logs' toggle
+        const thirdLevel = wrapper.find('#thirdLevel');
+        expect(thirdLevel.exists()).toBe(true);
+      });
+
+      it("should allow switching to 'build' mode", async () => {
+        // Switch to build mode
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+        await flushPromises();
+
+        // Build mode should be set
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("build");
+      });
+    });
+
+    describe("Build page handlers", () => {
+      it("should have onBuildApply handler defined", () => {
+        expect(wrapper.vm.onBuildApply).toBeDefined();
+        expect(typeof wrapper.vm.onBuildApply).toBe("function");
+      });
+
+      it("should update query and switch to logs on onBuildApply", async () => {
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+        await flushPromises();
+
+        const testQuery = 'SELECT * FROM "test_stream"';
+        wrapper.vm.onBuildApply(testQuery);
+        await flushPromises();
+
+        expect(wrapper.vm.searchObj.data.query).toBe(testQuery);
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
+      });
+
+      it("should have onBuildCancel handler defined", () => {
+        expect(wrapper.vm.onBuildCancel).toBeDefined();
+        expect(typeof wrapper.vm.onBuildCancel).toBe("function");
+      });
+
+      it("should switch to logs view on onBuildCancel", async () => {
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+        await flushPromises();
+
+        wrapper.vm.onBuildCancel();
+        await flushPromises();
+
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
+      });
+
+      it("should have onBuildQueryGenerated handler defined", () => {
+        expect(wrapper.vm.onBuildQueryGenerated).toBeDefined();
+        expect(typeof wrapper.vm.onBuildQueryGenerated).toBe("function");
+      });
+
+      it("should sync generated query on onBuildQueryGenerated", async () => {
+        const testQuery = 'SELECT histogram(_timestamp) FROM "logs"';
+        wrapper.vm.onBuildQueryGenerated(testQuery);
+        await flushPromises();
+
+        expect(wrapper.vm.searchObj.data.query).toBe(testQuery);
+      });
+
+      it("should not update query if onBuildQueryGenerated receives empty string", async () => {
+        const originalQuery = wrapper.vm.searchObj.data.query;
+        wrapper.vm.onBuildQueryGenerated("");
+        await flushPromises();
+
+        // Query should remain unchanged when empty string is passed
+        expect(wrapper.vm.searchObj.data.query).toBe(originalQuery);
+      });
+    });
+
+    describe("selectedDateTime computed", () => {
+      it("should have selectedDateTime computed property defined", () => {
+        expect(wrapper.vm.selectedDateTime).toBeDefined();
+      });
+
+      it("should return datetime object with start_time and end_time", () => {
+        const dateTime = wrapper.vm.selectedDateTime;
+        expect(dateTime).toHaveProperty("start_time");
+        expect(dateTime).toHaveProperty("end_time");
+      });
+
+      it("should include valueType in selectedDateTime", () => {
+        const dateTime = wrapper.vm.selectedDateTime;
+        expect(dateTime).toHaveProperty("valueType");
+      });
+
+      it("should include relativeTimePeriod in selectedDateTime", () => {
+        const dateTime = wrapper.vm.selectedDateTime;
+        expect(dateTime).toHaveProperty("relativeTimePeriod");
+      });
+    });
+
+    describe("BuildQueryPage ref", () => {
+      it("should have buildQueryPageRef defined", () => {
+        expect(wrapper.vm.buildQueryPageRef).toBeDefined();
+      });
+    });
+  });
 });

@@ -23,7 +23,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::{
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::extractors::Headers,
+};
 
 /// Query parameters for listing incidents
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
@@ -203,9 +206,11 @@ pub async fn get_incident(Path((org_id, incident_id)): Path<(String, String)>) -
 )]
 pub async fn update_incident(
     path: Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<UpdatePayload>,
 ) -> Response {
     let (org_id, incident_id) = path.0;
+    let user_id = user_email.user_id;
 
     match body {
         UpdatePayload::Title { title } => {
@@ -216,8 +221,13 @@ pub async fn update_incident(
                 return MetaHttpResponse::bad_request("Title cannot exceed 255 characters");
             }
 
-            match crate::service::alerts::incidents::update_title(&org_id, &incident_id, &title)
-                .await
+            match crate::service::alerts::incidents::update_title(
+                &org_id,
+                &incident_id,
+                &title,
+                &user_id,
+            )
+            .await
             {
                 Ok(incident) => MetaHttpResponse::json(incident),
                 Err(e) => {
@@ -234,6 +244,7 @@ pub async fn update_incident(
                 &org_id,
                 &incident_id,
                 severity.as_str(),
+                &user_id,
             )
             .await
             {
@@ -251,6 +262,7 @@ pub async fn update_incident(
             &org_id,
             &incident_id,
             status.as_str(),
+            &user_id,
         )
         .await
         {
@@ -369,7 +381,7 @@ pub async fn trigger_incident_rca(
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
 
-    if o2_config.incidents.rca_agent_url.is_empty() {
+    if o2_config.ai.agent_url.is_empty() {
         return axum::response::Response::builder()
             .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
             .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -398,7 +410,7 @@ pub async fn trigger_incident_rca(
     // Create RCA agent client
     let zo_config = config::get_config();
     let client = match RcaAgentClient::new(
-        &o2_config.incidents.rca_agent_url,
+        &o2_config.ai.agent_url,
         &zo_config.auth.root_user_email,
         &zo_config.auth.root_user_password,
     ) {
@@ -447,6 +459,60 @@ pub async fn trigger_incident_rca(
 
         MetaHttpResponse::json(RcaResponse { rca_content })
     }
+}
+
+/// Get incident events timeline
+#[cfg(feature = "enterprise")]
+pub async fn get_incident_events(Path((org_id, incident_id)): Path<(String, String)>) -> Response {
+    match infra::table::incident_events::get(&org_id, &incident_id).await {
+        Ok(events) => MetaHttpResponse::json(serde_json::json!({ "events": events })),
+        Err(e) => MetaHttpResponse::internal_error(format!("Failed to get events: {e}")),
+    }
+}
+
+/// Get incident events timeline (OSS)
+#[cfg(not(feature = "enterprise"))]
+pub async fn get_incident_events(_path: Path<(String, String)>) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+/// Post a comment on an incident
+#[cfg(feature = "enterprise")]
+pub async fn post_incident_comment(
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<CommentRequest>,
+) -> Response {
+    use config::meta::alerts::incidents::IncidentEvent;
+
+    if body.comment.trim().is_empty() {
+        return MetaHttpResponse::bad_request("Comment cannot be blank");
+    }
+    if body.comment.len() > 10_000 {
+        return MetaHttpResponse::bad_request("Comment must be 10,000 characters or fewer");
+    }
+
+    let event = IncidentEvent::comment(user_email.user_id, body.comment);
+
+    match infra::table::incident_events::append(&org_id, &incident_id, event).await {
+        Ok(()) => MetaHttpResponse::ok("Comment added"),
+        Err(e) => MetaHttpResponse::internal_error(format!("Failed to add comment: {e}")),
+    }
+}
+
+/// Post a comment (OSS)
+#[cfg(not(feature = "enterprise"))]
+pub async fn post_incident_comment(
+    _path: Path<(String, String)>,
+    _headers: Headers<UserEmail>,
+    _body: Json<CommentRequest>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CommentRequest {
+    pub comment: String,
 }
 
 #[cfg(not(feature = "enterprise"))]

@@ -400,7 +400,7 @@ pub async fn delete_fields(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a stream", "category": "streams"}))
+        ("x-o2-mcp" = json!({"description": "Delete a stream", "category": "streams", "requires_confirmation": true}))
     )
 )]
 pub async fn delete(

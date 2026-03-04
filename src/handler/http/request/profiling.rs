@@ -50,7 +50,7 @@ pub async fn memory_profile() -> Result<String, String> {
 
     // Use the configured cache directory with a profiling subdirectory
     let cfg = get_config();
-    let profile_dir = format!("{}/profiling", cfg.common.data_cache_dir);
+    let profile_dir = format!("{}profiling", cfg.common.data_cache_dir);
 
     // Ensure the profiling directory exists
     std::fs::create_dir_all(&profile_dir)
@@ -158,7 +158,7 @@ pub async fn cpu_profile(Query(params): Query<CpuProfileQuery>) -> Result<String
 
     // Use the configured cache directory with a profiling subdirectory
     let cfg = get_config();
-    let profile_dir = format!("{}/profiling", cfg.common.data_cache_dir);
+    let profile_dir = format!("{}profiling", cfg.common.data_cache_dir);
 
     // Ensure the profiling directory exists
     std::fs::create_dir_all(&profile_dir)

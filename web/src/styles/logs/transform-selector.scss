@@ -31,7 +31,7 @@
   :deep(.transform-icon),
   :deep(.function-icon) {
     .q-icon {
-      &.on-left {
+      img {
         filter: invert(1);
       }
     }
@@ -50,38 +50,39 @@
   }
 
   :deep(.btn-function) {
-    width: 140px;
     transition: all 0.2s ease;
+    padding: 0 0rem; // 6px
+    padding-left: 0.1rem;
+    min-width: auto;
 
     &:hover {
       background-color: var(--o2-hover-accent);
     }
 
     .q-btn__content {
-      justify-content: start !important;
-
-      span {
-        text-overflow: ellipsis;
-        overflow: hidden;
-        white-space: nowrap;
-        width: 80px;
-      }
+      justify-content: center !important;
 
       .q-btn-dropdown__arrow {
         margin-left: 4px !important;
       }
 
       .q-icon {
-        font-size: 1rem; // 18px
+        font-size: 1rem; // 16px
+        margin: 0;
       }
     }
   }
 
   :deep(.q-btn-dropdown__arrow-container) {
     transition: all 0.2s ease;
+    padding: 0 0.375rem; // 6px
 
     &:hover {
       background-color: var(--o2-hover-accent);
+    }
+
+    .q-icon {
+      font-size: 0.875rem; // 14px
     }
   }
 }

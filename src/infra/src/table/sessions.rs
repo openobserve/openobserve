@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -67,11 +67,7 @@ pub async fn set_with_expiry(
     match result {
         Ok(_) => Ok(()),
         Err(e) => {
-            log::error!(
-                "[DB] Failed to insert/update session: id={}, error={}",
-                session_id,
-                e
-            );
+            log::error!("[DB] Failed to insert/update session: id={session_id}, error={e}");
             Err(e.into())
         }
     }

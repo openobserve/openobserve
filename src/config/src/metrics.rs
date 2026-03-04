@@ -987,7 +987,7 @@ pub static QUERY_CANCELED_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// This corresponds to mysql or pgsql queries, not sqlite as that is local and can be ignored
+// This corresponds to pgsql queries, not sqlite as that is local and can be ignored
 pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new("db_query_nums", "db query number")

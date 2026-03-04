@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ props.row.name }} ({{
               showOnlyInterestingFields
                 ? interestingExpandedGroupRowsFieldCount[props.row.group]
-              : expandGroupRowsFieldCount[props.row.group]
+                : expandGroupRowsFieldCount[props.row.group]
             }})
           </div>
           <q-icon
@@ -113,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :selected-streams-count="selectedStreamsCount"
                 :theme="theme"
                 :show-quick-mode="showQuickMode"
+                :default-values-count="defaultValuesCount"
                 @add-to-filter="$emit('add-to-filter', $event)"
                 @toggle-field="$emit('toggle-field', $event)"
                 @toggle-interesting="
@@ -123,10 +124,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (fieldName, value, action) =>
                     $emit('add-search-term', fieldName, value, action)
                 "
+                @add-multiple-search-terms="
+                  (fieldName, values, action) =>
+                    $emit('add-multiple-search-terms', fieldName, values, action)
+                "
                 @before-show="
                   (event, field) => $emit('before-show', event, field)
                 "
                 @before-hide="(field) => $emit('before-hide', field)"
+                @search-field-values="
+                  (fieldName, searchTerm) =>
+                    $emit('search-field-values', fieldName, searchTerm)
+                "
+                @load-more-values="(fieldName) => $emit('load-more-values', fieldName)"
               />
             </template>
           </FieldRow>
@@ -214,6 +224,7 @@ interface Props {
   showQuickMode: boolean;
   fieldValues: Record<string, any>;
   selectedStreamsCount: number;
+  defaultValuesCount: number;
   showUserDefinedSchemaToggle: boolean;
   useUserDefinedSchemas: string;
   userDefinedSchemaBtnGroupOption: any[];
@@ -230,6 +241,13 @@ defineEmits<{
   "toggle-field": [field: any];
   "toggle-interesting": [field: any, isInteresting: boolean];
   "add-search-term": [fieldName: string, value: string, action: string];
+  "add-multiple-search-terms": [
+    fieldName: string,
+    values: string[],
+    action: string,
+  ];
+  "search-field-values": [fieldName: string, searchTerm: string];
+  "load-more-values": [fieldName: string];
   "before-show": [event: any, field: any];
   "before-hide": [field: any];
   "toggle-group": [group: string];
@@ -245,7 +263,7 @@ const fieldListRef = ref<HTMLElement | null>(null);
 // Methods
 const scrollToTop = () => {
   if (fieldListRef.value) {
-    const scrollContainer = fieldListRef.value.querySelector(
+    const scrollContainer = fieldListRef?.value?.$el?.querySelector(
       ".q-table__middle.scroll",
     );
     if (scrollContainer) {

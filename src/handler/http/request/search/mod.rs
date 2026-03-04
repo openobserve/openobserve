@@ -41,7 +41,7 @@ use hashbrown::HashMap;
 use http::HeaderMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
-use utils::check_stream_permissions;
+use utils::{StreamPermissionResourceType, check_stream_permissions};
 
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
@@ -265,7 +265,7 @@ pub async fn search(
         }
     }
 
-    let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone())
     } else {
         Span::none()
@@ -387,8 +387,14 @@ pub async fn search(
 
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
-        if let Some(res) =
-            check_stream_permissions(&stream_name, &org_id, user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            &stream_name,
+            &org_id,
+            user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
         {
             return res;
         }
@@ -578,7 +584,7 @@ pub async fn around_v1(
         }
     }
 
-    let http_span = if get_config().common.tracing_search_enabled {
+    let http_span = if get_config().common.should_create_span() {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
             org_id = org_id.clone(),
@@ -700,7 +706,7 @@ pub async fn around_v2(
         }
     }
 
-    let http_span = if get_config().common.tracing_search_enabled {
+    let http_span = if get_config().common.should_create_span() {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
             org_id = org_id.clone(),
@@ -804,7 +810,7 @@ pub async fn values(
     }
 
     let user_id = &user_email.user_id;
-    let http_span = if config::get_config().common.tracing_search_enabled {
+    let http_span = if config::get_config().common.should_create_span() {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_values",
             org_id = org_id.clone(),
@@ -1030,7 +1036,7 @@ pub async fn build_search_request_per_field(
         stream_type
     };
 
-    let size = req.query.size;
+    let size = req.query.size + req.query.from;
     let mut requests = Vec::new();
     for field in fields {
         let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
@@ -1455,7 +1461,7 @@ pub async fn search_partition(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone())
     } else {
         Span::none()
@@ -1648,7 +1654,7 @@ pub async fn search_history(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.should_create_span() {
         tracing::info_span!("/api/{org_id}/_search_history", org_id = org_id.clone())
     } else {
         Span::none()
@@ -1884,8 +1890,14 @@ pub async fn result_schema(
 
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
-        if let Some(res) =
-            check_stream_permissions(&stream_name, &org_id, user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            &stream_name,
+            &org_id,
+            user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
         {
             return res;
         }
@@ -1976,6 +1988,7 @@ pub async fn result_schema(
     Json(ResultSchemaResponse {
         projections: res_schema.projections,
         group_by: res_schema.group_by.into_iter().collect(),
+        having: res_schema.having,
         timeseries_field: res_schema.timeseries,
     })
     .into_response()
