@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -136,6 +136,7 @@ pub async fn query_by_ids(
                     start.elapsed().as_millis()
                 ),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("file_list get cached_ids".to_string())
                     .search_role("follower".to_string())
@@ -172,6 +173,7 @@ pub async fn query_by_ids(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("file_list query from db".to_string())
                 .search_role("follower".to_string())
@@ -224,6 +226,7 @@ pub async fn query_by_ids(
                         start.elapsed().as_millis()
                     ),
                     SearchInspectorFieldsBuilder::new()
+                        .trace_id(trace_id.to_string())
                         .node_name(LOCAL_NODE.name.clone())
                         .component("file_list set cached_ids".to_string())
                         .search_role("follower".to_string())

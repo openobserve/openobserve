@@ -181,6 +181,7 @@ pub async fn search_parquet(
                 scan_stats.compressed_size
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:parquet load".to_string())
                 .search_role("follower".to_string())
@@ -236,6 +237,7 @@ pub async fn search_parquet(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:parquet create tables".to_string())
                 .search_role("follower".to_string())
@@ -337,6 +339,7 @@ pub async fn search_memtable(
                 scan_stats.compressed_size,
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:memtable load".to_string())
                 .search_role("follower".to_string())
@@ -466,6 +469,7 @@ pub async fn search_memtable(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("wal:memtable create tables".to_string())
                 .search_role("follower".to_string())

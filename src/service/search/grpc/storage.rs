@@ -119,6 +119,7 @@ pub async fn search(
                     files.len(),
                 ),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("storage inverted index reduced file_list num".to_string())
                     .search_role("follower".to_string())
@@ -212,6 +213,7 @@ pub async fn search(
                 cache_start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("storage load files".to_string())
                 .search_role("follower".to_string())
@@ -272,6 +274,7 @@ pub async fn search(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("storage create tables".to_string())
                 .search_role("follower".to_string())
@@ -490,6 +493,7 @@ pub async fn tantivy_search(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("tantivy load files".to_string())
                 .search_role("follower".to_string())
@@ -675,6 +679,7 @@ pub async fn tantivy_search(
                 search_start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("tantivy search".to_string())
                 .search_role("follower".to_string())
