@@ -20,7 +20,7 @@ use std::{
 };
 
 use parking_lot::Mutex;
-use rand::Rng;
+use rand::RngExt;
 use svix_ksuid::{Ksuid, KsuidLike};
 use uuid::Uuid;
 
