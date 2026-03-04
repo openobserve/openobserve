@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column index-menu default-index-menu">
-    <div class="index-table logs-index-menu">
+  <div class="column index-menu default-index-menu tw:h-full!">
+    <div class="index-table logs-index-menu tw:h-full!">
       <q-table
         data-test="log-search-index-list-fields-table"
         :visible-columns="['name']"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="{ rowsPerPage: 10000 }"
         hide-header
         hide-bottom
-        class="traces-field-table tw:h-full"
+        class="traces-field-table tw:h-full!"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
-            class="o2-search-input tw:min-w-full "
+            class="o2-search-input tw:min-w-full"
           >
             <template #prepend>
               <q-icon name="search" class="o2-search-input-icon" />
@@ -411,9 +411,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.traces-field-table {
-  height: calc(100vh - 212px) !important;
-}
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
