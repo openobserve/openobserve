@@ -27,6 +27,7 @@ use config::{
         search::{Query as SearchQuery, SearchEventType},
         stream::StreamType,
     },
+    utils::time::now_micros,
 };
 use hashbrown::HashMap;
 use serde_json;
@@ -122,33 +123,37 @@ pub async fn get_search_profile(
 
     let stream_type = StreamType::Traces;
 
-    // Validate required parameters
-    let (query_trace_id, start_time, end_time) = match (
-        query.get("trace_id"),
-        query.get("start_time"),
-        query.get("end_time"),
-    ) {
-        (Some(query_trace_id), Some(start_time), Some(end_time)) => {
-            if query_trace_id.is_empty() || start_time.is_empty() || end_time.is_empty() {
-                return meta::http::HttpResponse::bad_request(
-                    "trace_id/start_time/end_time cannot be empty",
-                );
-            }
-            let start_time = start_time.parse::<i64>().unwrap_or(0);
-            let end_time = end_time.parse::<i64>().unwrap_or(0);
-            if start_time == 0 || end_time == 0 {
-                return meta::http::HttpResponse::bad_request(
-                    "start_time/end_time must be valid i64",
-                );
-            }
-            (query_trace_id, start_time, end_time)
-        }
+    let Some(query_trace_id) = query.get("trace_id") else {
+        return meta::http::HttpResponse::bad_request("trace_id is required");
+    };
+    let start_time_from_trace_id =
+        config::ider::get_start_time_from_trace_id(query_trace_id).unwrap_or(0);
+
+    let start_time = match query.get("start_time") {
+        Some(v) if !v.is_empty() => v.parse::<i64>().unwrap_or(0),
         _ => {
-            return meta::http::HttpResponse::bad_request(
-                "trace_id/start_time/end_time is required",
-            );
+            if start_time_from_trace_id > 0 {
+                start_time_from_trace_id - 60 * 1_000_000 // minus 1m
+            } else {
+                0
+            }
         }
     };
+    let end_time = match query.get("end_time") {
+        Some(v) if !v.is_empty() => v.parse::<i64>().unwrap_or(0),
+        _ => {
+            if start_time_from_trace_id > 0 {
+                std::cmp::min(now_micros(), start_time_from_trace_id + 3600 * 1_000_000) // plus 1h
+            } else {
+                0
+            }
+        }
+    };
+
+    // Validate required parameters
+    if start_time == 0 || end_time == 0 {
+        return meta::http::HttpResponse::bad_request("start_time/end_time must be valid i64");
+    }
 
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = config::meta::search::Request {
