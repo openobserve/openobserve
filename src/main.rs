@@ -1310,16 +1310,32 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
         }
     }
 
+    // Build resource attributes (base + extra envs)
+    let mut resource_attrs = vec![
+        KeyValue::new("service.name", cfg.common.node_role.to_string()),
+        KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
+        KeyValue::new("service.version", config::VERSION),
+    ];
+    for env_name in cfg
+        .common
+        .tracing_extra_envs
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        if let Ok(val) = std::env::var(env_name)
+            && !val.is_empty()
+        {
+            resource_attrs.push(KeyValue::new(env_name.to_lowercase(), val));
+        }
+    }
+
     // If search inspector is enabled, add a span processor that ingests traces
     // directly into the _meta org. This ensures search profiling data is always
     // available in _meta regardless of where the user's OTLP endpoint points.
     if cfg.common.search_inspector_enabled {
         let resource = Resource::builder()
-            .with_attributes(vec![
-                KeyValue::new("service.name", cfg.common.node_role.to_string()),
-                KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-                KeyValue::new("service.version", config::VERSION),
-            ])
+            .with_attributes(resource_attrs.clone())
             .build();
         let resource_attrs =
             opentelemetry_proto::transform::common::tonic::ResourceAttributesWithSchema::from(
@@ -1350,16 +1366,8 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
         }
     });
 
-    // Store the tracer provider before installing batch processor
-    let tracer = tracer_builder.with_resource(
-        Resource::builder()
-            .with_attributes(vec![
-                KeyValue::new("service.name", cfg.common.node_role.to_string()),
-                KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-                KeyValue::new("service.version", config::VERSION),
-            ])
-            .build(),
-    );
+    let tracer =
+        tracer_builder.with_resource(Resource::builder().with_attributes(resource_attrs).build());
 
     // build
     let tracer = tracer.build();

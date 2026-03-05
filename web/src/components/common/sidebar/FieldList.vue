@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column index-menu default-index-menu">
-    <div class="index-table logs-index-menu">
+  <div class="column index-menu default-index-menu tw:h-full!">
+    <div class="index-table logs-index-menu tw:h-full!">
       <q-table
         data-test="log-search-index-list-fields-table"
         :visible-columns="['name']"
@@ -24,85 +24,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="name"
         :filter="filterFieldValue"
         :filter-method="filterFieldFn"
-        :pagination="{ rowsPerPage: 10000 }"
+        v-model:pagination="pagination"
+        :rows-per-page-options="[]"
+        :hide-bottom="!showPagination"
         hide-header
-        hide-bottom
         class="traces-field-table tw:h-full"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
           <q-tr :props="props">
             <q-td :props="props" class="field_list">
-              <!-- TODO OK : Repeated code make separate component to display field  -->
+              <!-- Non-expandable field (ftsKey or no values to show) -->
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
                 :title="props.row.name"
               >
-                <div class="field_label ellipsis">
+                <div class="field_label ellipsis tw:flex tw:items-center">
+                  <FieldTypeBadge :dataType="props.row.type" />
                   {{ props.row.name }}
                 </div>
                 <div
-                  class="field_overlay"
-                  :style="{
-                    background:
-                      store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
-                  }"
+                  class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
                 >
                   <q-btn
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                    style="margin-right: 0.375rem"
                     size="0.4rem"
-                    class="q-mr-sm"
                     @click.stop="addSearchTerm(`${props.row.name}=''`)"
                     round
                   />
                 </div>
               </div>
+
+              <!-- Expandable field -->
               <q-expansion-item
                 v-else
                 dense
-                switch-toggle-side
+                hide-expand-icon
                 :label="props.row.name"
-                expand-icon-class="field-expansion-icon tw:text-[1rem]! tw:text-[var(--o2-icon-color)]"
-                expand-icon="
-                     expand_more
-                  "
                 @before-show="
-                  (event: any) => openFilterCreator(event, props.row)
+                  (event: any) => {
+                    expandedRows[props.row.name] = true;
+                    openFilterCreator(event, props.row);
+                  }
                 "
+                @before-hide="closeField(props.row.name)"
                 class="hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
               >
                 <template v-slot:header>
                   <div
-                    class="flex content-center ellipsis"
+                    class="flex content-center ellipsis field-expansion-header"
                     :title="props.row.name"
                   >
-                    <div class="field_label ellipsis">
+                    <div class="field_label ellipsis tw:flex tw:items-center">
+                      <span
+                        class="field-type-container"
+                        :title="props.row.type"
+                      >
+                        <FieldTypeBadge :dataType="props.row.type" />
+                        <q-icon
+                          class="field-expand-icon"
+                          :name="
+                            expandedRows[props.row.name]
+                              ? 'expand_less'
+                              : 'expand_more'
+                          "
+                          size="1rem"
+                        />
+                      </span>
                       {{ props.row.name }}
                     </div>
-                    <div v-if="!hideAddSearchTerm" class="field_overlay">
+                    <div
+                      v-if="!hideAddSearchTerm"
+                      class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
+                    >
                       <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
-                        style="margin-right: 0.375rem"
                         size="0.4rem"
-                        class="q-mr-sm"
                         @click.stop="addSearchTerm(`${props.row.name}=''`)"
                         round
                       />
                     </div>
                     <div
                       v-if="!hideCopyValue"
-                      style="background-color: #e8e8e8"
-                      class="field_overlay"
+                      class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
                     >
                       <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-copy-btn`"
                         icon="content_copy"
-                        size="10px"
-                        class="q-mr-sm"
+                        size="0.4rem"
                         @click.stop="copyContentValue(props.row.name)"
                         round
                         flat
@@ -111,127 +123,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </template>
+
                 <q-card>
                   <q-card-section class="q-pl-md q-pr-xs q-py-xs">
-                    <div class="filter-values-container">
-                      <div
-                        v-show="fieldValues[props.row.name]?.isLoading"
-                        class="q-pl-md q-py-xs"
-                        style="height: 60px"
-                      >
-                        <q-inner-loading
-                          size="xs"
-                          :showing="fieldValues[props.row.name]?.isLoading"
-                          label="Fetching values..."
-                          label-style="font-size: 1.1em"
-                        />
-                      </div>
-                      <div
-                        v-show="
-                          !fieldValues[props.row.name]?.values?.length &&
-                          !fieldValues[props.row.name]?.isLoading
-                        "
-                        class="q-pl-md q-py-xs text-subtitle2"
-                      >
-                        No values found
-                      </div>
-                      <div
-                        v-for="value in fieldValues[props.row.name]?.values ||
-                        []"
-                        :key="value.key"
-                      >
-                        <q-list dense>
-                          <q-item tag="label" class="q-pr-none">
-                            <div
-                              class="flex row wrap justify-between"
-                              style="width: calc(100% - 40px)"
-                            >
-                              <div
-                                :title="value.key"
-                                class="ellipsis q-pr-xs"
-                                style="width: calc(100% - 50px)"
-                              >
-                                {{ value.key }}
-                              </div>
-                              <div
-                                :title="value.count"
-                                class="ellipsis text-right q-pr-sm"
-                                style="width: 50px"
-                              >
-                                {{ value.count }}
-                              </div>
-                            </div>
-                            <div
-                              v-if="!hideIncludeExlcude"
-                              class="flex row"
-                              :class="
-                                store.state.theme === 'dark'
-                                  ? 'text-white'
-                                  : 'text-black'
-                              "
-                            >
-                              <q-btn
-                                class="q-mr-xs tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                                size="5px"
-                                title="Include Term"
-                                round
-                                @click="
-                                  addSearchTerm(
-                                    `${props.row.name}='${value.key}'`,
-                                  )
-                                "
-                              >
-                                <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
-                                  <EqualIcon></EqualIcon>
-                                </q-icon>
-                              </q-btn>
-                              <q-btn
-                                class="q-mr-xs tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                                size="5px"
-                                title="Include Term"
-                                round
-                                @click="
-                                  addSearchTerm(
-                                    `${props.row.name}!='${value.key}'`,
-                                  )
-                                "
-                              >
-                                <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
-                                  <NotEqualIcon></NotEqualIcon>
-                                </q-icon>
-                              </q-btn>
-                            </div>
-                            <div
-                              v-if="!hideCopyValue"
-                              class="flex row"
-                              :class="
-                                store.state.theme === 'dark'
-                                  ? 'text-white'
-                                  : 'text-black'
-                              "
-                            >
-                              <q-btn
-                                class="q-ml-md"
-                                size="8px"
-                                title="Copy Value"
-                                round
-                                dense
-                                flat
-                                @click="copyContentValue(value.key)"
-                              >
-                                <q-icon name="content_copy"></q-icon>
-                              </q-btn>
-                            </div>
-                          </q-item>
-                        </q-list>
-                      </div>
-                    </div>
+                    <FieldValuesPanel
+                      :field-name="props.row.name"
+                      :field-values="fieldValues[props.row.name]"
+                      :show-multi-select="!hideIncludeExlcude"
+                      :default-values-count="defaultValuesCount"
+                      :theme="store.state.theme"
+                      @add-search-term="handleAddSearchTerm"
+                      @add-multiple-search-terms="handleAddMultipleSearchTerms"
+                      @load-more-values="handleLoadMoreValues"
+                      @search-field-values="handleSearchFieldValues"
+                    />
                   </q-card-section>
                 </q-card>
               </q-expansion-item>
             </q-td>
           </q-tr>
         </template>
+
         <template #top-right>
           <q-input
             data-test="log-search-index-list-field-search-input"
@@ -242,12 +154,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
-            class="o2-search-input tw:min-w-full "
+            class="o2-search-input tw:min-w-full"
           >
             <template #prepend>
               <q-icon name="search" class="o2-search-input-icon" />
             </template>
           </q-input>
+        </template>
+
+        <template #pagination="scope">
+          <div v-if="scope.pagesNumber > 1" class="field-list-pagination">
+            <q-tooltip
+              anchor="center left"
+              self="center right"
+              max-width="18.75rem"
+              class="text-body2"
+            >
+              Total Fields: {{ filteredFieldsCount }}
+            </q-tooltip>
+            <q-btn
+              icon="fast_rewind"
+              color="primary"
+              flat
+              :disable="scope.isFirstPage"
+              @click="scope.firstPage"
+              class="pagination-nav-btn"
+            />
+            <template v-for="page in visiblePages" :key="page">
+              <q-btn
+                flat
+                :class="[
+                  'pagination-page-btn',
+                  scope.pagination.page === page
+                    ? 'pagination-page-active'
+                    : '',
+                ]"
+                @click="setPage(page)"
+                >{{ page }}</q-btn
+              >
+            </template>
+            <q-btn
+              icon="fast_forward"
+              color="primary"
+              flat
+              :disable="scope.isLastPage"
+              @click="scope.lastPage"
+              class="pagination-nav-btn"
+            />
+          </div>
         </template>
       </q-table>
     </div>
@@ -255,22 +209,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { computed, defineComponent, ref, watch, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-import { formatLargeNumber, getImageURL } from "@/utils/zincutils";
-import streamService from "@/services/stream";
+import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
-import EqualIcon from "@/components/icons/EqualIcon.vue";
-import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import useFieldValuesStream from "@/composables/useFieldValuesStream";
+import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
+import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 
 export default defineComponent({
   name: "IndexList",
   components: {
-    EqualIcon,
-    NotEqualIcon,
+    FieldTypeBadge,
+    FieldValuesPanel,
   },
   props: {
     fields: {
@@ -283,12 +237,7 @@ export default defineComponent({
     },
     timeStamp: {
       type: Object,
-      default: () => {
-        return {
-          endTime: "",
-          startTime: "",
-        };
-      },
+      default: () => ({ endTime: "", startTime: "" }),
     },
     streamType: {
       type: String,
@@ -314,25 +263,85 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const fieldValues: Ref<{
-      [key: string | number]: {
-        isLoading: boolean;
-        values: { key: string; count: string }[];
-      };
-    }> = ref({});
+
+    const expandedRows: Ref<Record<string, boolean>> = ref({});
+
+    // Table pagination
+    const pagination = ref({ page: 1, rowsPerPage: 50 });
+
+    // Reset to first page whenever the search filter changes
+    watch(filterFieldValue, () => {
+      pagination.value.page = 1;
+    });
+
+    // Per-field pagination state
+    const currentFrom: Ref<Record<string, number>> = ref({});
+    const currentKeyword: Ref<Record<string, string>> = ref({});
+
+    const defaultValuesCount = computed(
+      () => store.state.zoConfig?.query_values_default_num || 10,
+    );
+
+    const filteredFieldsCount = computed(() => {
+      if (!filterFieldValue.value) return (props.fields as any[]).length;
+      return filterFieldFn(props.fields as any[], filterFieldValue.value)
+        .length;
+    });
+
+    const showPagination = computed(
+      () => filteredFieldsCount.value > pagination.value.rowsPerPage,
+    );
+
+    const visiblePages = computed(() => {
+      const pages: number[] = [];
+      const page = pagination.value.page;
+      const total = Math.max(
+        1,
+        Math.ceil(filteredFieldsCount.value / pagination.value.rowsPerPage),
+      );
+      if (total <= 3) {
+        for (let i = 1; i <= total; i++) pages.push(i);
+      } else {
+        let start = Math.max(1, page - 1);
+        let end = Math.min(total, start + 2);
+        if (end === total) start = Math.max(1, end - 2);
+        for (let i = start; i <= end; i++) pages.push(i);
+      }
+      return pages;
+    });
+
+    const setPage = (page: number) => {
+      pagination.value.page = page;
+    };
+
+    const {
+      fieldValues,
+      fetchFieldValues,
+      cancelFieldStream,
+      resetFieldValues,
+    } = useFieldValuesStream();
+
+    // ─── Filter ──────────────────────────────────────────────────────────
 
     const filterFieldFn = (rows: any, terms: any) => {
-      var filtered = [];
-      if (terms != "") {
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
+      const filtered = [];
+      if (terms !== "") {
+        const lower = terms.toLowerCase();
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i]["name"].toLowerCase().includes(lower)) {
             filtered.push(rows[i]);
           }
         }
       }
       return filtered;
     };
+
+    // ─── SQL helper ──────────────────────────────────────────────────────
+
+    const buildSql = (streamName: string) =>
+      b64EncodeUnicode(`SELECT * FROM "${streamName}"`) || "";
+
+    // ─── Field expand / collapse ─────────────────────────────────────────
 
     const openFilterCreator = (
       event: any,
@@ -344,42 +353,122 @@ export default defineComponent({
         return;
       }
 
-      fieldValues.value[name] = {
-        isLoading: true,
-        values: [],
-      };
-      streamService
-        .fieldValues({
-          org_identifier: store.state.selectedOrganization.identifier,
-          stream_name: stream_name ? stream_name : props.streamName,
-          start_time: props.timeStamp.startTime,
-          end_time: props.timeStamp.endTime,
-          fields: [name],
-          size: store.state.zoConfig?.query_values_default_num || 10,
-          type: props.streamType,
-        })
-        .then((res: any) => {
-          if (res.data.hits.length) {
-            fieldValues.value[name]["values"] = res.data.hits
-              .find((field: any) => field.field === name)
-              .values.map((value: any) => {
-                return {
-                  key: value.zo_sql_key ? value.zo_sql_key : "null",
-                  count: formatLargeNumber(value.zo_sql_num),
-                };
-              });
-          }
-        })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: `Error while fetching values for ${name}`,
-          });
-        })
-        .finally(() => {
-          fieldValues.value[name]["isLoading"] = false;
-        });
+      cancelFieldStream(name);
+      currentFrom.value[name] = 0;
+      currentKeyword.value[name] = "";
+      resetFieldValues(name, true);
+
+      const resolvedStream = stream_name || props.streamName;
+      fetchFieldValues({
+        fields: [name],
+        size: defaultValuesCount.value,
+        from: 0,
+        no_count: false,
+        start_time: props.timeStamp.startTime,
+        end_time: props.timeStamp.endTime,
+        stream_name: resolvedStream,
+        stream_type: props.streamType,
+        sql: buildSql(resolvedStream),
+        timeout: 30000,
+        use_cache: (globalThis as any).use_cache ?? true,
+      });
     };
+
+    const closeField = (fieldName: string) => {
+      cancelFieldStream(fieldName);
+      expandedRows.value[fieldName] = false;
+      currentFrom.value[fieldName] = 0;
+      currentKeyword.value[fieldName] = "";
+      resetFieldValues(fieldName);
+    };
+
+    // ─── FieldValuesPanel event handlers ─────────────────────────────────
+
+    const handleSearchFieldValues = (fieldName: string, term: string) => {
+      const row: any = (props.fields as any[]).find(
+        (f: any) => f.name === fieldName,
+      );
+      const resolvedStream = row?.stream_name || props.streamName;
+      currentKeyword.value[fieldName] = term;
+      currentFrom.value[fieldName] = 0;
+      cancelFieldStream(fieldName);
+      resetFieldValues(fieldName, true);
+      fetchFieldValues({
+        fields: [fieldName],
+        size: defaultValuesCount.value,
+        from: 0,
+        no_count: false,
+        start_time: props.timeStamp.startTime,
+        end_time: props.timeStamp.endTime,
+        stream_name: resolvedStream,
+        stream_type: props.streamType,
+        sql: buildSql(resolvedStream),
+        keyword: term || undefined,
+        timeout: 30000,
+        use_cache: (globalThis as any).use_cache ?? true,
+      });
+    };
+
+    const handleLoadMoreValues = (fieldName: string) => {
+      const row: any = (props.fields as any[]).find(
+        (f: any) => f.name === fieldName,
+      );
+      const resolvedStream = row?.stream_name || props.streamName;
+      currentFrom.value[fieldName] =
+        (currentFrom.value[fieldName] ?? 0) + defaultValuesCount.value;
+      fetchFieldValues({
+        fields: [fieldName],
+        size: defaultValuesCount.value,
+        from: currentFrom.value[fieldName],
+        no_count: false,
+        start_time: props.timeStamp.startTime,
+        end_time: props.timeStamp.endTime,
+        stream_name: resolvedStream,
+        stream_type: props.streamType,
+        sql: buildSql(resolvedStream),
+        keyword: currentKeyword.value[fieldName] || undefined,
+        timeout: 30000,
+        use_cache: (globalThis as any).use_cache ?? true,
+      });
+    };
+
+    const isNullValue = (v: string) =>
+      v === null || v === undefined || v === "" || v.toLowerCase() === "null";
+
+    const buildExpression = (fieldName: string, v: string, action: string) =>
+      isNullValue(v)
+        ? action === "include"
+          ? `${fieldName} IS NULL`
+          : `${fieldName} IS NOT NULL`
+        : action === "include"
+          ? `${fieldName}='${v}'`
+          : `${fieldName}!='${v}'`;
+
+    const handleAddSearchTerm = (
+      fieldName: string,
+      value: string,
+      action: string,
+    ) => {
+      addSearchTerm(buildExpression(fieldName, value, action));
+    };
+
+    const handleAddMultipleSearchTerms = (
+      fieldName: string,
+      values: string[],
+      action: string,
+    ) => {
+      const joinOp = action === "include" ? " or " : " and ";
+      const expressions = values.map((v) =>
+        buildExpression(fieldName, v, action),
+      );
+      addSearchTerm(
+        expressions.length > 1
+          ? `(${expressions.join(joinOp)})`
+          : expressions[0],
+      );
+    };
+
+    // ─── Misc helpers ─────────────────────────────────────────────────────
 
     const addSearchTerm = (term: string) => {
       emit("event-emitted", "add-field", term);
@@ -387,10 +476,7 @@ export default defineComponent({
 
     const copyContentValue = (value: string) => {
       navigator.clipboard.writeText(value);
-      $q.notify({
-        type: "positive",
-        message: "Value copied to clipboard",
-      });
+      $q.notify({ type: "positive", message: "Value copied to clipboard" });
     };
 
     return {
@@ -400,11 +486,23 @@ export default defineComponent({
       filterFieldFn,
       getImageURL,
       openFilterCreator,
+      closeField,
       addSearchTerm,
+      copyContentValue,
       fieldValues,
+      expandedRows,
+      defaultValuesCount,
       outlinedAdd,
       filterFieldValue,
-      copyContentValue,
+      filteredFieldsCount,
+      showPagination,
+      pagination,
+      visiblePages,
+      setPage,
+      handleAddSearchTerm,
+      handleAddMultipleSearchTerms,
+      handleLoadMoreValues,
+      handleSearchFieldValues,
     };
   },
 });
@@ -413,6 +511,44 @@ export default defineComponent({
 <style lang="scss" scoped>
 .traces-field-table {
   height: calc(100vh - 212px) !important;
+}
+
+.field-list-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.pagination-nav-btn {
+  padding: 0.375rem 0.25rem !important;
+  margin: 0 !important;
+  min-width: 1.5rem !important;
+  width: 1.5rem !important;
+  min-height: 1.375rem !important;
+  height: 1.375rem !important;
+  border-radius: 0.25rem !important;
+  overflow: visible !important;
+}
+
+.pagination-page-btn {
+  padding: 0.375rem 0.25rem !important;
+  margin: 0 !important;
+  min-width: 1.5rem !important;
+  width: 1.5rem !important;
+  min-height: 1.375rem !important;
+  height: 1.375rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--o2-text-primary) !important;
+  border-radius: 0.25rem !important;
+  overflow: visible !important;
+}
+
+.pagination-page-active {
+  background-color: var(--q-primary) !important;
+  color: white !important;
 }
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
@@ -443,7 +579,6 @@ export default defineComponent({
 
   .index-table {
     width: 100%;
-    // border: 1px solid rgba(0, 0, 0, 0.02);
 
     .q-table {
       display: table;
@@ -492,7 +627,6 @@ export default defineComponent({
       display: inline;
       z-index: 2;
       left: 0;
-      // text-transform: capitalize;
     }
 
     .field-container {
@@ -517,15 +651,6 @@ export default defineComponent({
       }
     }
 
-    &.selected {
-      .field_overlay {
-        background-color: rgba(89, 96, 178, 0.3);
-
-        .field_icons {
-          opacity: 0;
-        }
-      }
-    }
     &:hover {
       .field-container {
         background-color: color-mix(in srgb, currentColor 15%, transparent);
@@ -535,7 +660,6 @@ export default defineComponent({
 }
 
 .q-item {
-  // color: $dark-page;
   min-height: 1.3rem;
   padding: 5px 10px;
 
@@ -564,14 +688,6 @@ export default defineComponent({
   padding: 0px 0px 0px 0px;
   height: auto;
   line-height: auto;
-}
-.q-field__native,
-.q-field__input {
-  padding: 0px 0px 0px 0px;
-}
-
-.q-field--dense .q-field__label {
-  top: 5px;
 }
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
@@ -619,12 +735,6 @@ export default defineComponent({
           }
         }
       }
-      .field-expansion-icon {
-        img {
-          width: 10px;
-          height: 10px;
-        }
-      }
     }
 
     .field-container {
@@ -643,10 +753,6 @@ export default defineComponent({
       &.selected {
         .q-expansion-item {
           background-color: rgba(89, 96, 178, 0.3);
-        }
-
-        .field_overlay {
-          // background-color: #ffffff;
         }
       }
     }
