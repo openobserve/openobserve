@@ -1416,9 +1416,7 @@ export default defineComponent({
         name: "searchJobInspector",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          trace_id: traceId,
-          start_time: searchObj.data.datetime.startTime,
-          end_time: searchObj.data.datetime.endTime * 10, // Add extra 0 for testing
+          trace_id: traceId
         },
       });
     };
