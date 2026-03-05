@@ -166,6 +166,7 @@ jobs:
                 "alerts-import.spec.js",
                 "alerts-advanced.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
+                "alerts-vrl-encoding.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
