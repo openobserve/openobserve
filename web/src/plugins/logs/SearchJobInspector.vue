@@ -529,447 +529,6 @@ export default defineComponent({
       },
     ]);
 
-    // Generate realistic test data based on backend structure
-    const generateTestData = (): ProfileData => {
-      const baseTimestamp = Date.now() * 1000; // Convert to microseconds
-      const events: ProfileEvent[] = [];
-
-      // Cacher search deltas events
-      events.push({
-        timestamp: (baseTimestamp + 1000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "cache",
-        duration: 2,
-        component: "cacher:search deltas",
-        desc: "search cacher search from 1h reduce to 1h",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      // Leader: get file id
-      events.push({
-        timestamp: (baseTimestamp + 5000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "leader",
-        duration: 0,
-        component: "flight:leader get file id",
-        desc: "get files 15 ids, records 45,238",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      // Leader: get nodes
-      events.push({
-        timestamp: (baseTimestamp + 6000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "leader",
-        duration: 0,
-        component: "flight:leader get nodes",
-        desc: "get nodes num: 3, querier num: 3",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      // Follower operations for node-1
-      const followerStartNode1 = baseTimestamp + 8000;
-
-      events.push({
-        timestamp: followerStartNode1.toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search get file_list by ids",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode1 + 500).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search handle tantivy optimize",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode1 + 1000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 1,
-        component: "flight:do_get::search sort file list",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode1 + 2000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search storage search",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode1 + 3000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 3,
-        component: "storage load files",
-        desc: "load files 5, memory cached 2, disk cached 1, scan_size 245.67 MB, compressed_size 89.23 MB",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode1 + 4000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 1,
-        component: "storage create tables",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode1 + 5000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search union table creation",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode1 + 6000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 1,
-        component: "flight:do_get::search union table scan",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode1 + 7000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search physical plan rewrite",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode1 + 8000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 1,
-        component: "flight:do_get::search generated physical plan",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode1 + 9000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 45,
-        component: "remote scan streaming",
-        desc: "remote scan search files: 5, scan_size: 245.67 MB, num_rows: 15,234",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode1 + 10000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "follower",
-        duration: 45,
-        component: "flight:run_datafusion collect done",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      // Follower operations for node-2
-      const followerStartNode2 = baseTimestamp + 9000;
-
-      events.push({
-        timestamp: followerStartNode2.toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search get file_list by ids",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode2 + 500).toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search handle tantivy optimize",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode2 + 1000).toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search sort file list",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode2 + 2000).toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search storage search",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode2 + 3000).toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 4,
-        component: "storage load files",
-        desc: "load files 5, memory cached 3, disk cached 0, scan_size 189.45 MB, compressed_size 67.89 MB",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode2 + 4000).toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 1,
-        component: "storage create tables",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode2 + 5000).toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search union table creation",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode2 + 6000).toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search union table scan",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode2 + 7000).toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search physical plan rewrite",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode2 + 8000).toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search generated physical plan",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode2 + 9000).toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 38,
-        component: "remote scan streaming",
-        desc: "remote scan search files: 5, scan_size: 189.45 MB, num_rows: 12,876",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode2 + 10000).toString(),
-        node_name: "node-2.openobserve.local",
-        search_role: "follower",
-        duration: 38,
-        component: "flight:run_datafusion collect done",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      // Follower operations for node-3
-      const followerStartNode3 = baseTimestamp + 10000;
-
-      events.push({
-        timestamp: followerStartNode3.toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search get file_list by ids",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode3 + 500).toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search handle tantivy optimize",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode3 + 1000).toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 1,
-        component: "flight:do_get::search sort file list",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode3 + 2000).toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search storage search",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode3 + 3000).toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 2,
-        component: "tantivy load files",
-        desc: "load tantivy files 3, scan_size 156.78 MB",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode3 + 4000).toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 12,
-        component: "tantivy search",
-        desc: "tantivy search files: 3, scan_size: 156.78 MB, num_rows: 8,943",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode3 + 5000).toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search union table creation",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode3 + 6000).toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search union table scan",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode3 + 7000).toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 0,
-        component: "flight:do_get::search tantivy optimize rewrite",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode3 + 8000).toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 1,
-        component: "flight:do_get::search generated physical plan",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode3 + 9000).toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 23,
-        component: "remote scan streaming",
-        desc: "remote scan search files: 3, scan_size: 156.78 MB, num_rows: 8,943",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      events.push({
-        timestamp: (followerStartNode3 + 10000).toString(),
-        node_name: "node-3.openobserve.local",
-        search_role: "follower",
-        duration: 23,
-        component: "flight:run_datafusion collect done",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      // Leader finish
-      events.push({
-        timestamp: (baseTimestamp + 65000).toString(),
-        node_name: "node-1.openobserve.local",
-        search_role: "leader",
-        duration: 58,
-        component: "service:search leader finish",
-        desc: "get files 15 ids",
-        region: "us-west-2",
-        cluster: "prod-cluster-1",
-      });
-
-      return {
-        sql: "SELECT * FROM logs WHERE level='error' AND timestamp >= '2025-01-01' AND timestamp < '2025-01-02'",
-        start_time: baseTimestamp.toString(),
-        end_time: (baseTimestamp + 70000).toString(),
-        total_duration: 58,
-        events,
-        data_records: 1802,
-        scan_records: 83897,
-        time_taken: 6330, // 6.33 seconds in milliseconds
-      };
-    };
-
     const fetchProfileData = async () => {
       if (!traceId.value || !orgIdentifier.value) {
         errorMessage.value = "Missing required parameters";
@@ -1132,8 +691,8 @@ export default defineComponent({
       try {
         const startMs = parseInt(start) / 1000; // Convert microseconds to milliseconds
         const endMs = parseInt(end) / 1000;
-        const startDate = new Date(startMs).toLocaleString();
-        const endDate = new Date(endMs).toLocaleString();
+        const startDate = new Date(startMs).toLocaleString('en-US', { timeZone: 'UTC' });
+        const endDate = new Date(endMs).toLocaleString('en-US', { timeZone: 'UTC' });
         return `${startDate} - ${endDate}`;
       } catch {
         return "-";
@@ -1163,6 +722,11 @@ export default defineComponent({
           text: "Moderate response",
           colorClass: store.state.theme === 'dark' ? 'tw:text-yellow-400' : 'tw:text-yellow-600'
         };
+      } else {
+        return {
+          text: "Slow response",
+          colorClass: store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-600'
+        };
       }
     };
 
@@ -1175,20 +739,26 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      navigator.clipboard.writeText(traceId.value);
-      copiedTraceId.value = true;
-      setTimeout(() => {
-        copiedTraceId.value = false;
-      }, 2000);
+      navigator.clipboard.writeText(traceId.value).then(() => {
+        copiedTraceId.value = true;
+        setTimeout(() => {
+          copiedTraceId.value = false;
+        }, 2000);
+      }).catch(() => {
+        $q.notify({ type: 'negative', message: 'Failed to copy trace ID to clipboard' });
+      });
     };
 
     const copiedSql = ref(false);
     const copySql = () => {
-      navigator.clipboard.writeText(profileData.value?.sql || "");
-      copiedSql.value = true;
-      setTimeout(() => {
-        copiedSql.value = false;
-      }, 2000);
+      navigator.clipboard.writeText(profileData.value?.sql || "").then(() => {
+        copiedSql.value = true;
+        setTimeout(() => {
+          copiedSql.value = false;
+        }, 2000);
+      }).catch(() => {
+        $q.notify({ type: 'negative', message: 'Failed to copy SQL to clipboard' });
+      });
     };
 
     onMounted(() => {
