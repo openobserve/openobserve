@@ -436,10 +436,11 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Verify no data or error is shown (incomplete Sankey config)
-      // Use .col-auto to target the unique parent error container (avoids strict mode with 2 dashboard-error elements)
-      await expect(
-        page.locator('[data-test="no-data"]').or(page.locator('[data-test="dashboard-error"].col-auto'))
-      ).toBeVisible({ timeout: 10000 });
+      // Check each independently — both may be visible simultaneously
+      await page.waitForSelector(
+        '[data-test="no-data"], [data-test="dashboard-error"].col-auto',
+        { state: "visible", timeout: 10000 }
+      );
 
       testLogger.info("Sankey no data state verified");
 

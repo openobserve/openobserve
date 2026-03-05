@@ -144,15 +144,17 @@ export default class ChartTypeSelector {
 
     // Locate the specific field item container using the exact field name in the data-test attribute
     // The format is: field-list-item-{streamType}-{streamName}-{fieldName}
-    // We combine ^= (starts with) and $= (ends with) to ensure exact match
+    // Fail fast on genuine suffix collisions (different data-test values)
     const fieldItems = this.page.locator(`[data-test^="field-list-item-"][data-test$="-${fieldName}"]`);
+    // Wait for at least one match to appear after search filtering
+    await fieldItems.first().waitFor({ state: "visible", timeout: 5000 });
     const matchCount = await fieldItems.count();
-    if (matchCount === 0) {
-      throw new Error(`No field match found for "${fieldName}". Verify the field exists in the selected stream.`);
-    }
     if (matchCount > 1) {
       const attrs = await fieldItems.evaluateAll(els => els.map(e => e.getAttribute('data-test')));
-      testLogger.warn(`Multiple field matches for "${fieldName}" (${matchCount}): ${attrs.join(', ')} — using first`);
+      const uniqueAttrs = [...new Set(attrs)];
+      if (uniqueAttrs.length > 1) {
+        throw new Error(`Ambiguous field match for "${fieldName}": ${attrs.join(', ')}`);
+      }
     }
     const fieldItem = fieldItems.first();
 
