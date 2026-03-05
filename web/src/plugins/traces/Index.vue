@@ -749,6 +749,7 @@ async function getQueryData(isPagination: boolean = false) {
         size: queryReq.query.size,
         took: 0,
       };
+      searchObj.meta.resultGrid.showPagination = false;
     } else {
       queryReq = searchObj.data.queryPayload;
     }
