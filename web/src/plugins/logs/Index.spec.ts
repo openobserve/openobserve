@@ -1124,6 +1124,42 @@ describe("Logs Index", async () => {
         // Query should remain unchanged when empty string is passed
         expect(wrapper.vm.searchObj.data.query).toBe(originalQuery);
       });
+
+      it("should not block build mode initialization with empty query in builder mode", async () => {
+        // Set up build mode with SQL mode and empty query
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+        wrapper.vm.searchObj.meta.sqlMode = true;
+        wrapper.vm.searchObj.data.query = "";
+        await flushPromises();
+
+        // In builder mode (non-custom), empty query should not force toggle back to logs
+        // PR #10758: validation only blocks custom query mode with empty query
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("build");
+      });
+
+      it("should remain in build mode when switching with non-empty query", async () => {
+        wrapper.vm.searchObj.meta.sqlMode = true;
+        wrapper.vm.searchObj.data.query = 'SELECT * FROM "test_stream"';
+
+        // Switch to build mode
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+        await flushPromises();
+
+        // Component should remain in build mode
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("build");
+      });
+
+      it("should allow build mode with empty query when not in custom query mode", async () => {
+        // Switch to build mode with empty query
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+        wrapper.vm.searchObj.meta.sqlMode = true;
+        wrapper.vm.searchObj.data.query = "";
+        await flushPromises();
+
+        // PR #10758: In builder mode (non-custom), empty query is valid because
+        // BuildQueryPage generates the query automatically from selected fields
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("build");
+      });
     });
 
     describe("selectedDateTime computed", () => {
