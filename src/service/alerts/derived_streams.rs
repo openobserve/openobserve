@@ -136,8 +136,7 @@ pub async fn save(
             .await
         {
             return Err(anyhow::anyhow!(
-                "DerivedStream not saved due to failed test run caused by {}",
-                e.to_string()
+                "DerivedStream not saved due to failed test run caused by {e}"
             ));
         };
     }

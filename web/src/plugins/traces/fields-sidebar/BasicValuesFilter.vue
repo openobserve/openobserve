@@ -1,20 +1,34 @@
 <template>
   <q-expansion-item
-    class="field-expansion-item"
+    class="field-expansion-item hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
     dense
-    switch-toggle-side
-    :label="row.name"
-    expand-icon-class="field-expansion-icon"
-    expand-icon="expand_more"
+    hide-expand-icon
+    v-model="isExpanded"
     @before-show="(event: any) => openFilterCreator(event, row)"
+    @before-hide="handleBeforeHide"
   >
     <template v-slot:header>
-      <div class="flex content-center ellipsis full-width" :title="row.name">
+      <div
+        class="flex content-center ellipsis full-width field-expansion-header"
+        :title="row.name"
+      >
         <div
-          class="field_label ellipsis"
+          class="field_label ellipsis tw:flex tw:items-center"
           style="width: calc(100% - 28px); font-size: 14px"
           :title="row.label || row.name"
         >
+          <span
+            v-if="row.dataType"
+            class="field-type-container"
+            :title="row.dataType"
+          >
+            <FieldTypeBadge :dataType="row.dataType" />
+            <q-icon
+              class="field-expand-icon"
+              :name="isExpanded ? 'expand_less' : 'expand_more'"
+              size="1rem"
+            />
+          </span>
           {{ row.label || row.name }}
         </div>
         <div class="field_overlay">
@@ -32,127 +46,39 @@
     </template>
     <q-card>
       <q-card-section class="q-pl-md q-pr-xs q-py-xs">
-        <div class="filter-values-container">
-          <div
-            v-show="fieldValues[row.name]?.isLoading"
-            class="q-pl-md q-py-xs"
-            style="height: 60px"
-          >
-            <q-inner-loading
-              size="xs"
-              :showing="fieldValues[row.name]?.isLoading"
-              label="Fetching values..."
-              label-style="font-size: 1.1em"
-            />
-          </div>
-          <div
-            v-show="
-              !fieldValues[row.name]?.values?.length &&
-              !fieldValues[row.name]?.isLoading
-            "
-            class="q-pl-md q-py-xs text-subtitle2"
-          >
-            No values found
-          </div>
-          <div
-            v-for="value in fieldValues[row.name]?.values || []"
-            :key="value.key"
-          >
-            <q-list dense>
-              <q-item tag="label" class="q-pr-none">
-                <div
-                  class="flex row wrap justify-between"
-                  style="width: calc(100% - 2.625rem)"
-                >
-                  <div
-                    :title="value.key"
-                    class="ellipsis q-pr-xs"
-                    style="width: calc(100% - 3.125rem)"
-                  >
-                    {{ value.key }}
-                  </div>
-                  <div
-                    :title="value.count"
-                    class="ellipsis text-right q-pr-sm"
-                    style="width: 3.125rem"
-                  >
-                    {{ value.count }}
-                  </div>
-                </div>
-                <div
-                  class="flex row"
-                  :class="
-                    store.state.theme === 'dark' ? 'text-white' : 'text-black'
-                  "
-                >
-                  <q-btn
-                    class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                    size="5px"
-                    title="Include Term"
-                    round
-                    @click="
-                      addSearchTerm(
-                        row.name === 'duration'
-                          ? `${row.name}>=${value.key}`
-                          : `${row.name}='${value.key}'`,
-                      )
-                    "
-                  >
-                    <q-icon
-                      v-if="row.name === 'duration'"
-                      :name="outlinedArrowForwardIos"
-                      class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
-                    />
-                    <q-icon v-else class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
-                      <EqualIcon></EqualIcon>
-                    </q-icon>
-                  </q-btn>
-                  <q-btn
-                    class="o2-custom-button-hover tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                    size="5px"
-                    title="Exclude Term"
-                    round
-                    @click="
-                      addSearchTerm(
-                        row.name === 'duration'
-                          ? `${row.name}<=${value.key}`
-                          : `${row.name}!='${value.key}'`,
-                      )
-                    "
-                  >
-                    <q-icon
-                      v-if="row.name === 'duration'"
-                      :name="outlinedArrowBackIos"
-                      class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
-                    />
-                    <q-icon v-else class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
-                      <NotEqualIcon></NotEqualIcon>
-                    </q-icon>
-                  </q-btn>
-                </div>
-              </q-item>
-            </q-list>
-          </div>
-        </div>
+        <FieldValuesPanel
+          ref="fieldValuesPanelRef"
+          :field-name="row.name"
+          :field-values="
+            fieldValues[row.name] || {
+              isLoading: false,
+              values: [],
+              hasMore: false,
+              errMsg: '',
+            }
+          "
+          :show-multi-select="true"
+          :default-values-count="defaultValuesCount"
+          :theme="store.state.theme"
+          @add-search-term="handleAddSearchTerm"
+          @add-multiple-search-terms="handleAddMultipleSearchTerms"
+          @load-more-values="handleLoadMoreValues"
+          @search-field-values="handleSearchFieldValues"
+        />
       </q-card-section>
     </q-card>
   </q-expansion-item>
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import useTraces from "@/composables/useTraces";
-import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
-import streamService from "@/services/stream";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
-import EqualIcon from "@/components/icons/EqualIcon.vue";
-import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import {
-  outlinedAdd,
-  outlinedArrowBackIos,
-  outlinedArrowForwardIos,
-} from "@quasar/extras/material-icons-outlined";
+import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
+import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
+import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
+import useFieldValuesStream from "@/composables/useFieldValuesStream";
 
 const props = defineProps({
   row: {
@@ -161,123 +87,161 @@ const props = defineProps({
   },
 });
 
-const fieldValues = ref<any>({});
+const isExpanded = ref(false);
+const fieldValuesPanelRef = ref();
+const currentFrom = ref(0);
+const currentKeyword = ref("");
 
 const store = useStore();
-
-const $q = useQuasar();
-
 const { searchObj } = useTraces();
+const { fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues } =
+  useFieldValuesStream();
+
+const defaultValuesCount = computed(
+  () => store.state.zoConfig?.query_values_default_num || 10,
+);
 
 const addSearchTerm = (term: string) => {
   searchObj.data.stream.addToFilter = term;
 };
 
-const openFilterCreator = (event: any, { name, ftsKey }: any) => {
+const buildSql = () => {
+  let query = searchObj.data.editorValue;
+  let parseQuery = query.split("|");
+  let whereClause = "";
+  if (parseQuery.length > 1) {
+    whereClause = parseQuery[1].trim();
+  } else {
+    whereClause = parseQuery[0].trim();
+  }
+
+  let query_context =
+    `SELECT * FROM "` +
+    searchObj.data.stream.selectedStream.value +
+    `" [WHERE_CLAUSE]`;
+
+  if (whereClause.trim() !== "") {
+    whereClause = whereClause
+      .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
+      .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
+      .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
+
+    whereClause = whereClause
+      .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
+      .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
+      .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
+      .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
+
+    const parsedSQL = whereClause.split(" ");
+    searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
+      parsedSQL.forEach((node: any, index: any) => {
+        if (node == field.name) {
+          node = node.replaceAll('"', "");
+          parsedSQL[index] = '"' + node + '"';
+        }
+      });
+    });
+
+    whereClause = parsedSQL.join(" ");
+    query_context = query_context
+      .split("[WHERE_CLAUSE]")
+      .join(" WHERE " + whereClause);
+  } else {
+    query_context = query_context.replace("[WHERE_CLAUSE]", "");
+  }
+
+  return b64EncodeUnicode(query_context) || "";
+};
+
+const fetchValues = (from: number = 0, keyword: string = "") => {
+  const fetchPayload: any = {
+    fields: [props.row.name],
+    size: from + defaultValuesCount.value,
+    from,
+    no_count: false,
+    start_time: searchObj.data.datetime.startTime,
+    end_time: searchObj.data.datetime.endTime,
+    stream_name: searchObj.data.stream.selectedStream.value,
+    stream_type: "traces",
+    sql: buildSql(),
+    timeout: 30000,
+    use_cache: (globalThis as any).use_cache ?? true,
+  };
+
+  if (keyword) {
+    fetchPayload.keyword = keyword;
+  }
+
+  fetchFieldValues(fetchPayload);
+};
+
+const openFilterCreator = (event: any, { ftsKey }: any) => {
   if (ftsKey) {
     event.stopPropagation();
     event.preventDefault();
     return;
   }
 
-  fieldValues.value[name] = {
-    isLoading: true,
-    values: [],
-  };
+  currentFrom.value = 0;
+  currentKeyword.value = "";
+  cancelFieldStream(props.row.name);
+  resetFieldValues(props.row.name, true);
+  fetchValues(0, "");
+};
 
-  try {
-    let query_context = "";
-    let query = searchObj.data.editorValue;
-    let parseQuery = query.split("|");
-    let whereClause = "";
-    if (parseQuery.length > 1) {
-      whereClause = parseQuery[1].trim();
-    } else {
-      whereClause = parseQuery[0].trim();
-    }
+const handleSearchFieldValues = (_fieldName: string, term: string) => {
+  currentKeyword.value = term;
+  currentFrom.value = 0;
+  cancelFieldStream(props.row.name);
+  resetFieldValues(props.row.name, true);
+  fetchValues(0, term);
+};
 
-    query_context =
-      `SELECT * FROM "` +
-      searchObj.data.stream.selectedStream.value +
-      `" [WHERE_CLAUSE]`;
+const handleLoadMoreValues = (_fieldName: string) => {
+  currentFrom.value += defaultValuesCount.value;
+  fetchValues(currentFrom.value, currentKeyword.value);
+};
 
-    if (whereClause.trim() != "") {
-      whereClause = whereClause
-        .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-        .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-        .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-      whereClause = whereClause
-        .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-        .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-        .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-        .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
-
-      const parsedSQL = whereClause.split(" ");
-      searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-        parsedSQL.forEach((node: any, index: any) => {
-          if (node == field.name) {
-            node = node.replaceAll('"', "");
-            parsedSQL[index] = '"' + node + '"';
-          }
-        });
-      });
-
-      whereClause = parsedSQL.join(" ");
-
-      // query_context = query_context.replace(
-      //   "[WHERE_CLAUSE]",
-      //   " WHERE " + whereClause,
-      // );
-      query_context = query_context
-        .split("[WHERE_CLAUSE]")
-        .join(" WHERE " + whereClause);
-    } else {
-      query_context = query_context.replace("[WHERE_CLAUSE]", "");
-    }
-    query_context = b64EncodeUnicode(query_context) || "";
-
-    fieldValues.value[name] = {
-      isLoading: true,
-      values: [],
-    };
-
-    streamService
-      .fieldValues({
-        org_identifier: store.state.selectedOrganization.identifier,
-        stream_name: searchObj.data.stream.selectedStream.value,
-        start_time: searchObj.data.datetime.startTime,
-        end_time: searchObj.data.datetime.endTime,
-        fields: [name],
-        size: store.state.zoConfig?.query_values_default_num || 10,
-        type: "traces",
-        query_context,
-      })
-      .then((res: any) => {
-        if (res.data.hits.length) {
-          fieldValues.value[name]["values"] = res.data.hits
-            .find((field: any) => field.field === name)
-            .values.map((value: any) => {
-              return {
-                key: value.zo_sql_key ? value.zo_sql_key : "null",
-                count: formatLargeNumber(value.zo_sql_num),
-              };
-            });
-        }
-      })
-      .catch(() => {
-        $q.notify({
-          type: "negative",
-          message: `Error while fetching values for ${name}`,
-        });
-      })
-      .finally(() => {
-        fieldValues.value[name]["isLoading"] = false;
-      });
-  } catch (e) {
-    fieldValues.value[name]["isLoading"] = false;
-    console.log("Error while fetching field values");
+const handleAddSearchTerm = (
+  fieldName: string,
+  value: string,
+  action: string,
+) => {
+  if (action === "include") {
+    addSearchTerm(
+      fieldName === "duration"
+        ? `${fieldName}>=${value}`
+        : `${fieldName}='${value}'`,
+    );
+  } else {
+    addSearchTerm(
+      fieldName === "duration"
+        ? `${fieldName}<=${value}`
+        : `${fieldName}!='${value}'`,
+    );
   }
+};
+
+const handleAddMultipleSearchTerms = (
+  fieldName: string,
+  values: string[],
+  action: string,
+) => {
+  const joinOp = action === "include" ? " or " : " and ";
+  const expressions = values.map((v) =>
+    action === "include" ? `${fieldName}='${v}'` : `${fieldName}!='${v}'`,
+  );
+  const combined =
+    expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0];
+  addSearchTerm(combined);
+};
+
+const handleBeforeHide = () => {
+  cancelFieldStream(props.row.name);
+  fieldValuesPanelRef.value?.reset();
+  currentFrom.value = 0;
+  currentKeyword.value = "";
+  resetFieldValues(props.row.name);
 };
 </script>
 

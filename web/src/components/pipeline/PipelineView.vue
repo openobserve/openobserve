@@ -51,6 +51,8 @@ import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
   import { ControlButton, Controls } from '@vue-flow/controls'
   import { VueFlow } from "@vue-flow/core";
   import { ref, onMounted } from "vue";
+  import { useStore } from "vuex";
+  import config from "@/aws-exports";
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
 import CustomEdge from "@/plugins/pipelines/CustomEdge.vue";
 /* import the required styles */
@@ -63,6 +65,7 @@ const streamOutputImage = getImageURL("images/pipeline/output_stream.png");
 const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
 const conditionImage = getImageURL("images/pipeline/transform_condition.png");
 const queryImage = getImageURL("images/pipeline/input_query.png");
+const llmEvaluationImage = getImageURL("images/common/ai_icon_primary.svg");
 
   
   export default defineComponent({
@@ -71,6 +74,7 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
     },
     components: { VueFlow, CustomNode, DropzoneBackground, CustomEdge, ControlButton, Controls },
     setup(props) {
+      const store = useStore();
       const {
       pipelineObj,
     } = useDragAndDrop();
@@ -158,6 +162,22 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
     isSectionHeader: false,
   },
 ];
+
+        if (config.isEnterprise == "true" && store.state.zoConfig.ai_enabled) {
+          const destIdx = pipelineObj.nodeTypes.findIndex(
+            (n) => n.isSectionHeader && n.label === "Destination",
+          );
+          if (destIdx !== -1) {
+            pipelineObj.nodeTypes.splice(destIdx, 0, {
+              label: "LLM Evaluation",
+              subtype: "llm_evaluation",
+              io_type: "default",
+              icon: "img:" + llmEvaluationImage,
+              tooltip: "LLM Evaluation Node",
+              isSectionHeader: false,
+            });
+          }
+        }
 
         setTimeout(() => {
           if(vueFlowRef.value)
