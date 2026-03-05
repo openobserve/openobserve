@@ -188,48 +188,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Metrics Tab Panel -->
         <q-tab-panel name="metrics" class="tw:p-0 tw:flex tw:flex-col">
-          <!-- Header bar: sidebar toggle + refresh -->
-          <div
-            class="tw:px-3 tw:py-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-between tw:gap-2"
-          >
-            <!-- Sidebar toggle button -->
-            <q-btn
-              flat
-              dense
-              :icon="showDimensionSelector ? 'chevron_left' : 'chevron_right'"
-              :title="showDimensionSelector ? 'Collapse Sidebar' : 'Expand Sidebar'"
-              size="sm"
-              @click="toggleDimensionSelector"
-            >
-              <q-tooltip>{{ showDimensionSelector ? 'Collapse Sidebar' : 'Expand Sidebar' }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              v-if="activeDashboardForGroup"
-              flat
-              dense
-              color="primary"
-              icon="refresh"
-              :label="t('common.refresh')"
-              @click="loadDashboard"
-              :loading="loading"
-              size="sm"
-            />
-          </div>
-
-          <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
+            <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
           <q-splitter
             v-model="splitterModel"
-            :limits="splitterLimits"
-            class="tw:flex-1 full-height full-width metric-splitter-smooth"
-            @update:model-value="onMetricSplitterUpdate"
+            class="tw:flex-1 full-height full-width"
           >
             <!-- ── Left sidebar ── -->
             <template #before>
-              <div class="relative-position tw:h-full">
-                <div
-                  v-if="showDimensionSelector"
-                  class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
-                >
+              <div class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col">
                   <!-- Search -->
                   <div
                     class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
@@ -257,8 +223,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :key="group.id"
                       >
                         <template v-if="group.streams.length > 0">
-                          <div class="metric-group-header">
+                          <div class="metric-group-header tw:cursor-pointer" @click="toggleGroupCollapse(group.id)">
                             <div class="metric-group-label">
+                              <q-icon
+                                :name="collapsedGroups.has(group.id) ? 'chevron_right' : 'expand_more'"
+                                size="0.875rem"
+                                class="tw:mr-0.5"
+                              />
                               <q-icon :name="group.icon" size="0.875rem" />
                               <span>{{ group.label }}</span>
                               <q-badge
@@ -273,19 +244,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 flat dense no-caps size="xs"
                                 :color="getGroupSelectionState(group.id) === 'none' ? 'primary' : 'grey-7'"
                                 label="All"
-                                @click="selectAllInGroup(group.id)"
+                                @click.stop="selectAllInGroup(group.id)"
                                 :disable="getGroupSelectionState(group.id) === 'all'"
                               />
                               <q-btn
                                 flat dense no-caps size="xs" color="grey-7"
                                 label="None"
-                                @click="deselectAllInGroup(group.id)"
+                                @click.stop="deselectAllInGroup(group.id)"
                                 :disable="getGroupSelectionState(group.id) === 'none'"
                               />
                             </div>
                           </div>
                           <q-item
                             v-for="stream in group.streams"
+                            v-show="!collapsedGroups.has(group.id)"
                             :key="stream.stream_name"
                             dense
                             clickable
@@ -317,7 +289,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ selectedMetricStreams.length }} of {{ uniqueMetricStreams.length }} selected
                   </div>
-                </div>
               </div>
             </template>
 
@@ -641,45 +612,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-if="activeTab == 'metrics'" class="tw:h-full tw:flex tw:flex-col">
-        <!-- Header bar: sidebar toggle + refresh -->
-        <div
-          class="tw:px-3 tw:py-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-between tw:gap-2"
-        >
-          <!-- Sidebar toggle button -->
-          <q-btn
-            flat
-            dense
-            :icon="showDimensionSelector ? 'chevron_left' : 'chevron_right'"
-            :title="showDimensionSelector ? 'Collapse Sidebar' : 'Expand Sidebar'"
-            size="sm"
-            @click="toggleDimensionSelector"
-          >
-            <q-tooltip>{{ showDimensionSelector ? 'Collapse Sidebar' : 'Expand Sidebar' }}</q-tooltip>
-          </q-btn>
-          <q-btn
-            v-if="activeDashboardForGroup"
-            flat dense color="primary" icon="refresh"
-            :label="t('common.refresh')"
-            @click="loadDashboard"
-            :loading="loading"
-            size="sm"
-          />
-        </div>
-
         <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
         <q-splitter
           v-model="splitterModel"
-          :limits="splitterLimits"
-          class="tw:flex-1 full-height full-width metric-splitter-smooth"
-          @update:model-value="onMetricSplitterUpdate"
+          class="tw:flex-1 full-height full-width"
         >
           <!-- ── Left sidebar ── -->
           <template #before>
-            <div class="relative-position tw:h-full">
-              <div
-                v-if="showDimensionSelector"
-                class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
-              >
+            <div class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col">
                 <!-- Search -->
                 <div
                   class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
@@ -707,8 +647,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :key="group.id"
                     >
                       <template v-if="group.streams.length > 0">
-                        <div class="metric-group-header">
+                        <div class="metric-group-header tw:cursor-pointer" @click="toggleGroupCollapse(group.id)">
                           <div class="metric-group-label">
+                            <q-icon
+                              :name="collapsedGroups.has(group.id) ? 'chevron_right' : 'expand_more'"
+                              size="0.875rem"
+                              class="tw:mr-0.5"
+                            />
                             <q-icon :name="group.icon" size="0.875rem" />
                             <span>{{ group.label }}</span>
                             <q-badge
@@ -723,19 +668,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               flat dense no-caps size="xs"
                               :color="getGroupSelectionState(group.id) === 'none' ? 'primary' : 'grey-7'"
                               label="All"
-                              @click="selectAllInGroup(group.id)"
+                              @click.stop="selectAllInGroup(group.id)"
                               :disable="getGroupSelectionState(group.id) === 'all'"
                             />
                             <q-btn
                               flat dense no-caps size="xs" color="grey-7"
                               label="None"
-                              @click="deselectAllInGroup(group.id)"
+                              @click.stop="deselectAllInGroup(group.id)"
                               :disable="getGroupSelectionState(group.id) === 'none'"
                             />
                           </div>
                         </div>
                         <q-item
                           v-for="stream in group.streams"
+                          v-show="!collapsedGroups.has(group.id)"
                           :key="stream.stream_name"
                           dense
                           clickable
@@ -767,19 +713,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ selectedMetricStreams.length }} of {{ uniqueMetricStreams.length }} selected
                 </div>
-              </div>
             </div>
           </template>
 
-          <!-- ── Separator: collapse/expand button ── -->
+          <!-- ── Separator ── -->
           <template #separator>
-            <q-btn
-              :icon="showDimensionSelector ? 'chevron_left' : 'chevron_right'"
-              :title="showDimensionSelector ? 'Collapse Metrics' : 'Expand Metrics'"
-              dense
-              round
-              @click="toggleDimensionSelector"
-            />
+            <div class="metric-splitter-separator" />
           </template>
 
           <!-- ── Right area: group tabs + dashboard ── -->
@@ -1238,31 +1177,19 @@ const dashboardChartsRef = ref<any>(null);
 const showMetricSelector = ref(false);
 const metricSearchText = ref("");
 
-// Splitter state for metrics sidebar (matching TracesAnalysisDashboard pattern)
+// Splitter model for metrics sidebar width (percentage)
 const splitterModel = ref(25);
-const splitterLimits = [0, 30];
-const lastSplitterPosition = ref(25);
-const showDimensionSelector = ref(true);
-const toggleDimensionSelector = () => {
-  if (showDimensionSelector.value) {
-    lastSplitterPosition.value = splitterModel.value;
-    splitterModel.value = 0;
-    showDimensionSelector.value = false;
-  } else {
-    const savedPosition = lastSplitterPosition.value;
-    splitterModel.value = savedPosition && savedPosition >= 10 ? savedPosition : 25;
-    showDimensionSelector.value = true;
-  }
-};
 
-// Sync showDimensionSelector when user manually drags the splitter
-const onMetricSplitterUpdate = () => {
-  if (splitterModel.value > 0) {
-    lastSplitterPosition.value = splitterModel.value;
-    showDimensionSelector.value = true;
+// Group-level collapse state within the sidebar
+const collapsedGroups = ref(new Set<MetricGroupId>());
+const toggleGroupCollapse = (groupId: MetricGroupId) => {
+  const next = new Set(collapsedGroups.value);
+  if (next.has(groupId)) {
+    next.delete(groupId);
   } else {
-    showDimensionSelector.value = false;
+    next.add(groupId);
   }
+  collapsedGroups.value = next;
 };
 
 // Panel data caching for hide/unhide optimization
@@ -2851,11 +2778,6 @@ watch(
   :deep(.trace-combined-header-wrapper) {
     margin-bottom: 0 !important;
   }
-}
-
-// Metrics splitter smooth transition
-.metric-splitter-smooth {
-  transition: all 0.3s ease;
 }
 
 // Splitter separator visual divider
