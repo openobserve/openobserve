@@ -15,11 +15,14 @@
 
 use std::time::Instant;
 
-use config::meta::{
-    search::{SearchEventType, StreamResponses, TimeOffset, ValuesEventContext},
-    self_reporting::usage::{RequestStats, UsageType},
-    sql::OrderBy,
-    stream::StreamType,
+use config::{
+    cluster::LOCAL_NODE,
+    meta::{
+        search::{SearchEventType, StreamResponses, TimeOffset, ValuesEventContext},
+        self_reporting::usage::{RequestStats, UsageType},
+        sql::OrderBy,
+        stream::StreamType,
+    },
 };
 use log;
 use tokio::sync::mpsc;
@@ -29,7 +32,13 @@ use crate::{
     common::meta::search::{
         CachedQueryResponse, MultiCachedQueryResponse, QueryDelta, SearchResultType,
     },
-    service::{search::cache, self_reporting::report_request_usage_stats},
+    service::{
+        search::{
+            cache,
+            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        },
+        self_reporting::report_request_usage_stats,
+    },
 };
 
 /// Write accumulated search results to cache
@@ -135,7 +144,6 @@ pub async fn handle_cache_responses_and_deltas(
     remaining_query_range: i64,
     req_order_by: &OrderBy,
     fallback_order_by_col: Option<String>,
-    start_timer: &mut Instant,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
     all_streams: &str,
@@ -228,7 +236,6 @@ pub async fn handle_cache_responses_and_deltas(
                     user_id,
                     &mut remaining_query_range,
                     cached_search_duration,
-                    start_timer,
                     cache_order_by,
                     sender.clone(),
                     values_ctx.clone(),
@@ -250,7 +257,6 @@ pub async fn handle_cache_responses_and_deltas(
                     accumulated_results,
                     fallback_order_by_col.clone(),
                     cache_order_by,
-                    start_timer,
                     sender.clone(),
                     user_id,
                     org_id,
@@ -279,7 +285,6 @@ pub async fn handle_cache_responses_and_deltas(
                 user_id,
                 &mut remaining_query_range,
                 cached_search_duration,
-                start_timer,
                 cache_order_by,
                 sender.clone(),
                 values_ctx.clone(),
@@ -301,7 +306,6 @@ pub async fn handle_cache_responses_and_deltas(
                 accumulated_results,
                 fallback_order_by_col.clone(),
                 cache_order_by,
-                start_timer,
                 sender.clone(),
                 user_id,
                 org_id,
@@ -314,10 +318,31 @@ pub async fn handle_cache_responses_and_deltas(
             .await?;
         }
 
+        #[allow(unused_mut)]
+        let mut search_role = "leader".to_string();
+        #[cfg(feature = "enterprise")]
+        if get_o2_config().super_cluster.enabled {
+            search_role = "super".to_string();
+        }
+
         // Stop if reached the requested result size
         if req_size != -1 && req_size != 0 && curr_res_size >= req_size {
             log::info!(
-                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size: {req_size}, stopping search",
+                "{}",
+                search_inspector_fields(
+                    format!(
+                        "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size: {req_size}, stopping search",
+                    ),
+                    SearchInspectorFieldsBuilder::new()
+                        .trace_id(trace_id.to_string())
+                        .node_name(LOCAL_NODE.name.clone())
+                        .component("handle cache response and deltas".to_string())
+                        .desc(format!(
+                            "Reached requested result size: {req_size}, stopping search"
+                        ))
+                        .search_role(search_role)
+                        .build()
+                )
             );
             break;
         }
@@ -337,7 +362,6 @@ async fn send_cached_responses(
     accumulated_results: &mut Vec<SearchResultType>,
     fallback_order_by_col: Option<String>,
     cache_order_by: &OrderBy,
-    start_timer: &mut Instant,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     user_id: &str,
     org_id: &str,
@@ -347,6 +371,7 @@ async fn send_cached_responses(
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
 ) -> Result<(), infra::errors::Error> {
+    let start_timer = Instant::now();
     log::info!(
         "[HTTP2_STREAM]: Processing cached response for trace_id: {trace_id}, cache_order_by: {cache_order_by:?}, fallback_order_by_col: {fallback_order_by_col:?}"
     );
@@ -384,8 +409,6 @@ async fn send_cached_responses(
     cached
         .cached_response
         .set_took(start_timer.elapsed().as_millis() as usize);
-    // reset start timer
-    *start_timer = Instant::now();
 
     log::info!(
         "[HTTP2_STREAM]: Sending cached search response for trace_id: {}, hits: {}, result_cache_ratio: {}",

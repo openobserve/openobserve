@@ -138,6 +138,26 @@ pub async fn search(
     let started_at = now_micros();
     let cfg = get_config();
 
+    #[allow(unused_mut)]
+    let mut search_role = "leader".to_string();
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        search_role = "super".to_string();
+    }
+
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] in leader task start"),
+            SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("service:search leader start".to_string())
+                .search_role(search_role.to_string())
+                .build()
+        )
+    );
+
     let trace_id = if trace_id.is_empty() {
         if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
             let ctx = tracing::Span::current().context();
@@ -218,14 +238,6 @@ pub async fn search(
         Ok(Err(e)) => Err(e),
         Err(e) => Err(Error::Message(e.to_string())),
     };
-
-    #[allow(unused_mut)]
-    let mut search_role = "leader".to_string();
-
-    #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        search_role = "super".to_string();
-    }
 
     log::info!(
         "{}",
