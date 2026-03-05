@@ -2,6 +2,7 @@
 import logsdata from "../../../../test-data/logs_data.json";
 import geoMapdata from "../../../../test-data/geo_map.json";
 import dashboardChartJsonData from "../../../../test-data/dashboard_chart_json.json";
+import sankeyData from "../../../../test-data/sankey_data.json";
 // Fixed testLogger path - updated to use correct relative path
 const testLogger = require('../../utils/test-logger.js');
 
@@ -129,5 +130,41 @@ const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") =
   }
 };
 
+// Ingestion function for Sankey chart data
+const ingestionForSankey = async (page, streamName = "sankey_data") => {
+  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
+    throw new Error("Required environment variables are not set");
+  }
+
+  const orgId = process.env["ORGNAME"];
+
+  try {
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: await getAuthToken(),
+    };
+
+    const fetchResponse = await fetch(
+      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(sankeyData),
+      }
+    );
+
+    if (!fetchResponse.ok) {
+      throw new Error(
+        `HTTP error! status: ${fetchResponse.status}, response: ${fetchResponse}`
+      );
+    }
+
+    return await fetchResponse.json();
+  } catch (error) {
+    testLogger.error("Sankey data ingestion failed", { error });
+    throw error;
+  }
+};
+
 // Export only the required functions
-export { ingestionForMaps, ingestionForDashboardChartJson, getAuthToken, removeUTFCharacters };
+export { ingestionForMaps, ingestionForDashboardChartJson, ingestionForSankey, getAuthToken, removeUTFCharacters };

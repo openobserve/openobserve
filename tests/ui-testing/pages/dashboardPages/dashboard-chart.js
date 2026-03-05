@@ -132,6 +132,9 @@ export default class ChartTypeSelector {
       value: "dashboard-value_for_maps-layout",
       firstcolumn: "dashboard-x-layout",
       othercolumn: "dashboard-y-layout",
+      source: "dashboard-add-source-data",
+      target: "dashboard-add-target-data",
+      sankeyvalue: "dashboard-add-value-data",
     };
 
     const buttonTestId = buttonSelectors[target];
@@ -173,6 +176,9 @@ export default class ChartTypeSelector {
       value: "dashboard-value_for_maps-layout",
       firstcolumn: "dashboard-x-layout",
       othercolumn: "dashboard-y-layout",
+      source: "dashboard-source-item",
+      target: "dashboard-target-item",
+      sankeyvalue: "dashboard-value-item",
     };
 
     const baseTestId = removeSelectors[target];
