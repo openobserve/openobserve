@@ -46,7 +46,7 @@ use serde_json::{Map, Value};
 use super::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
 use crate::{
     common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution},
-    service::{db, traces::otel::attributes::O2_LLM_PREFIX},
+    service::db,
 };
 
 pub(crate) fn get_upto_discard_error() -> anyhow::Error {
@@ -549,10 +549,15 @@ pub fn check_schema_for_defined_schema_fields(
             fields.insert("end_time".to_string());
             fields.insert("duration".to_string());
             fields.insert("events".to_string());
-            // Automatically include all fields with _o2_llm_ prefix from the schema
+            // Automatically include all OTEL Gen-AI and LLM evaluation fields from the schema
             for field in schema.fields() {
-                if field.name().starts_with(O2_LLM_PREFIX) {
-                    fields.insert(field.name().to_string());
+                let name = field.name();
+                if name.starts_with("gen_ai.")
+                    || name.starts_with("llm.")
+                    || name == "user.id"
+                    || name == "session.id"
+                {
+                    fields.insert(name.to_string());
                 }
             }
         }

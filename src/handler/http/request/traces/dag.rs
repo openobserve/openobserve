@@ -179,7 +179,7 @@ pub async fn get_trace_dag(
     // Query all spans for this trace_id
     let query_sql = format!(
         "SELECT span_id, trace_id, service_name, operation_name, span_status, \
-         reference_parent_span_id, start_time, end_time, _o2_llm_observation_type \
+         reference_parent_span_id, start_time, end_time, llm_observation_type \
          FROM {stream_name} \
          WHERE trace_id = '{trace_id}'"
     );
@@ -303,7 +303,7 @@ pub async fn get_trace_dag(
             start_time: item.get("start_time").and_then(|v| v.as_i64()).unwrap_or(0),
             end_time: item.get("end_time").and_then(|v| v.as_i64()).unwrap_or(0),
             llm_observation_type: item
-                .get("_o2_llm_observation_type")
+                .get("llm_observation_type")
                 .and_then(|v| v.as_str())
                 .filter(|s| !s.is_empty())
                 .map(|s| s.to_string()),
