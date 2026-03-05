@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- ── Sticky header ─────────────────────────────────────────────────── -->
     <div
-      class="tw:sticky tw:top-0 tw:z-[2] tw:min-h-[2.25rem] tw:min-w-max tw:shrink-0 tw:tracking-[0.125rem] tw:text-[var(--o2-text-3)] tw:bg-[var(--o2-card-bg-solid)]! tw:border-b tw:border-[var(--o2-border-color)]! row no-wrap items-center q-px-sm"
+      class="tw:sticky tw:top-0 tw:z-[2] tw:min-h-[2.25rem] tw:min-w-max tw:shrink-0 tw:tracking-[0.125rem] tw:text-[var(--o2-text-3)] tw:bg-[var(--o2-card-bg-solid)]! tw:border-b tw:border-[var(--o2-border-2)]! row no-wrap items-center q-px-sm"
     >
       <div
         v-for="header in table.getHeaderGroups()[0].headers"
