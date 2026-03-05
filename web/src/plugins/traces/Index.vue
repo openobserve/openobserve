@@ -772,6 +772,9 @@ async function getQueryData(isPagination: boolean = false) {
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {
+      if (tracesPartitionMap[currentSearchTraceId])
+        delete tracesPartitionMap[currentSearchTraceId];
+
       cancelStreamQueryBasedOnRequestId({
         trace_id: currentSearchTraceId,
         org_id: searchObj.organizationIdentifier,
