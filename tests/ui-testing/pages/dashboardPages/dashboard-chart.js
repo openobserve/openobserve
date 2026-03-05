@@ -118,8 +118,6 @@ export default class ChartTypeSelector {
     await searchInput.click();
     await searchInput.fill(fieldName);
 
-    await this.page.waitForTimeout(1000);
-
     const buttonSelectors = {
       x: "dashboard-add-x-data",
       y: "dashboard-add-y-data",
@@ -236,7 +234,6 @@ export default class ChartTypeSelector {
 
     const menuLocator = this.page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`);
     await menuLocator.waitFor({ state: "visible", timeout: 10000 });
-    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -247,16 +244,14 @@ export default class ChartTypeSelector {
     const dropdown = this.page.locator('[data-test="dashboard-function-dropdown"]').first();
     await dropdown.waitFor({ state: "visible", timeout: 10000 });
     await dropdown.click();
-    await this.page.waitForTimeout(300);
 
+    await this.page.locator('[role="listbox"]').waitFor({ state: "visible", timeout: 5000 });
     await this.page.keyboard.type(functionName);
-    await this.page.waitForTimeout(500);
 
     // Use case-insensitive contains match - filtering by typing already narrows options
     const option = this.page.getByRole("option", { name: new RegExp(functionName, 'i') }).first();
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
-    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -281,7 +276,8 @@ export default class ChartTypeSelector {
     await this.openYAxisFunctionPopup(alias);
     await this.selectFunction(functionName);
     await this.page.keyboard.press("Escape");
-    await this.page.waitForTimeout(500);
+    const menuLocator = this.page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`);
+    await menuLocator.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
   }
 
   // ===== RAW QUERY CONFIGURATION METHODS =====
