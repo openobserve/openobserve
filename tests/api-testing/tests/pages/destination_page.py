@@ -12,7 +12,7 @@ class DestinationPage:
         self.base_url = base_url
         self.org_id = org_id
 
-    def create_destination_webhook(self, session, base_url, org_id, user_email, user_password, template_name, destination_name, webhook_url=None):
+    def create_destination_webhook(self, session, base_url, org_id, user_email, user_password, template_name, destination_name, webhook_url=None, method=None):
         """Create a webhook destination."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
         session.auth = HTTPBasicAuth(user_email, user_password)
@@ -20,7 +20,9 @@ class DestinationPage:
 
         # Use provided webhook_url or default to placeholder
         url = webhook_url if webhook_url else "https://jsonplaceholder.typicode.com/todos"
-        method = "post" if webhook_url else "get"
+        # Use provided method, or default based on URL type
+        if method is None:
+            method = "post" if webhook_url else "get"
 
         payload = {
             "url": url,
