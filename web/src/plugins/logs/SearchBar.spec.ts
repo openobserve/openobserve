@@ -3105,6 +3105,32 @@ describe("SearchBar.vue Actual Component Methods", () => {
     expect(componentInstance.$q.notify).not.toHaveBeenCalled();
   });
 
+  // Test: onLogsVisualizeToggleUpdate from build mode to visualize mode (PR #10758)
+  it("should allow switching from build mode to visualize mode", () => {
+    componentInstance.searchObj.meta.logsVisualizeToggle = "build";
+    componentInstance.searchObj.meta.sqlMode = true;
+    componentInstance.searchObj.data.stream.selectedStream = ["test-stream"];
+
+    componentInstance.onLogsVisualizeToggleUpdate("visualize");
+
+    // PR #10758: simplified condition allows switching to visualize from any mode
+    expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
+    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+  });
+
+  // Test: onLogsVisualizeToggleUpdate from patterns mode to visualize mode (PR #10758)
+  it("should allow switching from patterns mode to visualize mode", () => {
+    componentInstance.searchObj.meta.logsVisualizeToggle = "patterns";
+    componentInstance.searchObj.meta.sqlMode = true;
+    componentInstance.searchObj.data.stream.selectedStream = ["test-stream"];
+
+    componentInstance.onLogsVisualizeToggleUpdate("visualize");
+
+    // PR #10758: simplified condition allows switching to visualize from any mode
+    expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
+    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+  });
+
   // Test 196: handleRunQueryFn with logs mode
   it("should handle run query in logs mode", () => {
     componentInstance.searchObj.meta.logsVisualizeToggle = "logs";

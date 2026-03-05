@@ -348,6 +348,51 @@ describe("BuildQueryPage Component", () => {
 
       expect(mockUpdateGroupedFields).toHaveBeenCalled();
     });
+
+    it("should emit 'initialized' and return early without running query for empty query", async () => {
+      mockMakeAutoSQLQuery.mockClear();
+
+      wrapper = createWrapper({
+        searchQuery: "",
+        selectedStream: "test_stream",
+      });
+      await flushPromises();
+
+      // Should emit "initialized" for empty query builder mode (PR #10758)
+      const emitted = wrapper.emitted("initialized");
+      expect(emitted).toBeTruthy();
+      expect(emitted!.length).toBeGreaterThanOrEqual(1);
+
+      // Should NOT attempt to generate/run auto SQL query during initialization
+      // because builder mode with empty query returns early to let user select fields
+      expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+    });
+
+    it("should not call makeAutoSQLQuery for empty query without selected stream", async () => {
+      mockMakeAutoSQLQuery.mockClear();
+
+      wrapper = createWrapper({
+        searchQuery: "",
+        selectedStream: "",
+      });
+      await flushPromises();
+
+      // Even without a stream, empty query should not trigger auto SQL query
+      expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+    });
+
+    it("should emit 'initialized' for whitespace-only query", async () => {
+      wrapper = createWrapper({
+        searchQuery: "   ",
+        selectedStream: "test_stream",
+      });
+      await flushPromises();
+
+      // Whitespace-only query should be treated same as empty query
+      const emitted = wrapper.emitted("initialized");
+      expect(emitted).toBeTruthy();
+      expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(false);
+    });
   });
 
   describe("Query Parsing", () => {
