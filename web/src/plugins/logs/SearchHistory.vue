@@ -702,10 +702,12 @@ export default defineComponent({
     };
 
     const goToInspector = (row) => {
+      const rawTraceId = row.trace_id as string;
+      const trace_id = rawTraceId.includes("-")
+        ? rawTraceId.split("-")[0]
+        : rawTraceId;
       const queryObject = {
-        trace_id: row.trace_id,
-        start_time: row.toBeStoredStartTime,
-        end_time: row.toBeStoredEndTime,
+        trace_id,
         org_identifier: row.org_id,
       };
 
