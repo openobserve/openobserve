@@ -361,12 +361,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- SQL Query Dialog -->
     <q-dialog v-model="showSqlDialog" position="right" full-height maximized>
       <q-card style="width: 600px; max-width: 80vw;">
-        <q-card-section class="row items-center q-pb-none">
+        <q-card-section class="row items-center q-pb-none tw:justify-between tw:mb-2">
           <div class="text-h6">SQL Query</div>
-          <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <div class="tw:flex tw:items-center tw:gap-1">
+            <q-btn
+              v-if="profileData?.sql"
+              flat
+              dense
+              size="sm"
+              :icon="copiedSql ? 'check' : 'content_copy'"
+              :color="copiedSql ? 'positive' : 'default'"
+              @click="copySql"
+              data-test="inspector-copy-sql-btn"
+            >
+              <q-tooltip>{{ copiedSql ? 'Copied!' : 'Copy SQL' }}</q-tooltip>
+            </q-btn>
+            <q-btn icon="cancel" flat round dense v-close-popup />
+          </div>
         </q-card-section>
 
+        <q-separator />
         <q-card-section>
           <div class="sql-query-container">
             <pre class="sql-query">{{ profileData?.sql || 'No SQL query available' }}</pre>
@@ -1168,6 +1182,15 @@ export default defineComponent({
       }, 2000);
     };
 
+    const copiedSql = ref(false);
+    const copySql = () => {
+      navigator.clipboard.writeText(profileData.value?.sql || "");
+      copiedSql.value = true;
+      setTimeout(() => {
+        copiedSql.value = false;
+      }, 2000);
+    };
+
     onMounted(() => {
       fetchProfileData();
     });
@@ -1191,6 +1214,8 @@ export default defineComponent({
       showTraceIdDialog,
       copiedTraceId,
       copyTraceId,
+      copiedSql,
+      copySql,
       store,
       hasNoData,
     };

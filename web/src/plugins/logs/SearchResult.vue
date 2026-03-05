@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-7 text-left q-pl-lg warning flex items-center">
+        <div v-else class="col-8 text-left q-pl-lg warning flex items-center">
           {{
             searchObj.meta.logsVisualizeToggle === "patterns"
               ? patternSummaryText
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             icon="troubleshoot"
             label="Inspect"
-            class="q-ml-md"
+            class="q-ml-sm"
             size="sm"
             @click="openSearchJobInspector"
             data-test="logs-inspect-button"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             icon="timeline"
             :label="t('volumeInsights.insightsButtonLabel')"
-            class="tw:ml-[0.5rem]! analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
+            class=" analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
             size="sm"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
 
-        <div class="col-5 text-right q-pr-sm q-gutter-xs pagination-block">
+        <div class="col-4 text-right q-pr-sm q-gutter-xs pagination-block">
           <q-pagination
             v-if="
               searchObj.meta.resultGrid.showPagination &&
