@@ -123,7 +123,7 @@ export const convertSQLChartData = async (
     }
   }
 
-  // ΓöÇΓöÇ POST-PROCESSING (verbatim from original convertSQLData) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // POST-PROCESSING (verbatim from original convertSQLData)
 
   let isTimeSeriesFlag = false;
 
