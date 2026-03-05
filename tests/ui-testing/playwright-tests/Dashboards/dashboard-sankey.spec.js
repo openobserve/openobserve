@@ -436,9 +436,8 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Verify no data or error is shown (incomplete Sankey config)
-      await expect(
-        page.locator('[data-test="no-data"]').or(page.locator('[data-test="dashboard-error"]').first())
-      ).toBeVisible({ timeout: 10000 });
+      const noDataOrError = page.locator('[data-test="no-data"]').or(page.locator('[data-test="dashboard-error"]'));
+      await expect(noDataOrError.first()).toBeVisible({ timeout: 10000 });
 
       testLogger.info("Sankey no data state verified");
 

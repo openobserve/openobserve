@@ -146,7 +146,12 @@ export default class ChartTypeSelector {
     // The format is: field-list-item-{streamType}-{streamName}-{fieldName}
     // We combine ^= (starts with) and $= (ends with) to ensure exact match
     // Use .first() to handle self-join scenarios where the same field appears twice
-    const fieldItem = this.page.locator(`[data-test^="field-list-item-"][data-test$="-${fieldName}"]`).first();
+    const fieldItems = this.page.locator(`[data-test^="field-list-item-"][data-test$="-${fieldName}"]`);
+    const count = await fieldItems.count();
+    if (count > 1) {
+      testLogger.debug(`Multiple matches (${count}) for field "${fieldName}" — using first match`);
+    }
+    const fieldItem = fieldItems.first();
 
     // Now locate the button within that field item
     const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
