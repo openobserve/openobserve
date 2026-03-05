@@ -734,507 +734,329 @@ def test_delete_alertnew(create_session, base_url):
         assert resp_verify.status_code == 404, f"Expected 404 for deleted alert, got {resp_verify.status_code}"
 
 
-def test_new_alert_create_with_vrl_no_trigger(create_session, base_url):
-    """Test creating an alert with VRL function that returns empty array.
+def _setup_vrl_test_resources(session, url, org_id, prefix):
+    """Helper to create folder, template, destination for VRL tests.
 
-    This test verifies that an alert can be created with a VRL function
-    and that the VRL function is correctly stored and retrieved.
-    The VRL function returns an empty array (no trigger scenario).
+    Returns a dict with resource names/IDs for cleanup.
     """
-
-    alert_name = f"vrl_no_trigger_alert_{random.randint(1000, 9999)}"
-    folder_alert = f"vrl_folder_{random.randint(1000, 9999)}"
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+    folder_name = f"{prefix}_folder_{random.randint(1000, 9999)}"
+    template_name = f"{prefix}_temp_{random.randint(10000, 99999)}"
+    destination_name = f"{prefix}_dest_{random.randint(10000, 99999)}"
 
     # Create folder
-    payload_folder = {"description": "VRL test folder", "name": folder_alert}
-    resp_create_folder = session.post(
-        f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
-
-    print(resp_create_folder.content)
-    assert (
-        resp_create_folder.status_code == 200
-    ), f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
-
-    folder_id = resp_create_folder.json()["folderId"]
+    resp = session.post(
+        f"{url}api/v2/{org_id}/folders/alerts",
+        json={"description": f"{prefix} test folder", "name": folder_name}
+    )
+    assert resp.status_code == 200, f"Failed to create folder: {resp.status_code} {resp.content}"
+    folder_id = resp.json()["folderId"]
 
     # Create template
-    template_alert = f"vrl_temp_{random.randint(10000, 99999)}"
-    destination_alert = f"vrl_dest_{random.randint(10000, 99999)}"
-
-    payload_temp_alert = {
-        "name": template_alert,
-        "body": "{\n  \"text\": \"VRL Alert: {alert_name} triggered\"\n}",
-        "type": "http",
-        "title": ""
-    }
-
-    resp_create_templates_alert = session.post(
-        f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert
+    resp = session.post(
+        f"{url}api/{org_id}/alerts/templates",
+        json={
+            "name": template_name,
+            "body": "{\n  \"text\": \"VRL Alert: {alert_name} triggered\"\n}",
+            "type": "http",
+            "title": ""
+        }
     )
-    print(resp_create_templates_alert.content)
-    assert (
-        resp_create_templates_alert.status_code == 200
-    ), f"Expected 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
+    assert resp.status_code == 200, f"Failed to create template: {resp.status_code} {resp.content}"
 
     # Create destination
-    payload_dest_alert = {
-        "url": "https://jsonplaceholder.typicode.com/todos",
-        "method": "get",
-        "skip_tls_verify": False,
-        "template": template_alert,
-        "headers": {},
-        "name": destination_alert
-    }
-
-    resp_create_destinations_alert = session.post(
+    resp = session.post(
         f"{url}api/{org_id}/alerts/destinations",
-        json=payload_dest_alert,
+        json={
+            "url": "https://jsonplaceholder.typicode.com/todos",
+            "method": "get",
+            "skip_tls_verify": False,
+            "template": template_name,
+            "headers": {},
+            "name": destination_name
+        }
     )
-    print(resp_create_destinations_alert.content)
-    assert (
-        resp_create_destinations_alert.status_code == 200
-    ), f"Failed to create destination: {resp_create_destinations_alert.status_code} {resp_create_destinations_alert.content}"
+    assert resp.status_code == 200, f"Failed to create destination: {resp.status_code} {resp.content}"
 
     time.sleep(5)
 
     # Ingest logs
     stream_name = "default"
-    payload_logs = [
-        {
-            "Athlete": "VRL_Test",
-            "code": 200,
-            "City": "Athens",
-            "Country": "GRC",
-        },
-    ]
-
-    resp_create_logstream = session.post(
-        f"{url}api/{org_id}/{stream_name}/_json", json=payload_logs
+    resp = session.post(
+        f"{url}api/{org_id}/{stream_name}/_json",
+        json=[{"test": prefix, "code": 200}]
     )
-    print(resp_create_logstream.content)
-    assert (
-        resp_create_logstream.status_code == 200
-    ), f"Ingest logs expected 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
+    assert resp.status_code == 200, f"Failed to ingest logs: {resp.status_code} {resp.content}"
 
     time.sleep(5)
 
-    # VRL function that returns empty array (won't trigger alert)
-    # Decoded: #ResultArray#\n. = []\n.
-    vrl_function_no_trigger = "I1Jlc3VsdEFycmF5IwouID0gW10KLg=="
-
-    payload_alert = {
-        "name": alert_name,
-        "stream_type": "logs",
-        "stream_name": stream_name,
-        "is_real_time": False,
-        "query_condition": {
-            "conditions": [],
-            "sql": f"select code from {stream_name}",
-            "promql": "",
-            "type": "sql",
-            "aggregation": None,
-            "promql_condition": None,
-            "vrl_function": vrl_function_no_trigger,
-            "multi_time_range": []
-        },
-        "trigger_condition": {
-            "period": 1440,
-            "operator": ">=",
-            "frequency": 1,
-            "cron": "",
-            "threshold": 1,
-            "silence": 10,
-            "frequency_type": "minutes",
-            "timezone": "UTC"
-        },
-        "destinations": [destination_alert],
-        "context_attributes": {},
-        "enabled": True,
-        "description": "VRL alert test - no trigger (empty array)",
-        "folderId": folder_id
+    return {
+        "folder_id": folder_id,
+        "folder_name": folder_name,
+        "template_name": template_name,
+        "destination_name": destination_name,
+        "stream_name": stream_name
     }
 
-    resp_post_alertnew = session.post(
-        f"{url}api/v2/{org_id}/alerts",
-        json=payload_alert,
-        headers=headers,
-    )
-    print(resp_post_alertnew.content)
-    assert (
-        resp_post_alertnew.status_code == 200
-    ), f"Post alert expected 200, but got {resp_post_alertnew.status_code} {resp_post_alertnew.content}"
 
-    print(f"VRL Alert (no trigger) {alert_name} created successfully")
-
-    # Get the alert ID from the creation response
-    alert_id = resp_post_alertnew.json().get("id")
-    assert alert_id is not None, "Alert ID should be returned in creation response"
-
-    # Verify alert was created with VRL function by fetching it directly
-    time.sleep(2)
-    resp_get_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-    assert resp_get_alert.status_code == 200, f"Failed to fetch alert: {resp_get_alert.status_code} {resp_get_alert.content}"
-
-    created_alert = resp_get_alert.json()
-    assert created_alert.get("name") == alert_name, f"Alert name mismatch. Expected: {alert_name}, Got: {created_alert.get('name')}"
-
-    # Verify VRL function is present
-    vrl_in_response = created_alert.get("query_condition", {}).get("vrl_function")
-    assert vrl_in_response is not None, "VRL function should be present in the alert"
-    assert vrl_in_response == vrl_function_no_trigger, f"VRL function mismatch. Expected: {vrl_function_no_trigger}, Got: {vrl_in_response}"
-
-    print(f"VRL function verified in alert: {vrl_in_response}")
-
-    # Cleanup: Delete alert, destination, template, and folder
-    session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-    session.delete(f"{url}api/{org_id}/alerts/destinations/{destination_alert}")
-    session.delete(f"{url}api/{org_id}/alerts/templates/{template_alert}")
-    session.delete(f"{url}api/v2/{org_id}/folders/{folder_id}")
-    print(f"Cleanup completed for test_new_alert_create_with_vrl_no_trigger")
+def _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id=None):
+    """Helper to cleanup VRL test resources."""
+    if alert_id:
+        session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+    if resources.get("destination_name"):
+        session.delete(f"{url}api/{org_id}/alerts/destinations/{resources['destination_name']}")
+    if resources.get("template_name"):
+        session.delete(f"{url}api/{org_id}/alerts/templates/{resources['template_name']}")
+    if resources.get("folder_id"):
+        session.delete(f"{url}api/v2/{org_id}/folders/{resources['folder_id']}")
 
 
-def test_new_alert_create_with_vrl_trigger(create_session, base_url):
-    """Test creating an alert with VRL function that returns objects.
-
-    This test verifies that an alert can be created with a VRL function
-    and that the VRL function is correctly stored and retrieved.
-    The VRL function returns an array with objects (trigger scenario).
-    """
-
-    alert_name = f"vrl_trigger_alert_{random.randint(1000, 9999)}"
-    folder_alert = f"vrl_trigger_folder_{random.randint(1000, 9999)}"
-
+def test_alert_with_vrl_empty_array(create_session, base_url):
+    """Test that an alert with VRL returning empty array is stored correctly."""
     session = create_session
     url = base_url
     org_id = "default"
+    alert_id = None
+    resources = {}
 
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+    try:
+        resources = _setup_vrl_test_resources(session, url, org_id, "vrl_empty")
+        alert_name = f"vrl_empty_alert_{random.randint(1000, 9999)}"
 
-    # Create folder
-    payload_folder = {"description": "VRL trigger test folder", "name": folder_alert}
-    resp_create_folder = session.post(
-        f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
+        # VRL function that returns empty array
+        # Decoded: #ResultArray#\n. = []\n.
+        vrl_function = "I1Jlc3VsdEFycmF5IwouID0gW10KLg=="
 
-    print(resp_create_folder.content)
-    assert (
-        resp_create_folder.status_code == 200
-    ), f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
+        payload_alert = {
+            "name": alert_name,
+            "stream_type": "logs",
+            "stream_name": resources["stream_name"],
+            "is_real_time": False,
+            "query_condition": {
+                "conditions": [],
+                "sql": f"select code from {resources['stream_name']}",
+                "promql": "",
+                "type": "sql",
+                "aggregation": None,
+                "promql_condition": None,
+                "vrl_function": vrl_function,
+                "multi_time_range": []
+            },
+            "trigger_condition": {
+                "period": 1440,
+                "operator": ">=",
+                "frequency": 1,
+                "cron": "",
+                "threshold": 1,
+                "silence": 10,
+                "frequency_type": "minutes",
+                "timezone": "UTC"
+            },
+            "destinations": [resources["destination_name"]],
+            "context_attributes": {},
+            "enabled": True,
+            "description": "VRL alert test - empty array",
+            "folderId": resources["folder_id"]
+        }
 
-    folder_id = resp_create_folder.json()["folderId"]
+        resp = session.post(f"{url}api/v2/{org_id}/alerts", json=payload_alert)
+        assert resp.status_code == 200, f"Failed to create alert: {resp.status_code} {resp.content}"
 
-    # Create template
-    template_alert = f"vrl_trigger_temp_{random.randint(10000, 99999)}"
-    destination_alert = f"vrl_trigger_dest_{random.randint(10000, 99999)}"
+        alert_id = resp.json().get("id")
+        assert alert_id is not None, "Alert ID should be returned"
 
-    payload_temp_alert = {
-        "name": template_alert,
-        "body": "{\n  \"text\": \"VRL Trigger Alert: {alert_name} fired\"\n}",
-        "type": "http",
-        "title": ""
-    }
+        # Verify VRL function is stored correctly
+        time.sleep(2)
+        resp = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp.status_code == 200, f"Failed to fetch alert: {resp.status_code}"
 
-    resp_create_templates_alert = session.post(
-        f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert
-    )
-    print(resp_create_templates_alert.content)
-    assert (
-        resp_create_templates_alert.status_code == 200
-    ), f"Expected 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
+        created_alert = resp.json()
+        vrl_in_response = created_alert.get("query_condition", {}).get("vrl_function")
+        assert vrl_in_response == vrl_function, f"VRL mismatch. Expected: {vrl_function}, Got: {vrl_in_response}"
 
-    # Create destination
-    payload_dest_alert = {
-        "url": "https://jsonplaceholder.typicode.com/todos",
-        "method": "get",
-        "skip_tls_verify": False,
-        "template": template_alert,
-        "headers": {},
-        "name": destination_alert
-    }
+        print(f"VRL function verified in alert: {vrl_in_response}")
 
-    resp_create_destinations_alert = session.post(
-        f"{url}api/{org_id}/alerts/destinations",
-        json=payload_dest_alert,
-    )
-    print(resp_create_destinations_alert.content)
-    assert (
-        resp_create_destinations_alert.status_code == 200
-    ), f"Failed to create destination: {resp_create_destinations_alert.status_code} {resp_create_destinations_alert.content}"
+    finally:
+        _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id)
+        print("Cleanup completed for test_alert_with_vrl_empty_array")
 
-    time.sleep(5)
 
-    # Ingest logs
-    stream_name = "default"
-    payload_logs = [
-        {
-            "Athlete": "VRL_Trigger_Test",
-            "code": 500,
-            "City": "Paris",
-            "Country": "FRA",
-        },
-    ]
+def test_alert_with_vrl_object_array(create_session, base_url):
+    """Test that an alert with VRL returning object array is stored correctly."""
+    session = create_session
+    url = base_url
+    org_id = "default"
+    alert_id = None
+    resources = {}
 
-    resp_create_logstream = session.post(
-        f"{url}api/{org_id}/{stream_name}/_json", json=payload_logs
-    )
-    print(resp_create_logstream.content)
-    assert (
-        resp_create_logstream.status_code == 200
-    ), f"Ingest logs expected 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
+    try:
+        resources = _setup_vrl_test_resources(session, url, org_id, "vrl_objects")
+        alert_name = f"vrl_objects_alert_{random.randint(1000, 9999)}"
 
-    time.sleep(5)
+        # VRL function that returns array with objects
+        # Decoded: #ResultArray#\n. = [{}, {}]\n.
+        vrl_function = "I1Jlc3VsdEFycmF5IwouID0gW3t9LCB7fV0KLg=="
 
-    # VRL function that returns array with objects (will trigger alert)
-    # Decoded: #ResultArray#\n. = [{}, {}]\n.
-    vrl_function_trigger = "I1Jlc3VsdEFycmF5IwouID0gW3t9LCB7fV0KLg=="
+        payload_alert = {
+            "name": alert_name,
+            "stream_type": "logs",
+            "stream_name": resources["stream_name"],
+            "is_real_time": False,
+            "query_condition": {
+                "conditions": [],
+                "sql": f"select code from {resources['stream_name']}",
+                "promql": "",
+                "type": "sql",
+                "aggregation": None,
+                "promql_condition": None,
+                "vrl_function": vrl_function,
+                "multi_time_range": []
+            },
+            "trigger_condition": {
+                "period": 1440,
+                "operator": ">=",
+                "frequency": 1,
+                "cron": "",
+                "threshold": 1,
+                "silence": 10,
+                "frequency_type": "minutes",
+                "timezone": "UTC"
+            },
+            "destinations": [resources["destination_name"]],
+            "context_attributes": {},
+            "enabled": True,
+            "description": "VRL alert test - object array",
+            "folderId": resources["folder_id"]
+        }
 
-    payload_alert = {
-        "name": alert_name,
-        "stream_type": "logs",
-        "stream_name": stream_name,
-        "is_real_time": False,
-        "query_condition": {
-            "conditions": [],
-            "sql": f"select code from {stream_name}",
-            "promql": "",
-            "type": "sql",
-            "aggregation": None,
-            "promql_condition": None,
-            "vrl_function": vrl_function_trigger,
-            "multi_time_range": []
-        },
-        "trigger_condition": {
-            "period": 1440,
-            "operator": ">=",
-            "frequency": 1,
-            "cron": "",
-            "threshold": 1,
-            "silence": 10,
-            "frequency_type": "minutes",
-            "timezone": "UTC"
-        },
-        "destinations": [destination_alert],
-        "context_attributes": {},
-        "enabled": True,
-        "description": "VRL alert test - trigger (returns objects)",
-        "folderId": folder_id
-    }
+        resp = session.post(f"{url}api/v2/{org_id}/alerts", json=payload_alert)
+        assert resp.status_code == 200, f"Failed to create alert: {resp.status_code} {resp.content}"
 
-    resp_post_alertnew = session.post(
-        f"{url}api/v2/{org_id}/alerts",
-        json=payload_alert,
-        headers=headers,
-    )
-    print(resp_post_alertnew.content)
-    assert (
-        resp_post_alertnew.status_code == 200
-    ), f"Post alert expected 200, but got {resp_post_alertnew.status_code} {resp_post_alertnew.content}"
+        alert_id = resp.json().get("id")
+        assert alert_id is not None, "Alert ID should be returned"
 
-    print(f"VRL Alert (trigger) {alert_name} created successfully")
+        # Verify VRL function is stored correctly
+        time.sleep(2)
+        resp = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp.status_code == 200, f"Failed to fetch alert: {resp.status_code}"
 
-    # Get the alert ID from the creation response
-    alert_id = resp_post_alertnew.json().get("id")
-    assert alert_id is not None, "Alert ID should be returned in creation response"
+        created_alert = resp.json()
+        vrl_in_response = created_alert.get("query_condition", {}).get("vrl_function")
+        assert vrl_in_response == vrl_function, f"VRL mismatch. Expected: {vrl_function}, Got: {vrl_in_response}"
 
-    # Verify alert was created with VRL function by fetching it directly
-    time.sleep(2)
-    resp_get_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-    assert resp_get_alert.status_code == 200, f"Failed to fetch alert: {resp_get_alert.status_code} {resp_get_alert.content}"
+        print(f"VRL function verified in alert: {vrl_in_response}")
 
-    created_alert = resp_get_alert.json()
-    assert created_alert.get("name") == alert_name, f"Alert name mismatch. Expected: {alert_name}, Got: {created_alert.get('name')}"
-
-    # Verify VRL function is present
-    vrl_in_response = created_alert.get("query_condition", {}).get("vrl_function")
-    assert vrl_in_response is not None, "VRL function should be present in the alert"
-    assert vrl_in_response == vrl_function_trigger, f"VRL function mismatch. Expected: {vrl_function_trigger}, Got: {vrl_in_response}"
-
-    print(f"VRL function (trigger) verified in alert: {vrl_in_response}")
-
-    # Cleanup: Delete alert, destination, template, and folder
-    session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-    session.delete(f"{url}api/{org_id}/alerts/destinations/{destination_alert}")
-    session.delete(f"{url}api/{org_id}/alerts/templates/{template_alert}")
-    session.delete(f"{url}api/v2/{org_id}/folders/{folder_id}")
-    print(f"Cleanup completed for test_new_alert_create_with_vrl_trigger")
+    finally:
+        _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id)
+        print("Cleanup completed for test_alert_with_vrl_object_array")
 
 
 def test_update_alert_vrl_function(create_session, base_url):
-    """Test updating an alert's VRL function.
-
-    This test verifies that an existing alert's VRL function can be
-    updated and the change is correctly persisted.
-    """
-
-    alert_name = f"vrl_update_alert_{random.randint(1000, 9999)}"
-    folder_alert = f"vrl_update_folder_{random.randint(1000, 9999)}"
-
+    """Test that an alert's VRL function can be updated."""
     session = create_session
     url = base_url
     org_id = "default"
+    alert_id = None
+    resources = {}
 
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+    try:
+        resources = _setup_vrl_test_resources(session, url, org_id, "vrl_update")
+        alert_name = f"vrl_update_alert_{random.randint(1000, 9999)}"
 
-    # Create folder
-    payload_folder = {"description": "VRL update test folder", "name": folder_alert}
-    resp_create_folder = session.post(
-        f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
+        # Initial VRL function (empty array)
+        vrl_function_initial = "I1Jlc3VsdEFycmF5IwouID0gW10KLg=="
 
-    assert resp_create_folder.status_code == 200, f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
-    folder_id = resp_create_folder.json()["folderId"]
+        payload_alert = {
+            "name": alert_name,
+            "stream_type": "logs",
+            "stream_name": resources["stream_name"],
+            "is_real_time": False,
+            "query_condition": {
+                "conditions": [],
+                "sql": f"select code from {resources['stream_name']}",
+                "promql": "",
+                "type": "sql",
+                "aggregation": None,
+                "promql_condition": None,
+                "vrl_function": vrl_function_initial,
+                "multi_time_range": []
+            },
+            "trigger_condition": {
+                "period": 1440,
+                "operator": ">=",
+                "frequency": 1,
+                "cron": "",
+                "threshold": 1,
+                "silence": 10,
+                "frequency_type": "minutes",
+                "timezone": "UTC"
+            },
+            "destinations": [resources["destination_name"]],
+            "context_attributes": {},
+            "enabled": True,
+            "description": "VRL update test",
+            "folderId": resources["folder_id"]
+        }
 
-    # Create template and destination
-    template_alert = f"vrl_update_temp_{random.randint(10000, 99999)}"
-    destination_alert = f"vrl_update_dest_{random.randint(10000, 99999)}"
+        resp = session.post(f"{url}api/v2/{org_id}/alerts", json=payload_alert)
+        assert resp.status_code == 200, f"Failed to create alert: {resp.status_code} {resp.content}"
 
-    payload_temp_alert = {
-        "name": template_alert,
-        "body": "{\n  \"text\": \"VRL Update Test\"\n}",
-        "type": "http",
-        "title": ""
-    }
-    resp_create_template = session.post(f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert)
-    assert resp_create_template.status_code == 200, f"Failed to create template: {resp_create_template.status_code} {resp_create_template.content}"
+        alert_id = resp.json().get("id")
+        assert alert_id is not None, "Alert ID should be returned"
 
-    payload_dest_alert = {
-        "url": "https://jsonplaceholder.typicode.com/todos",
-        "method": "get",
-        "skip_tls_verify": False,
-        "template": template_alert,
-        "headers": {},
-        "name": destination_alert
-    }
-    resp_create_dest = session.post(f"{url}api/{org_id}/alerts/destinations", json=payload_dest_alert)
-    assert resp_create_dest.status_code == 200, f"Failed to create destination: {resp_create_dest.status_code} {resp_create_dest.content}"
+        time.sleep(2)
 
-    time.sleep(3)
+        # Updated VRL function (object array)
+        vrl_function_updated = "I1Jlc3VsdEFycmF5IwouID0gW3t9LCB7fV0KLg=="
 
-    # Ingest logs
-    stream_name = "default"
-    payload_logs = [{"test": "vrl_update", "code": 200}]
-    resp_ingest = session.post(f"{url}api/{org_id}/{stream_name}/_json", json=payload_logs)
-    assert resp_ingest.status_code == 200, f"Failed to ingest logs: {resp_ingest.status_code} {resp_ingest.content}"
+        payload_update = {
+            "id": alert_id,
+            "name": alert_name,
+            "org_id": org_id,
+            "stream_type": "logs",
+            "stream_name": resources["stream_name"],
+            "is_real_time": False,
+            "query_condition": {
+                "conditions": [],
+                "sql": f"select code from {resources['stream_name']}",
+                "promql": "",
+                "type": "sql",
+                "aggregation": None,
+                "promql_condition": None,
+                "vrl_function": vrl_function_updated,
+                "multi_time_range": []
+            },
+            "trigger_condition": {
+                "period": 1440,
+                "operator": ">=",
+                "frequency": 1,
+                "cron": "",
+                "threshold": 1,
+                "silence": 10,
+                "frequency_type": "minutes",
+                "timezone": "UTC"
+            },
+            "destinations": [resources["destination_name"]],
+            "context_attributes": {},
+            "enabled": True,
+            "description": "VRL update test - UPDATED",
+            "folderId": resources["folder_id"]
+        }
 
-    time.sleep(3)
+        resp = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}?type=logs", json=payload_update)
+        assert resp.status_code == 200, f"Failed to update alert: {resp.status_code} {resp.content}"
 
-    # Initial VRL function (no trigger)
-    vrl_function_initial = "I1Jlc3VsdEFycmF5IwouID0gW10KLg=="
+        # Verify the VRL function was updated
+        time.sleep(2)
+        resp = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp.status_code == 200, f"Failed to fetch alert: {resp.status_code}"
 
-    payload_alert = {
-        "name": alert_name,
-        "stream_type": "logs",
-        "stream_name": stream_name,
-        "is_real_time": False,
-        "query_condition": {
-            "conditions": [],
-            "sql": f"select code from {stream_name}",
-            "promql": "",
-            "type": "sql",
-            "aggregation": None,
-            "promql_condition": None,
-            "vrl_function": vrl_function_initial,
-            "multi_time_range": []
-        },
-        "trigger_condition": {
-            "period": 1440,
-            "operator": ">=",
-            "frequency": 1,
-            "cron": "",
-            "threshold": 1,
-            "silence": 10,
-            "frequency_type": "minutes",
-            "timezone": "UTC"
-        },
-        "destinations": [destination_alert],
-        "context_attributes": {},
-        "enabled": True,
-        "description": "VRL update test",
-        "folderId": folder_id
-    }
+        updated_alert = resp.json()
+        updated_vrl = updated_alert.get("query_condition", {}).get("vrl_function")
+        assert updated_vrl == vrl_function_updated, f"VRL not updated. Expected: {vrl_function_updated}, Got: {updated_vrl}"
 
-    resp_create = session.post(
-        f"{url}api/v2/{org_id}/alerts",
-        json=payload_alert,
-        headers=headers,
-    )
-    assert resp_create.status_code == 200, f"Failed to create alert: {resp_create.content}"
+        assert updated_alert.get("description") == "VRL update test - UPDATED", "Description was not updated"
+        print(f"VRL function update test passed")
 
-    # Get the alert ID from the creation response
-    alert_id = resp_create.json().get("id")
-    assert alert_id is not None, "Alert ID should be returned in creation response"
-    print(f"Created alert with ID: {alert_id}")
-
-    time.sleep(2)
-
-    # Updated VRL function (trigger variant)
-    vrl_function_updated = "I1Jlc3VsdEFycmF5IwouID0gW3t9LCB7fV0KLg=="
-
-    # Update the alert with new VRL function
-    payload_update = {
-        "id": alert_id,
-        "name": alert_name,
-        "org_id": org_id,
-        "stream_type": "logs",
-        "stream_name": stream_name,
-        "is_real_time": False,
-        "query_condition": {
-            "conditions": [],
-            "sql": f"select code from {stream_name}",
-            "promql": "",
-            "type": "sql",
-            "aggregation": None,
-            "promql_condition": None,
-            "vrl_function": vrl_function_updated,
-            "multi_time_range": []
-        },
-        "trigger_condition": {
-            "period": 1440,
-            "operator": ">=",
-            "frequency": 1,
-            "cron": "",
-            "threshold": 1,
-            "silence": 10,
-            "frequency_type": "minutes",
-            "timezone": "UTC"
-        },
-        "destinations": [destination_alert],
-        "context_attributes": {},
-        "enabled": True,
-        "description": "VRL update test - UPDATED",
-        "folderId": folder_id
-    }
-
-    resp_update = session.put(
-        f"{url}api/v2/{org_id}/alerts/{alert_id}?type=logs",
-        json=payload_update,
-        headers=headers,
-    )
-    print(resp_update.content)
-    assert resp_update.status_code == 200, f"Failed to update alert: {resp_update.content}"
-
-    # Verify the VRL function was updated
-    time.sleep(2)
-    resp_get_updated = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-    assert resp_get_updated.status_code == 200
-
-    updated_alert = resp_get_updated.json()
-    updated_vrl = updated_alert.get("query_condition", {}).get("vrl_function")
-
-    assert updated_vrl == vrl_function_updated, f"VRL function not updated. Expected: {vrl_function_updated}, Got: {updated_vrl}"
-    print(f"VRL function successfully updated from no-trigger to trigger variant")
-
-    # Verify description was also updated
-    assert updated_alert.get("description") == "VRL update test - UPDATED", "Description was not updated"
-    print(f"Alert {alert_name} VRL function update test passed")
-
-    # Cleanup: Delete alert, destination, template, and folder
-    session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-    session.delete(f"{url}api/{org_id}/alerts/destinations/{destination_alert}")
-    session.delete(f"{url}api/{org_id}/alerts/templates/{template_alert}")
-    session.delete(f"{url}api/v2/{org_id}/folders/{folder_id}")
-    print(f"Cleanup completed for test_update_alert_vrl_function")
+    finally:
+        _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id)
+        print("Cleanup completed for test_update_alert_vrl_function")
