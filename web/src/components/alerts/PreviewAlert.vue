@@ -45,7 +45,7 @@ import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
-import { b64EncodeUnicode, b64DecodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, b64DecodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 const getDefaultDashboardPanelData: any = () => ({
@@ -187,11 +187,8 @@ const getDecodedVrlFunction = (): string | null => {
   if (!props.formData.query_condition?.vrl_function) {
     return null;
   }
-  try {
-    return b64DecodeUnicode(props.formData.query_condition.vrl_function);
-  } catch (e) {
-    return props.formData.query_condition.vrl_function;
-  }
+  // Use smart decoder to handle both single and double-encoded VRL
+  return smartDecodeVrlFunction(props.formData.query_condition.vrl_function);
 };
 
 onBeforeMount(() => {

@@ -673,9 +673,9 @@ export default defineComponent({
 
 
     // Handler for VRL function updates from QueryEditorDialog
-    // The dialog emits the encoded value, so we just pass it through
-    const handleVrlFunctionUpdate = (encodedValue: string) => {
-      emit("update:vrlFunction", encodedValue);
+    // The dialog now emits plain text VRL (encoding happens once at save time)
+    const handleVrlFunctionUpdate = (vrlValue: string) => {
+      emit("update:vrlFunction", vrlValue);
     };
 
     // Handler for SQL validation from QueryEditorDialog

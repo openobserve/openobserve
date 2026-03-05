@@ -1698,14 +1698,10 @@ export default defineComponent({
           // This will be cleared when trace IDs arrive (via watcher) or when unmounting
           // When SQL mode is OFF, build page handles its own loading state
           if (searchObj.meta.logsVisualizeToggle === "build" && searchObj.meta.sqlMode) {
-            variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
-
-            // Check for empty query - no API call will be made, so clear loading flag
-            if (!searchObj.data.query?.trim()) {
-              showErrorNotification(
-                "Query is empty, please select fields to build query",
-              );
-              variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+            // If query is empty, don't set loading flag - BuildQueryPage handles
+            // empty query by using builder mode with the selected stream
+            if (searchObj.data.query?.trim()) {
+              variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
             }
           }
 
@@ -2320,8 +2316,10 @@ export default defineComponent({
       }
 
       if (searchObj.meta.logsVisualizeToggle == "build") {
-        // Validate query before running - same as visualization mode
-        if (searchObj.meta.sqlMode && !searchObj.data.query?.trim()) {
+        // Validate query before running - only block if in custom query mode with empty query.
+        // In builder mode (non-custom), BuildQueryPage generates the query automatically.
+        const isCustomQueryMode = buildDashboardPanelData.data.queries[0]?.customQuery === true;
+        if (isCustomQueryMode && searchObj.meta.sqlMode && !searchObj.data.query?.trim()) {
           showErrorNotification(
             "Query is empty, please select fields to build query",
           );

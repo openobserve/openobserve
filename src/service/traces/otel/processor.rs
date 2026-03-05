@@ -634,7 +634,7 @@ mod tests {
         span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
         span_attrs.insert(
             "gen_ai.request.model".to_string(),
-            json::json!("claude-sonnet-4-5"),
+            json::json!("claude-sonnet-4-6"),
         );
         span_attrs.insert(
             "gen_ai.input.messages".to_string(),
@@ -656,7 +656,7 @@ mod tests {
         assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
         let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
 
-        // claude-sonnet-4-5 default tier: $3.00/1M input, $15.00/1M output
+        // claude-sonnet-4-6 default tier: $3.00/1M input, $15.00/1M output
         // 50000 tokens input = 50000/1M * $3.00 = $0.15
         // 10000 tokens output = 10000/1M * $15.00 = $0.15
         // Total = $0.30
@@ -676,7 +676,7 @@ mod tests {
         span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
         span_attrs.insert(
             "gen_ai.request.model".to_string(),
-            json::json!("claude-sonnet-4-5"),
+            json::json!("claude-sonnet-4-6"),
         );
         span_attrs.insert(
             "gen_ai.input.messages".to_string(),
@@ -699,7 +699,7 @@ mod tests {
         assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
         let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
 
-        // claude-sonnet-4-5 extended tier: $6.00/1M input, $22.50/1M output
+        // claude-sonnet-4-6 extended tier: $6.00/1M input, $22.50/1M output
         // 250000 tokens input = 250000/1M * $6.00 = $1.5
         // 10000 tokens output = 10000/1M * $22.50 = $0.225
         // Total = $1.725
