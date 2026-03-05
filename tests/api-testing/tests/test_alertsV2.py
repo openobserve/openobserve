@@ -752,11 +752,11 @@ def test_new_alert_create_with_vrl_no_trigger(create_session, base_url):
         f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
 
     print(resp_create_folder.content)
-    folder_id = resp_create_folder.json()["folderId"]
-
     assert (
         resp_create_folder.status_code == 200
     ), f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
+
+    folder_id = resp_create_folder.json()["folderId"]
 
     # Create template
     template_alert = f"vrl_temp_{random.randint(10000, 99999)}"
@@ -843,7 +843,7 @@ def test_new_alert_create_with_vrl_no_trigger(create_session, base_url):
             "operator": ">=",
             "frequency": 1,
             "cron": "",
-            "threshold": 3,
+            "threshold": 1,
             "silence": 10,
             "frequency_type": "minutes",
             "timezone": "UTC"
@@ -905,11 +905,11 @@ def test_new_alert_create_with_vrl_trigger(create_session, base_url):
         f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
 
     print(resp_create_folder.content)
-    folder_id = resp_create_folder.json()["folderId"]
-
     assert (
         resp_create_folder.status_code == 200
     ), f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
+
+    folder_id = resp_create_folder.json()["folderId"]
 
     # Create template
     template_alert = f"vrl_trigger_temp_{random.randint(10000, 99999)}"
@@ -1057,8 +1057,8 @@ def test_update_alert_vrl_function(create_session, base_url):
     resp_create_folder = session.post(
         f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
 
+    assert resp_create_folder.status_code == 200, f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
     folder_id = resp_create_folder.json()["folderId"]
-    assert resp_create_folder.status_code == 200
 
     # Create template and destination
     template_alert = f"vrl_update_temp_{random.randint(10000, 99999)}"
@@ -1070,7 +1070,8 @@ def test_update_alert_vrl_function(create_session, base_url):
         "type": "http",
         "title": ""
     }
-    session.post(f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert)
+    resp_create_template = session.post(f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert)
+    assert resp_create_template.status_code == 200, f"Failed to create template: {resp_create_template.status_code} {resp_create_template.content}"
 
     payload_dest_alert = {
         "url": "https://jsonplaceholder.typicode.com/todos",
@@ -1080,7 +1081,8 @@ def test_update_alert_vrl_function(create_session, base_url):
         "headers": {},
         "name": destination_alert
     }
-    session.post(f"{url}api/{org_id}/alerts/destinations", json=payload_dest_alert)
+    resp_create_dest = session.post(f"{url}api/{org_id}/alerts/destinations", json=payload_dest_alert)
+    assert resp_create_dest.status_code == 200, f"Failed to create destination: {resp_create_dest.status_code} {resp_create_dest.content}"
 
     time.sleep(3)
 
@@ -1114,7 +1116,7 @@ def test_update_alert_vrl_function(create_session, base_url):
             "operator": ">=",
             "frequency": 1,
             "cron": "",
-            "threshold": 3,
+            "threshold": 1,
             "silence": 10,
             "frequency_type": "minutes",
             "timezone": "UTC"
@@ -1166,7 +1168,7 @@ def test_update_alert_vrl_function(create_session, base_url):
             "operator": ">=",
             "frequency": 1,
             "cron": "",
-            "threshold": 3,
+            "threshold": 1,
             "silence": 10,
             "frequency_type": "minutes",
             "timezone": "UTC"
