@@ -567,26 +567,30 @@ pub async fn ingest(
 
     // update ingestion metrics
     let took_time = start.elapsed().as_secs_f64();
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            endpoint,
-            metric_rpt_status_code,
-            org_id,
-            StreamType::Logs.as_str(),
-            "",
-            "",
-        ])
-        .observe(took_time);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            endpoint,
-            metric_rpt_status_code,
-            org_id,
-            StreamType::Logs.as_str(),
-            "",
-            "",
-        ])
-        .inc();
+    // Bulk requests are counted by the bulk handler (bulk.rs) once per HTTP request.
+    // Counting here would result in N increments (one per stream) plus 1 from bulk.rs.
+    if !matches!(usage_type, UsageType::Bulk) {
+        metrics::HTTP_RESPONSE_TIME
+            .with_label_values(&[
+                endpoint,
+                metric_rpt_status_code,
+                org_id,
+                StreamType::Logs.as_str(),
+                "",
+                "",
+            ])
+            .observe(took_time);
+        metrics::HTTP_INCOMING_REQUESTS
+            .with_label_values(&[
+                endpoint,
+                metric_rpt_status_code,
+                org_id,
+                StreamType::Logs.as_str(),
+                "",
+                "",
+            ])
+            .inc();
+    }
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
