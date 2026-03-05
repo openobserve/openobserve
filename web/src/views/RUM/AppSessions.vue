@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:pb-[0.375rem] tw:px-[0.375rem]">
             <query-editor
               editor-id="session-replay-query-editor"
-              class="monaco-editor tw:border tw:solid tw:border-[var(--o2-border-color)] tw:p-[0.25rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-[4rem]"
+              class="monaco-editor tw:border tw:solid tw:border-[var(--o2-border-color)] tw:p-[0.25rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-[4rem]!"
               v-model:query="sessionState.data.editorValue"
               :debounce-time="300"
             />
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <q-splitter
-        class="tw:pl-[0.625rem]! tw:h-[calc(100%-80px)]"
+        class="tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]"
         v-model="splitterModel"
         unit="px"
         vertical
