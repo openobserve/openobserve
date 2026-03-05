@@ -147,6 +147,8 @@ declare module "@tanstack/vue-table" {
     align?: "left" | "center" | "right";
     /** whether clicking the header triggers server-side sort */
     sortable?: boolean;
+    /** custom column classes */
+    class?: string;
   }
 }
 export default {};

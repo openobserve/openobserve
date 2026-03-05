@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
         />
         <div
-          v-if="props.errorCount != null"
+          v-if="props.errorCount != null && props.errorCount > 0"
           data-test="traces-error-count-badge"
           class="tw:rounded-xl tw:py-[0.25rem] tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit tw:mr-[0.85rem]"
           style="
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading banner: shown above rows while a new page is fetching -->
           <template #loading-banner>
             <div
-              data-test="traces-table-loading-row"
+              data-test="traces-table-loading-banner-row"
               class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
             >
               <q-spinner-hourglass
