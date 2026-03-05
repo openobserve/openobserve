@@ -141,7 +141,12 @@ pub async fn search(
         log::info!("[trace_id {trace_id}] Query hit full cache");
     }
 
-    let search_role = "leader".to_string();
+    #[allow(unused_mut)]
+    let mut search_role = "leader".to_string();
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        search_role = "super".to_string();
+    }
 
     // Result caching check ends, start search
     let cache_took = start.elapsed().as_millis() as usize;
@@ -720,7 +725,7 @@ pub fn merge_response(
     cache_response.scan_size = 0;
 
     let mut files_cache_ratio = 0;
-    let mut result_cache_len = 0;
+    let mut search_hits_len = 0;
 
     let mut res_took = ResponseTook::default();
 
@@ -731,7 +736,7 @@ pub fn merge_response(
         files_cache_ratio += res.cached_ratio;
         cache_response.histogram_interval = res.histogram_interval;
 
-        result_cache_len += res.total;
+        search_hits_len += res.total;
 
         if res.hits.is_empty() {
             continue;
@@ -769,11 +774,32 @@ pub fn merge_response(
         cache_response.cached_ratio = files_cache_ratio / search_responses.len();
     }
     cache_response.size = cache_response.hits.len() as i64;
+    let total = cache_response.size;
+
+    #[allow(unused_mut)]
+    let mut search_role = "leader".to_string();
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        search_role = "super".to_string();
+    }
     log::info!(
-        "[trace_id {trace_id}] cached hits len: {}, result cache len: {}",
-        cached_hits_len,
-        result_cache_len
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] total: {total}, cached hits: {cached_hits_len}, search hits: {search_hits_len}",
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("merge response".to_string())
+                .desc(format!(
+                    "total: {total}, cached hits: {cached_hits_len}, search hits: {search_hits_len}"
+                ))
+                .search_role(search_role)
+                .build()
+        )
     );
+
     cache_response.took_detail = res_took;
     cache_response.order_by = search_responses
         .first()
@@ -784,7 +810,7 @@ pub fn merge_response(
         .map(|res| res.order_by_metadata.clone())
         .unwrap_or_default();
     cache_response.result_cache_ratio = (((cached_hits_len as f64) * 100_f64)
-        / ((result_cache_len + cached_hits_len) as f64))
+        / ((search_hits_len + cached_hits_len) as f64))
         as usize;
     if !fn_error.is_empty() {
         cache_response.function_error.extend(fn_error);

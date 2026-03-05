@@ -302,6 +302,9 @@ pub async fn get_search_profile(
                 events: vec![],
             };
 
+            let mut search_summary = Vec::new();
+            let mut stream_summary = Vec::new();
+
             for hit in res.hits {
                 if let Some(events_str) = hit.get("events")
                     && let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
@@ -316,14 +319,9 @@ pub async fn get_search_profile(
                                 extract_search_inspector_fields(event.name.as_str())
                             {
                                 if fields.component == Some("summary".to_string()) {
-                                    si.sql = fields.sql.unwrap();
-                                    let time_range = fields.time_range.unwrap_or_default();
-                                    si.start_time = time_range.0;
-                                    si.end_time = time_range.1;
-                                    si.total_duration = fields.duration.unwrap_or_default();
-                                    si.scan_size = fields.scan_size.unwrap_or_default();
-                                    si.scan_records = fields.scan_records.unwrap_or_default();
-                                    si.data_records = fields.data_records.unwrap_or_default();
+                                    search_summary.push(fields);
+                                } else if fields.component == Some("stream_summary".to_string()) {
+                                    stream_summary.push(fields);
                                 } else {
                                     fields.timestamp = Some(event._timestamp.to_string());
                                     inspectors.push(fields);
@@ -333,6 +331,38 @@ pub async fn get_search_profile(
                         .collect();
 
                     events.extend(inspectors);
+                }
+            }
+
+            if stream_summary.is_empty() {
+                for event in search_summary {
+                    si.sql = event.sql.unwrap();
+                    let time_range = event.time_range.unwrap_or_default();
+                    si.start_time = if si.start_time.is_empty() {
+                        time_range.0
+                    } else {
+                        si.start_time.clone().min(time_range.0)
+                    };
+                    si.end_time = si.end_time.clone().max(time_range.1);
+                    si.total_duration += event.duration.unwrap_or_default();
+                    si.scan_size += event.scan_size.unwrap_or_default();
+                    si.scan_records += event.scan_records.unwrap_or_default();
+                    si.data_records += event.data_records.unwrap_or_default();
+                }
+            } else {
+                for event in stream_summary {
+                    si.sql = event.sql.unwrap();
+                    let time_range = event.time_range.unwrap_or_default();
+                    si.start_time = if si.start_time.is_empty() {
+                        time_range.0
+                    } else {
+                        si.start_time.clone().min(time_range.0)
+                    };
+                    si.end_time = si.end_time.clone().max(time_range.1);
+                    si.total_duration += event.duration.unwrap_or_default();
+                    si.scan_size += event.scan_size.unwrap_or_default();
+                    si.scan_records += event.scan_records.unwrap_or_default();
+                    si.data_records += event.data_records.unwrap_or_default();
                 }
             }
 
@@ -401,6 +431,13 @@ fn organize_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspectorFie
             summary.duration = Some(duration);
             summary.search_role = Some("leader".to_string());
             summary.events = Some(group_leader_events(nested));
+            if let Some(events) = summary.events.as_ref()
+                && let Some(event) = events
+                    .iter()
+                    .find(|e| e.component == Some("remote scan streaming".to_string()))
+            {
+                summary.desc = Some(event.desc.clone().unwrap_or_default());
+            }
             summary
         },
     );
@@ -430,6 +467,14 @@ fn group_leader_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspecto
             summary.duration = Some(duration);
             summary.search_role = Some("follower".to_string());
             summary.events = Some(sort_events_by_timestamp(nested));
+            dbg!(&summary);
+            if let Some(events) = summary.events.as_ref()
+                && let Some(event) = events
+                    .iter()
+                    .find(|e| e.component == Some("remote scan streaming".to_string()))
+            {
+                summary.desc = Some(event.desc.clone().unwrap_or_default());
+            }
             summary
         },
     );
