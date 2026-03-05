@@ -467,7 +467,6 @@ fn group_leader_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspecto
             summary.duration = Some(duration);
             summary.search_role = Some("follower".to_string());
             summary.events = Some(sort_events_by_timestamp(nested));
-            dbg!(&summary);
             if let Some(events) = summary.events.as_ref()
                 && let Some(event) = events
                     .iter()
