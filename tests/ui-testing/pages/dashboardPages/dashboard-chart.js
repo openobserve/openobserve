@@ -149,7 +149,7 @@ export default class ChartTypeSelector {
     const fieldItems = this.page.locator(`[data-test^="field-list-item-"][data-test$="-${fieldName}"]`);
     const count = await fieldItems.count();
     if (count > 1) {
-      testLogger.debug(`Multiple matches (${count}) for field "${fieldName}" — using first match`);
+      testLogger.warn(`Multiple matches (${count}) for field "${fieldName}" — suffix collision possible, using first match`);
     }
     const fieldItem = fieldItems.first();
 
