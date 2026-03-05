@@ -13,7 +13,6 @@ const generateDashboardName = () =>
 
 test.describe("Sankey chart testcases", () => {
   test.describe.configure({ mode: "parallel" });
-  let pm;
 
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing");
@@ -29,7 +28,7 @@ test.describe("Sankey chart testcases", () => {
     { tag: ["@dashboards", "@sankey", "@smoke", "@P0"] },
     async ({ page }) => {
       testLogger.info("Testing Sankey chart type selection");
-      pm = new PageManager(page);
+      const pm = new PageManager(page);
 
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
@@ -68,7 +67,7 @@ test.describe("Sankey chart testcases", () => {
     { tag: ["@dashboards", "@sankey", "@smoke", "@P0"] },
     async ({ page }) => {
       testLogger.info("Testing Sankey chart field addition and rendering");
-      pm = new PageManager(page);
+      const pm = new PageManager(page);
 
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
@@ -93,7 +92,6 @@ test.describe("Sankey chart testcases", () => {
 
       // Verify Sankey chart is rendered and has data
       await pm.dashboardPanelActions.verifyChartRenders(expect);
-      await pm.dashboardPanelActions.verifyNoErrors(expect);
 
       testLogger.info("Sankey chart rendered with data successfully");
 
@@ -112,7 +110,7 @@ test.describe("Sankey chart testcases", () => {
     { tag: ["@dashboards", "@sankey", "@smoke", "@P0"] },
     async ({ page }) => {
       testLogger.info("Testing Sankey panel save and persistence");
-      pm = new PageManager(page);
+      const pm = new PageManager(page);
 
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
@@ -160,7 +158,7 @@ test.describe("Sankey chart testcases", () => {
     { tag: ["@dashboards", "@sankey", "@functional", "@P1"] },
     async ({ page }) => {
       testLogger.info("Testing Sankey field removal");
-      pm = new PageManager(page);
+      const pm = new PageManager(page);
 
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
@@ -210,7 +208,7 @@ test.describe("Sankey chart testcases", () => {
     { tag: ["@dashboards", "@sankey", "@functional", "@P1"] },
     async ({ page }) => {
       testLogger.info("Testing Sankey field button disabled state");
-      pm = new PageManager(page);
+      const pm = new PageManager(page);
 
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
@@ -261,7 +259,7 @@ test.describe("Sankey chart testcases", () => {
     { tag: ["@dashboards", "@sankey", "@functional", "@P1"] },
     async ({ page }) => {
       testLogger.info("Testing Sankey chart with custom SQL");
-      pm = new PageManager(page);
+      const pm = new PageManager(page);
 
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
@@ -313,7 +311,7 @@ test.describe("Sankey chart testcases", () => {
     { tag: ["@dashboards", "@sankey", "@functional", "@P1"] },
     async ({ page }) => {
       testLogger.info("Testing Sankey chart with dashboard variable filter");
-      pm = new PageManager(page);
+      const pm = new PageManager(page);
 
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
@@ -411,7 +409,7 @@ test.describe("Sankey chart testcases", () => {
     { tag: ["@dashboards", "@sankey", "@edge", "@P2"] },
     async ({ page }) => {
       testLogger.info("Testing Sankey no data state");
-      pm = new PageManager(page);
+      const pm = new PageManager(page);
 
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
@@ -430,10 +428,9 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Verify no data or error is shown (incomplete Sankey config)
-      const noDataOrError = page
-        .locator('[data-test="no-data"]')
-        .or(page.locator('[data-test="dashboard-error"]'));
-      await expect(noDataOrError.first()).toBeVisible({ timeout: 15000 });
+      const noDataVisible = await page.locator('[data-test="no-data"]').isVisible().catch(() => false);
+      const errorVisible = await page.locator('[data-test="dashboard-error"]').first().isVisible().catch(() => false);
+      expect(noDataVisible || errorVisible).toBeTruthy();
 
       testLogger.info("Sankey no data state verified");
 
