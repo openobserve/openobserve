@@ -1089,7 +1089,8 @@ def test_update_alert_vrl_function(create_session, base_url):
     # Ingest logs
     stream_name = "default"
     payload_logs = [{"test": "vrl_update", "code": 200}]
-    session.post(f"{url}api/{org_id}/{stream_name}/_json", json=payload_logs)
+    resp_ingest = session.post(f"{url}api/{org_id}/{stream_name}/_json", json=payload_logs)
+    assert resp_ingest.status_code == 200, f"Failed to ingest logs: {resp_ingest.status_code} {resp_ingest.content}"
 
     time.sleep(3)
 
@@ -1177,6 +1178,7 @@ def test_update_alert_vrl_function(create_session, base_url):
         "context_attributes": {},
         "enabled": True,
         "description": "VRL update test - UPDATED",
+        "folderId": folder_id
     }
 
     resp_update = session.put(
