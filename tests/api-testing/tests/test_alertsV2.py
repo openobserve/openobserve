@@ -69,7 +69,7 @@ def test_new_alert_create(create_session, base_url):
     print(resp_create_templates_alert.content)
     assert (
         resp_create_templates_alert.status_code == 200
-    ), f"Create template 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
+    ), f"Expected 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
 
     
     skip_tls_verify_value = False  # Define the skip_tls_verify_value
@@ -277,7 +277,7 @@ def test_put_alertnew_update(create_session, base_url):
     print(resp_create_templates_alert.content)
     assert (
         resp_create_templates_alert.status_code == 200
-    ), f"Create template 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
+    ), f"Expected 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
 
     
     skip_tls_verify_value = False  # Define the skip_tls_verify_value
@@ -735,7 +735,12 @@ def test_delete_alertnew(create_session, base_url):
 
 
 def test_new_alert_create_with_vrl_no_trigger(create_session, base_url):
-    """Running an E2E test for creating a new alert with VRL function (no trigger - empty array)."""
+    """Test creating an alert with VRL function that returns empty array.
+
+    This test verifies that an alert can be created with a VRL function
+    and that the VRL function is correctly stored and retrieved.
+    The VRL function returns an empty array (no trigger scenario).
+    """
 
     alert_name = f"vrl_no_trigger_alert_{random.randint(1000, 9999)}"
     folder_alert = f"vrl_folder_{random.randint(1000, 9999)}"
@@ -775,7 +780,7 @@ def test_new_alert_create_with_vrl_no_trigger(create_session, base_url):
     print(resp_create_templates_alert.content)
     assert (
         resp_create_templates_alert.status_code == 200
-    ), f"Create template 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
+    ), f"Expected 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
 
     # Create destination
     payload_dest_alert = {
@@ -886,9 +891,21 @@ def test_new_alert_create_with_vrl_no_trigger(create_session, base_url):
 
     print(f"VRL function verified in alert: {vrl_in_response}")
 
+    # Cleanup: Delete alert, destination, template, and folder
+    session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+    session.delete(f"{url}api/{org_id}/alerts/destinations/{destination_alert}")
+    session.delete(f"{url}api/{org_id}/alerts/templates/{template_alert}")
+    session.delete(f"{url}api/v2/{org_id}/folders/{folder_id}")
+    print(f"Cleanup completed for test_new_alert_create_with_vrl_no_trigger")
+
 
 def test_new_alert_create_with_vrl_trigger(create_session, base_url):
-    """Running an E2E test for creating a new alert with VRL function (trigger - returns objects)."""
+    """Test creating an alert with VRL function that returns objects.
+
+    This test verifies that an alert can be created with a VRL function
+    and that the VRL function is correctly stored and retrieved.
+    The VRL function returns an array with objects (trigger scenario).
+    """
 
     alert_name = f"vrl_trigger_alert_{random.randint(1000, 9999)}"
     folder_alert = f"vrl_trigger_folder_{random.randint(1000, 9999)}"
@@ -928,7 +945,7 @@ def test_new_alert_create_with_vrl_trigger(create_session, base_url):
     print(resp_create_templates_alert.content)
     assert (
         resp_create_templates_alert.status_code == 200
-    ), f"Create template 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
+    ), f"Expected 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
 
     # Create destination
     payload_dest_alert = {
@@ -1039,9 +1056,20 @@ def test_new_alert_create_with_vrl_trigger(create_session, base_url):
 
     print(f"VRL function (trigger) verified in alert: {vrl_in_response}")
 
+    # Cleanup: Delete alert, destination, template, and folder
+    session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+    session.delete(f"{url}api/{org_id}/alerts/destinations/{destination_alert}")
+    session.delete(f"{url}api/{org_id}/alerts/templates/{template_alert}")
+    session.delete(f"{url}api/v2/{org_id}/folders/{folder_id}")
+    print(f"Cleanup completed for test_new_alert_create_with_vrl_trigger")
+
 
 def test_update_alert_vrl_function(create_session, base_url):
-    """Running an E2E test for updating an alert's VRL function."""
+    """Test updating an alert's VRL function.
+
+    This test verifies that an existing alert's VRL function can be
+    updated and the change is correctly persisted.
+    """
 
     alert_name = f"vrl_update_alert_{random.randint(1000, 9999)}"
     folder_alert = f"vrl_update_folder_{random.randint(1000, 9999)}"
@@ -1204,3 +1232,9 @@ def test_update_alert_vrl_function(create_session, base_url):
     assert updated_alert.get("description") == "VRL update test - UPDATED", "Description was not updated"
     print(f"Alert {alert_name} VRL function update test passed")
 
+    # Cleanup: Delete alert, destination, template, and folder
+    session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+    session.delete(f"{url}api/{org_id}/alerts/destinations/{destination_alert}")
+    session.delete(f"{url}api/{org_id}/alerts/templates/{template_alert}")
+    session.delete(f"{url}api/v2/{org_id}/folders/{folder_id}")
+    print(f"Cleanup completed for test_update_alert_vrl_function")
