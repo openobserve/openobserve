@@ -105,6 +105,7 @@ function buildPivotHeaderLevels(
         key: `${lvl}_Total`,
         label: "Total",
         colspan: yCount > 1 ? yCount : 1,
+        rowspan: pivotCount,
         hasBorder: true,
       });
     }

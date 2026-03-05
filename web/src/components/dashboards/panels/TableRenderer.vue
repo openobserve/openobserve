@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(cell, cellIdx) in level.cells"
             :key="'c_' + levelIdx + '_' + cell.key"
             :colspan="cell.colspan"
+            :rowspan="cell.rowspan || 1"
             :class="[
               level.isLeaf ? 'pivot-value-header' : 'pivot-group-header text-center',
               { 'pivot-section-border': cell.hasBorder }
