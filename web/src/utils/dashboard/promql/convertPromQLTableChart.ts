@@ -18,9 +18,9 @@ import { applyAggregation } from "./shared/dataProcessor";
 import {
   getUnitValue,
   formatUnitValue,
-  formatDate,
-  findFirstValidMappedValue,
 } from "../convertDataIntoUnitValue";
+import { formatDate } from "../dateTimeUtils";
+import { findFirstValidMappedValue } from "../panelValidation";
 import { toZonedTime } from "date-fns-tz";
 
 /**
