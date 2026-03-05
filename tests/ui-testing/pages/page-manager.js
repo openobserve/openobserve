@@ -29,8 +29,8 @@ import { AlertDestinationsPage } from "./alertsPages/alertDestinationsPage.js";
 import { PipelinesPage } from "./pipelinesPages/pipelinesPage.js";
 import { LoginPage } from "./generalPages/loginPage.js";
 import { IngestionPage } from "./generalPages/ingestionPage.js";
-const { CloudLoginPage } = require("./cloudPages/cloudLoginPage.js");
-const { isCloudEnvironment } = require("./cloudPages/cloud-env.js");
+import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
+import { isCloudEnvironment } from "./cloudPages/cloud-env.js";
 import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
