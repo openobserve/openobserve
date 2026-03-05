@@ -2275,73 +2275,66 @@ export class AlertsPage {
      * @returns {Promise<string|null>} The VRL content or null if not visible
      */
     async getVrlEditorContent() {
-        // Wait longer for the editor to appear
+        // Wait for the editor to appear
         await this.page.waitForTimeout(3000);
 
-        // First, try to find and expand VRL Function section if collapsed
-        const vrlSectionHeaders = [
-            'text=VRL Function',
-            'text=Apply Over Hits',
-            '[data-test="vrl-function-section"]',
-            '.vrl-function-header',
-            'button:has-text("VRL")'
-        ];
+        // Primary selector: data-test="scheduled-alert-vrl-function-editor" contains the VRL Monaco editor
+        const vrlEditorSelector = '[data-test="scheduled-alert-vrl-function-editor"]';
+        const vrlEditorContainer = this.page.locator(vrlEditorSelector);
 
-        for (const selector of vrlSectionHeaders) {
-            const header = this.page.locator(selector).first();
-            if (await header.isVisible({ timeout: 1000 }).catch(() => false)) {
-                await header.click().catch(() => {});
-                await this.page.waitForTimeout(1000);
-                testLogger.info('Clicked VRL section header', { selector });
-                break;
+        if (await vrlEditorContainer.isVisible({ timeout: 5000 }).catch(() => false)) {
+            // Find Monaco editor view-lines within the VRL editor container
+            const viewLines = vrlEditorContainer.locator('.view-lines').first();
+            if (await viewLines.isVisible({ timeout: 2000 }).catch(() => false)) {
+                const content = await viewLines.textContent();
+                testLogger.info('Retrieved VRL editor content from scheduled-alert-vrl-function-editor', { length: content?.length });
+                return content;
             }
+            testLogger.warn('VRL editor container visible but .view-lines not found');
         }
 
-        // Try multiple VRL editor selectors
-        const vrlSelectors = [
-            this.locators.vrlFunctionEditorDialog + ' .view-lines',  // Monaco editor lines
-            this.locators.vrlFunctionEditorDialog,                    // #alert-editor-vrl
-            '#alert-editor-vrl .monaco-editor .view-lines',           // More specific
-            '[data-test="alert-vrl-editor"] .view-lines',             // Alternative data-test
-            '.vrl-function-editor .view-lines',                       // Class-based
-            '.alert-vrl-editor .view-lines'                           // Another class
+        // Fallback: Try other VRL editor selectors
+        const fallbackSelectors = [
+            this.locators.vrlFunctionEditorDialog + ' .view-lines',
+            '#alert-editor-vrl .monaco-editor .view-lines',
+            '[data-test="alert-vrl-editor"] .view-lines'
         ];
 
-        for (const selector of vrlSelectors) {
+        for (const selector of fallbackSelectors) {
             const vrlEditor = this.page.locator(selector).first();
             if (await vrlEditor.isVisible({ timeout: 2000 }).catch(() => false)) {
                 const content = await vrlEditor.textContent();
-                testLogger.info('Retrieved VRL editor content', { selector, length: content?.length });
+                testLogger.info('Retrieved VRL editor content via fallback', { selector, length: content?.length });
                 return content;
             }
         }
 
-        // Check for any Monaco editor with VRL-like content
+        // Last resort: Check all Monaco editors and find one with VRL-like content
         const allEditorContents = await this.page.evaluate(() => {
             const viewLines = document.querySelectorAll('.view-lines');
             return Array.from(viewLines).map(el => ({
                 text: el.textContent?.substring(0, 200),
-                parent: el.closest('[id]')?.id || 'no-id'
+                parent: el.closest('[data-test]')?.getAttribute('data-test') || el.closest('[id]')?.id || 'no-id'
             }));
         }).catch(() => []);
         testLogger.info('All editor contents', { editors: JSON.stringify(allEditorContents) });
 
-        // Find VRL content by parent container - fnEditor-dialog is the VRL function dialog
-        // TODO: Request UI team to add data-test="vrl-editor" attribute for reliable selection.
-        // Current heuristic relies on fnEditor-dialog parent ID which may change without notice.
+        // Find VRL content by data-test attribute
         for (const editor of allEditorContents) {
-            if (editor.parent === 'fnEditor-dialog') {
-                testLogger.info('Found VRL content in fnEditor-dialog', { content: editor.text });
+            if (editor.parent === 'scheduled-alert-vrl-function-editor' ||
+                editor.parent?.includes('vrl') ||
+                editor.parent?.includes('function-editor')) {
+                testLogger.info('Found VRL content via fallback scan', { parent: editor.parent, content: editor.text });
                 return editor.text;
             }
         }
 
         // Log detailed info for debugging when VRL editor not found
         const availableParents = allEditorContents.map(e => e.parent).join(', ');
-        testLogger.error('VRL editor not found - fnEditor-dialog container missing', {
+        testLogger.error('VRL editor not found', {
             availableParents: availableParents || 'none',
             editorCount: allEditorContents.length,
-            hint: 'UI may have changed - check if fnEditor-dialog container ID still exists. Tests using this method should assert content is not null.'
+            hint: 'Expected data-test="scheduled-alert-vrl-function-editor" container'
         });
         return null;
     }
