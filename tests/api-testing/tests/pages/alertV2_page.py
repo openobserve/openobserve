@@ -72,7 +72,7 @@ class AlertV2Page:
                     "type": "sql",
                     "aggregation": None,
                     "promql_condition": None,
-                    "vrl_function":"I1Jlc3VsdEFycmF5IwouID0gW10KLg..",
+                    "vrl_function":"I1Jlc3VsdEFycmF5IwouID0gW10KLg==",
                     "multi_time_range": []
                     },
                     "trigger_condition": {
@@ -80,7 +80,7 @@ class AlertV2Page:
                     "operator": ">=",
                     "frequency": 1,
                     "cron": "",
-                    "threshold": 3,
+                    "threshold": 1,
                     "silence": 10,
                     "frequency_type": "minutes",
                     "timezone": "UTC"
@@ -103,7 +103,7 @@ class AlertV2Page:
             return False  # Indicate that creation failed due to existing alert
         assert response.status_code == 200, f"Failed to create alert: {response.content}"
         return True  # Indicate successful creation
-    
+
     def create_scheduled_sql_alert_vrl_trigger(self, session, base_url, user_email, user_password, org_id, stream_name, destination_name, folder_id, alert_name):
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
         session.auth = HTTPBasicAuth(user_email, user_password)
@@ -119,7 +119,7 @@ class AlertV2Page:
                     "type": "sql",
                     "aggregation": None,
                     "promql_condition": None,
-                    "vrl_function":"I1Jlc3VsdEFycmF5IwouID0gW3t9LCB7fV0KLg..",
+                    "vrl_function":"I1Jlc3VsdEFycmF5IwouID0gW3t9LCB7fV0KLg==",
                     "multi_time_range": []
                     },
                     "trigger_condition": {
@@ -127,7 +127,7 @@ class AlertV2Page:
                     "operator": ">=",
                     "frequency": 1,
                     "cron": "",
-                    "threshold": 3,
+                    "threshold": 1,
                     "silence": 10,
                     "frequency_type": "minutes",
                     "timezone": "UTC"
