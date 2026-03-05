@@ -352,16 +352,18 @@ test.describe("Sankey chart testcases", () => {
       await pm.chartTypeSelector.searchAndAddField("target", "target");
       await pm.chartTypeSelector.searchAndAddField("value", "sankeyvalue");
 
-      // Add source as a filter field (use last +F button to avoid Sankey dual-button ambiguity)
+      // Add source as a filter field
+      // Sankey mode renders two button groups per field: standard (+X +Y +B +F) and sankey (+S +T +V +F).
+      // Scope to the sankey group by finding +F that's a sibling of the +S button.
       const searchInput = page.locator('[data-test="index-field-search-input"]');
       await searchInput.click();
       await searchInput.fill("source");
       const fieldItem = page
         .locator('[data-test^="field-list-item-"][data-test$="-source"]')
         .first();
-      const filterBtn = fieldItem
-        .locator('[data-test="dashboard-add-filter-data"]')
-        .last();
+      // Target the Sankey button group (contains +S) and find +F within it
+      const sankeyGroup = fieldItem.locator('.field_icons:has([data-test="dashboard-add-source-data"])');
+      const filterBtn = sankeyGroup.locator('[data-test="dashboard-add-filter-data"]');
       await filterBtn.waitFor({ state: "visible", timeout: 5000 });
       await filterBtn.click();
       await searchInput.fill("");
@@ -434,9 +436,9 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Verify no data or error is shown (incomplete Sankey config)
-      const noDataVisible = await page.locator('[data-test="no-data"]').isVisible().catch(() => false);
-      const errorVisible = await page.locator('[data-test="dashboard-error"]').first().isVisible().catch(() => false);
-      expect(noDataVisible || errorVisible).toBeTruthy();
+      await expect(
+        page.locator('[data-test="no-data"]').or(page.locator('[data-test="dashboard-error"]')).first()
+      ).toBeVisible({ timeout: 10000 });
 
       testLogger.info("Sankey no data state verified");
 

@@ -60,7 +60,7 @@ export default class ChartTypeSelector {
 
     // CRITICAL: Wait for stream list API call to complete after changing type
     await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-    await this.page.waitForTimeout(1000);
+    await this.page.locator('[data-test="index-dropdown-stream"]').waitFor({ state: "visible", timeout: 10000 });
   }
 
   // Stream select with retry mechanism (no page reload to preserve context)
@@ -73,10 +73,9 @@ export default class ChartTypeSelector {
       try {
         // Close any open dropdown first
         await this.page.keyboard.press("Escape");
-        await this.page.waitForTimeout(500);
 
+        await streamInput.waitFor({ state: "visible", timeout: 5000 });
         await streamInput.click();
-        await this.page.waitForTimeout(500);
 
         // Log all available options in dropdown for debugging
         const allOptions = await this.page.locator('[role="listbox"] [role="option"]').allTextContents();
@@ -84,7 +83,9 @@ export default class ChartTypeSelector {
 
         await streamInput.press("Control+a");
         await streamInput.fill(streamName);
-        await this.page.waitForTimeout(1500);
+
+        // Wait for dropdown options to filter
+        await this.page.locator('[role="listbox"]').waitFor({ state: "visible", timeout: 10000 });
 
         const streamOption = this.page
           .getByRole("option", { name: streamName, exact: true })
@@ -101,9 +102,9 @@ export default class ChartTypeSelector {
           testLogger.error(`FAILED after ${maxRetries} attempts. Final options: ${finalOptions.join(', ')}`);
           throw error;
         }
-        // Close dropdown and wait before retry (don't reload - loses context!)
+        // Close dropdown and wait for network before retry (don't reload - loses context!)
         await this.page.keyboard.press("Escape");
-        await this.page.waitForTimeout(3000);
+        await this.page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
       }
     }
   }
