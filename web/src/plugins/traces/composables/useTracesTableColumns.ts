@@ -40,12 +40,20 @@ export function useTracesTableColumns(showLlmColumns: Ref<boolean>) {
       {
         id: "service",
         header: "SERVICE",
-        meta: { grow: true, width: 180, class:'tw:text-[var(--o2-text-1)]'},
+        meta: {
+          grow: true,
+          width: 180,
+          cellClass: "tw:text-[var(--o2-text-1)]",
+        },
       },
       {
         id: "operation_name",
         header: "OPERATION NAME",
-        meta: { grow: true, width: 200, class:'tw:text-[var(--o2-text-1)]'},
+        meta: {
+          grow: true,
+          width: 200,
+          cellClass: "tw:text-[var(--o2-text-1)]",
+        },
       },
       {
         id: "duration",

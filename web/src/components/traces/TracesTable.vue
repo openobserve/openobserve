@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="header.id"
         class="tw:px-2 tw:truncate text-caption text-weight-bold tw:select-none"
         :class="[
-          getAlignClass(header.column),
+          getAlignClass(header.column, 'header'),
           header.column.columnDef.meta?.sortable
             ? 'tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-[0.25rem]'
             : '',
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="cell in allRows[virtualRow.index].getVisibleCells()"
             :key="cell.id"
             class="tw:p-2 tw:overflow-hidden tw:text-ellipsis"
-            :class="getAlignClass(cell.column)"
+            :class="getAlignClass(cell.column, 'cell')"
             :style="getColumnStyle(cell.column)"
           >
             <slot
@@ -148,7 +148,8 @@ declare module "@tanstack/vue-table" {
     /** whether clicking the header triggers server-side sort */
     sortable?: boolean;
     /** custom column classes */
-    class?: string;
+    cellClass?: string;
+    headerClass?: string;
   }
 }
 export default {};
@@ -261,9 +262,14 @@ function getColumnStyle(column: Column<T, unknown>): Record<string, string> {
   return { flex: `0 0 ${size}px`, width: `${size}px`, overflow: "hidden" };
 }
 
-function getAlignClass(column: Column<T, unknown>): string {
+function getAlignClass(
+  column: Column<T, unknown>,
+  type: "header" | "cell",
+): string {
   const a = column.columnDef.meta?.align;
-  const colClass = column.columnDef.meta?.class ?? "";
+  const colClass =
+    column.columnDef.meta?.[type === "header" ? "headerClass" : "cellClass"] ??
+    "";
   if (a === "center") return `${colClass} text-center`;
   if (a === "right") return `${colClass} text-right`;
   return colClass;
