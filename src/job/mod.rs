@@ -396,6 +396,75 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(service_graph::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_alert_manager() {
+        // Register the OSS search layer as the query executor for anomaly detection.
+        // Must happen before start_scheduler() so the training/detection jobs can
+        // call execute_anomaly_query() via the registered callback.
+        o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
+            |org_id, sql, start, end, cfg_id| {
+                Box::pin(async move {
+                    crate::service::anomaly_detection::execute_anomaly_query(
+                        &org_id, &sql, start, end, &cfg_id,
+                    )
+                    .await
+                })
+            },
+        );
+
+        o2_enterprise::enterprise::anomaly_detection::query_executor::register_anomaly_writer(
+            |org_id, records| {
+                Box::pin(async move {
+                    crate::service::anomaly_detection::write_anomalies_to_stream(&org_id, records)
+                        .await
+                })
+            },
+        );
+
+        o2_enterprise::enterprise::anomaly_detection::query_executor::register_alert_sender(
+            |org_id, dest_id, cfg_name, cfg_id, anomaly_count, stream_name| {
+                Box::pin(async move {
+                    crate::service::anomaly_detection::send_anomaly_alert(
+                        org_id,
+                        dest_id,
+                        cfg_name,
+                        cfg_id,
+                        anomaly_count,
+                        stream_name,
+                    )
+                    .await
+                })
+            },
+        );
+
+        // When training completes, reset the scheduled_jobs trigger to now so
+        // detection starts immediately rather than waiting for the next retry cycle.
+        o2_enterprise::enterprise::anomaly_detection::query_executor::register_training_complete_notifier(
+            |org_id, config_id| {
+                Box::pin(async move {
+                    use config::{meta::triggers::TriggerModule, utils::time::now_micros};
+                    match crate::service::db::scheduler::get(&org_id, TriggerModule::AnomalyDetection, &config_id).await {
+                        Ok(mut trigger) => {
+                            trigger.next_run_at = now_micros();
+                            trigger.status = crate::service::db::scheduler::TriggerStatus::Waiting;
+                            crate::service::db::scheduler::update_trigger(trigger, false, "").await
+                                .map_err(|e| anyhow::anyhow!(e))
+                        }
+                        Err(e) => {
+                            log::warn!("[anomaly_detection {config_id}] trigger not found after training: {e}");
+                            Ok(())
+                        }
+                    }
+                })
+            },
+        );
+
+        if let Err(e) =
+            o2_enterprise::enterprise::anomaly_detection::scheduler::start_scheduler().await
+        {
+            log::error!("Failed to start anomaly detection scheduler: {e}");
+        }
+    }
     tokio::task::spawn(metrics::run());
     let _ = promql::run();
     tokio::task::spawn(alert_manager::run());

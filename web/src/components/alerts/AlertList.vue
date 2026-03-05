@@ -98,8 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="importAlert"
             data-test="alert-import"
           />
-          <!-- Add Alert button -->
+          <!-- Add Alert button (hidden on Anomaly Detection tab) -->
           <q-btn
+            v-if="activeTab !== 'anomalyDetection'"
             data-test="alert-list-add-alert-btn"
             class="q-ml-sm o2-primary-button tw:h-[36px]"
             no-caps
@@ -108,6 +109,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="!destinations.length ? t('alerts.noDestinations') : ''"
             :label="t(`alerts.add`)"
             @click="showAddUpdateFn({})"
+          />
+          <!-- New Anomaly Detection button (shown only on Anomaly Detection tab) -->
+          <q-btn
+            v-if="activeTab === 'anomalyDetection'"
+            data-test="alert-list-add-anomaly-btn"
+            class="q-ml-sm o2-primary-button tw:h-[36px]"
+            no-caps
+            flat
+            :label="t('alerts.newAnomalyDetection')"
+            @click="router.push({ name: 'addAnomalyDetection', query: { org_identifier: store.state.selectedOrganization.identifier } })"
           />
         </div>
       </div>
@@ -138,8 +149,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
             <div class="tw:h-full card-container">
+              <!-- Anomaly Detection List (shown when Anomaly Detection tab is active) -->
+              <AnomalyDetectionList
+                v-if="activeTab === 'anomalyDetection'"
+                :org_identifier="store.state.selectedOrganization.identifier"
+              />
               <!-- Alert List Table -->
               <q-table
+                v-if="activeTab !== 'anomalyDetection'"
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
                 selection="multiple"
@@ -777,6 +794,7 @@ import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { toRaw } from "vue";
 import { nextTick } from "vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import AnomalyDetectionList from "@/components/anomaly_detection/AnomalyDetectionList.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
@@ -798,6 +816,7 @@ export default defineComponent({
     FolderList,
     MoveAcrossFolders,
     AppTabs,
+    AnomalyDetectionList,
     SelectFolderDropDown,
     AlertHistoryDrawer,
     O2AIContextAddBtn,
@@ -951,21 +970,22 @@ export default defineComponent({
       (router.currentRoute.value.query.tab as string) || "all"
     );
 
+    const isAnomalyDetectionEnabled = computed(
+      () => store.state.zoConfig.anomaly_detection_enabled === true,
+    );
+
     // Tabs for alerts view
-    const alertTabs = reactive([
-      {
-        label: t("alerts.all"),
-        value: "all",
-      },
-      {
-        label: t("alerts.scheduled"),
-        value: "scheduled",
-      },
-      {
-        label: t("alerts.realTime"),
-        value: "realTime",
-      },
-    ]);
+    const alertTabs = computed(() => {
+      const tabs: { label: string; value: string }[] = [
+        { label: t("alerts.all"),      value: "all" },
+        { label: t("alerts.scheduled"), value: "scheduled" },
+        { label: t("alerts.realTime"),  value: "realTime" },
+      ];
+      if (isAnomalyDetectionEnabled.value) {
+        tabs.push({ label: t("alerts.anomalyDetection"), value: "anomalyDetection" });
+      }
+      return tabs;
+    });
 
     // Keep old tabs for backward compatibility if needed
     const tabs = reactive([
@@ -1336,6 +1356,10 @@ export default defineComponent({
       }
       // When incidents tab is active, skip filtering (IncidentList handles its own data)
       if (activeTab.value === "incidents") {
+        return;
+      }
+      // Anomaly Detection tab shows its own component — no alert table filtering needed
+      if (activeTab.value === "anomalyDetection") {
         return;
       }
       //here we are filtering the alerts by the activeTab

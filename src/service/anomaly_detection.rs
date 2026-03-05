@@ -75,9 +75,9 @@ pub async fn create_config(
     let config_id = svix_ksuid::Ksuid::new(None, None).to_string();
     let now = Utc::now().naive_utc();
 
-    // Calculate next_run_at based on detection_interval
+    // Calculate next_run_at in microseconds (matching the enterprise scheduler convention)
     let interval_secs = parse_interval(&req.detection_interval)?;
-    let next_run_at = Utc::now().timestamp() + interval_secs;
+    let next_run_at = Utc::now().timestamp_micros() + (interval_secs * 1_000_000);
 
     let new_config = anomaly_detection_config::ActiveModel {
         config_id: Set(config_id.clone()),
@@ -103,9 +103,23 @@ pub async fn create_config(
         last_detection_run: Set(None),
         next_run_at: Set(next_run_at),
         current_model_version: Set(0),
-        rcf_num_trees: Set(req.rcf_num_trees.unwrap_or(100)),
-        rcf_tree_size: Set(req.rcf_tree_size.unwrap_or(256)),
-        rcf_shingle_size: Set(req.rcf_shingle_size.unwrap_or(1)),
+        rcf_num_trees: Set(req.rcf_num_trees.unwrap_or(
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_num_trees as i32,
+        )),
+        rcf_tree_size: Set(req.rcf_tree_size.unwrap_or(
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_tree_size as i32,
+        )),
+        // shingle_size default comes from O2_ANOMALY_RCF_SHINGLE_SIZE env var (default=4).
+        // 4 consecutive time-buckets gives the RCF model enough temporal context.
+        rcf_shingle_size: Set(req.rcf_shingle_size.unwrap_or(
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_shingle_size as i32,
+        )),
         alert_enabled: Set(req.alert_enabled.unwrap_or(true)),
         alert_destination_id: Set(req.alert_destination_id.clone()),
         status: Set("waiting".to_string()),
@@ -118,6 +132,46 @@ pub async fn create_config(
     };
 
     let result = new_config.insert(db).await?;
+
+    // Register a detection trigger in the shared scheduler so it is driven by the
+    // same infrastructure as alerts.  The handler will check `is_trained` and skip
+    // until training is complete.
+    {
+        use config::{meta::triggers::TriggerModule, utils::time::now_micros};
+        let trigger = crate::service::db::scheduler::Trigger {
+            org: org_id.to_string(),
+            module: TriggerModule::AnomalyDetection,
+            module_key: config_id.clone(),
+            next_run_at: now_micros(),
+            is_realtime: false,
+            is_silenced: false,
+            ..Default::default()
+        };
+        if let Err(e) = crate::service::db::scheduler::push(trigger).await {
+            log::warn!("[anomaly_detection {config_id}] failed to push detection trigger: {e}");
+        }
+    }
+
+    // Immediately kick off training in the background rather than waiting up to
+    // `training_check_interval_seconds` (default 1h) for the scheduler tick.
+    #[cfg(feature = "enterprise")]
+    {
+        let config_id_for_training = config_id.clone();
+        tokio::spawn(async move {
+            if let Err(e) =
+                o2_enterprise::enterprise::anomaly_detection::scheduler::trigger_training(
+                    &config_id_for_training,
+                )
+                .await
+            {
+                log::error!(
+                    "[anomaly_detection {}] failed to trigger initial training on create: {}",
+                    config_id_for_training,
+                    e
+                );
+            }
+        });
+    }
 
     Ok(serde_json::to_value(result)?)
 }
@@ -187,6 +241,20 @@ pub async fn delete_config(org_id: &str, config_id: &str) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
     config.delete(db).await?;
+
+    // Remove the detection trigger from the shared scheduler.
+    {
+        use config::meta::triggers::TriggerModule;
+        if let Err(e) = crate::service::db::scheduler::delete(
+            org_id,
+            TriggerModule::AnomalyDetection,
+            config_id,
+        )
+        .await
+        {
+            log::warn!("[anomaly_detection {config_id}] failed to delete detection trigger: {e}");
+        }
+    }
 
     Ok(())
 }
@@ -272,7 +340,7 @@ pub async fn train_model(org_id: &str, config_id: &str) -> Result<serde_json::Va
                                     result.message,
                                 );
                             }
-                            // Update status to active now that training succeeded
+                            // Update status and is_trained flag after training
                             if result.success {
                                 if let Some(db) = infra::db::ORM_CLIENT.get() {
                                     use infra::table::entity::anomaly_detection_config;
@@ -286,9 +354,12 @@ pub async fn train_model(org_id: &str, config_id: &str) -> Result<serde_json::Va
                                     {
                                         let mut active = cfg.into_active_model();
                                         active.status = sea_orm::Set("active".to_string());
+                                        active.is_trained = sea_orm::Set(true);
+                                        active.training_completed_at =
+                                            sea_orm::Set(Some(chrono::Utc::now().naive_utc()));
                                         let _ = sea_orm::ActiveModelTrait::update(active, db).await;
                                         log::info!(
-                                            "[anomaly_detection {}] status updated to active",
+                                            "[anomaly_detection {}] status updated to active, is_trained=true",
                                             config_id_owned
                                         );
                                     }
@@ -420,6 +491,29 @@ pub async fn detect_anomalies(org_id: &str, config_id: &str) -> Result<serde_jso
                 .collect::<Result<Vec<_>, _>>()?;
 
             write_anomalies_to_stream(org_id, records).await?;
+        }
+
+        // Send alert if anomalies found and alert is configured
+        if result.anomaly_count > 0 && config.alert_enabled {
+            if let Some(ref dest_id) = config.alert_destination_id {
+                if let Err(e) = send_anomaly_alert(
+                    org_id.to_string(),
+                    dest_id.clone(),
+                    config.name.clone(),
+                    config_id.to_string(),
+                    result.anomaly_count,
+                    config.stream_name.clone(),
+                )
+                .await
+                {
+                    log::warn!(
+                        "[anomaly_detection {}] failed to send alert to '{}': {}",
+                        config_id,
+                        dest_id,
+                        e
+                    );
+                }
+            }
         }
 
         // Return only the anomalous points in the API response to keep it concise.
@@ -793,6 +887,104 @@ pub async fn write_anomalies_to_stream(
     tracing::info!(
         org_id = %org_id,
         "Successfully wrote anomalies to _anomalies stream"
+    );
+
+    Ok(())
+}
+
+/// Send an anomaly alert to the configured destination.
+///
+/// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
+/// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
+#[cfg(feature = "enterprise")]
+pub async fn send_anomaly_alert(
+    org_id: String,
+    destination_id: String,
+    config_name: String,
+    config_id: String,
+    anomaly_count: i32,
+    stream_name: String,
+) -> anyhow::Result<()> {
+    use config::meta::destinations::{DestinationType, Module};
+
+    use crate::service::alerts::destinations;
+
+    let dest = match destinations::get(&org_id, &destination_id).await {
+        Ok(d) => d,
+        Err(e) => {
+            log::warn!(
+                "[anomaly_detection {}] destination '{}' not found: {}",
+                config_id,
+                destination_id,
+                e
+            );
+            return Ok(());
+        }
+    };
+
+    let endpoint = match &dest.module {
+        Module::Alert {
+            destination_type: DestinationType::Http(ep),
+            ..
+        } => ep.clone(),
+        _ => {
+            log::warn!(
+                "[anomaly_detection {}] destination '{}' is not an HTTP destination — skipping",
+                config_id,
+                destination_id
+            );
+            return Ok(());
+        }
+    };
+
+    let message = format!(
+        "Anomaly detected: {} anomalies found in stream '{}' by config '{}'",
+        anomaly_count, stream_name, config_name
+    );
+    // Use Slack-compatible format (text field) so the same payload works for
+    // Slack incoming webhooks. Other webhook receivers can still use the fields.
+    let payload = serde_json::json!({
+        "text": message,
+        "alert_type": "anomaly_detection",
+        "config_id": config_id,
+        "config_name": config_name,
+        "org_id": org_id,
+        "stream_name": stream_name,
+        "anomaly_count": anomaly_count,
+        "message": message,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+    });
+
+    let client = if endpoint.skip_tls_verify {
+        reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()?
+    } else {
+        reqwest::Client::new()
+    };
+
+    let mut req = client.post(&endpoint.url);
+
+    if let Some(headers) = &endpoint.headers {
+        for (key, value) in headers.iter() {
+            if !key.is_empty() && !value.is_empty() {
+                req = req.header(key, value);
+            }
+        }
+    }
+
+    let resp = req
+        .header("Content-Type", "application/json")
+        .body(payload.to_string())
+        .send()
+        .await?;
+
+    let status = resp.status();
+    log::info!(
+        "[anomaly_detection {}] alert sent to '{}': status={}",
+        config_id,
+        destination_id,
+        status
     );
 
     Ok(())

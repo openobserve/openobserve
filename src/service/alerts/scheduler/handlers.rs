@@ -75,7 +75,86 @@ pub async fn handle_triggers(
             handle_query_recommendations_triggers(trace_id, trigger).await
         }
         db::scheduler::TriggerModule::Backfill => handle_backfill_triggers(trace_id, trigger).await,
+        db::scheduler::TriggerModule::AnomalyDetection => {
+            handle_anomaly_detection_triggers(trigger).await
+        }
     }
+}
+
+/// Handle an anomaly detection trigger.
+///
+/// Loads the config, runs detection via the enterprise crate (if trained),
+/// then reschedules the trigger according to `detection_interval`.
+async fn handle_anomaly_detection_triggers(
+    mut trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use config::utils::time::now_micros;
+    use infra::table::entity::anomaly_detection_config;
+    use sea_orm::EntityTrait;
+
+    let config_id = trigger.module_key.clone();
+
+    let db = infra::db::ORM_CLIENT
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+
+    let config = anomaly_detection_config::Entity::find_by_id(&config_id)
+        .one(db)
+        .await?;
+
+    // If config was deleted, clean up the trigger.
+    let Some(config) = config else {
+        db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::AnomalyDetection,
+            &config_id,
+        )
+        .await?;
+        return Ok(());
+    };
+
+    // If not yet trained or disabled, retry after 1 minute.
+    if !config.is_trained || !config.enabled {
+        trigger.next_run_at = now_micros() + 60 * 1_000_000;
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        db::scheduler::update_trigger(trigger, false, "").await?;
+        return Ok(());
+    }
+
+    // Run detection via enterprise.
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) =
+            o2_enterprise::enterprise::anomaly_detection::scheduler::run_detection_for_config(
+                &config_id,
+            )
+            .await
+        {
+            log::error!("[anomaly_detection] detection failed for {config_id}: {e}");
+        }
+    }
+
+    // Reschedule for the next detection_interval.
+    let interval_us = parse_detection_interval_to_micros(&config.detection_interval);
+    trigger.next_run_at = now_micros() + interval_us;
+    trigger.status = db::scheduler::TriggerStatus::Waiting;
+    db::scheduler::update_trigger(trigger, false, "").await?;
+
+    Ok(())
+}
+
+/// Parse a detection interval string like "5m", "1h" into microseconds.
+/// Defaults to 5 minutes on parse failure.
+fn parse_detection_interval_to_micros(interval: &str) -> i64 {
+    let s = interval.trim();
+    let secs: i64 = if let Some(n) = s.strip_suffix('h') {
+        n.trim().parse::<i64>().unwrap_or(1) * 3600
+    } else if let Some(n) = s.strip_suffix('m') {
+        n.trim().parse::<i64>().unwrap_or(5) * 60
+    } else {
+        s.parse::<i64>().unwrap_or(5) * 60
+    };
+    secs * 1_000_000
 }
 
 /// Returns the skipped timestamps and the final timestamp to evaluate the alert.

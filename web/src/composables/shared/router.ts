@@ -381,6 +381,30 @@ const useRoutes = () => {
       },
     },
     {
+      path: "alerts/anomaly/add",
+      name: "addAnomalyDetection",
+      component: () =>
+        import("@/views/AddAnomalyDetectionView.vue"),
+      meta: {
+        title: "Add Anomaly Detection",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/anomaly/edit/:config_id",
+      name: "editAnomalyDetection",
+      component: () =>
+        import("@/views/AddAnomalyDetectionView.vue"),
+      meta: {
+        title: "Edit Anomaly Detection",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "alerts/history",
       name: "alertHistory",
       component: () => import("@/components/alerts/AlertHistory.vue"),
