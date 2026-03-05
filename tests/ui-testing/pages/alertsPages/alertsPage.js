@@ -1853,8 +1853,10 @@ export class AlertsPage {
         const destinationFound = await pm.alertDestinationsPage.findDestinationAcrossPages(destinationName);
 
         if (!destinationFound) {
-            // Generate Basic auth header
-            const authHeader = this.commonActions.constructor.generateBasicAuthHeader(
+            // Generate Basic auth header using getAuthHeaders (supports cloud passcode)
+            const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
+            const headers = getAuthHeaders();
+            const authHeader = headers['Authorization'] || this.commonActions.constructor.generateBasicAuthHeader(
                 process.env["ZO_ROOT_USER_EMAIL"],
                 process.env["ZO_ROOT_USER_PASSWORD"]
             );

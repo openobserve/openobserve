@@ -2,46 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const logData = require("../../fixtures/log.json");
-const logsdata = require("../../../test-data/logs_data.json");
-
-// Legacy login function replaced by global authentication via navigateToBase
-
-async function ingestion(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-
-  try {
-    const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(logsdata)
-      });
-      if (!fetchResponse.ok) {
-        throw new Error(`HTTP error! status: ${fetchResponse.status}`);
-      }
-      return await fetchResponse.json();
-    }, {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: streamName,
-      logsdata: logsdata
-    });
-    return response;
-  } catch (error) {
-    testLogger.error('Ingestion failed:', { error: error.message });
-    throw error;
-  }
-}
+const { ingestTestData: ingestion } = require('../utils/data-ingestion.js');
 
 test.describe("Logs Table Field Management - Complete Test Suite", () => {
   let pageManager;

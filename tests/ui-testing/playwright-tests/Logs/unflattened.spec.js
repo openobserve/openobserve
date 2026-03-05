@@ -40,39 +40,7 @@ async function toggleQuickModeIfOff(page) {
   }
 }
 
-async function ingestion(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-
-  const headers = {
-    Authorization: `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-  const response = await page.evaluate(
-    async ({ url, headers, orgId, streamName, logsdata }) => {
-      const fetchResponse = await fetch(
-        `${url}/api/${orgId}/${streamName}/_json`,
-        {
-          method: "POST",
-          headers: headers,
-          body: JSON.stringify(logsdata),
-        }
-      );
-      return await fetchResponse.json();
-    },
-    {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: streamName,
-      logsdata: logsdata,
-    }
-  );
-  testLogger.debug('API response received', { response });
-}
+const { ingestTestData: ingestion } = require('../utils/data-ingestion.js');
 
 test.describe("Unflattened testcases", () => {
   let pageManager;
@@ -153,7 +121,9 @@ test.describe("Unflattened testcases", () => {
     // await pageManager.commonActions.flipStreaming();
   });
 
-  test("stream to toggle store original data toggle and display o2 id", async ({ page }) => {
+  test("stream to toggle store original data toggle and display o2 id", {
+    tag: ['@unflattened', '@logs', '@all']
+  }, async ({ page }) => {
     testLogger.info('Starting test: toggle store original data and display o2 id');
 
     // Navigate to Streams Menu
@@ -294,7 +264,9 @@ test.describe("Unflattened testcases", () => {
   });
 
 
-  test("stream to display o2 id when quick mode is on and select * query is added", async ({ page }) => {
+  test("stream to display o2 id when quick mode is on and select * query is added", {
+    tag: ['@unflattened', '@logs', '@all']
+  }, async ({ page }) => {
     testLogger.info('Starting test: display o2 id with quick mode and SELECT * query');
 
     testLogger.info('Navigating to Streams menu');

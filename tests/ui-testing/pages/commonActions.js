@@ -1,6 +1,9 @@
-import { exec } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 import { test } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { getAuthHeaders, getOrgIdentifier } from '../playwright-tests/utils/cloud-auth.js';
+import testLogger from '../playwright-tests/utils/test-logger.js';
 
 // Common Locator exports
 export var dateTimeButtonLocator='[data-test="date-time-btn"]';
@@ -67,7 +70,7 @@ export class CommonActions {
                         await option.locator('span').click();
                     }
                     optionFound = true;
-                    console.log(`Found ${optionType} after scrolling: ${optionName}`);
+                    testLogger.debug(`Found ${optionType} after scrolling: ${optionName}`);
                     await this.page.waitForTimeout(500);
                 } else {
                     // Get the current scroll position and height
@@ -100,7 +103,7 @@ export class CommonActions {
         }
 
         if (!optionFound) {
-            console.error(`Failed to find ${optionType} ${optionName} after scrolling ${totalScrolled}px`);
+            testLogger.error(`Failed to find ${optionType} ${optionName} after scrolling ${totalScrolled}px`);
             throw new Error(`${optionType} ${optionName} not found in dropdown after scrolling`);
         }
 
@@ -108,20 +111,19 @@ export class CommonActions {
     }
 
     async ingestTestData(streamName) {
-        const curlCommand = `curl -u ${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]} -k ${process.env["ZO_BASE_URL"]}/api/${process.env["ORGNAME"]}/${streamName}/_json -d '[{"level":"info","job":"test","log":"test message for openobserve. this data ingestion has been done using a playwright automation script."}]'`;
+        const headers = getAuthHeaders();
+        const baseUrl = process.env["ZO_BASE_URL"];
+        const orgName = getOrgIdentifier();
+        const data = [{"level":"info","job":"test","log":"test message for openobserve. this data ingestion has been done using a playwright automation script."}];
 
-        return new Promise((resolve, reject) => {
-            exec(curlCommand, (error, stdout, stderr) => {
-                if (error) {
-                    console.error('Error executing curl command:', error);
-                    reject(error);
-                    return;
-                }
-                console.log('Curl command response:', stdout);
-                console.log('Successfully ingested test data');
-                resolve();
-            });
+        const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {
+            headers,
+            data
         });
+        const responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
+        testLogger.debug('Ingestion response', { response: responseData });
+        testLogger.info('Successfully ingested test data');
+        return responseData;
     }
 
     /**
@@ -135,8 +137,6 @@ export class CommonActions {
      */
     async ingestTestDataWithUniqueId(streamName, uniqueId, triggerField = 'city', triggerValue = 'bangalore') {
         const timestamp = Date.now();
-        // Use custom, predictable columns that we control
-        // This eliminates dependency on existing stream columns
         const testData = {
             city: triggerField === 'city' ? triggerValue : 'mumbai',
             country: 'india',
@@ -147,27 +147,20 @@ export class CommonActions {
             message: `Alert trigger test - run_id: ${uniqueId}`
         };
 
+        const headers = getAuthHeaders();
         const baseUrl = process.env["ZO_BASE_URL"];
-        const orgName = process.env["ORGNAME"];
-        const username = process.env["ZO_ROOT_USER_EMAIL"];
-        const password = process.env["ZO_ROOT_USER_PASSWORD"];
+        const orgName = getOrgIdentifier();
 
-        const curlCommand = `curl -s -u ${username}:${password} -k "${baseUrl}/api/${orgName}/${streamName}/_json" -d '${JSON.stringify([testData])}'`;
+        testLogger.debug(`Ingesting test data with unique ID: ${uniqueId}`, { streamName, triggerField, triggerValue });
 
-        console.log(`Ingesting test data with unique ID: ${uniqueId}`, { streamName, triggerField, triggerValue });
-
-        return new Promise((resolve, reject) => {
-            exec(curlCommand, (error, stdout, stderr) => {
-                if (error) {
-                    console.error('Error ingesting test data with unique ID:', error);
-                    reject(error);
-                    return;
-                }
-                console.log('Ingested test data response:', stdout);
-                console.log(`Successfully ingested test data with unique ID: ${uniqueId}`);
-                resolve({ uniqueId, timestamp });
-            });
+        const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {
+            headers,
+            data: [testData]
         });
+        const responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
+        testLogger.debug('Ingested test data response', { response: responseData });
+        testLogger.info(`Successfully ingested test data with unique ID: ${uniqueId}`);
+        return { uniqueId, timestamp };
     }
 
     /**
@@ -177,12 +170,10 @@ export class CommonActions {
      * @returns {Promise<{streamName: string, columns: string[]}>}
      */
     async initializeAlertTestStream(streamName) {
+        const headers = getAuthHeaders();
         const baseUrl = process.env["ZO_BASE_URL"];
-        const orgName = process.env["ORGNAME"];
-        const username = process.env["ZO_ROOT_USER_EMAIL"];
-        const password = process.env["ZO_ROOT_USER_PASSWORD"];
+        const orgName = getOrgIdentifier();
 
-        // Ingest initial data to create stream with our custom schema
         const initialData = [
             {
                 city: 'delhi',
@@ -195,42 +186,38 @@ export class CommonActions {
             }
         ];
 
-        const curlCommand = `curl -s -u ${username}:${password} -k "${baseUrl}/api/${orgName}/${streamName}/_json" -d '${JSON.stringify(initialData)}'`;
+        testLogger.info(`Initializing alert test stream: ${streamName}`);
 
-        console.log(`Initializing alert test stream: ${streamName}`);
-
-        return new Promise((resolve, reject) => {
-            exec(curlCommand, (error, stdout, stderr) => {
-                if (error) {
-                    console.error('Error initializing alert test stream:', error);
-                    reject(error);
-                    return;
-                }
-                console.log('Stream initialization response:', stdout);
-                console.log(`Successfully initialized stream: ${streamName}`);
-                resolve({
-                    streamName,
-                    columns: ['city', 'country', 'status', 'age', 'test_run_id', 'test_timestamp', 'message']
-                });
-            });
+        const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {
+            headers,
+            data: initialData
         });
+        const responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
+        testLogger.debug('Stream initialization response', { response: responseData });
+        testLogger.info(`Successfully initialized stream: ${streamName}`);
+        return {
+            streamName,
+            columns: ['city', 'country', 'status', 'age', 'test_run_id', 'test_timestamp', 'message']
+        };
     }
 
     async ingestCustomTestData(streamName) {
-        const curlCommand = `curl -u ${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]} -k ${process.env["ZO_BASE_URL"]}/api/${process.env["ORGNAME"]}/${streamName}/_json -d @utils/td150.json`;
+        const headers = getAuthHeaders();
+        const baseUrl = process.env["ZO_BASE_URL"];
+        const orgName = getOrgIdentifier();
 
-        return new Promise((resolve, reject) => {
-            exec(curlCommand, (error, stdout, stderr) => {
-                if (error) {
-                    console.error('Error executing curl command:', error);
-                    reject(error);
-                    return;
-                }
-                console.log('Custom curl command response:', stdout);
-                console.log('Successfully ingested custom test data');
-                resolve();
-            });
+        // Read custom test data from file (equivalent to curl -d @utils/td150.json)
+        const dataPath = path.resolve('utils', 'td150.json');
+        const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+
+        const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {
+            headers,
+            data
         });
+        const responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
+        testLogger.debug('Custom test data response', { response: responseData });
+        testLogger.info('Successfully ingested custom test data');
+        return responseData;
     }
 
     /**
@@ -285,7 +272,7 @@ export class CommonActions {
         await this.page.getByText('Organization settings updated', { exact: false }).waitFor({ timeout: 15000 });
         await this.page.reload();
         const newState = await this.getStreamingState();
-        console.log(`[Streaming Toggle] ${isOn ? 'ON' : 'OFF'} -> ${newState ? 'ON' : 'OFF'}`);
+        testLogger.info(`[Streaming Toggle] ${isOn ? 'ON' : 'OFF'} -> ${newState ? 'ON' : 'OFF'}`);
     }
 
     /**
@@ -297,15 +284,12 @@ export class CommonActions {
      * @returns {Promise<{success: boolean, hits: number, data: any[]}>}
      */
     async queryStream(streamName, searchQuery = null, timeRangeMinutes = 15) {
+        const headers = getAuthHeaders();
         const baseUrl = process.env["ZO_BASE_URL"];
-        const orgName = process.env["ORGNAME"];
-        const username = process.env["ZO_ROOT_USER_EMAIL"];
-        const password = process.env["ZO_ROOT_USER_PASSWORD"];
+        const orgName = getOrgIdentifier();
 
-        // Default query if none provided
         const query = searchQuery || `SELECT * FROM "${streamName}"`;
 
-        // Calculate time range (last N minutes)
         const endTime = Date.now() * 1000; // microseconds
         const startTime = endTime - (timeRangeMinutes * 60 * 1000 * 1000); // microseconds
 
@@ -319,32 +303,23 @@ export class CommonActions {
             }
         };
 
-        const curlCommand = `curl -s -u ${username}:${password} -k "${baseUrl}/api/${orgName}/_search?type=logs" -H "Content-Type: application/json" -d '${JSON.stringify(searchPayload)}'`;
-
-        return new Promise((resolve) => {
-            exec(curlCommand, (error, stdout, stderr) => {
-                if (error) {
-                    console.error('Error querying stream:', error);
-                    resolve({ success: false, hits: 0, data: [] });
-                    return;
-                }
-
-                try {
-                    const response = JSON.parse(stdout);
-                    const hits = response.hits?.length || response.total || 0;
-                    console.log(`Query stream ${streamName}: found ${hits} results`);
-                    resolve({
-                        success: true,
-                        hits: hits,
-                        data: response.hits || []
-                    });
-                } catch (parseError) {
-                    console.error('Error parsing query response:', parseError);
-                    console.log('Raw response:', stdout);
-                    resolve({ success: false, hits: 0, data: [] });
-                }
+        try {
+            const response = await this.page.request.post(`${baseUrl}/api/${orgName}/_search?type=logs`, {
+                headers,
+                data: searchPayload
             });
-        });
+            const responseData = await response.json().catch(() => null);
+            const hits = responseData?.hits || [];
+            testLogger.debug(`Query stream ${streamName}: found ${hits.length} results`);
+            return {
+                success: true,
+                hits: hits.length,
+                data: hits
+            };
+        } catch (error) {
+            testLogger.error('Error querying stream', { error: error.message });
+            return { success: false, hits: 0, data: [] };
+        }
     }
 
     /**
@@ -359,7 +334,7 @@ export class CommonActions {
     async waitForAlertInValidationStream(validationStreamName, uniqueId, maxWaitSeconds = 60, pollIntervalSeconds = 5) {
         const maxAttempts = Math.ceil(maxWaitSeconds / pollIntervalSeconds);
 
-        console.log(`Waiting for "${uniqueId}" in stream "${validationStreamName}" (max ${maxWaitSeconds}s)...`);
+        testLogger.info(`Waiting for "${uniqueId}" in stream "${validationStreamName}" (max ${maxWaitSeconds}s)...`);
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             // Query for recent data containing the search term
@@ -371,17 +346,17 @@ export class CommonActions {
             );
 
             if (result.success && result.hits > 0) {
-                console.log(`Found unique ID "${uniqueId}" in validation stream after ${attempt * pollIntervalSeconds}s`);
+                testLogger.info(`Found unique ID "${uniqueId}" in validation stream after ${attempt * pollIntervalSeconds}s`);
                 return { found: true, payload: result.data[0], attempts: attempt };
             }
 
             if (attempt < maxAttempts) {
-                console.log(`Attempt ${attempt}/${maxAttempts}: Unique ID not found yet, waiting ${pollIntervalSeconds}s...`);
+                testLogger.debug(`Attempt ${attempt}/${maxAttempts}: Unique ID not found yet, waiting ${pollIntervalSeconds}s...`);
                 await new Promise(resolve => setTimeout(resolve, pollIntervalSeconds * 1000));
             }
         }
 
-        console.log(`Unique ID "${uniqueId}" not found in validation stream "${validationStreamName}" after ${maxWaitSeconds}s`);
+        testLogger.warn(`Unique ID "${uniqueId}" not found in validation stream "${validationStreamName}" after ${maxWaitSeconds}s`);
         return { found: false, payload: null, attempts: maxAttempts };
     }
 
@@ -405,15 +380,12 @@ export class CommonActions {
      * @returns {Promise<{success: boolean, count: number, data: any[]}>}
      */
     async countAlertNotificationsInStream(validationStreamName, alertName, timeRangeMinutes = 15) {
+        const headers = getAuthHeaders();
         const baseUrl = process.env["ZO_BASE_URL"];
-        const orgName = process.env["ORGNAME"];
-        const username = process.env["ZO_ROOT_USER_EMAIL"];
-        const password = process.env["ZO_ROOT_USER_PASSWORD"];
+        const orgName = getOrgIdentifier();
 
-        // Query for notifications matching the alert name
         const query = `SELECT * FROM "${validationStreamName}" WHERE str_match_ignore_case(text, '${alertName}')`;
 
-        // Calculate time range (last N minutes)
         const endTime = Date.now() * 1000; // microseconds
         const startTime = endTime - (timeRangeMinutes * 60 * 1000 * 1000); // microseconds
 
@@ -427,33 +399,23 @@ export class CommonActions {
             }
         };
 
-        const curlCommand = `curl -s -u ${username}:${password} -k "${baseUrl}/api/${orgName}/_search?type=logs" -H "Content-Type: application/json" -d '${JSON.stringify(searchPayload)}'`;
-
-        return new Promise((resolve) => {
-            exec(curlCommand, (error, stdout, stderr) => {
-                if (error) {
-                    console.error('Error counting notifications in stream:', error);
-                    resolve({ success: false, count: 0, data: [] });
-                    return;
-                }
-
-                try {
-                    const response = JSON.parse(stdout);
-                    const hits = response.hits || [];
-                    const count = hits.length;
-                    console.log(`Count notifications for "${alertName}" in ${validationStreamName}: found ${count} notifications`);
-                    resolve({
-                        success: true,
-                        count: count,
-                        data: hits
-                    });
-                } catch (parseError) {
-                    console.error('Error parsing notification count response:', parseError);
-                    console.log('Raw response:', stdout);
-                    resolve({ success: false, count: 0, data: [] });
-                }
+        try {
+            const response = await this.page.request.post(`${baseUrl}/api/${orgName}/_search?type=logs`, {
+                headers,
+                data: searchPayload
             });
-        });
+            const responseData = await response.json().catch(() => null);
+            const hits = responseData?.hits || [];
+            testLogger.debug(`Count notifications for "${alertName}" in ${validationStreamName}: found ${hits.length} notifications`);
+            return {
+                success: true,
+                count: hits.length,
+                data: hits
+            };
+        } catch (error) {
+            testLogger.error('Error counting notifications in stream', { error: error.message });
+            return { success: false, count: 0, data: [] };
+        }
     }
 
     /**
@@ -469,29 +431,29 @@ export class CommonActions {
     async waitForExactNotificationCount(validationStreamName, alertName, expectedCount, maxWaitSeconds = 120, pollIntervalSeconds = 10) {
         const maxAttempts = Math.ceil(maxWaitSeconds / pollIntervalSeconds);
 
-        console.log(`Waiting for exactly ${expectedCount} notifications for "${alertName}" in "${validationStreamName}" (max ${maxWaitSeconds}s)...`);
+        testLogger.info(`Waiting for exactly ${expectedCount} notifications for "${alertName}" in "${validationStreamName}" (max ${maxWaitSeconds}s)...`);
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             const result = await this.countAlertNotificationsInStream(validationStreamName, alertName, 15);
 
             if (result.success && result.count === expectedCount) {
-                console.log(`Found expected ${expectedCount} notifications after ${attempt * pollIntervalSeconds}s`);
+                testLogger.info(`Found expected ${expectedCount} notifications after ${attempt * pollIntervalSeconds}s`);
                 return { match: true, actualCount: result.count, attempts: attempt };
             }
 
             if (result.count > expectedCount) {
-                console.log(`Found more notifications than expected: ${result.count} > ${expectedCount}`);
+                testLogger.warn(`Found more notifications than expected: ${result.count} > ${expectedCount}`);
                 return { match: false, actualCount: result.count, attempts: attempt };
             }
 
             if (attempt < maxAttempts) {
-                console.log(`Attempt ${attempt}/${maxAttempts}: Found ${result.count} notifications, expected ${expectedCount}, waiting ${pollIntervalSeconds}s...`);
+                testLogger.debug(`Attempt ${attempt}/${maxAttempts}: Found ${result.count} notifications, expected ${expectedCount}, waiting ${pollIntervalSeconds}s...`);
                 await new Promise(resolve => setTimeout(resolve, pollIntervalSeconds * 1000));
             }
         }
 
         const finalResult = await this.countAlertNotificationsInStream(validationStreamName, alertName, 15);
-        console.log(`Final count: ${finalResult.count} notifications (expected ${expectedCount})`);
+        testLogger.info(`Final count: ${finalResult.count} notifications (expected ${expectedCount})`);
         return { match: finalResult.count === expectedCount, actualCount: finalResult.count, attempts: maxAttempts };
     }
 } 

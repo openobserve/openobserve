@@ -2,39 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
-const logsdata = require('../../../test-data/logs_data.json');
-
-// Utility Functions
-
-// Legacy login function replaced by global authentication via navigateToBase
-
-async function ingestTestData(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(logsdata)
-    });
-    return await fetchResponse.json();
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logsdata: logsdata
-  });
-  testLogger.debug('API response received', { response });
-}
+const { ingestTestData } = require('../utils/data-ingestion.js');
 
 test.describe("Logs Histogram testcases", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -68,7 +36,7 @@ test.describe("Logs Histogram testcases", () => {
     // Wait for initial search to complete
     const orgName = process.env.ORGNAME || 'default';
     const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await pm.logsPage.clickRefreshButton();
     await allsearch;
     await page.waitForTimeout(1000);
 

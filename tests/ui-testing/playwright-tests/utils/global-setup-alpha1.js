@@ -159,6 +159,47 @@ async function globalSetup() {
     await context.storageState({ path: authFile });
     testLogger.info(`[alpha1] Auth state saved to ${authFile}`);
 
+    // Step 8: Fetch org identifier and passcode for API/ingestion auth
+    // On cloud, ingestion requires Basic Auth with email:passcode (not email:password)
+    testLogger.info('[alpha1] Fetching org identifier and passcode...');
+    try {
+      const orgsResponse = await page.evaluate(async () => {
+        const r = await fetch('/api/organizations?page_num=0&page_size=100');
+        return r.ok ? await r.json() : null;
+      });
+
+      if (orgsResponse && orgsResponse.data && orgsResponse.data.length > 0) {
+        const org = orgsResponse.data[0];
+        const orgIdentifier = org.identifier;
+        testLogger.info(`[alpha1] User org: ${org.name} (${orgIdentifier})`);
+
+        // Fetch passcode for this org
+        const passcodeResponse = await page.evaluate(async (orgId) => {
+          const r = await fetch('/api/' + orgId + '/passcode');
+          return r.ok ? await r.json() : null;
+        }, orgIdentifier);
+
+        if (passcodeResponse && passcodeResponse.data) {
+          const cloudConfig = {
+            orgIdentifier,
+            orgName: org.name,
+            userEmail: passcodeResponse.data.user,
+            passcode: passcodeResponse.data.passcode,
+          };
+
+          const cloudConfigFile = path.join(authDir, 'cloud-config.json');
+          fs.writeFileSync(cloudConfigFile, JSON.stringify(cloudConfig, null, 2));
+          testLogger.info(`[alpha1] Cloud config saved to ${cloudConfigFile}`);
+        } else {
+          testLogger.warn('[alpha1] Could not fetch passcode');
+        }
+      } else {
+        testLogger.warn('[alpha1] Could not fetch organizations');
+      }
+    } catch (e) {
+      testLogger.warn('[alpha1] Failed to fetch cloud config', { error: e.message });
+    }
+
   } catch (error) {
     const debugDir = path.join(__dirname, '..', '..', 'test-results');
     if (!fs.existsSync(debugDir)) {

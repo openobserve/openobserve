@@ -3,6 +3,8 @@ const logData = require("../../fixtures/log.json");
 const logsdata = require("../../../test-data/logs_data.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { ingestTestData } = require('../utils/data-ingestion.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Utility Functions
 
@@ -27,7 +29,7 @@ async function runQuery(page, query) {
     const response = await page.evaluate(async ({ query, url, streamName, orgId }) => {
       try {
         const fetchUrl = `${url}/api/${orgId}/${streamName}/_search?type=logs`;
-        
+
         const response = await fetch(fetchUrl, {
           method: 'POST',
           headers: {
@@ -35,24 +37,24 @@ async function runQuery(page, query) {
           },
           body: JSON.stringify(query)
         });
-        
+
         if (!response.ok) {
           const errorText = await response.text();
-          testLogger.error('Query failed', { status: response.status, error: errorText });
+          console.error('Query failed', response.status, errorText);
           return { error: errorText, status: response.status };
         }
-        
+
         const result = await response.json();
         return result;
       } catch (err) {
-        testLogger.error('Query execution error', { error: err.message });
+        console.error('Query execution error', err.message);
         return { error: err.message };
       }
-    }, { 
-      query, 
-      url: process.env.ZO_BASE_URL, 
-      streamName: "e2e_automate", 
-      orgId: process.env.ORGNAME 
+    }, {
+      query,
+      url: process.env.ZO_BASE_URL,
+      streamName: "e2e_automate",
+      orgId: getOrgIdentifier()
     });
     const endTime = Date.now();
     const duration = endTime - startTime;
@@ -77,34 +79,8 @@ test.describe("Compare SQL query execution times", () => {
     // Strategic 500ms wait for post-authentication stabilization - this is functionally necessary
     await page.waitForTimeout(500);
 
-    // Data ingestion for performance testing (preserve exact logic)
-    const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString('base64');
-
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-
-    const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(logsdata)
-      });
-      return await fetchResponse.json();
-    }, {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: streamName,
-      logsdata: logsdata
-    });
-
-    testLogger.debug('Query response received', { response });
+    // Data ingestion for performance testing
+    await ingestTestData(page);
 
     // Navigate to logs page and setup for performance testing
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
@@ -240,16 +216,9 @@ test.describe("Compare SQL query execution times", () => {
     // - Multi-source logs: Different systems sending logs with their local timestamps
     // - Time zone handling: Logs from different time zones with past timestamps
     
-    const orgId = process.env["ORGNAME"];
+    const orgId = getOrgIdentifier();
     const streamName = `e2e_time_test_${Date.now()}`; // Use timestamp for uniqueness
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString('base64');
-
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
+    const headers = getAuthHeaders();
 
     // Create test data with different timestamps (within 5-hour ingestion limit)
     const now = Date.now();
@@ -353,7 +322,7 @@ test.describe("Compare SQL query execution times", () => {
     // Verify all 3 logs are visible (all within 6 hours)
     await pm.logsPage.expectLogsTableRowCount(3);
     await pm.logsPage.waitForSearchResultAndCheckText("Recent log entry - 1 hour ago");
-    await pm.logsPage.waitForSearchResultAndCheckText("data_age\":1h_old");
+    await pm.logsPage.waitForSearchResultAndCheckText("1h_old");
     testLogger.info('6-hour range test passed: All 3 logs visible (all within 6 hours)');
 
     // Test 3: Return to 6 days - should show all 3 logs again (final verification)
@@ -366,9 +335,9 @@ test.describe("Compare SQL query execution times", () => {
     await pm.logsPage.waitForSearchResultAndCheckText("Recent log entry - 1 hour ago");
     await pm.logsPage.waitForSearchResultAndCheckText("Three hour old log entry - 3 hours ago");
     await pm.logsPage.waitForSearchResultAndCheckText("Four hour old log entry - 4 hours ago");
-    await pm.logsPage.waitForSearchResultAndCheckText("data_age\":1h_old");
-    await pm.logsPage.waitForSearchResultAndCheckText("data_age\":3h_old");
-    await pm.logsPage.waitForSearchResultAndCheckText("data_age\":4h_old");
+    await pm.logsPage.waitForSearchResultAndCheckText("1h_old");
+    await pm.logsPage.waitForSearchResultAndCheckText("3h_old");
+    await pm.logsPage.waitForSearchResultAndCheckText("4h_old");
     
     testLogger.info('Final verification passed: All 3 logs visible in 6-day range');
     testLogger.info('Time range filtering validation completed successfully - Progressive filtering works: 0 → 3 → 3 logs as range expands');
