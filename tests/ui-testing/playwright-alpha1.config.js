@@ -24,6 +24,12 @@ if (!process.env.ALPHA1_USER_EMAIL || !process.env.ALPHA1_USER_PASSWORD) {
   testLogger.warn('ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set for Dex email login');
 }
 
+// Ensure INGESTION_URL is set — on cloud, it's the same as the base URL
+if (!process.env.INGESTION_URL) {
+  process.env.INGESTION_URL = process.env.ZO_BASE_URL;
+  testLogger.info(`INGESTION_URL defaulted to ZO_BASE_URL: ${process.env.ZO_BASE_URL}`);
+}
+
 // Override ORGNAME with the correct org identifier from cloud-config.json
 // (written by global-setup-alpha1.js after Dex login)
 const fs = require('fs');
