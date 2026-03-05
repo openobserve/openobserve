@@ -243,6 +243,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Configuration"
                     no-caps
                   />
+
+                  <!-- Cross-Linking Tab -->
+                  <q-tab
+                    v-if="store.state.zoConfig?.enable_cross_linking"
+                    name="crossLinking"
+                    icon="link"
+                    :label="t('crossLinks.header')"
+                    no-caps
+                  />
                 </q-tabs>
               </div>
             </div>
@@ -862,6 +871,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
+            <!-- cross-linking tab -->
+            <div v-if="activeMainTab == 'crossLinking'">
+              <div class="tw:p-4">
+                <!-- Stream-level cross-links (editable) -->
+                <CrossLinkManager
+                  v-model="streamCrossLinks"
+                  :title="t('crossLinks.streamCrossLinks')"
+                  :subtitle="t('crossLinks.streamCrossLinksSubtitle')"
+                  :availableFields="streamFieldNames"
+                  @change="formDirtyFlag = true"
+                />
+
+                <!-- Organization-level cross-links (read-only, hidden when empty) -->
+                <template v-if="orgCrossLinks.length > 0">
+                  <q-separator class="tw:my-4" />
+                  <CrossLinkManager
+                    :modelValue="orgCrossLinks"
+                    :title="t('crossLinks.orgCrossLinks')"
+                    :subtitle="t('crossLinks.orgCrossLinksSubtitle')"
+                    readonly
+                  />
+                </template>
+              </div>
+            </div>
+
             <!-- floating footer for the table -->
             <div
               :class="
@@ -902,7 +936,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </q-btn>
                   <q-btn
-                    v-if="activeMainTab != 'configuration'"
+                    v-if="activeMainTab != 'configuration' && activeMainTab != 'crossLinking'"
                     v-bind:disable="
                       !selectedFields.length && !selectedDateFields.length
                     "
@@ -1013,6 +1047,7 @@ import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import {
   outlinedSchema,
   outlinedPerson,
@@ -1051,6 +1086,7 @@ export default defineComponent({
     DateTime,
     AssociatedRegexPatterns,
     PerformanceFieldsDialog,
+    CrossLinkManager,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -1093,6 +1129,13 @@ export default defineComponent({
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
+    const streamCrossLinks = ref<any[]>([]);
+    const orgCrossLinks = computed(() =>
+      store.state?.organizationData?.organizationSettings?.cross_links || [],
+    );
+    const streamFieldNames = computed(() =>
+      (indexData.value.schema || []).map((f: any) => f.name).sort(),
+    );
     const isDialogOpen = ref(false);
     const patternAssociations = ref([]);
     const redDaysList = ref([]);
@@ -1397,6 +1440,9 @@ export default defineComponent({
       indexData.value.defined_schema_fields =
         streamResponse.settings.defined_schema_fields || [];
 
+      // Populate stream-level cross-links
+      streamCrossLinks.value = streamResponse.settings?.cross_links || [];
+
       if (showDataRetention.value)
         dataRetentionDays.value =
           streamResponse.settings.data_retention ||
@@ -1619,6 +1665,34 @@ export default defineComponent({
         previousSchemaVersion,
         settings,
       );
+
+      // Add cross_links diff
+      const prevCrossLinks = previousSchemaVersion?.cross_links || [];
+      const currCrossLinks = streamCrossLinks.value || [];
+      const prevCrossLinkNames = new Set(prevCrossLinks.map((l: any) => l.name));
+      const currCrossLinkNames = new Set(currCrossLinks.map((l: any) => l.name));
+
+      const crossLinksToAdd = currCrossLinks.filter((l: any) => !prevCrossLinkNames.has(l.name));
+      const crossLinksToRemove = prevCrossLinks.filter((l: any) => !currCrossLinkNames.has(l.name));
+
+      // Check for modified links (same name but different url or fields)
+      for (const curr of currCrossLinks) {
+        if (prevCrossLinkNames.has(curr.name)) {
+          const prev = prevCrossLinks.find((l: any) => l.name === curr.name);
+          if (prev && JSON.stringify(prev) !== JSON.stringify(curr)) {
+            crossLinksToRemove.push(prev);
+            crossLinksToAdd.push(curr);
+          }
+        }
+      }
+
+      if (crossLinksToAdd.length > 0 || crossLinksToRemove.length > 0) {
+        modifiedSettings.cross_links = {
+          add: crossLinksToAdd,
+          remove: crossLinksToRemove,
+        };
+      }
+
       await streamService
         .updateSettings(
           store.state.selectedOrganization.identifier,
@@ -2462,6 +2536,9 @@ export default defineComponent({
       updateActiveMainTab,
       redBtnColumns,
       redBtnRows,
+      streamCrossLinks,
+      orgCrossLinks,
+      streamFieldNames,
       selectedDateFields,
       redDaysList,
       deleteDates,
