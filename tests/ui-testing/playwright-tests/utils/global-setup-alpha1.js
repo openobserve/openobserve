@@ -169,7 +169,7 @@ async function globalSetup() {
       });
 
       if (orgsResponse && orgsResponse.data && orgsResponse.data.length > 0) {
-        const org = orgsResponse.data[0];
+        const org = orgsResponse.data.find(o => o.identifier !== '_meta') || orgsResponse.data[0];
         const orgIdentifier = org.identifier;
         testLogger.info(`[alpha1] User org: ${org.name} (${orgIdentifier})`);
 

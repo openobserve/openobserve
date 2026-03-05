@@ -207,7 +207,7 @@ export class CommonActions {
         const orgName = getOrgIdentifier();
 
         // Read custom test data from file (equivalent to curl -d @utils/td150.json)
-        const dataPath = path.resolve('utils', 'td150.json');
+        const dataPath = path.resolve(__dirname, '..', 'utils', 'td150.json');
         const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
 
         const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {

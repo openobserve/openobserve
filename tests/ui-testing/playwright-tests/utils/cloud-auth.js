@@ -39,6 +39,8 @@ function getAuthHeaders() {
             };
         }
         // Fallback: no passcode available, try without auth (cookies may work for some endpoints)
+        const testLogger = require('./test-logger.js');
+        testLogger.warn('Cloud environment active but no passcode found in cloud-config.json — ingestion calls may fail with 401');
         return {
             'Content-Type': 'application/json',
         };
