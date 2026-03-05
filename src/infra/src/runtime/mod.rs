@@ -44,3 +44,35 @@ pub static METRICS_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
             .unwrap(),
     )
 });
+
+pub static WAL_RUNTIME: Lazy<Option<Arc<Runtime>>> = Lazy::new(|| {
+    let cfg = get_config();
+
+    if !cfg.common.wal_dedicated_runtime_enabled {
+        return None;
+    }
+
+    let total_cpus = cfg.limit.cpu_num;
+    // Security Check: At least 2 CPU cores are required for isolation (1 for HTTP, 1 for WAL)
+    if total_cpus < 2 {
+        return None;
+    }
+
+    // Worker number strategy for WAL runtime
+    let thread_num = if cfg.limit.wal_runtime_worker_num > 0 {
+        cfg.limit.wal_runtime_worker_num
+    } else {
+        cfg.limit.mem_table_bucket_num
+    };
+    // Ensure the number of worker threads less than the total number of CPU cores
+    let thread_num = thread_num.min(total_cpus);
+
+    tokio::runtime::Builder::new_multi_thread()
+        .thread_name("wal-runtime")
+        .worker_threads(thread_num)
+        .thread_stack_size(16 * 1024 * 1024)
+        .enable_all()
+        .build()
+        .ok()
+        .map(Arc::new)
+});
