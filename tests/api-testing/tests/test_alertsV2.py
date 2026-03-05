@@ -867,14 +867,17 @@ def test_new_alert_create_with_vrl_no_trigger(create_session, base_url):
 
     print(f"VRL Alert (no trigger) {alert_name} created successfully")
 
-    # Verify alert was created with VRL function
-    time.sleep(2)
-    resp_get_alert = session.get(f"{url}api/v2/{org_id}/alerts?folder={folder_id}")
-    assert resp_get_alert.status_code == 200, f"Failed to fetch alerts: {resp_get_alert.status_code}"
+    # Get the alert ID from the creation response
+    alert_id = resp_post_alertnew.json().get("id")
+    assert alert_id is not None, "Alert ID should be returned in creation response"
 
-    alerts = resp_get_alert.json().get("list", [])
-    created_alert = next((a for a in alerts if a.get("name") == alert_name), None)
-    assert created_alert is not None, f"Alert {alert_name} not found in folder {folder_id}"
+    # Verify alert was created with VRL function by fetching it directly
+    time.sleep(2)
+    resp_get_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+    assert resp_get_alert.status_code == 200, f"Failed to fetch alert: {resp_get_alert.status_code} {resp_get_alert.content}"
+
+    created_alert = resp_get_alert.json()
+    assert created_alert.get("name") == alert_name, f"Alert name mismatch. Expected: {alert_name}, Got: {created_alert.get('name')}"
 
     # Verify VRL function is present
     vrl_in_response = created_alert.get("query_condition", {}).get("vrl_function")
@@ -1017,14 +1020,17 @@ def test_new_alert_create_with_vrl_trigger(create_session, base_url):
 
     print(f"VRL Alert (trigger) {alert_name} created successfully")
 
-    # Verify alert was created with VRL function
-    time.sleep(2)
-    resp_get_alert = session.get(f"{url}api/v2/{org_id}/alerts?folder={folder_id}")
-    assert resp_get_alert.status_code == 200, f"Failed to fetch alerts: {resp_get_alert.status_code}"
+    # Get the alert ID from the creation response
+    alert_id = resp_post_alertnew.json().get("id")
+    assert alert_id is not None, "Alert ID should be returned in creation response"
 
-    alerts = resp_get_alert.json().get("list", [])
-    created_alert = next((a for a in alerts if a.get("name") == alert_name), None)
-    assert created_alert is not None, f"Alert {alert_name} not found in folder {folder_id}"
+    # Verify alert was created with VRL function by fetching it directly
+    time.sleep(2)
+    resp_get_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+    assert resp_get_alert.status_code == 200, f"Failed to fetch alert: {resp_get_alert.status_code} {resp_get_alert.content}"
+
+    created_alert = resp_get_alert.json()
+    assert created_alert.get("name") == alert_name, f"Alert name mismatch. Expected: {alert_name}, Got: {created_alert.get('name')}"
 
     # Verify VRL function is present
     vrl_in_response = created_alert.get("query_condition", {}).get("vrl_function")
@@ -1127,16 +1133,12 @@ def test_update_alert_vrl_function(create_session, base_url):
     )
     assert resp_create.status_code == 200, f"Failed to create alert: {resp_create.content}"
 
-    time.sleep(2)
-
-    # Get the alert ID
-    resp_get_alerts = session.get(f"{url}api/v2/{org_id}/alerts?folder={folder_id}")
-    alerts = resp_get_alerts.json().get("list", [])
-    created_alert = next((a for a in alerts if a.get("name") == alert_name), None)
-    assert created_alert is not None, f"Alert {alert_name} not found"
-
-    alert_id = created_alert.get("alert_id")
+    # Get the alert ID from the creation response
+    alert_id = resp_create.json().get("id")
+    assert alert_id is not None, "Alert ID should be returned in creation response"
     print(f"Created alert with ID: {alert_id}")
+
+    time.sleep(2)
 
     # Updated VRL function (trigger variant)
     vrl_function_updated = "I1Jlc3VsdEFycmF5IwouID0gW3t9LCB7fV0KLg=="
