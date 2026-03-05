@@ -14,12 +14,17 @@ const generateDashboardName = () =>
 test.describe("Sankey chart testcases", () => {
   test.describe.configure({ mode: "parallel" });
 
+  test.beforeAll(async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await login(page);
+    await ingestionForSankey();
+    await context.close();
+  });
+
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing");
     await login(page);
-    await page.waitForTimeout(1000);
-    await ingestionForSankey(page);
-    await page.waitForTimeout(2000);
   });
 
   // P0: Select Sankey chart type and verify builder UI
@@ -228,13 +233,13 @@ test.describe("Sankey chart testcases", () => {
       );
       await searchInput.click();
       await searchInput.fill("target");
-      await page.waitForTimeout(1000);
 
       const fieldItem = page
         .locator(
           '[data-test^="field-list-item-"][data-test$="-target"]'
         )
         .first();
+      await fieldItem.waitFor({ state: "visible", timeout: 5000 });
       const sourceBtn = fieldItem.locator(
         '[data-test="dashboard-add-source-data"]'
       );
@@ -274,18 +279,20 @@ test.describe("Sankey chart testcases", () => {
       await pm.chartTypeSelector.switchToCustomQueryMode();
 
       // Enter custom SQL for Sankey
-      const customSQL = `SELECT source, target, sum(value) as value FROM "sankey_data" GROUP BY source, target`;
+      const customSQL = `SELECT source, target, sum(value) as flow FROM "sankey_data" GROUP BY source, target`;
       await pm.chartTypeSelector.enterCustomSQL(customSQL);
 
       // Apply first to populate field list from query result
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender();
-      await page.waitForTimeout(2000);
+
+      // Wait for field list to populate from query result
+      await page.locator('[data-test="index-field-search-input"]').waitFor({ state: "visible", timeout: 10000 });
 
       // Assign fields from custom query result to Sankey axes
       await pm.chartTypeSelector.searchAndAddField("source", "source");
       await pm.chartTypeSelector.searchAndAddField("target", "target");
-      await pm.chartTypeSelector.searchAndAddField("value", "sankeyvalue");
+      await pm.chartTypeSelector.searchAndAddField("flow", "sankeyvalue");
 
       // Apply again with fields assigned
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -349,7 +356,6 @@ test.describe("Sankey chart testcases", () => {
       const searchInput = page.locator('[data-test="index-field-search-input"]');
       await searchInput.click();
       await searchInput.fill("source");
-      await page.waitForTimeout(1000);
       const fieldItem = page
         .locator('[data-test^="field-list-item-"][data-test$="-source"]')
         .first();

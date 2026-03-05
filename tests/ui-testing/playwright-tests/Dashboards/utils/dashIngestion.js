@@ -131,7 +131,7 @@ const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") =
 };
 
 // Ingestion function for Sankey chart data
-const ingestionForSankey = async (page, streamName = "sankey_data") => {
+const ingestionForSankey = async (streamName = "sankey_data") => {
   if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
