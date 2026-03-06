@@ -161,6 +161,7 @@ struct ConfigResponse<'a> {
     fqn_priority_dimensions: Vec<String>,
     #[cfg(not(feature = "enterprise"))]
     fqn_priority_dimensions: Vec<String>,
+    enable_cross_linking: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -441,6 +442,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             .get_fqn_priority_dimensions(),
         #[cfg(not(feature = "enterprise"))]
         fqn_priority_dimensions: vec![],
+        enable_cross_linking: cfg.common.enable_cross_linking,
     }))
 }
 
