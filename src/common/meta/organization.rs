@@ -345,6 +345,8 @@ pub struct OrganizationSettingPayload {
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -380,6 +382,8 @@ pub struct OrganizationSetting {
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
+    #[serde(default)]
+    pub cross_links: Vec<config::meta::stream::CrossLink>,
 }
 
 impl Default for OrganizationSetting {
@@ -411,6 +415,7 @@ impl Default for OrganizationSetting {
             usage_stream_enabled: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
+            cross_links: Vec::new(),
         }
     }
 }

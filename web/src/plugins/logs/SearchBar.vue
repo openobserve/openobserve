@@ -4181,12 +4181,9 @@ export default defineComponent({
         // Switching to patterns mode - this will be handled by a separate watcher in Index.vue
         emit("extractPatterns");
         // console.log("[SearchBar] Switching to patterns mode");
-      } else if (
-        value == "visualize" &&
-        searchObj.meta.logsVisualizeToggle == "logs"
-      ) {
+      } else if (value == "visualize") {
         // validate query
-        // return if query is emptry and stream is not selected
+        // return if query is empty and stream is not selected
         if (
           searchObj.data.query === "" &&
           searchObj?.data?.stream?.selectedStream?.length === 0

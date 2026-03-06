@@ -447,6 +447,7 @@ import {
   getUUID,
   getTimezoneOffset,
   b64DecodeUnicode,
+  smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
 } from "@/utils/zincutils";
@@ -761,11 +762,9 @@ export default defineComponent({
       if (!formData.value.query_condition.vrl_function) {
         return "";
       }
-      try {
-        return b64DecodeUnicode(formData.value.query_condition.vrl_function);
-      } catch (e) {
-        return formData.value.query_condition.vrl_function;
-      }
+      // formData already has decoded VRL (decoded at load time in created() hook)
+      // Just return it directly, no need to decode again
+      return formData.value.query_condition.vrl_function;
     });
 
     const editorData = ref("");
@@ -2352,7 +2351,8 @@ export default defineComponent({
 
       if (this.formData.query_condition.vrl_function) {
         this.showVrlFunction = true;
-        this.formData.query_condition.vrl_function = b64DecodeUnicode(
+        // Use smart decoder to handle both single and double-encoded VRL (backwards compatibility)
+        this.formData.query_condition.vrl_function = smartDecodeVrlFunction(
           this.formData.query_condition.vrl_function,
         );
       }
