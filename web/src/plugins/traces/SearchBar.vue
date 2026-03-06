@@ -152,6 +152,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="search-time tw:mr-[0.375rem] float-left">
           <q-btn
+            v-if="config.isEnterprise == 'true' && isLoading"
+            data-test="traces-search-bar-cancel-btn"
+            dense
+            :title="t('search.cancel')"
+            class="q-pa-none o2-run-query-button tw:bg-[var(--o2-cancel-query-bg)]! tw:h-[30px] element-box-shadow tw:leading-8!"
+            @click="cancelQueryData"
+            >{{ t("search.cancel") }}</q-btn
+          >
+          <q-btn
+            v-else
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
             dense
@@ -290,7 +300,7 @@ export default defineComponent({
     ),
     SyntaxGuide,
   },
-  emits: ["searchdata", "update:activeTab"],
+  emits: ["searchdata", "update:activeTab", "cancel-query"],
   props: {
     fieldValues: {
       type: Object,
@@ -314,6 +324,9 @@ export default defineComponent({
         // this.searchObj.runQuery = true;
         this.$emit("searchdata");
       }
+    },
+    cancelQueryData() {
+      this.$emit("cancel-query");
     },
   },
   setup(props, { emit }) {
@@ -607,6 +620,7 @@ export default defineComponent({
       updateNewDateTime,
       metricsIcon,
       tracesShareURL,
+      config,
     };
   },
   computed: {

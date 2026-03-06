@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:activeTab="activeTab = $event"
           @error-only-toggled="onErrorOnlyToggled"
           @filters-reset="onFiltersReset"
+          @cancel-query="cancelSearch"
         />
       </div>
 
@@ -932,6 +933,18 @@ async function getQueryData(
     searchObj.data.errorDetail = "";
   }
 }
+
+const cancelSearch = () => {
+  if (!currentSearchTraceId) return;
+  if (tracesPartitionMap[currentSearchTraceId])
+    delete tracesPartitionMap[currentSearchTraceId];
+  cancelStreamQueryBasedOnRequestId({
+    trace_id: currentSearchTraceId,
+    org_id: searchObj.organizationIdentifier,
+  });
+  currentSearchTraceId = null;
+  searchObj.loading = false;
+};
 
 /**
  *
