@@ -1,5 +1,4 @@
-import { test, expect } from "../baseFixtures.js";
-import { login } from "./utils/dashLogin.js";
+import { test, expect, navigateToBase } from "../utils/enhanced-baseFixtures.js";
 import { ingestionForSankey } from "./utils/dashIngestion.js";
 import {
   waitForDashboardPage,
@@ -14,17 +13,12 @@ const generateDashboardName = () =>
 test.describe("Sankey chart testcases", () => {
   test.describe.configure({ mode: "parallel" });
 
-  test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    await login(page);
+  test.beforeAll(async () => {
     await ingestionForSankey();
-    await context.close();
   });
 
   test.beforeEach(async ({ page }) => {
-    testLogger.debug("Test setup - beforeEach hook executing");
-    await login(page);
+    await navigateToBase(page);
   });
 
   // P0: Select Sankey chart type and verify builder UI
