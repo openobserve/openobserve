@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { calculateWidthText } from "./convertDataIntoUnitValue";
+import { calculateWidthText } from "./chartDimensionUtils";
 
 // Constants for better maintainability
 const LEGEND_CONSTANTS = {
@@ -992,7 +992,7 @@ export const applyPieDonutLegendPositioning = (
  * @param {any[]} seriesData - Series data for legend calculations
  * @returns {object} Object containing grid properties and available dimensions
  */
-const calculatePieChartContainer = (
+export const calculatePieChartContainer = (
   panelSchema: any,
   chartWidth: number,
   chartHeight: number,

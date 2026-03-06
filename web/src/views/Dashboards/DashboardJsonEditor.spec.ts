@@ -14,7 +14,7 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mocked-${path}`),
 }));
 
-vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
+vi.mock("@/utils/dashboard/panelValidation", () => ({
   validateDashboardJson: vi.fn(() => []),
 }));
 
@@ -192,7 +192,7 @@ describe("DashboardJsonEditor", () => {
   // Test 8: handleEditorChange with validation errors from validateDashboardJson
   it("should handle validation errors from validateDashboardJson", async () => {
     // Mock the validateDashboardJson function to return an error
-    const mockValidate = await import("@/utils/dashboard/convertDataIntoUnitValue");
+    const mockValidate = await import("@/utils/dashboard/panelValidation");
     vi.mocked(mockValidate.validateDashboardJson).mockReturnValue(["Test validation error"]);
     
     wrapper = createWrapper();
@@ -266,7 +266,7 @@ describe("DashboardJsonEditor", () => {
 
   // Test 14: saveChanges should handle validation errors during save
   it("should handle validation errors during save", async () => {
-    const mockValidate = await import("@/utils/dashboard/convertDataIntoUnitValue");
+    const mockValidate = await import("@/utils/dashboard/panelValidation");
     vi.mocked(mockValidate.validateDashboardJson).mockReturnValue(["Save-time validation error"]);
     
     wrapper = createWrapper();
@@ -281,7 +281,7 @@ describe("DashboardJsonEditor", () => {
 
   // Test 15: saveChanges should successfully save valid JSON
   it("should successfully save valid JSON", async () => {
-    const mockValidate = await import("@/utils/dashboard/convertDataIntoUnitValue");
+    const mockValidate = await import("@/utils/dashboard/panelValidation");
     vi.mocked(mockValidate.validateDashboardJson).mockReturnValue([]);
     
     wrapper = createWrapper();
@@ -295,7 +295,7 @@ describe("DashboardJsonEditor", () => {
 
   // Test 16: saveChanges should handle save execution errors
   it("should handle save execution errors", async () => {
-    const mockValidate = await import("@/utils/dashboard/convertDataIntoUnitValue");
+    const mockValidate = await import("@/utils/dashboard/panelValidation");
     vi.mocked(mockValidate.validateDashboardJson).mockReturnValue([]);
     
     const saveError = new Error("Save failed");
@@ -318,7 +318,7 @@ describe("DashboardJsonEditor", () => {
 
   // Test 17: saveChanges should handle non-Error exceptions
   it("should handle non-Error exceptions during save", async () => {
-    const mockValidate = await import("@/utils/dashboard/convertDataIntoUnitValue");
+    const mockValidate = await import("@/utils/dashboard/panelValidation");
     vi.mocked(mockValidate.validateDashboardJson).mockReturnValue([]);
     
     mockSaveJsonDashboard.execute.mockRejectedValue("String error");
@@ -406,7 +406,7 @@ describe("DashboardJsonEditor", () => {
 
   // Test 23: Save button click should call saveChanges
   it("should call saveChanges when save button is clicked", async () => {
-    const mockValidate = await import("@/utils/dashboard/convertDataIntoUnitValue");
+    const mockValidate = await import("@/utils/dashboard/panelValidation");
     vi.mocked(mockValidate.validateDashboardJson).mockReturnValue([]);
     
     wrapper = createWrapper();
@@ -462,7 +462,7 @@ describe("DashboardJsonEditor", () => {
   // Test 27: Editor change without restricted fields
   it("should allow valid JSON without restricted fields", async () => {
     // Reset the validateDashboardJson mock to return no errors
-    const mockValidate = await import("@/utils/dashboard/convertDataIntoUnitValue");
+    const mockValidate = await import("@/utils/dashboard/panelValidation");
     vi.mocked(mockValidate.validateDashboardJson).mockReturnValue([]);
     
     wrapper = createWrapper();
@@ -551,7 +551,7 @@ describe("DashboardJsonEditor", () => {
 
   // Test 34: Mixed validation errors - both custom validation and validateDashboardJson
   it("should handle mixed validation errors", async () => {
-    const mockValidate = await import("@/utils/dashboard/convertDataIntoUnitValue");
+    const mockValidate = await import("@/utils/dashboard/panelValidation");
     vi.mocked(mockValidate.validateDashboardJson).mockReturnValue(["Schema validation error"]);
     
     wrapper = createWrapper();

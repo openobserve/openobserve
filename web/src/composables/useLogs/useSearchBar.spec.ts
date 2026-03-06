@@ -124,4 +124,18 @@ describe("useSearchBar Composable", () => {
       expect(onStreamChange).toHaveBeenCalled;
     });
   });
+
+  describe("Cross-Linking in getQueryData", () => {
+    it("should have getQueryData function for cross-linking support", () => {
+      expect(typeof wrapper.vm.getQueryData).toBe("function");
+    });
+
+    it("should have handleQueryData function", () => {
+      expect(typeof wrapper.vm.handleQueryData).toBe("function");
+    });
+
+    it("should have cancelQuery function for cancelling cross-link requests", () => {
+      expect(typeof wrapper.vm.cancelQuery).toBe("function");
+    });
+  });
 });

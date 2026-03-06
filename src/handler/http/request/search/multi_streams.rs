@@ -602,8 +602,10 @@ pub async fn search_multi(
                                             .collect::<Vec<_>>();
                                         serde_json::Value::Array(flattened_array)
                                     })
-                                } else {
+                                } else if !v.is_null() && v.is_object() {
                                     config::utils::flatten::flatten(v.clone()).ok()
+                                } else {
+                                    None
                                 }
                             })
                             .collect(),
