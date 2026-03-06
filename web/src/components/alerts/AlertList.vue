@@ -1182,7 +1182,7 @@ export default defineComponent({
                 }
                 historyByAlert[alertName].total++;
                 const status = (entry.status || "").toLowerCase();
-                if (status === "firing" || status === "error") {
+                if (status === "completed") {
                   historyByAlert[alertName].firing++;
                 }
               });
