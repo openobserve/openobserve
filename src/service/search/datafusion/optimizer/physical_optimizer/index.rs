@@ -21,6 +21,7 @@ use std::{
     },
 };
 
+use config::utils::tantivy::tokenizer::o2_collect_search_tokens;
 use datafusion::{
     common::{
         Result,
@@ -44,7 +45,7 @@ use parking_lot::Mutex;
 use crate::service::search::{
     datafusion::{
         optimizer::physical_optimizer::utils::{
-            get_column_name, is_column, is_only_timestamp_filter, is_value,
+            extract_string_literal, get_column_name, is_column, is_only_timestamp_filter, is_value,
         },
         udf::{
             MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
@@ -274,7 +275,12 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
     } else if let Some(expr) = expr.as_any().downcast_ref::<ScalarFunctionExpr>() {
         let name = expr.name();
         return match name {
-            MATCH_ALL_UDF_NAME => expr.args().len() == 1,
+            MATCH_ALL_UDF_NAME => {
+                expr.args().len() == 1
+                    && extract_string_literal(&expr.args()[0])
+                        .map(|s| !o2_collect_search_tokens(&s).is_empty())
+                        .unwrap_or(false)
+            }
             FUZZY_MATCH_ALL_UDF_NAME => expr.args().len() == 2,
             STR_MATCH_UDF_NAME
             | STR_MATCH_UDF_IGNORE_CASE_NAME
@@ -494,6 +500,10 @@ mod tests {
                     Box::new(Condition::MatchAll("error".to_string())),
                 )),
             ),
+            // match_all('c') should be invalid because tokens are empty
+            (match_all("c"), false, None),
+            // match_all('a') should be invalid because tokens are empty
+            (match_all("a"), false, None),
             // status = 'test'
             (eq(column("status"), literal("test")), false, None),
         ];
