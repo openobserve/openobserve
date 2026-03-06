@@ -74,7 +74,7 @@ export function useStickyColumns(props: any, store: any) {
 
     const stickyColTotals = !!props.data?.stickyColTotals;
     const stickyRowTotals = !!props.data?.stickyRowTotals;
-    const TOTAL_COL_WIDTH = 100;
+    const TOTAL_COL_WIDTH = 150;
 
     // Generate CSS rules for each column position
     columns.forEach((col: any, colIndex: number) => {

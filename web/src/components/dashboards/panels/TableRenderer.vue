@@ -304,7 +304,7 @@ export default defineComponent({
     });
 
     // Default width for total columns used to calculate right offsets
-    const TOTAL_COL_WIDTH = 100;
+    const TOTAL_COL_WIDTH = 150;
 
     const getStickyTotalColumnStyle = (col: any) => {
       if (!stickyColTotals.value || !col?._isTotalColumn) return {};
@@ -313,9 +313,13 @@ export default defineComponent({
         position: "sticky",
         right: `${rightOffset}px`,
         "z-index": 2,
+        "width": `${TOTAL_COL_WIDTH}px`,
         "min-width": `${TOTAL_COL_WIDTH}px`,
+        "max-width": `${TOTAL_COL_WIDTH}px`,
         "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
         "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+        "white-space": "normal",
+        "word-break": "break-word",
       };
     };
 
@@ -326,9 +330,13 @@ export default defineComponent({
         position: "sticky",
         right: `${rightOffset}px`,
         "z-index": 3,
+        "width": `${TOTAL_COL_WIDTH}px`,
         "min-width": `${TOTAL_COL_WIDTH}px`,
+        "max-width": `${TOTAL_COL_WIDTH}px`,
         "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
         "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+        "white-space": "normal",
+        "word-break": "break-word",
       };
     };
 
@@ -338,13 +346,18 @@ export default defineComponent({
     const getStickyTotalHeaderForPivot = (cell: any) => {
       if (!stickyColTotals.value) return {};
       const rightOffset = (cell._totalColRightIndex ?? 0) * TOTAL_COL_WIDTH;
+      const width = cell.colspan ? cell.colspan * TOTAL_COL_WIDTH : TOTAL_COL_WIDTH;
       return {
         position: "sticky",
         right: `${rightOffset}px`,
         "z-index": 3,
-        "min-width": cell._totalColRightIndex !== undefined ? `${TOTAL_COL_WIDTH}px` : undefined,
+        "width": `${width}px`,
+        "min-width": `${width}px`,
+        "max-width": `${width}px`,
         "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
         "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+        "white-space": "normal",
+        "word-break": "break-word",
       };
     };
 

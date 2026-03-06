@@ -513,6 +513,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </div>
       </div>
+      <div
+        v-if="dashboardPanelData.data.config.table_pivot_show_row_totals"
+        class="row items-center q-ml-md"
+      >
+        <q-toggle
+          v-model="dashboardPanelData.data.config.table_pivot_sticky_col_totals"
+          :label="t('dashboard.pivotStickyColTotals')"
+          data-test="dashboard-config-pivot-sticky-col-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        />
+        <div>
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-pivot-sticky-col-totals-info"
+          />
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotStickyColTotalsTooltip") }}
+          </q-tooltip>
+        </div>
+      </div>
       <div class="row items-center">
         <q-toggle
           v-model="dashboardPanelData.data.config.table_pivot_show_col_totals"
@@ -545,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="dashboardPanelData.data.config.table_pivot_show_col_totals"
-        class="row items-center"
+        class="row items-center q-ml-md"
       >
         <q-toggle
           v-model="dashboardPanelData.data.config.table_pivot_sticky_row_totals"
@@ -573,39 +606,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             max-width="250px"
           >
             {{ t("dashboard.pivotStickyRowTotalsTooltip") }}
-          </q-tooltip>
-        </div>
-      </div>
-      <div
-        v-if="dashboardPanelData.data.config.table_pivot_show_row_totals"
-        class="row items-center"
-      >
-        <q-toggle
-          v-model="dashboardPanelData.data.config.table_pivot_sticky_col_totals"
-          :label="t('dashboard.pivotStickyColTotals')"
-          data-test="dashboard-config-pivot-sticky-col-totals"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
-          size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
-        />
-        <div>
-          <q-icon
-            class="q-ml-xs"
-            size="20px"
-            name="info"
-            data-test="dashboard-config-pivot-sticky-col-totals-info"
-          />
-          <q-tooltip
-            class="bg-grey-8"
-            anchor="top middle"
-            self="bottom middle"
-            max-width="250px"
-          >
-            {{ t("dashboard.pivotStickyColTotalsTooltip") }}
           </q-tooltip>
         </div>
       </div>
