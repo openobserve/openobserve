@@ -3,6 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const { ingestTestData } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 async function applyQuery(pm) {
   const search = pm.page.waitForResponse(logData.applyQuery, { timeout: 90000 });
@@ -50,13 +51,28 @@ test.describe("Search Partition Tests", () => {
     
     // Setup and execute query
     await pm.logsPage.executeHistogramQuery(histogramQuery);
-    await pm.logsPage.toggleHistogramAndExecute();
 
     if (!isStreamingEnabled) {
       testLogger.info('Testing non-streaming mode partition verification');
-      
-      // Verify search partition response
-      const searchPartitionData = await pm.logsPage.verifySearchPartitionResponse();
+
+      // Set up response listeners BEFORE the action that triggers them
+      const orgName = getOrgIdentifier() || 'default';
+      const searchPartitionPromise = pm.page.waitForResponse(
+        response =>
+          response.url().includes(`/api/${orgName}/_search_partition`) &&
+          response.request().method() === 'POST',
+        { timeout: 90000 }
+      );
+
+      await pm.logsPage.toggleHistogramAndExecute();
+
+      // Verify search partition response (listener was set up before action)
+      const searchPartitionResponse = await searchPartitionPromise;
+      const searchPartitionData = await searchPartitionResponse.json();
+      expect(searchPartitionData).toHaveProperty('partitions');
+      expect(searchPartitionData).toHaveProperty('histogram_interval');
+      expect(searchPartitionData).toHaveProperty('order_by', 'asc');
+
       const searchCalls = await pm.logsPage.captureSearchCalls();
       
       expect(searchCalls.length).toBe(searchPartitionData.partitions.length);
@@ -76,8 +92,9 @@ test.describe("Search Partition Tests", () => {
         searchCalls: searchCalls.length
       });
     } else {
+      await pm.logsPage.toggleHistogramAndExecute();
       testLogger.info('Testing streaming mode response verification');
-      
+
       await pm.logsPage.clickRunQueryButtonAndVerifyStreamingResponse();
       
       testLogger.info('Streaming mode verification completed');
