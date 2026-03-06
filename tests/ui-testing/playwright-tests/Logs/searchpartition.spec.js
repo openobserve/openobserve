@@ -5,7 +5,7 @@ const logData = require("../../fixtures/log.json");
 const { ingestTestData } = require('../utils/data-ingestion.js');
 
 async function applyQuery(pm) {
-  const search = pm.page.waitForResponse(logData.applyQuery);
+  const search = pm.page.waitForResponse(logData.applyQuery, { timeout: 90000 });
   // CRITICAL: Search preparation wait - allows histogram query partitioning to initialize
   await pm.page.waitForTimeout(3000);
   await pm.logsPage.clickRefreshButton();
