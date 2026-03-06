@@ -15,15 +15,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="width: 50vw;" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
+  <div
+    style="width: 50vw"
+    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  >
     <!-- Header -->
-    <div class="drawer-header" :class="store.state.theme === 'dark' ? 'drawer-header-dark' : 'drawer-header-light'">
+    <div
+      class="drawer-header"
+      :class="
+        store.state.theme === 'dark'
+          ? 'drawer-header-dark'
+          : 'drawer-header-light'
+      "
+    >
       <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
         <!-- Left: Title -->
-        <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0" data-test="alert-details-title">
-          <q-icon name="history" size="18px" :color="store.state.theme === 'dark' ? 'blue-4' : 'primary'" />
-          <span class="tw:font-semibold tw:text-[15px] tw:whitespace-nowrap">{{ t('alert_list.alert_history') }}</span>
-          <q-icon name="chevron_right" size="16px" color="grey-5" class="tw:shrink-0" />
+        <div
+          class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
+          data-test="alert-details-title"
+        >
+          <q-icon
+            name="history"
+            size="18px"
+            :color="store.state.theme === 'dark' ? 'blue-4' : 'primary'"
+          />
+          <span class="tw:font-semibold tw:text-[15px] tw:whitespace-nowrap">{{
+            t("alert_list.alert_history")
+          }}</span>
+          <q-icon
+            name="chevron_right"
+            size="16px"
+            color="grey-5"
+            class="tw:shrink-0"
+          />
           <!-- Alert Name Badge -->
           <span
             v-if="alertDetails"
@@ -31,11 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'tw:font-medium tw:text-[13px] tw:px-2 tw:py-0.5 tw:rounded tw:truncate tw:max-w-[220px] tw:inline-block',
               store.state.theme === 'dark'
                 ? 'tw:text-blue-300 tw:bg-blue-900/40'
-                : 'tw:text-blue-700 tw:bg-blue-50'
+                : 'tw:text-blue-700 tw:bg-blue-50',
             ]"
           >
             {{ alertDetails.name }}
-            <q-tooltip v-if="alertDetails.name && alertDetails.name.length > 28" class="tw:text-xs">
+            <q-tooltip
+              v-if="alertDetails.name && alertDetails.name.length > 28"
+              class="tw:text-xs"
+            >
               {{ alertDetails.name }}
             </q-tooltip>
           </span>
@@ -67,19 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
           <q-btn
-            data-test="alert-details-refresh-btn"
-            flat
-            round
-            dense
-            size="sm"
-            icon="refresh"
-            @click="refreshHistory"
-            :loading="isLoadingHistory"
-            :disable="isLoadingHistory"
-          >
-            <q-tooltip>Refresh History</q-tooltip>
-          </q-btn>
-          <q-btn
             data-test="alert-details-edit-btn"
             flat
             round
@@ -88,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="edit"
             @click="editAlertFromDrawer"
           >
-            <q-tooltip>{{ t('alerts.edit') }}</q-tooltip>
+            <q-tooltip>{{ t("alerts.edit") }}</q-tooltip>
           </q-btn>
           <q-btn
             data-test="alert-details-close-btn"
@@ -104,21 +118,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Content -->
-    <div class="tw:flex tw:flex-col" style="height: calc(100vh - 57px); overflow: hidden;" v-if="alertDetails">
-
+    <div
+      class="tw:flex tw:flex-col"
+      style="height: calc(100vh - 57px); overflow: hidden"
+      v-if="alertDetails"
+    >
       <!-- Query / Conditions Block -->
       <div class="tw:px-4 tw:pt-3 tw:pb-2 tw:shrink-0">
-        <div class="code-block" :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'">
+        <div
+          class="code-block"
+          :class="
+            store.state.theme === 'dark'
+              ? 'code-block-dark'
+              : 'code-block-light'
+          "
+        >
           <!-- Code block header bar -->
-          <div class="code-block-header" :class="store.state.theme === 'dark' ? 'code-block-header-dark' : 'code-block-header-light'">
+          <div
+            class="code-block-header"
+            :class="
+              store.state.theme === 'dark'
+                ? 'code-block-header-dark'
+                : 'code-block-header-light'
+            "
+          >
             <div class="tw:flex tw:items-center tw:gap-1.5">
-              <span class="tw:text-[11px] tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
-                {{ alertDetails.type === 'sql' ? 'SQL' : alertDetails.type === 'promql' ? 'PromQL' : 'Conditions' }}
+              <span
+                class="tw:text-[11px] tw:font-medium"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:text-gray-400'
+                    : 'tw:text-gray-500'
+                "
+              >
+                {{
+                  alertDetails.type === "sql"
+                    ? "SQL"
+                    : alertDetails.type === "promql"
+                      ? "PromQL"
+                      : "Conditions"
+                }}
               </span>
             </div>
             <q-btn
-              v-if="alertDetails.conditions && alertDetails.conditions !== '' && alertDetails.conditions !== '--'"
-              @click="copyToClipboard(alertDetails.conditions, alertDetails.type === 'sql' ? t('alerts.alertDetails.sqlQuery') : alertDetails.type === 'promql' ? t('alerts.alertDetails.promqlQuery') : t('alerts.alertDetails.conditions'))"
+              v-if="
+                alertDetails.conditions &&
+                alertDetails.conditions !== '' &&
+                alertDetails.conditions !== '--'
+              "
+              @click="
+                copyToClipboard(
+                  alertDetails.conditions,
+                  alertDetails.type === 'sql'
+                    ? t('alerts.alertDetails.sqlQuery')
+                    : alertDetails.type === 'promql'
+                      ? t('alerts.alertDetails.promqlQuery')
+                      : t('alerts.alertDetails.conditions'),
+                )
+              "
               flat
               dense
               size="xs"
@@ -126,33 +183,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
               data-test="alert-details-copy-conditions-btn"
             >
-              <q-tooltip>{{ t('alerts.alertDetails.copy') }}</q-tooltip>
+              <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
             </q-btn>
           </div>
           <!-- Code content -->
-          <pre class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed">{{
-            alertDetails.conditions !== '' && alertDetails.conditions !== '--'
-              ? (alertDetails.type === 'sql' || alertDetails.type === 'promql'
+          <pre
+            class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed"
+            >{{
+              alertDetails.conditions !== "" && alertDetails.conditions !== "--"
+                ? alertDetails.type === "sql" || alertDetails.type === "promql"
                   ? alertDetails.conditions
                   : alertDetails.conditions.length !== 2
                     ? `if ${alertDetails.conditions}`
-                    : t('alerts.alertDetails.noCondition'))
-              : t('alerts.alertDetails.noCondition')
-          }}</pre>
+                    : t("alerts.alertDetails.noCondition")
+                : t("alerts.alertDetails.noCondition")
+            }}</pre
+          >
         </div>
 
         <!-- Description (only show if exists) -->
         <div v-if="alertDetails.description" class="tw:mt-2">
           <div
             class="tw:flex tw:items-center tw:gap-1.5 tw:text-[12px] tw:font-semibold tw:uppercase tw:tracking-wider tw:mb-1"
-            :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:text-gray-400'
+                : 'tw:text-gray-500'
+            "
           >
             <q-icon name="info_outline" size="13px" />
-            {{ t('common.description') }}
+            {{ t("common.description") }}
           </div>
           <div
             class="tw:text-[13px] tw:px-3 tw:py-2 tw:rounded tw:leading-relaxed"
-            :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-300' : 'tw:bg-gray-50 tw:text-gray-700'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:bg-gray-800 tw:text-gray-300'
+                : 'tw:bg-gray-50 tw:text-gray-700'
+            "
           >
             {{ alertDetails.description }}
           </div>
@@ -162,17 +230,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- History Section -->
       <div
         class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-4 tw:pt-2"
-        :class="store.state.theme === 'dark' ? 'tw:border-t tw:border-gray-700' : 'tw:border-t tw:border-gray-200'"
+        :class="
+          store.state.theme === 'dark'
+            ? 'tw:border-t tw:border-gray-700'
+            : 'tw:border-t tw:border-gray-200'
+        "
       >
-
         <!-- Loading state -->
         <div
           v-if="isLoadingHistory"
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:gap-3"
         >
           <q-spinner-hourglass size="32px" color="primary" />
-          <div class="tw:text-sm" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
-            {{ t('alerts.alertDetails.loadingHistory') }}
+          <div
+            class="tw:text-sm"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:text-gray-400'
+                : 'tw:text-gray-500'
+            "
+          >
+            {{ t("alerts.alertDetails.loadingHistory") }}
           </div>
         </div>
 
@@ -183,14 +261,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div
             class="tw:w-14 tw:h-14 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:mb-1"
-            :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'"
+            :class="
+              store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'
+            "
           >
-            <q-icon name="history_toggle_off" size="28px" :color="store.state.theme === 'dark' ? 'grey-6' : 'grey-5'" />
+            <q-icon
+              name="history_toggle_off"
+              size="28px"
+              :color="store.state.theme === 'dark' ? 'grey-6' : 'grey-5'"
+            />
           </div>
-          <div class="tw:text-sm tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">
-            {{ t('alerts.alertDetails.noHistoryAvailable') }}
+          <div
+            class="tw:text-sm tw:font-medium"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:text-gray-400'
+                : 'tw:text-gray-600'
+            "
+          >
+            {{ t("alerts.alertDetails.noHistoryAvailable") }}
           </div>
-          <div class="tw:text-xs" :class="store.state.theme === 'dark' ? 'tw:text-gray-600' : 'tw:text-gray-400'">
+          <div
+            class="tw:text-xs"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:text-gray-600'
+                : 'tw:text-gray-400'
+            "
+          >
             Try expanding the time range
           </div>
         </div>
@@ -199,86 +297,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-else
           class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:mb-2"
-          :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'code-block-dark'
+              : 'code-block-light'
+          "
         >
-        <q-table
-          ref="qTableRef"
-          :rows="alertHistory"
-          :columns="historyTableColumns"
-          row-key="timestamp"
-          v-model:pagination="pagination"
-          @request="onRequest"
-          style="flex: 1; overflow: hidden;"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky history-table"
-          data-test="alert-details-history-table"
-        >
-          <template v-slot:body="props">
-            <q-tr
-              :props="props"
-              :class="getRowClass(props.row.status)"
-            >
-              <q-td v-for="col in historyTableColumns" :key="col.name" :props="props">
-                <template v-if="col.name === '#'">
-                  <span class="tw:text-[13px] tw:tabular-nums" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
-                    {{ (currentPage - 1) * selectedPerPage + props.rowIndex + 1 }}
-                  </span>
-                </template>
-                <template v-else-if="col.name === 'status'">
-                  <div class="tw:flex tw:items-center tw:gap-1.5">
-                    <span class="status-dot" :class="getStatusDotClass(props.row.status)" />
-                    <span class="tw:text-[13px] tw:font-medium" :class="getStatusTextClass(props.row.status)">
-                      {{ formatStatus(props.row.status) }}
+          <q-table
+            ref="qTableRef"
+            :rows="alertHistory"
+            :columns="historyTableColumns"
+            row-key="timestamp"
+            v-model:pagination="pagination"
+            @request="onRequest"
+            style="flex: 1; overflow: hidden"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky history-table"
+            data-test="alert-details-history-table"
+          >
+            <template v-slot:body="props">
+              <q-tr :props="props" :class="getRowClass(props.row.status)">
+                <q-td
+                  v-for="col in historyTableColumns"
+                  :key="col.name"
+                  :props="props"
+                >
+                  <template v-if="col.name === '#'">
+                    <span
+                      class="tw:text-[13px] tw:tabular-nums"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-500'
+                          : 'tw:text-gray-400'
+                      "
+                    >
+                      {{
+                        (currentPage - 1) * selectedPerPage + props.rowIndex + 1
+                      }}
                     </span>
-                  </div>
-                </template>
-                <template v-else-if="col.name === 'timestamp'">
-                  <span class="tw:text-[13px]">{{ formatTimestamp(props.row.timestamp) }}</span>
-                  <q-tooltip class="tw:text-xs">
-                    {{ formatTimestampFull(props.row.timestamp) }}
-                  </q-tooltip>
-                </template>
-                <template v-else-if="col.name === 'evaluation_time'">
-                  <span class="tw:text-[13px] tw:tabular-nums">
-                    {{ props.row.evaluation_took_in_secs ? props.row.evaluation_took_in_secs.toFixed(3) + 's' : '—' }}
-                  </span>
-                </template>
-                <template v-else-if="col.name === 'query_time'">
-                  <span class="tw:text-[13px] tw:tabular-nums">
-                    {{ props.row.query_took ? props.row.query_took + 'ms' : '—' }}
-                  </span>
-                </template>
-                <template v-else-if="col.name === 'error'">
-                  <div v-if="props.row.error" class="tw:flex tw:items-center tw:gap-1">
-                    <q-icon name="error_outline" size="16px" class="tw:text-red-500" />
-                    <span class="tw:text-[12px] tw:text-red-500 tw:truncate tw:max-w-[120px]">
-                      {{ props.row.error }}
-                    </span>
-                    <q-tooltip class="tw:text-xs tw:max-w-xs tw:break-words">
-                      {{ props.row.error }}
+                  </template>
+                  <template v-else-if="col.name === 'status'">
+                    <div class="tw:flex tw:items-center tw:gap-1.5">
+                      <span
+                        class="status-dot"
+                        :class="getStatusDotClass(props.row.status)"
+                      />
+                      <span
+                        class="tw:text-[13px] tw:font-medium"
+                        :class="getStatusTextClass(props.row.status)"
+                      >
+                        {{ formatStatus(props.row.status) }}
+                      </span>
+                    </div>
+                  </template>
+                  <template v-else-if="col.name === 'timestamp'">
+                    <span class="tw:text-[13px]">{{
+                      formatTimestamp(props.row.timestamp)
+                    }}</span>
+                    <q-tooltip class="tw:text-xs">
+                      {{ formatTimestampFull(props.row.timestamp) }}
                     </q-tooltip>
-                  </div>
-                  <span v-else class="tw:text-gray-400">—</span>
-                </template>
-              </q-td>
-            </q-tr>
-          </template>
+                  </template>
+                  <template v-else-if="col.name === 'evaluation_time'">
+                    <span class="tw:text-[13px] tw:tabular-nums">
+                      {{
+                        props.row.evaluation_took_in_secs
+                          ? props.row.evaluation_took_in_secs.toFixed(3) + "s"
+                          : "—"
+                      }}
+                    </span>
+                  </template>
+                  <template v-else-if="col.name === 'query_time'">
+                    <span class="tw:text-[13px] tw:tabular-nums">
+                      {{
+                        props.row.query_took ? props.row.query_took + "ms" : "—"
+                      }}
+                    </span>
+                  </template>
+                  <template v-else-if="col.name === 'error'">
+                    <div
+                      v-if="props.row.error"
+                      class="tw:flex tw:items-center tw:gap-1"
+                    >
+                      <q-icon
+                        name="error_outline"
+                        size="16px"
+                        class="tw:text-red-500"
+                      />
+                      <span
+                        class="tw:text-[12px] tw:text-red-500 tw:truncate tw:max-w-[120px]"
+                      >
+                        {{ props.row.error }}
+                      </span>
+                      <q-tooltip class="tw:text-xs tw:max-w-xs tw:break-words">
+                        {{ props.row.error }}
+                      </q-tooltip>
+                    </div>
+                    <span v-else class="tw:text-gray-400">—</span>
+                  </template>
+                </q-td>
+              </q-tr>
+            </template>
 
-          <template #bottom="scope">
-            <div class="tw:flex tw:items-center tw:w-full tw:h-[48px]">
-              <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[220px]">
-                {{ resultTotal }} {{ t('alerts.alertDetails.results') }}
+            <template #bottom="scope">
+              <div class="tw:flex tw:items-center tw:w-full tw:h-[48px]">
+                <div
+                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[220px]"
+                >
+                  {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
+                </div>
+                <QTablePagination
+                  :scope="scope"
+                  :position="'bottom'"
+                  :resultTotal="resultTotal"
+                  :perPageOptions="perPageOptions"
+                  @update:changeRecordPerPage="changePagination"
+                  @update:changePagination="onPageChange"
+                />
               </div>
-              <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-                @update:changePagination="onPageChange"
-              />
-            </div>
-          </template>
-        </q-table>
+            </template>
+          </q-table>
         </div>
       </div>
     </div>
@@ -347,7 +484,7 @@ const perPageOptions = [
   { label: "10", value: 10 },
   { label: "20", value: 20 },
   { label: "50", value: 50 },
-  { label: "100", value: 100 }
+  { label: "100", value: 100 },
 ];
 
 const onRequest = async (requestProps: any) => {
@@ -366,64 +503,64 @@ const changePagination = (val: { label: string; value: any }) => {
   pagination.value.rowsPerPage = val.value;
   pagination.value.page = 1;
   qTableRef.value?.requestServerInteraction({
-    pagination: pagination.value
+    pagination: pagination.value,
   });
 };
 
 const onPageChange = (page: number) => {
   pagination.value.page = page;
   qTableRef.value?.requestServerInteraction({
-    pagination: pagination.value
+    pagination: pagination.value,
   });
 };
 
 // Constants
 const historyTableColumns = [
   {
-    name: '#',
-    label: '#',
-    field: '#',
-    align: 'left' as const,
+    name: "#",
+    label: "#",
+    field: "#",
+    align: "left" as const,
     sortable: false,
-    style: 'width: 48px;'
+    style: "width: 48px;",
   },
   {
-    name: 'timestamp',
-    label: t('alerts.historyTable.timestamp'),
-    field: 'timestamp',
-    align: 'left' as const,
+    name: "timestamp",
+    label: t("alerts.historyTable.timestamp"),
+    field: "timestamp",
+    align: "left" as const,
     sortable: true,
-    style: 'width: 140px;'
+    style: "width: 140px;",
   },
   {
-    name: 'status',
-    label: t('alerts.historyTable.status'),
-    field: 'status',
-    align: 'left' as const,
+    name: "status",
+    label: t("alerts.historyTable.status"),
+    field: "status",
+    align: "left" as const,
     sortable: true,
-    style: 'width: 110px;'
+    style: "width: 110px;",
   },
   {
-    name: 'evaluation_time',
-    label: t('alerts.historyTable.evaluationTime'),
-    field: 'evaluation_took_in_secs',
-    align: 'right' as const,
+    name: "evaluation_time",
+    label: t("alerts.historyTable.evaluationTime"),
+    field: "evaluation_took_in_secs",
+    align: "right" as const,
     sortable: true,
-    style: 'width: 130px;'
+    style: "width: 130px;",
   },
   {
-    name: 'query_time',
-    label: t('alerts.historyTable.queryTime'),
-    field: 'query_took',
-    align: 'right' as const,
+    name: "query_time",
+    label: t("alerts.historyTable.queryTime"),
+    field: "query_took",
+    align: "right" as const,
     sortable: true,
-    style: 'width: 120px;'
+    style: "width: 120px;",
   },
   {
-    name: 'error',
-    label: t('alerts.historyTable.error'),
-    field: 'error',
-    align: 'left' as const,
+    name: "error",
+    label: t("alerts.historyTable.error"),
+    field: "error",
+    align: "left" as const,
     sortable: false,
   },
 ];
@@ -432,24 +569,36 @@ const historyTableColumns = [
 const getStatusDotClass = (status: string) => {
   switch (status?.toLowerCase()) {
     case "firing":
-    case "error": return "status-dot-error";
+    case "error":
+      return "status-dot-error";
     case "ok":
-    case "success": return "status-dot-success";
-    case "skipped": return "status-dot-warning";
-    case "pending": return "status-dot-info";
-    default: return "status-dot-default";
+    case "success":
+      return "status-dot-success";
+    case "skipped":
+      return "status-dot-warning";
+    case "pending":
+      return "status-dot-info";
+    default:
+      return "status-dot-default";
   }
 };
 
 const getStatusTextClass = (status: string) => {
   switch (status?.toLowerCase()) {
     case "firing":
-    case "error": return "tw:text-red-500";
+    case "error":
+      return "tw:text-red-500";
     case "ok":
-    case "success": return "tw:text-green-600";
-    case "skipped": return "tw:text-amber-600";
-    case "pending": return "tw:text-blue-500";
-    default: return store.state.theme === "dark" ? "tw:text-gray-400" : "tw:text-gray-500";
+    case "success":
+      return "tw:text-green-600";
+    case "skipped":
+      return "tw:text-amber-600";
+    case "pending":
+      return "tw:text-blue-500";
+    default:
+      return store.state.theme === "dark"
+        ? "tw:text-gray-400"
+        : "tw:text-gray-500";
   }
 };
 
@@ -457,14 +606,18 @@ const getRowClass = (status: string) => {
   if (store.state.theme === "dark") {
     switch (status?.toLowerCase()) {
       case "firing":
-      case "error": return "row-error-dark";
-      default: return "";
+      case "error":
+        return "row-error-dark";
+      default:
+        return "";
     }
   } else {
     switch (status?.toLowerCase()) {
       case "firing":
-      case "error": return "row-error-light";
-      default: return "";
+      case "error":
+        return "row-error-light";
+      default:
+        return "";
     }
   }
 };
@@ -515,8 +668,8 @@ const fetchAlertHistory = async (alertId: string) => {
         size: selectedPerPage.value,
         from: from,
         start_time: startTime,
-        end_time: endTime
-      }
+        end_time: endTime,
+      },
     );
     alertHistory.value = response.data?.hits || [];
     resultTotal.value = response.data?.total || 0;
@@ -527,7 +680,10 @@ const fetchAlertHistory = async (alertId: string) => {
     pagination.value.rowsNumber = 0;
     $q.notify({
       type: "negative",
-      message: error.response?.data?.message || error.message || t("alerts.failedToFetchHistory"),
+      message:
+        error.response?.data?.message ||
+        error.message ||
+        t("alerts.failedToFetchHistory"),
       timeout: 5000,
     });
   }
@@ -559,18 +715,6 @@ const updateDateTime = (value: any) => {
     fetchAlertHistory(props.alertId).finally(() => {
       isLoadingHistory.value = false;
     });
-  }
-};
-
-const refreshHistory = async () => {
-  if (props.alertId) {
-    pagination.value.page = 1;
-    pagination.value.rowsPerPage = 50;
-    currentPage.value = 1;
-    selectedPerPage.value = 50;
-    isLoadingHistory.value = true;
-    await fetchAlertHistory(props.alertId);
-    isLoadingHistory.value = false;
   }
 };
 
@@ -611,12 +755,12 @@ watch(
         isLoadingHistory.value = false;
       } else {
         qTableRef.value?.requestServerInteraction({
-          pagination: pagination.value
+          pagination: pagination.value,
         });
       }
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 </script>
 
@@ -670,7 +814,7 @@ watch(
 
 .code-block-content {
   padding: 10px 14px;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
   white-space: pre-wrap;
   overflow-x: auto;
   font-size: 13px;
@@ -684,15 +828,33 @@ watch(
   border-radius: 50%;
   flex-shrink: 0;
 }
-.status-dot-error   { background: #ef4444; box-shadow: 0 0 0 2px #fecaca; }
-.status-dot-success { background: #22c55e; box-shadow: 0 0 0 2px #bbf7d0; }
-.status-dot-warning { background: #f59e0b; box-shadow: 0 0 0 2px #fde68a; }
-.status-dot-info    { background: #3b82f6; box-shadow: 0 0 0 2px #bfdbfe; }
-.status-dot-default { background: #9ca3af; }
+.status-dot-error {
+  background: #ef4444;
+  box-shadow: 0 0 0 2px #fecaca;
+}
+.status-dot-success {
+  background: #22c55e;
+  box-shadow: 0 0 0 2px #bbf7d0;
+}
+.status-dot-warning {
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px #fde68a;
+}
+.status-dot-info {
+  background: #3b82f6;
+  box-shadow: 0 0 0 2px #bfdbfe;
+}
+.status-dot-default {
+  background: #9ca3af;
+}
 
 /* ── Row tints ── */
-.row-error-light { background: #fff5f5 !important; }
-.row-error-dark  { background: #2d1b1b !important; }
+.row-error-light {
+  background: #fff5f5 !important;
+}
+.row-error-dark {
+  background: #2d1b1b !important;
+}
 
 /* ── Table layout ── */
 .history-table {
