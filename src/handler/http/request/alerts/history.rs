@@ -34,7 +34,9 @@ use utoipa::ToSchema;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::{auth::UserEmail, http::get_or_create_trace_id},
+        utils::{
+            auth::UserEmail, http::get_or_create_trace_id, stream::get_settings_max_query_range,
+        },
     },
     handler::http::extractors::Headers,
     service::{
@@ -166,9 +168,27 @@ pub async fn get_alert_history(
 
     // Set default time range (last 7 days if not specified)
     let end_time = query.end_time.unwrap_or_else(now_micros);
-    let start_time = query
+    let mut start_time = query
         .start_time
         .unwrap_or_else(|| (Utc::now() - Duration::try_days(7).unwrap()).timestamp_micros());
+
+    // Check the max query range allowed on the triggers stream
+    if let Some(settings) =
+        infra::schema::get_settings(&org_id, TRIGGERS_STREAM, StreamType::Logs).await
+    {
+        let max_query_range = get_settings_max_query_range(
+            settings.max_query_range,
+            &org_id,
+            Some(&user_email.user_id),
+        )
+        .await;
+        if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
+            start_time = end_time - max_query_range * 3600 * 1_000_000;
+            log::warn!(
+                "Start time for alert History api for org {org_id} updated as per max query range set for triggers stream"
+            )
+        }
+    }
 
     // Validate time range
     if start_time >= end_time {
