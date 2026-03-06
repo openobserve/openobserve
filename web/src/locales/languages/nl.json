@@ -1470,7 +1470,18 @@
     "hideQueryResults": "Resultaten van zoekopdrachten verbergen",
     "vrlExtractionTooltip": "Om geëxtraheerde VRL-velden in het diagram te gebruiken, schrijft u een VRL-functie en klikt u op de knop Toepassen. De velden worden geëxtraheerd, zodat u ze kunt gebruiken om de grafiek samen te stellen.",
     "errorFetchingFunctions": "Fout bij het ophalen van functies",
-    "functionAppliedSuccess": "De functie {name} is succesvol toegepast."
+    "functionAppliedSuccess": "De functie {name} is succesvol toegepast.",
+    "pivotOptions": "Pivot-opties",
+    "pivotShowRowTotals": "Rijtotalen weergeven",
+    "pivotShowColTotals": "Kolomtotalen weergeven",
+    "pivotMissingValue": "Ontbrekende waarde",
+    "pivotMissingValueHint": "Getoonde waarde voor cellen zonder gegevens",
+    "pivotShowRowTotalsTooltip": "Een rij met totalen onder aan de draaitabel weergeven met een samenvatting van de waarden van elke kolom",
+    "pivotShowColTotalsTooltip": "Een kolom met totalen aan de rechterkant van de draaitabel weergeven met een samenvatting van de waarden van elke rij",
+    "pivotStickyRowTotals": "Totalen van Sticky Row",
+    "pivotStickyRowTotalsTooltip": "Zet de rij met totalen onderaan vast, zodat deze zichtbaar blijft wanneer je verticaal scrolt.",
+    "pivotStickyColTotals": "Totalen van plakkerige kolommen",
+    "pivotStickyColTotalsTooltip": "Zet de kolom met totalen aan de rechterkant vast, zodat deze zichtbaar blijft wanneer u horizontaal scrolt"
   },
   "panel": {
     "header": "Paneel",
@@ -1552,7 +1563,9 @@
     "sqlBuilder": "SQL Builder",
     "generatedSql": "Gegenereerde SQL",
     "enterCustomSql": "Voer uw aangepaste SQL-query in...",
-    "customSql": "SQL op maat"
+    "customSql": "SQL op maat",
+    "pivotField": "Draaiveld",
+    "addToPivot": "Aan draadveld toevoegen"
   },
   "home": {
     "streams": "Streams",

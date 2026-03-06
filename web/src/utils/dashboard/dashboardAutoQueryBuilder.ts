@@ -355,12 +355,22 @@ export function buildSQLChartQuery(config: {
   const streamAlias = queryData?.joins?.length ? stream : "";
 
   // Merge all field lists
-  const allFields = [
-    ...queryData.fields.x,
-    ...queryData.fields.y,
-    ...(queryData.fields?.breakdown || []),
-    ...(queryData.fields?.z || []),
-  ]
+  // For tables, put breakdown (pivot) before y for cleaner pivot SQL readability
+  const allFields = (
+    chartType === "table"
+      ? [
+          ...queryData.fields.x,
+          ...(queryData.fields?.breakdown || []),
+          ...queryData.fields.y,
+          ...(queryData.fields?.z || []),
+        ]
+      : [
+          ...queryData.fields.x,
+          ...queryData.fields.y,
+          ...(queryData.fields?.breakdown || []),
+          ...(queryData.fields?.z || []),
+        ]
+  )
     .flat()
     .filter((fieldObj: any) => !fieldObj.isDerived);
 

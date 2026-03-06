@@ -72,6 +72,10 @@ export function useStickyColumns(props: any, store: any) {
     const bgColor = store.state.theme === "dark" ? "#1a1a1a" : "#fff";
     let css = "";
 
+    const stickyColTotals = !!props.data?.stickyColTotals;
+    const stickyRowTotals = !!props.data?.stickyRowTotals;
+    const TOTAL_COL_WIDTH = 150;
+
     // Generate CSS rules for each column position
     columns.forEach((col: any, colIndex: number) => {
       if (col.sticky) {
@@ -92,6 +96,21 @@ export function useStickyColumns(props: any, store: any) {
           }
         `;
       }
+
+      // Right-sticky total columns (for standard single-row headers)
+      if (stickyColTotals && col._isTotalColumn) {
+        const rightOffset = (col._totalColRightIndex ?? 0) * TOTAL_COL_WIDTH;
+        css += `
+          .my-sticky-virtscroll-table thead tr:first-child th:nth-child(${colIndex + 1}) {
+            position: sticky !important;
+            right: ${rightOffset}px !important;
+            z-index: 4 !important;
+            min-width: ${TOTAL_COL_WIDTH}px !important;
+            background-color: ${bgColor} !important;
+            box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1) !important;
+          }
+        `;
+      }
     });
 
     // Add base styling for all sticky columns
@@ -102,6 +121,29 @@ export function useStickyColumns(props: any, store: any) {
         position: sticky !important;
         z-index: 2 !important;
         box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1) !important;
+      }
+
+      /* Right-sticky total column body cells */
+      .my-sticky-virtscroll-table tbody td.pivot-total-col {
+        position: sticky !important;
+        z-index: 2 !important;
+        background-color: ${bgColor} !important;
+        box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1) !important;
+      }
+
+      /* Sticky total row (bottom sticky) */
+      .my-sticky-virtscroll-table.pivot-sticky-totals .pivot-sticky-total-row td {
+        position: sticky !important;
+        bottom: 0 !important;
+        z-index: 2 !important;
+        background-color: ${bgColor} !important;
+        font-weight: bold !important;
+        box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1) !important;
+      }
+
+      /* Corner: sticky total row + sticky total column intersection */
+      .my-sticky-virtscroll-table.pivot-sticky-totals .pivot-sticky-total-row td.pivot-total-col {
+        z-index: 5 !important;
       }
 
       /* Column-specific positions for headers and body cells */

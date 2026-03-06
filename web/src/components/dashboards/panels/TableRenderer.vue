@@ -21,11 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'my-sticky-virtscroll-table',
         { 'no-position-absolute': store.state.printMode },
         { 'wrap-enabled': wrapCells },
+        { 'pivot-sticky-totals': stickyRowTotals },
       ]"
       :virtual-scroll="!showPagination"
       v-model:pagination="pagination"
       :rows-per-page-options="paginationOptions"
-      :virtual-scroll-sticky-size-start="48"
+      :virtual-scroll-sticky-size-start="pivotHeaderLevels.length > 0 ? 28 * pivotHeaderLevels.length : 48"
+      :virtual-scroll-sticky-size-end="stickyTotalRow ? 28 : 0"
       dense
       :wrap-cells="wrapCells"
       :rows="data.rows || []"
@@ -35,12 +37,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-panel-table"
       @row-click="(...args: any) => $emit('row-click', ...args)"
       hide-no-data
+      :row-class="getRowClass"
     >
+      <!-- N-level hierarchical headers for pivot tables -->
+      <template v-slot:header="headerProps" v-if="pivotHeaderLevels.length > 0">
+        <q-tr
+          v-for="(level, levelIdx) in pivotHeaderLevels"
+          :key="'hl_' + levelIdx"
+        >
+          <!-- Row field headers — only in first row, spanning all levels -->
+          <q-th
+            v-if="levelIdx === 0"
+            v-for="col in pivotRowColumns"
+            :key="'rh_' + col.name"
+            :rowspan="pivotHeaderLevels.length"
+            class="pivot-group-header cursor-pointer"
+            :style="getStickyColumnStyle(col)"
+            @click="headerProps.sort(col.name)"
+          >
+            {{ col.label }}
+            <q-icon
+              :name="pagination.descending ? 'arrow_downward' : 'arrow_upward'"
+              size="12px"
+              class="q-ml-xs pivot-sort-icon"
+              :class="{ 'pivot-sort-active': pagination.sortBy === col.name }"
+            />
+          </q-th>
+          <!-- Pivot/value group headers at this level -->
+          <q-th
+            v-for="(cell, cellIdx) in level.cells"
+            :key="'c_' + levelIdx + '_' + cell.key"
+            :colspan="cell.colspan"
+            :rowspan="cell.rowspan || 1"
+            :class="[
+              level.isLeaf ? 'pivot-value-header' : 'pivot-group-header text-center',
+              { 'pivot-section-border': cell.hasBorder },
+              { 'pivot-total-col': stickyColTotals && cell._isTotalHeader },
+              { 'cursor-pointer': cell._sortColumn }
+            ]"
+            :style="stickyColTotals && cell._isTotalHeader ? getStickyTotalHeaderForPivot(cell) : {}"
+            @click="cell._sortColumn && headerProps.sort(cell._sortColumn)"
+          >
+            {{ cell.label }}
+            <q-icon
+              v-if="level.isLeaf && cell._sortColumn"
+              :name="pagination.descending ? 'arrow_downward' : 'arrow_upward'"
+              size="12px"
+              class="q-ml-xs pivot-sort-icon"
+              :class="{ 'pivot-sort-active': pagination.sortBy === cell._sortColumn }"
+            />
+          </q-th>
+        </q-tr>
+      </template>
       <template v-slot:body-cell="props">
         <q-td
           :props="props"
-          :style="[getStyle(props), getStickyColumnStyle(props.col)]"
-          :class="{ 'sticky-column': props.col.sticky }"
+          :style="[getStyle(props), getStickyColumnStyle(props.col), getStickyTotalColumnStyle(props.col)]"
+          :class="{ 'sticky-column': props.col.sticky, 'pivot-total-col': stickyColTotals && props.col._isTotalColumn }"
           :data-col-index="props.col.__colIndex"
           class="copy-cell-td"
         >
@@ -100,6 +153,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           </q-btn>
         </q-td>
+      </template>
+
+      <!-- Sticky total row rendered outside virtual scroll for sticky bottom -->
+      <template v-slot:bottom-row="bottomRowProps" v-if="stickyTotalRow">
+        <q-tr class="pivot-total-row pivot-sticky-total-row">
+          <q-td
+            v-for="col in bottomRowProps.cols"
+            :key="'ft_' + col.name"
+            :style="[
+              getStickyTotalColumnStyle(col),
+              getStickyColumnStyle(col),
+            ]"
+            :class="{
+              'pivot-total-col': stickyColTotals && col._isTotalColumn,
+              'sticky-column': col.sticky,
+              'text-right': col.align === 'right',
+              'text-left': col.align === 'left',
+            }"
+          >
+            {{
+              stickyTotalRow[col.field] === undefined || stickyTotalRow[col.field] === null
+                ? ""
+                : col.format
+                  ? col.format(stickyTotalRow[col.field], stickyTotalRow)
+                  : stickyTotalRow[col.field]
+            }}
+          </q-td>
+        </q-tr>
       </template>
 
       <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
@@ -200,6 +281,90 @@ export default defineComponent({
     // Use sticky columns composable
     const { getStickyColumnStyle } = useStickyColumns(props, store);
 
+    // Pivot table header levels (from convertPivotTableData)
+    const pivotHeaderLevels = computed(() => {
+      return props.data?.pivotHeaderLevels || [];
+    });
+
+    const pivotRowColumns = computed(() => {
+      return props.data?.columns?.filter((c: any) => c._isRowField) || [];
+    });
+
+    // Sticky totals support (separate controls for row and column)
+    const stickyRowTotals = computed(() => {
+      return !!props.data?.stickyRowTotals;
+    });
+
+    const stickyColTotals = computed(() => {
+      return !!props.data?.stickyColTotals;
+    });
+
+    const stickyTotalRow = computed(() => {
+      return props.data?.stickyTotalRow || null;
+    });
+
+    // Default width for total columns used to calculate right offsets
+    const TOTAL_COL_WIDTH = 150;
+
+    const getStickyTotalColumnStyle = (col: any) => {
+      if (!stickyColTotals.value || !col?._isTotalColumn) return {};
+      const rightOffset = (col._totalColRightIndex ?? 0) * TOTAL_COL_WIDTH;
+      return {
+        position: "sticky",
+        right: `${rightOffset}px`,
+        "z-index": 2,
+        "width": `${TOTAL_COL_WIDTH}px`,
+        "min-width": `${TOTAL_COL_WIDTH}px`,
+        "max-width": `${TOTAL_COL_WIDTH}px`,
+        "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
+        "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+        "white-space": "normal",
+        "word-break": "break-word",
+      };
+    };
+
+    const getStickyTotalHeaderStyle = (col: any) => {
+      if (!stickyColTotals.value || !col?._isTotalColumn) return {};
+      const rightOffset = (col._totalColRightIndex ?? 0) * TOTAL_COL_WIDTH;
+      return {
+        position: "sticky",
+        right: `${rightOffset}px`,
+        "z-index": 3,
+        "width": `${TOTAL_COL_WIDTH}px`,
+        "min-width": `${TOTAL_COL_WIDTH}px`,
+        "max-width": `${TOTAL_COL_WIDTH}px`,
+        "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
+        "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+        "white-space": "normal",
+        "word-break": "break-word",
+      };
+    };
+
+    // Style for Total header cells in multi-row pivot headers.
+    // Level-0 "Total" cell spans all sub-columns → right: 0.
+    // Y-label level cells have individual _totalColRightIndex offsets.
+    const getStickyTotalHeaderForPivot = (cell: any) => {
+      if (!stickyColTotals.value) return {};
+      const rightOffset = (cell._totalColRightIndex ?? 0) * TOTAL_COL_WIDTH;
+      const width = cell.colspan ? cell.colspan * TOTAL_COL_WIDTH : TOTAL_COL_WIDTH;
+      return {
+        position: "sticky",
+        right: `${rightOffset}px`,
+        "z-index": 3,
+        "width": `${width}px`,
+        "min-width": `${width}px`,
+        "max-width": `${width}px`,
+        "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
+        "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+        "white-space": "normal",
+        "word-break": "break-word",
+      };
+    };
+
+    const getRowClass = (row: any) => {
+      return row?.__isTotalRow ? "pivot-total-row" : "";
+    };
+
     function wrapCsvValue(val: any, formatFn?: any, row?: any) {
       let formatted = formatFn !== void 0 ? formatFn(val, row) : val;
 
@@ -219,11 +384,15 @@ export default defineComponent({
 
     const downloadTableAsCSV = (title?: any) => {
       // naive encoding to csv format
+      const allRows = [
+        ...(tableRef?.value?.filteredSortedRows || []),
+        ...(stickyTotalRow.value ? [stickyTotalRow.value] : []),
+      ];
       const content = [
         props?.data?.columns?.map((col: any) => wrapCsvValue(col.label)),
       ]
         .concat(
-          tableRef?.value?.filteredSortedRows?.map((row: any) =>
+          allRows?.map((row: any) =>
             props?.data?.columns
               ?.map((col: any) =>
                 wrapCsvValue(
@@ -256,10 +425,14 @@ export default defineComponent({
 
     const downloadTableAsJSON = (title?: string) => {
       try {
-        // Create JSON structure with columns and rows
+        // Create JSON structure with columns and rows (include sticky total row if present)
+        const allRows = [
+          ...(tableRef?.value?.filteredSortedRows || []),
+          ...(stickyTotalRow.value ? [stickyTotalRow.value] : []),
+        ];
         const jsonContent = {
           columns: props?.data?.columns,
-          rows: tableRef?.value?.filteredSortedRows || [],
+          rows: allRows,
         };
 
         const content = JSON.stringify(jsonContent, null, 2);
@@ -415,10 +588,19 @@ export default defineComponent({
       tableRef,
       getStyle,
       getStickyColumnStyle,
+      getStickyTotalColumnStyle,
+      getStickyTotalHeaderStyle,
+      getStickyTotalHeaderForPivot,
       store,
       copyCellContent,
       isCellCopied,
       shouldShowCopyButton,
+      pivotHeaderLevels,
+      pivotRowColumns,
+      getRowClass,
+      stickyRowTotals,
+      stickyColTotals,
+      stickyTotalRow,
     };
   },
 });
@@ -437,7 +619,7 @@ export default defineComponent({
 
   :deep(.q-table__top),
   :deep(.q-table__bottom),
-  :deep(thead tr:first-child th) {
+  :deep(thead tr th) {
     /* bg color is important for th; just specify one */
     background-color: #fff;
   }
@@ -448,14 +630,23 @@ export default defineComponent({
     z-index: 1;
   }
 
-  /* this will be the loading indicator */
-  :deep(thead tr:last-child th) {
-    /* height of all previous header rows */
-    top: 48px;
-  }
-
   :deep(thead tr:first-child th) {
     top: 0;
+  }
+
+  /* Second header row (for 2+ row headers in pivot or loading indicator) */
+  :deep(thead tr:nth-child(2) th) {
+    top: 28px;
+  }
+
+  /* Third header row (for 3-level pivot: 2 pivot levels + Y labels) */
+  :deep(thead tr:nth-child(3) th) {
+    top: 56px;
+  }
+
+  /* Fourth header row (for 4-level pivot: 3 pivot levels + Y labels) */
+  :deep(thead tr:nth-child(4) th) {
+    top: 84px;
   }
 
   :deep(.q-virtual-scroll) {
@@ -470,9 +661,8 @@ export default defineComponent({
 .my-sticky-virtscroll-table.q-dark {
   :deep(.q-table__top),
   :deep(.q-table__bottom),
-  :deep(thead tr:first-child th) {
+  :deep(thead tr th) {
     /* bg color is important for th; just specify one */
-    //   background-color: #fff;
     background-color: $dark-page !important;
   }
 }
@@ -500,6 +690,58 @@ export default defineComponent({
   height: 100%;
   width: 100%;
   position: relative;
+}
+
+// Pivot table styles
+:deep(.pivot-total-row) {
+  font-weight: bold;
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.body--dark :deep(.pivot-total-row) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+:deep(.pivot-group-header) {
+  font-weight: 600;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.12);
+}
+
+:deep(.pivot-section-border) {
+  border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+:deep(.pivot-value-header) {
+  font-weight: 500;
+  font-size: 0.85em;
+}
+
+// Sticky total row (bottom-row slot)
+:deep(.pivot-sticky-total-row) {
+  font-weight: bold;
+
+  td {
+    border-top: 2px solid rgba(0, 0, 0, 0.12);
+  }
+}
+
+// Pivot header sort icons
+:deep(.pivot-sort-icon) {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+:deep(th:hover .pivot-sort-icon) {
+  opacity: 0.4;
+}
+
+:deep(.pivot-sort-active) {
+  opacity: 1 !important;
+}
+
+// Sticky total column visual separator
+:deep(.pivot-total-col) {
+  border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
 }
 
 @media print {

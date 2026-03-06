@@ -1470,7 +1470,18 @@
     "hideQueryResults": "Ocultar los resultados de la consulta",
     "vrlExtractionTooltip": "Para usar los campos VRL extraídos en el gráfico, escriba una función VRL y haga clic en el botón Aplicar. Los campos se extraerán, lo que le permitirá usarlos para crear el gráfico.",
     "errorFetchingFunctions": "Error al recuperar las funciones",
-    "functionAppliedSuccess": "La función {name} se aplicó correctamente."
+    "functionAppliedSuccess": "La función {name} se aplicó correctamente.",
+    "pivotOptions": "Opciones de pivote",
+    "pivotShowRowTotals": "Mostrar totales de fila",
+    "pivotShowColTotals": "Mostrar totales de columna",
+    "pivotMissingValue": "Valor faltante",
+    "pivotMissingValueHint": "Se muestra el valor de las celdas sin datos",
+    "pivotShowRowTotalsTooltip": "Mostrar una fila de totales en la parte inferior de la tabla dinámica que resume los valores de cada columna",
+    "pivotShowColTotalsTooltip": "Muestra una columna de totales en el lado derecho de la tabla dinámica que resume los valores de cada fila",
+    "pivotStickyRowTotals": "Totales de Sticky Row",
+    "pivotStickyRowTotalsTooltip": "Fija la fila de totales en la parte inferior para que permanezca visible al desplazarte verticalmente",
+    "pivotStickyColTotals": "Totales de columnas fijas",
+    "pivotStickyColTotalsTooltip": "Fija la columna de totales a la derecha para que permanezca visible al desplazarte horizontalmente"
   },
   "panel": {
     "header": "Panel",
@@ -1552,7 +1563,9 @@
     "sqlBuilder": "Constructor SQL",
     "generatedSql": "SQL generado",
     "enterCustomSql": "Introduzca su consulta SQL personalizada...",
-    "customSql": "SQL personalizado"
+    "customSql": "SQL personalizado",
+    "pivotField": "Campo de pivote",
+    "addToPivot": "Agregar al campo dinámico"
   },
   "home": {
     "streams": "Transmisiones",

@@ -1470,7 +1470,18 @@
     "hideQueryResults": "Nascondi i risultati delle query",
     "vrlExtractionTooltip": "Per utilizzare i campi VRL estratti nel grafico, scrivi una funzione VRL e fai clic sul pulsante Applica. I campi verranno estratti, consentendoti di utilizzarli per creare il grafico.",
     "errorFetchingFunctions": "Errore durante il recupero delle funzioni",
-    "functionAppliedSuccess": "Funzione {name} applicata correttamente."
+    "functionAppliedSuccess": "Funzione {name} applicata correttamente.",
+    "pivotOptions": "Opzioni Pivot",
+    "pivotShowRowTotals": "Mostra i totali delle righe",
+    "pivotShowColTotals": "Mostra i totali delle colonne",
+    "pivotMissingValue": "Valore mancante",
+    "pivotMissingValueHint": "Valore mostrato per le celle senza dati",
+    "pivotShowRowTotalsTooltip": "Visualizza una riga dei totali nella parte inferiore della tabella pivot che riassume i valori di ogni colonna",
+    "pivotShowColTotalsTooltip": "Visualizza una colonna dei totali sul lato destro della tabella pivot che riassume i valori di ogni riga",
+    "pivotStickyRowTotals": "Totali di Sticky Row",
+    "pivotStickyRowTotalsTooltip": "Appunta la riga dei totali in basso in modo che rimanga visibile quando scorri verticalmente",
+    "pivotStickyColTotals": "Totali delle colonne permanenti",
+    "pivotStickyColTotalsTooltip": "Appunta la colonna dei totali sulla destra in modo che rimanga visibile quando scorri orizzontalmente"
   },
   "panel": {
     "header": "Pannello",
@@ -1552,7 +1563,9 @@
     "sqlBuilder": "SQL Builder",
     "generatedSql": "SQL generato",
     "enterCustomSql": "Inserisci la tua query SQL personalizzata...",
-    "customSql": "SQL personalizzato"
+    "customSql": "SQL personalizzato",
+    "pivotField": "Campo pivot",
+    "addToPivot": "Aggiungi al campo pivot"
   },
   "home": {
     "streams": "Stream",
