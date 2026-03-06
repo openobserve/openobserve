@@ -49,7 +49,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <div class="col-auto tw-flex tw-items-center">
+        <div class="col-auto tw:flex tw:items-center">
+          <DateTime
+            ref="dateTimeRef"
+            auto-apply
+            :default-type="dateTimeType"
+            :default-absolute-time="{
+              startTime: absoluteTime.startTime,
+              endTime: absoluteTime.endTime,
+            }"
+            :default-relative-time="relativeTime"
+            data-test="alert-history-drawer-date-picker"
+            @on:date-change="updateDateTime"
+          />
           <q-btn
             data-test="alert-details-edit-btn"
             flat
@@ -217,6 +229,7 @@ import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
+import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import type { Ref } from "vue";
@@ -242,6 +255,23 @@ const resultTotal = ref(0);
 const alertHistory: Ref<any[]> = ref([]);
 const isLoadingHistory = ref(false);
 const qTableRef: Ref<any> = ref(null);
+
+// Date time - default to last 15 minutes (relative)
+const dateTimeRef = ref<any>(null);
+const dateTimeType = ref("relative");
+const relativeTime = ref("15m");
+const _now = Date.now();
+const _fifteenMinutesAgo = _now - 15 * 60 * 1000;
+const absoluteTime = ref({
+  startTime: _fifteenMinutesAgo * 1000, // microseconds
+  endTime: _now * 1000, // microseconds
+});
+const dateTimeValues = ref({
+  startTime: _fifteenMinutesAgo * 1000,
+  endTime: _now * 1000,
+  type: "relative",
+  relativeTimePeriod: "15m",
+});
 
 // Pagination (server-side pagination)
 const selectedPerPage = ref<number>(50);
@@ -394,9 +424,9 @@ const fetchAlertHistory = async (alertId: string) => {
   if (!alertId) return;
 
   try {
-    // Get history for last 30 days
-    const endTime = Date.now() * 1000; // Convert to microseconds
-    const startTime = endTime - (30 * 24 * 60 * 60 * 1000000); // 30 days ago in microseconds
+    // Use the stored datetime values (already in microseconds)
+    const startTime = dateTimeValues.value.startTime;
+    const endTime = dateTimeValues.value.endTime;
 
     // Calculate offset for server-side pagination
     const from = (currentPage.value - 1) * selectedPerPage.value;
@@ -424,6 +454,36 @@ const fetchAlertHistory = async (alertId: string) => {
       type: "negative",
       message: error.response?.data?.message || error.message || t("alerts.failedToFetchHistory"),
       timeout: 5000,
+    });
+  }
+};
+
+const updateDateTime = (value: any) => {
+  dateTimeValues.value = {
+    startTime: value.startTime,
+    endTime: value.endTime,
+    type: value.relativeTimePeriod ? "relative" : "absolute",
+    relativeTimePeriod: value.relativeTimePeriod || "",
+  };
+
+  if (value.relativeTimePeriod) {
+    dateTimeType.value = "relative";
+    relativeTime.value = value.relativeTimePeriod;
+  } else {
+    dateTimeType.value = "absolute";
+    absoluteTime.value = {
+      startTime: value.startTime,
+      endTime: value.endTime,
+    };
+  }
+
+  // Reset pagination and re-fetch
+  pagination.value.page = 1;
+  currentPage.value = 1;
+  if (props.alertId) {
+    isLoadingHistory.value = true;
+    fetchAlertHistory(props.alertId).finally(() => {
+      isLoadingHistory.value = false;
     });
   }
 };
