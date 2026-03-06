@@ -248,7 +248,21 @@ pub async fn update_incident(
             )
             .await
             {
-                Ok(incident) => MetaHttpResponse::json(incident),
+                Ok(incident) => {
+                    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+                    let cooldown = get_o2_config().incidents.reanalysis_cooldown_minutes;
+                    let events = infra::table::incident_events::get(&org_id, &incident_id)
+                        .await
+                        .unwrap_or_default();
+                    let in_flight = crate::service::alerts::incidents::is_analysis_in_flight(
+                        &events,
+                        cooldown * 2,
+                    );
+                    MetaHttpResponse::json(UpdateSeverityResponse {
+                        incident,
+                        analysis_in_flight: in_flight,
+                    })
+                }
                 Err(e) => {
                     if e.to_string().contains("not found") {
                         MetaHttpResponse::not_found("Incident not found")
@@ -322,6 +336,14 @@ pub async fn get_incident_stats(Path(org_id): Path<String>) -> Response {
     MetaHttpResponse::json(stats)
 }
 
+/// Response for severity update — wraps Incident and signals whether analysis is running
+#[derive(Debug, Serialize, ToSchema)]
+pub struct UpdateSeverityResponse {
+    #[serde(flatten)]
+    pub incident: config::meta::alerts::incidents::Incident,
+    pub analysis_in_flight: bool,
+}
+
 /// Response for RCA analysis
 #[derive(Debug, Serialize, ToSchema)]
 pub struct RcaResponse {
@@ -334,6 +356,9 @@ pub struct TriggerRcaQuery {
     /// Use streaming response (default: false)
     #[serde(default)]
     pub stream: bool,
+    /// Treat this as a user-initiated reanalysis — bypasses cooldown (default: false)
+    #[serde(default)]
+    pub reanalysis: bool,
 }
 
 #[cfg(feature = "enterprise")]
@@ -391,6 +416,25 @@ pub async fn trigger_incident_rca(
             .unwrap();
     }
 
+    // In-flight guard
+    {
+        let cooldown = o2_config.incidents.reanalysis_cooldown_minutes;
+        let events = infra::table::incident_events::get(&org_id, &incident_id)
+            .await
+            .unwrap_or_default();
+        if crate::service::alerts::incidents::is_analysis_in_flight(&events, cooldown * 2) {
+            return MetaHttpResponse::bad_request("Analysis already in progress");
+        }
+    }
+
+    // Emit AIAnalysisBegin
+    let _ = infra::table::incident_events::append(
+        &org_id,
+        &incident_id,
+        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+    )
+    .await;
+
     // Get incident with alerts
     let incident =
         match crate::service::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
@@ -431,9 +475,39 @@ pub async fn trigger_incident_rca(
             .unwrap();
     }
 
+    // User-initiated reanalysis: fire-and-forget — spawn agent in background, return 202
+    // immediately. Begin was already emitted above; the spawn passes begin_already_emitted=true
+    // to skip duplicate emission and the in-flight/cooldown guards.
+    if query.reanalysis {
+        let org_id_bg = org_id.clone();
+        let incident_id_bg = incident_id.clone();
+        tokio::spawn(async move {
+            if let Err(e) = crate::service::alerts::incidents::trigger_rca_for_incident(
+                org_id_bg.clone(),
+                incident_id_bg.clone(),
+                true,
+                true,
+            )
+            .await
+            {
+                log::warn!(
+                    "[INCIDENTS::RCA] Background reanalysis failed for {incident_id_bg}: {e}"
+                );
+            }
+        });
+
+        return axum::response::Response::builder()
+            .status(axum::http::StatusCode::ACCEPTED)
+            .header(axum::http::header::CONTENT_TYPE, "application/json")
+            .body(axum::body::Body::from(
+                serde_json::json!({"message": "Analysis started"}).to_string(),
+            ))
+            .unwrap();
+    }
+
     // Choose streaming or non-streaming based on query parameter
     if query.stream {
-        // Start streaming RCA
+        // Start streaming RCA — emit AIAnalysisComplete best-effort after stream starts
         let stream = match rca_service::analyze_incident_stream(client, context).await {
             Ok(s) => s,
             Err(e) => {
@@ -442,6 +516,14 @@ pub async fn trigger_incident_rca(
                 ));
             }
         };
+
+        // Emit AIAnalysisComplete — stream confirmed started (best-effort)
+        let _ = infra::table::incident_events::append(
+            &org_id,
+            &incident_id,
+            config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
+        )
+        .await;
 
         axum::response::Response::builder()
             .status(axum::http::StatusCode::OK)
@@ -456,6 +538,14 @@ pub async fn trigger_incident_rca(
                 return MetaHttpResponse::internal_error(format!("Failed to perform RCA: {e}"));
             }
         };
+
+        // Emit AIAnalysisComplete on success
+        let _ = infra::table::incident_events::append(
+            &org_id,
+            &incident_id,
+            config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
+        )
+        .await;
 
         MetaHttpResponse::json(RcaResponse { rca_content })
     }
