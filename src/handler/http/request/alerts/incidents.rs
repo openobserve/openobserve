@@ -525,6 +525,21 @@ pub async fn trigger_incident_rca(
         )
         .await;
 
+        // Track usage: every explicitly-requested RCA is an IncidentReAnalysis event
+        crate::service::self_reporting::report_request_usage_stats(
+            config::meta::self_reporting::usage::RequestStats {
+                records: 1,
+                ..Default::default()
+            },
+            &org_id,
+            "",
+            config::meta::stream::StreamType::Metadata,
+            config::meta::self_reporting::usage::UsageType::IncidentReAnalysis,
+            0,
+            chrono::Utc::now().timestamp_micros(),
+        )
+        .await;
+
         axum::response::Response::builder()
             .status(axum::http::StatusCode::OK)
             .header(axum::http::header::CONTENT_TYPE, "text/event-stream")
@@ -544,6 +559,21 @@ pub async fn trigger_incident_rca(
             &org_id,
             &incident_id,
             config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
+        )
+        .await;
+
+        // Track usage: every explicitly-requested RCA is an IncidentReAnalysis event
+        crate::service::self_reporting::report_request_usage_stats(
+            config::meta::self_reporting::usage::RequestStats {
+                records: 1,
+                ..Default::default()
+            },
+            &org_id,
+            "",
+            config::meta::stream::StreamType::Metadata,
+            config::meta::self_reporting::usage::UsageType::IncidentReAnalysis,
+            0,
+            chrono::Utc::now().timestamp_micros(),
         )
         .await;
 

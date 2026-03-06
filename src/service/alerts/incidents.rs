@@ -936,6 +936,21 @@ async fn find_or_create_incident(
         severity
     );
 
+    // Report incident creation to the usage stream
+    crate::service::self_reporting::report_request_usage_stats(
+        config::meta::self_reporting::usage::RequestStats {
+            records: 1,
+            ..Default::default()
+        },
+        org_id,
+        "",
+        config::meta::stream::StreamType::Metadata,
+        config::meta::self_reporting::usage::UsageType::IncidentCreation,
+        0,
+        triggered_at,
+    )
+    .await;
+
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
@@ -1513,6 +1528,25 @@ pub async fn trigger_rca_for_incident(
                 log::error!(
                     "[INCIDENTS::RCA] Failed to emit AIAnalysisComplete for {incident_id}: {e}"
                 );
+            }
+
+            // Track reanalysis usage. The initial analysis on a brand-new incident is already
+            // counted by IncidentCreation in find_or_create_incident; every subsequent run
+            // (lifecycle-triggered or user-initiated) is tracked separately as IncidentReAnalysis.
+            if reanalysis || !begin_already_emitted {
+                crate::service::self_reporting::report_request_usage_stats(
+                    config::meta::self_reporting::usage::RequestStats {
+                        records: 1,
+                        ..Default::default()
+                    },
+                    &org_id,
+                    "",
+                    config::meta::stream::StreamType::Metadata,
+                    config::meta::self_reporting::usage::UsageType::IncidentReAnalysis,
+                    0,
+                    chrono::Utc::now().timestamp_micros(),
+                )
+                .await;
             }
 
             Ok(())
