@@ -51,10 +51,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="col in pivotRowColumns"
             :key="'rh_' + col.name"
             :rowspan="pivotHeaderLevels.length"
-            class="pivot-group-header"
+            class="pivot-group-header cursor-pointer"
             :style="getStickyColumnStyle(col)"
+            @click="headerProps.sort(col.name)"
           >
             {{ col.label }}
+            <q-icon
+              :name="pagination.descending ? 'arrow_downward' : 'arrow_upward'"
+              size="12px"
+              class="q-ml-xs pivot-sort-icon"
+              :class="{ 'pivot-sort-active': pagination.sortBy === col.name }"
+            />
           </q-th>
           <!-- Pivot/value group headers at this level -->
           <q-th
@@ -65,11 +72,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               level.isLeaf ? 'pivot-value-header' : 'pivot-group-header text-center',
               { 'pivot-section-border': cell.hasBorder },
-              { 'pivot-total-col': stickyColTotals && cell._isTotalHeader }
+              { 'pivot-total-col': stickyColTotals && cell._isTotalHeader },
+              { 'cursor-pointer': cell._sortColumn }
             ]"
             :style="stickyColTotals && cell._isTotalHeader ? getStickyTotalHeaderForPivot(cell) : {}"
+            @click="cell._sortColumn && headerProps.sort(cell._sortColumn)"
           >
             {{ cell.label }}
+            <q-icon
+              v-if="level.isLeaf && cell._sortColumn"
+              :name="pagination.descending ? 'arrow_downward' : 'arrow_upward'"
+              size="12px"
+              class="q-ml-xs pivot-sort-icon"
+              :class="{ 'pivot-sort-active': pagination.sortBy === cell._sortColumn }"
+            />
           </q-th>
         </q-tr>
       </template>
@@ -694,6 +710,20 @@ export default defineComponent({
   td {
     border-top: 2px solid rgba(0, 0, 0, 0.12);
   }
+}
+
+// Pivot header sort icons
+:deep(.pivot-sort-icon) {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+:deep(th:hover .pivot-sort-icon) {
+  opacity: 0.4;
+}
+
+:deep(.pivot-sort-active) {
+  opacity: 1 !important;
 }
 
 // Sticky total column visual separator

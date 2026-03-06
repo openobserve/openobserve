@@ -87,12 +87,17 @@ function buildPivotHeaderLevels(
           ? cells.length > 0 // level 0: border on every group except first
           : topLevelBoundaries.has(leafColPos); // deeper: align with level 0
 
-      cells.push({
+      const cell: any = {
         key: `${lvl}_${groupValue}_${i}`,
         label: groupValue,
         colspan,
         hasBorder,
-      });
+        // Sort by the first leaf column under this group header.
+        // allPivotKeys[i] is the first pivot key in this group.
+        _sortColumn: `${allPivotKeys[i]}_${yFields[0].alias}`,
+      };
+
+      cells.push(cell);
 
       leafColPos += colspan;
       i += span;
@@ -108,6 +113,8 @@ function buildPivotHeaderLevels(
         rowspan: pivotCount,
         hasBorder: true,
         _isTotalHeader: true,
+        // Sort by the first total column
+        _sortColumn: `Total_${yFields[0].alias}`,
       });
     }
 
@@ -125,6 +132,7 @@ function buildPivotHeaderLevels(
           label: yField.label,
           colspan: 1,
           hasBorder: topLevelBoundaries.has(leafColPos),
+          _sortColumn: `${pk}_${yField.alias}`,
         });
         leafColPos++;
       }
@@ -138,6 +146,7 @@ function buildPivotHeaderLevels(
           hasBorder: topLevelBoundaries.has(leafColPos),
           _isTotalHeader: true,
           _totalColRightIndex: yFields.length - 1 - tIdx,
+          _sortColumn: `Total_${yFields[tIdx].alias}`,
         });
         leafColPos++;
       }
@@ -312,7 +321,7 @@ export const convertPivotTableData = (
       for (const pk of allPivotKeys) {
         const colKey = `${pk}_${yAlias}`;
         if (row[colKey] === undefined || row[colKey] === null) {
-          row[colKey] = missingValue;
+          row[colKey] = null; // Keep null for correct totals/sorting; format() handles display
         }
         rowTotal += Number(row[colKey]) || 0;
       }
@@ -413,7 +422,7 @@ export const convertPivotTableData = (
         align: "right",
         sortable: true,
         _groupStart: isGroupStart,
-        sort: (a: any, b: any) => parseFloat(a) - parseFloat(b),
+        sort: (a: any, b: any) => (Number(a) || 0) - (Number(b) || 0),
         format: (val: any) => {
           if (val === null || val === undefined) return String(missingValue);
           return !Number.isNaN(val)
@@ -450,7 +459,7 @@ export const convertPivotTableData = (
         _groupStart: tIdx === 0,
         _isTotalColumn: true,
         _totalColRightIndex: yFields.length - 1 - tIdx,
-        sort: (a: any, b: any) => parseFloat(a) - parseFloat(b),
+        sort: (a: any, b: any) => (Number(a) || 0) - (Number(b) || 0),
         format: (val: any) => {
           if (val === null || val === undefined) return String(missingValue);
           return !Number.isNaN(val)
