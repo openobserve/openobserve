@@ -852,7 +852,7 @@ pub fn service_routes() -> Router {
                 post(cloud::marketing::handle_new_attribution_event),
             )
             .route(
-                "/organizations/all",
+                "/{org_id}/organizations",
                 get(organization::org::all_organizations),
             )
             .route(
