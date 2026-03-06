@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         v-if="!errorDetail?.message"
-        :style="{ height: chartPanelHeight, width: '100%' }"
+        :style="{ height: chartPanelHeight, width: '100%', position: 'relative' }"
       >
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
@@ -116,6 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }
                 : panelData
           "
+          :isStreaming="isPartialData && loading && !errorDetail?.message"
+          :loadingProgressPercentage="loadingProgressPercentage"
           :height="chartPanelHeight"
           @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
@@ -945,13 +947,18 @@ export default defineComponent({
       tableRendererRef.value = null;
       parser = null;
     });
+    // Holds the ECharts options from the last fully-complete render.
+    // While a new query is streaming, old series that haven't arrived yet are
+    // stitched back in so the chart doesn't go blank during the transition.
+    const prevCompleteOptions = shallowRef<any>(null);
+
     const convertPanelDataCommon = async () => {
       if (
         !errorDetail?.value?.message &&
         validatePanelData?.value?.length === 0
       ) {
         try {
-          panelData.value = await convertPanelData(
+          const newData = await convertPanelData(
             panelSchema.value,
             filteredData.value,
             store,
@@ -964,8 +971,31 @@ export default defineComponent({
             loading.value,
           );
 
+          // During streaming: stitch back old series that haven't arrived yet.
+          // New series replace their old counterparts; unreceived ones stay visible.
+          if (
+            loading.value &&
+            prevCompleteOptions.value?.series?.length &&
+            newData?.options?.series
+          ) {
+            const newNames = new Set(
+              (newData.options.series as any[]).map((s) => s.name),
+            );
+            const kept = (prevCompleteOptions.value.series as any[]).filter(
+              (s) => !newNames.has(s.name),
+            );
+            if (kept.length) {
+              newData.options = {
+                ...newData.options,
+                series: [...newData.options.series, ...kept],
+              };
+            }
+          }
+
+          panelData.value = newData;
+
           limitNumberOfSeriesWarningMessage.value =
-            panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
+            newData?.extras?.limitNumberOfSeriesWarningMessage ?? "";
 
           errorDetail.value = {
             message: "",
@@ -1124,15 +1154,29 @@ export default defineComponent({
             code: "",
           };
 
-        // Check if this is the first chunk with actual data
-        const hasData = data.value?.length > 0 &&
-                       data.value[0]?.result?.length > 0;
+        // Check if this is the first chunk with actual data.
+        // SQL results: data.value[0] is a plain row array (no .result).
+        // PromQL results: data.value[0] has a .result array.
+        const hasData = data.value?.length > 0 && data.value.some((d: any) => {
+          if (!d) return false;
+          if (Array.isArray(d)) return d.length > 0;       // SQL rows
+          if (d?.result) return d.result.length > 0;        // PromQL
+          return false;
+        });
 
         // Use throttled version during loading (streaming), immediate version when complete
         // This prevents excessive re-renders during PromQL data streaming
         if (loading.value) {
+          if (!hasData) {
+            // No data yet (query just started) — save current complete options as
+            // the baseline so series can be stitched back during streaming.
+            if (!prevCompleteOptions.value && panelData.value?.options?.series?.length) {
+              prevCompleteOptions.value = panelData.value.options;
+            }
+            return;
+          }
           // First chunk with actual data: render immediately!
-          if (hasData && !hasRenderedFirstDataChunk.value) {
+          if (!hasRenderedFirstDataChunk.value) {
             hasRenderedFirstDataChunk.value = true;
             await convertPanelDataCommon();
           } else {
@@ -1140,10 +1184,10 @@ export default defineComponent({
             await convertPanelDataThrottled();
           }
         } else {
-          // Loading complete: immediate final render with full data
-          // Cancel any pending throttled calls and render immediately
+          // Loading complete: clear the baseline and do one clean final render
+          prevCompleteOptions.value = null;
           convertPanelDataThrottled.cancel();
-          hasRenderedFirstDataChunk.value = false; // Reset for next query
+          hasRenderedFirstDataChunk.value = false;
           await convertPanelDataCommon();
         }
       },
@@ -2776,4 +2820,5 @@ export default defineComponent({
   width: 100%;
   text-align: center;
 }
+
 </style>

@@ -15,27 +15,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="chart-renderer"
-    ref="chartRef"
-    id="chart1"
-    class="chart-container"
-    @mouseover="
-      () => {
-        // if hoveredSeriesState is not null then set panelId
-        if (hoveredSeriesState)
-          hoveredSeriesState.panelId = data?.extras?.panelId;
-      }
-    "
-    @mouseleave="
-      () => {
-        // if hoveredSeriesState is not null then set -1
-        if (hoveredSeriesState) hoveredSeriesState.setIndex(-1, -1, -1, null);
-      }
-    "
-    @contextmenu="handleNativeContextMenu"
-    style="height: 100%; width: 100%"
-  ></div>
+  <div style="height: 100%; width: 100%; position: relative">
+    <div
+      data-test="chart-renderer"
+      ref="chartRef"
+      id="chart1"
+      class="chart-container"
+      @mouseover="
+        () => {
+          // if hoveredSeriesState is not null then set panelId
+          if (hoveredSeriesState)
+            hoveredSeriesState.panelId = data?.extras?.panelId;
+        }
+      "
+      @mouseleave="
+        () => {
+          // if hoveredSeriesState is not null then set -1
+          if (hoveredSeriesState) hoveredSeriesState.setIndex(-1, -1, -1, null);
+        }
+      "
+      @contextmenu="handleNativeContextMenu"
+      style="height: 100%; width: 100%"
+    ></div>
+
+    <!-- Streaming background — clipped to ECharts grid area (no axis labels) -->
+    <Transition name="chart-streaming-bg-fade">
+      <div
+        v-if="isStreaming && gridBounds"
+        class="chart-streaming-bg"
+        :class="isDark ? 'chart-streaming-bg--dark' : ''"
+        :style="streamingBgStyle"
+      />
+    </Transition>
+  </div>
 </template>
 
 <script lang="ts">
@@ -75,6 +87,7 @@ import { throttle } from "lodash-es";
 import {
   defineComponent,
   ref,
+  computed,
   onMounted,
   watch,
   onUnmounted,
@@ -216,11 +229,54 @@ export default defineComponent({
       type: String,
       default: "100%",
     },
+    isStreaming: {
+      type: Boolean,
+      default: false,
+    },
+    loadingProgressPercentage: {
+      type: Number,
+      default: 0,
+    },
   },
   setup(props: any, { emit }) {
     const chartRef: any = ref(null);
     let chart: any;
     const store = useStore();
+
+    // Grid bounds (in px) read from ECharts after each render — used to position
+    // the streaming background overlay precisely within the plot area.
+    const gridBounds = ref<{ x: number; y: number; width: number; height: number } | null>(null);
+
+    const isDark = computed(() => store.state.theme === "dark");
+
+    const streamingBgStyle = computed(() => {
+      if (!gridBounds.value || !chartRef.value) return {};
+      const { x, y, width, height } = gridBounds.value;
+      const containerWidth = (chartRef.value as HTMLElement).clientWidth;
+      // Background anchored to grid's right edge, grows leftward as data streams in
+      const pct = Math.max((props.loadingProgressPercentage as number) || 0, 5);
+      const bgWidth = (pct / 100) * width;
+      return {
+        top: `${y}px`,
+        right: `${containerWidth - x - width}px`,
+        width: `${bgWidth}px`,
+        height: `${height}px`,
+      };
+    });
+
+    function updateGridBounds() {
+      if (!chart) return;
+      try {
+        const gridComp = (chart as any).getModel().getComponent("grid", 0);
+        if (gridComp?.coordinateSystem?.getRect) {
+          const r = gridComp.coordinateSystem.getRect();
+          gridBounds.value = { x: r.x, y: r.y, width: r.width, height: r.height };
+        }
+      } catch {
+        // Non-cartesian chart (gauge, pie, etc.) — no grid bounds available
+        gridBounds.value = null;
+      }
+    }
 
     const cleanupChart = () => {
       // Remove all event listeners from chart
@@ -233,6 +289,7 @@ export default defineComponent({
       chart?.off("click");
       chart?.off("mouseover");
       chart?.off("contextmenu");
+      chart?.off("finished");
 
       //dispose
       if (chart) {
@@ -479,6 +536,9 @@ export default defineComponent({
     };
 
     const chartInitialSetUp = () => {
+      // Update grid bounds after every render so the streaming overlay stays accurate
+      chart?.on("finished", updateGridBounds);
+
       chart?.on("mousemove", (params: any) => {
         emit("mousemove", params);
         mouseHoverEffectFn(params);
@@ -853,6 +913,9 @@ export default defineComponent({
       chartRef,
       hoveredSeriesState,
       handleNativeContextMenu,
+      gridBounds,
+      isDark,
+      streamingBgStyle,
       get chart() {
         return chart;
       }
@@ -890,5 +953,48 @@ export default defineComponent({
     max-height: 100% !important;
     object-fit: contain !important;
   }
+}
+</style>
+
+<style scoped>
+.chart-streaming-bg-fade-enter-active { transition: opacity 0.3s ease; }
+.chart-streaming-bg-fade-leave-active { transition: opacity 0.4s ease; }
+.chart-streaming-bg-fade-enter-from,
+.chart-streaming-bg-fade-leave-to    { opacity: 0; }
+
+.chart-streaming-bg {
+  position: absolute;
+  pointer-events: none;
+  z-index: 10;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(
+    270deg,
+    rgba(89, 96, 178, 0.04) 0%,
+    rgba(89, 96, 178, 0.14) 100%
+  );
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: 100%;
+    background: rgba(89, 96, 178, 0.5);
+    animation: chart-frontier-pulse 1.2s ease-in-out infinite;
+  }
+}
+
+.chart-streaming-bg--dark {
+  background: linear-gradient(
+    270deg,
+    rgba(89, 96, 178, 0.06) 0%,
+    rgba(89, 96, 178, 0.24) 100%
+  );
+}
+
+@keyframes chart-frontier-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1;   }
 }
 </style>
