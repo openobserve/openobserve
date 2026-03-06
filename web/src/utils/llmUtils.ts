@@ -490,8 +490,8 @@ export function extractLLMData(span: any): LLMData | null {
   const modelParams = parseModelParameters(
     span.llm_request_parameters || span.llm_model_parameters
   );
-  const usage = parseUsageDetails(span.llm_usage_tokens || span);
-  const cost = parseCostDetails(span.llm_usage_cost || {});
+  const usage = parseUsageDetails(span);
+  const cost = parseCostDetails(span);
   const evaluation = parseEvaluationScores(span);
 
   return {
