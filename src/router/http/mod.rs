@@ -20,7 +20,10 @@ use ::config::{
     meta::{
         cluster::{Node, Role, RoleGroup},
         promql::RequestRangeQuery,
-        search::{Request as SearchRequest, SearchPartitionRequest, ValuesRequest},
+        search::{
+            MultiSearchPartitionRequest, MultiStreamRequest, Request as SearchRequest,
+            SearchPartitionRequest, ValuesRequest,
+        },
     },
     router::{is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
     utils::{json, rand::get_rand_element},
@@ -68,8 +71,12 @@ enum QuerierPayload {
     PromQL(web::Form<RequestRangeQuery>),
     /// Search request JSON
     Search(Box<web::Json<SearchRequest>>),
+    /// Search request JSON
+    MultiSearch(Box<web::Json<MultiStreamRequest>>),
     /// Search partition request JSON
     SearchPartition(Box<web::Json<SearchPartitionRequest>>),
+    /// Search partition request JSON
+    MultiSearchPartition(Box<web::Json<MultiSearchPartitionRequest>>),
     /// Values stream request JSON
     Values(Box<web::Json<ValuesRequest>>),
 }
@@ -404,7 +411,15 @@ async fn proxy_with_body_routing(
             .post(&target.full_url)
             .headers(headers)
             .json(&json.into_inner()),
+        QuerierPayload::MultiSearch(json) => client
+            .post(&target.full_url)
+            .headers(headers)
+            .json(&json.into_inner()),
         QuerierPayload::SearchPartition(json) => client
+            .post(&target.full_url)
+            .headers(headers)
+            .json(&json.into_inner()),
+        QuerierPayload::MultiSearchPartition(json) => client
             .post(&target.full_url)
             .headers(headers)
             .json(&json.into_inner()),
@@ -459,6 +474,26 @@ async fn parse_querier_payload(
             ))
         }
 
+        // Multi stream Search endpoints
+        s if s.ends_with("/_search_multi") || s.ends_with("/_search_multi_stream") => {
+            let body = read_payload_bytes(payload, "multi search").await?;
+            let query = json::from_slice::<MultiStreamRequest>(&body).map_err(|_| {
+                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                    "Failed to parse multi search request",
+                )))
+            })?;
+            if query.sql.is_empty() {
+                return Err(Error::from(actix_http::error::PayloadError::Io(
+                    std::io::Error::other("Failed to parse multi search request"),
+                )));
+            }
+            Some((
+                // Only use the first sql query for routing
+                query.sql[0].sql.clone(),
+                QuerierPayload::MultiSearch(Box::new(web::Json(query))),
+            ))
+        }
+
         // Search partition endpoint
         s if s.ends_with("/_search_partition") => {
             let body = read_payload_bytes(payload, "search partition").await?;
@@ -470,6 +505,25 @@ async fn parse_querier_payload(
             Some((
                 query.sql.to_string(),
                 QuerierPayload::SearchPartition(Box::new(web::Json(query))),
+            ))
+        }
+
+        // Search partition endpoint
+        s if s.ends_with("/_search_partition_multi") => {
+            let body = read_payload_bytes(payload, "multi search partition").await?;
+            let query = json::from_slice::<MultiSearchPartitionRequest>(&body).map_err(|_| {
+                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                    "Failed to parse multi search partition request",
+                )))
+            })?;
+            if query.sql.is_empty() {
+                return Err(Error::from(actix_http::error::PayloadError::Io(
+                    std::io::Error::other("Failed to parse multi search partition request"),
+                )));
+            }
+            Some((
+                query.sql[0].clone(),
+                QuerierPayload::MultiSearchPartition(Box::new(web::Json(query))),
             ))
         }
 
