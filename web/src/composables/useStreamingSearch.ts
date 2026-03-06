@@ -89,7 +89,7 @@ const useHttpStreaming = () => {
     if (!traceMap.value[traceId]) return;
 
     errorOccurred.value = true;
-    
+
     const response = convertToWsError(traceId, error);
 
     for (const handler of traceMap.value[traceId].error) {
@@ -195,8 +195,8 @@ const useHttpStreaming = () => {
 
     //TODO OK: Create method to get the url based on the type
     if (type === "search" || type === "histogram" || type === "pageCount") {
-      const streamEndpoint = isMultiStream ? "_multi_search_stream" : "_search_stream";
-      
+      const streamEndpoint = isMultiStream ? "_search_multi_stream" : "_search_stream";
+
       url = `/${streamEndpoint}?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
       if (meta?.dashboard_name)
@@ -217,7 +217,7 @@ const useHttpStreaming = () => {
         url += `&clear_cache=${clear_cache}`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
 
-      if(type === "histogram") {
+      if (type === "histogram") {
         let is_multi_stream_search = false;
         if (queryReq.query?.sql.indexOf(' UNION ALL ') !== -1) is_multi_stream_search = true;
         url += `&is_multi_stream_search=${is_multi_stream_search}`;
@@ -286,9 +286,9 @@ const useHttpStreaming = () => {
 
       // Set up worker for stream processing
       const worker = createStreamWorker();
-      
-      if(worker) {
-      // Set up worker message handling
+
+      if (worker) {
+        // Set up worker message handling
         worker.onmessage = (event) => {
           const { type, traceId: eventTraceId, data } = event.data;
           switch (type) {
@@ -326,19 +326,19 @@ const useHttpStreaming = () => {
       if (!readableStream) {
         throw new Error('Response body is null');
       }
-      
+
       // Start the stream in the worker
-      if (worker) {        
+      if (worker) {
         // Initialize the stream in the worker
         worker.postMessage({
           action: 'startStream',
           traceId
         });
-        
+
         // For Safari compatibility: manually read the stream and send chunks to worker
         const reader = readableStream.getReader();
         const decoder = new TextDecoder();
-        
+
         (async () => {
           try {
             while (true) {
@@ -347,9 +347,9 @@ const useHttpStreaming = () => {
                 // console.log('Trace no longer active, stopping stream reading for traceId:', traceId);
                 break;
               }
-              
+
               const { done, value } = await reader.read();
-              
+
               if (done) {
                 worker.postMessage({
                   action: 'endStream',
@@ -357,13 +357,13 @@ const useHttpStreaming = () => {
                 });
                 break;
               }
-              
+
               // Check again before processing the chunk
               if (!traceMap.value[traceId]) {
                 // console.log('Trace cancelled during processing, skipping chunk for traceId:', traceId);
                 break;
               }
-              
+
               // Decode and send chunks to the worker
               const chunk = decoder.decode(value, { stream: true });
               worker.postMessage({
@@ -377,7 +377,7 @@ const useHttpStreaming = () => {
             if ((error as any).name === 'AbortError') {
               // console.log('Stream reading was cancelled for traceId:', traceId);
               // Don't call onError for expected cancellations
-            } else if((error as any).status === 401) {
+            } else if ((error as any).status === 401) {
               store.dispatch("logout");
               localStorage.clear();
               sessionStorage.clear();
@@ -399,14 +399,14 @@ const useHttpStreaming = () => {
       } else {
         throw new Error('Worker is not supported');
       }
-      
+
       // Store reference to abort controller for cancellation
       activeStreamId.value = traceId;
-      
+
     } catch (error) {
       if ((error as any).name === 'AbortError') {
-       // console.error('Stream was canceled');
-      } else if((error as any).status === 401) {
+        // console.error('Stream was canceled');
+      } else if ((error as any).status === 401) {
         store.dispatch("logout");
         localStorage.clear();
         sessionStorage.clear();

@@ -1113,7 +1113,7 @@ const fn default_size() -> i64 {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/_multi_search_stream")]
+#[post("/{org_id}/_search_multi_stream")]
 pub async fn search_multi_stream(
     org_id: web::Path<String>,
     web::Query(query): web::Query<HashMap<String, String>>,
@@ -1125,7 +1125,7 @@ pub async fn search_multi_stream(
     let org_id = org_id.into_inner();
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
-        tracing::info_span!("/api/{org_id}/_multi_search_stream")
+        tracing::info_span!("/api/{org_id}/_search_multi_stream")
     } else {
         Span::none()
     };

@@ -44,11 +44,14 @@ const QUERIER_ROUTES: [(&str, usize); 25] = [
                                                * values */
     ("service_streams", 2), // /api/{org_id}/service_streams/...
 ];
-const QUERIER_ROUTES_BY_BODY: [&str; 6] = [
+const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
     "/_search_partition",
     "/_search_stream",
     "/_values_stream",
+    "/_search_multi_stream",
+    "/_search_partition_multi",
+    "/_search_multi",
     "/prometheus/api/v1/query_range",
     "/prometheus/api/v1/query_exemplars",
 ];
