@@ -447,6 +447,10 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     table_pivot_show_col_totals: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    table_pivot_sticky_row_totals: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_pivot_sticky_col_totals: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_range: Option<PanelTimeRange>,

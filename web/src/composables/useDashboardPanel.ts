@@ -148,6 +148,8 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       // Pivot table config
       table_pivot_show_row_totals: false,
       table_pivot_show_col_totals: false,
+      table_pivot_sticky_row_totals: false,
+      table_pivot_sticky_col_totals: false,
       panel_time_enabled: false,
       panel_time_range: null,
     },

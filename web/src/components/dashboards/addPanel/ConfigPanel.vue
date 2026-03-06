@@ -543,6 +543,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </div>
       </div>
+      <div class="row items-center">
+        <q-toggle
+          v-model="dashboardPanelData.data.config.table_pivot_sticky_row_totals"
+          :label="t('dashboard.pivotStickyRowTotals')"
+          data-test="dashboard-config-pivot-sticky-row-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+          :disable="
+            !dashboardPanelData.data.config.table_pivot_show_col_totals
+          "
+        />
+        <div>
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-pivot-sticky-row-totals-info"
+          />
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotStickyRowTotalsTooltip") }}
+          </q-tooltip>
+        </div>
+      </div>
+      <div class="row items-center">
+        <q-toggle
+          v-model="dashboardPanelData.data.config.table_pivot_sticky_col_totals"
+          :label="t('dashboard.pivotStickyColTotals')"
+          data-test="dashboard-config-pivot-sticky-col-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+          :disable="
+            !dashboardPanelData.data.config.table_pivot_show_row_totals
+          "
+        />
+        <div>
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-pivot-sticky-col-totals-info"
+          />
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotStickyColTotalsTooltip") }}
+          </q-tooltip>
+        </div>
+      </div>
     </div>
     <div class="space"></div>
 
@@ -2695,6 +2761,18 @@ export default defineComponent({
             undefined
           ) {
             dashboardPanelData.data.config.table_pivot_show_col_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_sticky_row_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_sticky_row_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_sticky_col_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_sticky_col_totals = false;
           }
         }
       },

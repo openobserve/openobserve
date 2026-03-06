@@ -107,6 +107,7 @@ function buildPivotHeaderLevels(
         colspan: yCount > 1 ? yCount : 1,
         rowspan: pivotCount,
         hasBorder: true,
+        _isTotalHeader: true,
       });
     }
 
@@ -135,6 +136,8 @@ function buildPivotHeaderLevels(
           label: yFields[tIdx].label,
           colspan: 1,
           hasBorder: topLevelBoundaries.has(leafColPos),
+          _isTotalHeader: true,
+          _totalColRightIndex: yFields.length - 1 - tIdx,
         });
         leafColPos++;
       }
@@ -163,7 +166,14 @@ export const convertPivotTableData = (
   panelSchema: any,
   searchQueryData: any,
   store: any,
-): { rows: any[]; columns: any[]; pivotHeaderLevels: any[] } => {
+): {
+  rows: any[];
+  columns: any[];
+  pivotHeaderLevels: any[];
+  stickyTotalRow?: any;
+  stickyRowTotals?: boolean;
+  stickyColTotals?: boolean;
+} => {
   const empty = { rows: [], columns: [], pivotHeaderLevels: [] };
 
   if (
@@ -201,6 +211,8 @@ export const convertPivotTableData = (
   const missingValue = config.no_value_replacement ?? "";
   const showRowTotals = config.table_pivot_show_row_totals ?? false;
   const showColTotals = config.table_pivot_show_col_totals ?? false;
+  const stickyRowTotals = config.table_pivot_sticky_row_totals ?? false;
+  const stickyColTotals = config.table_pivot_sticky_col_totals ?? false;
 
   // --- Step 1: Build pivot keys and count totals ---
   const pivotKeyTotals: Map<string, number> = new Map();
@@ -436,6 +448,8 @@ export const convertPivotTableData = (
         align: "right",
         sortable: true,
         _groupStart: tIdx === 0,
+        _isTotalColumn: true,
+        _totalColRightIndex: yFields.length - 1 - tIdx,
         sort: (a: any, b: any) => parseFloat(a) - parseFloat(b),
         format: (val: any) => {
           if (val === null || val === undefined) return String(missingValue);
@@ -456,9 +470,21 @@ export const convertPivotTableData = (
     showRowTotals,
   );
 
+  // --- Step 7: Separate sticky total row if needed ---
+  let stickyTotalRow: any = undefined;
+  if (stickyRowTotals && showColTotals && pivotedRows.length > 0) {
+    const lastRow = pivotedRows[pivotedRows.length - 1];
+    if (lastRow?.__isTotalRow) {
+      stickyTotalRow = pivotedRows.pop();
+    }
+  }
+
   return {
     rows: pivotedRows,
     columns,
     pivotHeaderLevels,
+    stickyTotalRow,
+    stickyRowTotals,
+    stickyColTotals,
   };
 };
