@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'tw:text-gray-600 tw:bg-gray-100'
                   ]"
                 >
-                  UTC
+                  {{ store.state.timezone || 'UTC' }}
                 </span>
                 <div
                   :class="[
@@ -689,10 +689,11 @@ export default defineComponent({
     const formatTimeRange = (start: string, end: string) => {
       if (!start || !end) return "-";
       try {
+        const timeZone = store.state.timezone || 'UTC';
         const startMs = parseInt(start) / 1000; // Convert microseconds to milliseconds
         const endMs = parseInt(end) / 1000;
-        const startDate = new Date(startMs).toLocaleString('en-US', { timeZone: 'UTC' });
-        const endDate = new Date(endMs).toLocaleString('en-US', { timeZone: 'UTC' });
+        const startDate = new Date(startMs).toLocaleString('en-US', { timeZone });
+        const endDate = new Date(endMs).toLocaleString('en-US', { timeZone });
         return `${startDate} - ${endDate}`;
       } catch {
         return "-";
