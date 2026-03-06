@@ -21,6 +21,7 @@ import { AlertCreationWizard } from './alertCreationWizard.js';
 import { AlertManagement } from './alertManagement.js';
 import { AlertBulkOperations } from './alertBulkOperations.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class AlertsPage {
     constructor(page) {
@@ -1854,7 +1855,6 @@ export class AlertsPage {
 
         if (!destinationFound) {
             // Generate Basic auth header using getAuthHeaders (supports cloud passcode)
-            const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
             const headers = getAuthHeaders();
             const authHeader = headers['Authorization'] || this.commonActions.constructor.generateBasicAuthHeader(
                 process.env["ZO_ROOT_USER_EMAIL"],
