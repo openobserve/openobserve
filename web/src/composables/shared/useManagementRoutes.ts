@@ -54,6 +54,18 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "model_pricing",
+          name: "modelPricing",
+          meta: {
+            title: "LLM Model Pricing",
+          },
+          component: () =>
+            import("@/components/settings/ModelPricingList.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "templates",
           name: "alertTemplates",
           meta:{

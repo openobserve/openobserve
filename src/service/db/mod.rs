@@ -37,6 +37,7 @@ pub mod kv;
 pub mod license;
 pub mod metas;
 pub mod metrics;
+pub mod model_pricing;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod org_users;
