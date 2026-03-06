@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="searchResultRef"
                   @update:datetime="setHistogramDate"
                   @update:scroll="getMoreData"
-                  @update:sort="runQueryFn"
+                  @update:sort="runQueryOnSort"
                   @shareLink="copyTracesUrl"
                   @metrics:filters-updated="onMetricsFiltersUpdated"
                 />
@@ -717,7 +717,7 @@ const updateFieldValues = (data) => {
   });
 };
 
-async function getQueryData(isPagination: boolean = false) {
+async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
@@ -769,7 +769,7 @@ async function getQueryData(isPagination: boolean = false) {
     const filter = searchObj.data.editorValue.trim();
     const combinedFilter = filter;
 
-    if (!isPagination) searchResultRef?.value?.getDashboardData();
+    if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {
@@ -1219,6 +1219,12 @@ const runQueryFn = () => {
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.runQuery = false;
   getQueryData();
+};
+
+const runQueryOnSort = () => {
+  searchObj.data.resultGrid.currentPage = 0;
+  searchObj.runQuery = false;
+  getQueryData(false, true);
 };
 
 function restoreUrlQueryParams() {
