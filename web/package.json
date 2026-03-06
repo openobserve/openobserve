@@ -45,7 +45,7 @@
     "d3-scale": "^4.0.2",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
-    "dompurify": "^3.3.1",
+    "dompurify": "^3.3.2",
     "echarts": "^5.6.0",
     "echarts-gl": "^2.0.9",
     "escodegen": "^2.1.0",
