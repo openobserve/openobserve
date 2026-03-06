@@ -52,7 +52,7 @@ try {
  */
 module.exports = defineConfig({
   testDir: './playwright-tests',
-  testMatch: ['**/Logs/**/*.spec.js', '**/Cloud/**/*.spec.js', '**/utils/**/*.spec.js'],
+  testMatch: ['**/*.spec.js'],
   outputDir: './test-results',
   testIgnore: ['**/test-archives/**', '**/*_old.js'],
 
