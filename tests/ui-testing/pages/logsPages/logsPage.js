@@ -538,33 +538,29 @@ export class LogsPage {
         testLogger.debug(`waitForStreamAvailable: Waiting for stream ${streamName} to be available`);
         const startTime = Date.now();
 
-        // Get credentials from cloud-auth
-        const apiUrl = process.env.INGESTION_URL;
+        const apiUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
         const orgId = getOrgIdentifier();
-        const headers = getAuthHeaders();
-        const authHeader = headers['Authorization'];
 
         while (Date.now() - startTime < maxWaitMs) {
             try {
-                // Use dynamic import for node-fetch
-                const fetchModule = await import('node-fetch');
-                const fetch = fetchModule.default;
+                // Use page.request which automatically includes browser session cookies
+                // This works on both cloud (cookie auth) and self-hosted (Basic Auth via storageState)
+                const response = await this.page.request.get(
+                    `${apiUrl}/api/${orgId}/streams`,
+                    { headers: getAuthHeaders() }
+                );
 
-                const response = await fetch(`${apiUrl}/api/${orgId}/streams`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': authHeader,
-                        'Content-Type': 'application/json'
+                if (response.ok()) {
+                    const data = await response.json();
+                    if (data.list) {
+                        const streamExists = data.list.some(s => s.name === streamName);
+                        if (streamExists) {
+                            testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
+                            return true;
+                        }
                     }
-                });
-
-                const data = await response.json();
-                if (response.status === 200 && data.list) {
-                    const streamExists = data.list.some(s => s.name === streamName);
-                    if (streamExists) {
-                        testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
-                        return true;
-                    }
+                } else {
+                    testLogger.debug(`waitForStreamAvailable: API returned ${response.status()}, retrying...`);
                 }
 
                 testLogger.debug(`waitForStreamAvailable: Stream ${streamName} not found yet, waiting ${pollIntervalMs}ms...`);
