@@ -831,6 +831,7 @@ impl FromRequest for AuthExtractor {
                 || (url_len == 5 && path.ends_with("/patterns/extract"))
                 // Ignore permission check for generate_sql endpoint, we need to check it in handler
                 || (method.eq("POST")
+                    && url_len == 4
                     && path_columns[0].eq(V2_API_PREFIX)
                     && path_columns[2].eq("alerts")
                     && path_columns[3].eq("generate_sql"))
