@@ -1477,7 +1477,11 @@
     "pivotMissingValue": "Valore mancante",
     "pivotMissingValueHint": "Valore mostrato per le celle senza dati",
     "pivotShowRowTotalsTooltip": "Visualizza una riga dei totali nella parte inferiore della tabella pivot che riassume i valori di ogni colonna",
-    "pivotShowColTotalsTooltip": "Visualizza una colonna dei totali sul lato destro della tabella pivot che riassume i valori di ogni riga"
+    "pivotShowColTotalsTooltip": "Visualizza una colonna dei totali sul lato destro della tabella pivot che riassume i valori di ogni riga",
+    "pivotStickyRowTotals": "Totali di Sticky Row",
+    "pivotStickyRowTotalsTooltip": "Appunta la riga dei totali in basso in modo che rimanga visibile quando scorri verticalmente",
+    "pivotStickyColTotals": "Totali delle colonne permanenti",
+    "pivotStickyColTotalsTooltip": "Appunta la colonna dei totali sulla destra in modo che rimanga visibile quando scorri orizzontalmente"
   },
   "panel": {
     "header": "Pannello",

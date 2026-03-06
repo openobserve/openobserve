@@ -1477,7 +1477,11 @@
     "pivotMissingValue": "누락된 값",
     "pivotMissingValueHint": "데이터가 없는 셀에 표시된 값",
     "pivotShowRowTotalsTooltip": "피벗 테이블 하단에 각 열의 값을 요약하는 합계 행을 표시합니다.",
-    "pivotShowColTotalsTooltip": "피벗 테이블 오른쪽에 각 행의 값을 요약하는 합계 열을 표시합니다."
+    "pivotShowColTotalsTooltip": "피벗 테이블 오른쪽에 각 행의 값을 요약하는 합계 열을 표시합니다.",
+    "pivotStickyRowTotals": "고정 행 합계",
+    "pivotStickyRowTotalsTooltip": "총계 행을 아래쪽에 고정하여 세로로 스크롤할 때 계속 표시되도록 합니다.",
+    "pivotStickyColTotals": "고정 컬럼 합계",
+    "pivotStickyColTotalsTooltip": "합계 열을 오른쪽에 고정하여 가로로 스크롤할 때 계속 표시되도록 합니다."
   },
   "panel": {
     "header": "패널",

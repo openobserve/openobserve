@@ -1477,7 +1477,11 @@
     "pivotMissingValue": "Eksik Değer",
     "pivotMissingValueHint": "Veri içermeyen hücreler için gösterilen değer",
     "pivotShowRowTotalsTooltip": "Pivot tablonun altında her sütunun değerlerini özetleyen bir toplamlar satırı görüntüleyin",
-    "pivotShowColTotalsTooltip": "Pivot tablonun sağ tarafında her satırın değerlerini özetleyen bir toplamlar sütunu görüntüleyin"
+    "pivotShowColTotalsTooltip": "Pivot tablonun sağ tarafında her satırın değerlerini özetleyen bir toplamlar sütunu görüntüleyin",
+    "pivotStickyRowTotals": "Yapışkan Satır Toplamları",
+    "pivotStickyRowTotalsTooltip": "Toplamlar satırını dikey olarak kaydırırken görünür kalması için alttaki sabitleyin",
+    "pivotStickyColTotals": "Yapışkan Sütun Toplamları",
+    "pivotStickyColTotalsTooltip": "Yatay kaydırırken görünür kalması için sağdaki toplamlar sütununu sabitleyin"
   },
   "panel": {
     "header": "Panel",

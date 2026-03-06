@@ -1477,7 +1477,11 @@
     "pivotMissingValue": "Valor ausente",
     "pivotMissingValueHint": "Valor mostrado para células sem dados",
     "pivotShowRowTotalsTooltip": "Exibir uma linha de totais na parte inferior da tabela dinâmica resumindo os valores de cada coluna",
-    "pivotShowColTotalsTooltip": "Exibir uma coluna de totais no lado direito da tabela dinâmica resumindo os valores de cada linha"
+    "pivotShowColTotalsTooltip": "Exibir uma coluna de totais no lado direito da tabela dinâmica resumindo os valores de cada linha",
+    "pivotStickyRowTotals": "Totais de linhas fixas",
+    "pivotStickyRowTotalsTooltip": "Fixe a linha de totais na parte inferior para que ela permaneça visível ao rolar verticalmente",
+    "pivotStickyColTotals": "Totais de colunas fixas",
+    "pivotStickyColTotalsTooltip": "Fixe a coluna de totais à direita para que ela permaneça visível ao rolar horizontalmente"
   },
   "panel": {
     "header": "Painel",

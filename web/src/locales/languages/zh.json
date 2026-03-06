@@ -1477,7 +1477,11 @@
     "pivotMissingValue": "缺失的价值",
     "pivotMissingValueHint": "为没有数据的单元格显示的值",
     "pivotShowRowTotalsTooltip": "在数据透视表底部显示总计行，汇总每列的值",
-    "pivotShowColTotalsTooltip": "在数据透视表的右侧显示总计列，汇总每行的值"
+    "pivotShowColTotalsTooltip": "在数据透视表的右侧显示总计列，汇总每行的值",
+    "pivotStickyRowTotals": "置顶行总数",
+    "pivotStickyRowTotalsTooltip": "将总数行固定在底部，以便在垂直滚动时保持可见状态",
+    "pivotStickyColTotals": "置顶栏总数",
+    "pivotStickyColTotalsTooltip": "将总数列固定在右侧，以便在水平滚动时保持可见"
   },
   "panel": {
     "header": "面板",

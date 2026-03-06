@@ -1494,7 +1494,11 @@
     "pivotMissingValue": "値が見つかりません",
     "pivotMissingValueHint": "データがないセルに表示される値",
     "pivotShowRowTotalsTooltip": "ピボットテーブルの下部に、各列の値をまとめた集計行を表示します",
-    "pivotShowColTotalsTooltip": "ピボットテーブルの右側に、各行の値をまとめた合計列を表示します"
+    "pivotShowColTotalsTooltip": "ピボットテーブルの右側に、各行の値をまとめた合計列を表示します",
+    "pivotStickyRowTotals": "スティッキー行の合計",
+    "pivotStickyRowTotalsTooltip": "合計行を下部に固定して、垂直方向にスクロールしても表示されたままにします",
+    "pivotStickyColTotals": "スティッキーカラムの合計",
+    "pivotStickyColTotalsTooltip": "合計列を右側に固定して、横にスクロールしても表示されたままにします"
   },
   "panel": {
     "header": "パネル",

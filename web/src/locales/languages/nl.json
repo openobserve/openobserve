@@ -1477,7 +1477,11 @@
     "pivotMissingValue": "Ontbrekende waarde",
     "pivotMissingValueHint": "Getoonde waarde voor cellen zonder gegevens",
     "pivotShowRowTotalsTooltip": "Een rij met totalen onder aan de draaitabel weergeven met een samenvatting van de waarden van elke kolom",
-    "pivotShowColTotalsTooltip": "Een kolom met totalen aan de rechterkant van de draaitabel weergeven met een samenvatting van de waarden van elke rij"
+    "pivotShowColTotalsTooltip": "Een kolom met totalen aan de rechterkant van de draaitabel weergeven met een samenvatting van de waarden van elke rij",
+    "pivotStickyRowTotals": "Totalen van Sticky Row",
+    "pivotStickyRowTotalsTooltip": "Zet de rij met totalen onderaan vast, zodat deze zichtbaar blijft wanneer je verticaal scrolt.",
+    "pivotStickyColTotals": "Totalen van plakkerige kolommen",
+    "pivotStickyColTotalsTooltip": "Zet de kolom met totalen aan de rechterkant vast, zodat deze zichtbaar blijft wanneer u horizontaal scrolt"
   },
   "panel": {
     "header": "Paneel",

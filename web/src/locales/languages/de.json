@@ -1477,7 +1477,11 @@
     "pivotMissingValue": "Fehlender Wert",
     "pivotMissingValueHint": "Wert, der für Zellen ohne Daten angezeigt wird",
     "pivotShowRowTotalsTooltip": "Zeigen Sie am Ende der Pivot-Tabelle eine Summenzeile an, in der die Werte der einzelnen Spalten zusammengefasst sind",
-    "pivotShowColTotalsTooltip": "Zeigen Sie auf der rechten Seite der Pivot-Tabelle eine Summenspalte an, in der die Werte jeder Zeile zusammengefasst sind"
+    "pivotShowColTotalsTooltip": "Zeigen Sie auf der rechten Seite der Pivot-Tabelle eine Summenspalte an, in der die Werte jeder Zeile zusammengefasst sind",
+    "pivotStickyRowTotals": "Gesamtwerte für wichtige Zeilen",
+    "pivotStickyRowTotalsTooltip": "Stecken Sie die Ergebniszeile unten fest, damit sie beim vertikalen Scrollen sichtbar bleibt",
+    "pivotStickyColTotals": "Gesamtwerte für wichtige Spalten",
+    "pivotStickyColTotalsTooltip": "Fixieren Sie die Summenspalte auf der rechten Seite, damit sie beim horizontalen Scrollen sichtbar bleibt"
   },
   "panel": {
     "header": "Panel",
