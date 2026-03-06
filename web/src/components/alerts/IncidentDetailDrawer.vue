@@ -2363,23 +2363,61 @@ export default defineComponent({
       updating.value = true;
       try {
         const org = store.state.selectedOrganization.identifier;
+        const incidentId = incidentDetails.value.id;
         const response = await incidentsService.updateIncident(
           org,
-          incidentDetails.value.id,
+          incidentId,
           { severity: newSeverity }
         );
 
+        const data = response.data;
+
         // Update local state with the actual severity from the API response
-        incidentDetails.value.severity = response.data.severity;
-        editableSeverity.value = response.data.severity;
+        incidentDetails.value.severity = data.severity;
+        editableSeverity.value = data.severity;
 
         $q.notify({
           type: "positive",
-          message: `Incident severity updated to ${response.data.severity}`,
+          message: `Incident severity updated to ${data.severity}`,
           timeout: 2000,
         });
         // Mark data as stale so incident list will refresh
         store.dispatch('incidents/setShouldRefresh', true);
+
+        // Handle reanalysis prompt based on in-flight state
+        if ('analysis_in_flight' in data) {
+          if (data.analysis_in_flight) {
+            $q.notify({
+              type: "info",
+              message: "AI analysis is already running for this incident",
+              timeout: 3000,
+            });
+          } else {
+            $q.dialog({
+              title: "Re-run AI Analysis?",
+              message: "Severity has changed. Would you like AI to re-analyze this incident?",
+              cancel: { label: "No thanks", flat: true },
+              ok: { label: "Re-run AI analysis", color: "primary" },
+              persistent: false,
+            }).onOk(async () => {
+              try {
+                await incidentsService.triggerRca(org, incidentId, { reanalysis: true });
+                $q.notify({
+                  type: "positive",
+                  message: "AI reanalysis started",
+                  timeout: 2000,
+                });
+                await loadDetails(incidentId);
+              } catch (e: any) {
+                $q.notify({
+                  type: "negative",
+                  message: e?.response?.data?.message || "Failed to start reanalysis",
+                  timeout: 3000,
+                });
+              }
+            });
+          }
+        }
       } catch (error: any) {
         console.error("Failed to update severity:", error);
         $q.notify({
