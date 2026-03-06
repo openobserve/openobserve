@@ -286,6 +286,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
     tokio::task::spawn(db::system_settings::watch());
+    tokio::task::spawn(db::model_pricing::watch());
     tokio::task::spawn(db::alerts::templates::watch());
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
@@ -332,6 +333,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::system_settings::cache()
         .await
         .expect("system settings cache failed");
+
+    db::model_pricing::cache()
+        .await
+        .expect("model pricing cache failed");
 
     // ensure system templates exist in database BEFORE caching
     alerts::templates::ensure_system_templates()

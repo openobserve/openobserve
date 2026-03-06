@@ -20,6 +20,7 @@ pub mod enrichment_tables;
 pub mod folders;
 pub mod incident_events;
 pub mod kv_store;
+pub mod model_pricing;
 pub mod org_users;
 pub mod organizations;
 pub mod pipeline_last_errors;
