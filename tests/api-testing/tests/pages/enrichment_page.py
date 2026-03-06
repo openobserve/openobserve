@@ -130,7 +130,7 @@ class EnrichmentPage:
             replace_failed: whether to replace failed records (default: False)
 
         Returns:
-            response object (status 202 on success - job runs async)
+            response object (status 200 on success - job saved, runs async in background)
         """
         session.auth = HTTPBasicAuth(user_email, user_password)
         headers = {
@@ -146,7 +146,7 @@ class EnrichmentPage:
         url = f"{base_url}api/{org_id}/enrichment_tables/{table_name}/url?append={str(append).lower()}"
 
         response = session.post(url, headers=headers, json=payload)
-        assert response.status_code in [200, 202], f"Failed to create enrichment table from URL: {response.status_code} {response.content.decode()}"
+        assert response.status_code == 200, f"Failed to create enrichment table from URL: {response.status_code} {response.content.decode()}"
         return response
 
     def get_enrichment_table_url_status(self, session, base_url, user_email, user_password, org_id, table_name):

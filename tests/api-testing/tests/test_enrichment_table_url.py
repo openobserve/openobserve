@@ -76,12 +76,12 @@ class TestEnrichmentTableURL:
             append=False
         )
 
-        # API returns 200 or 202 (async job)
-        assert response.status_code in [200, 202], f"Expected 200/202, got {response.status_code}: {response.text}"
+        # API returns 200 when job is saved (runs async in background)
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
 
     def test_create_and_wait_for_completion(self):
         """Test creating enrichment table from URL and waiting for completion."""
-        # Create the enrichment table
+        # Create the enrichment table (200 means job saved, runs async in background)
         response = self.enrichment_page.create_enrichment_table_from_url(
             session=self.session,
             base_url=self.base_url,
@@ -92,14 +92,9 @@ class TestEnrichmentTableURL:
             csv_url=self.TEST_CSV_URL,
             append=False
         )
-        assert response.status_code in [200, 202]
+        assert response.status_code == 200
 
-        # If 200, job completed synchronously - no need to wait
-        if response.status_code == 200:
-            print(f"Job completed synchronously for table {self.table_name}")
-            return
-
-        # If 202, job is async - wait for completion
+        # Wait for async job to complete
         result = self.enrichment_page.wait_for_url_enrichment_job(
             session=self.session,
             base_url=self.base_url,
@@ -145,12 +140,12 @@ class TestEnrichmentTableURL:
         # Status should exist and have expected fields
         assert status is not None, f"Status should exist for table {self.table_name}"
         assert "status" in status, f"Status response missing 'status' field: {status}"
-        assert status["status"] in ["pending", "running", "completed", "failed"], \
+        assert status["status"] in ["pending", "processing", "completed", "failed"], \
             f"Unexpected status value: {status['status']}"
 
     def test_create_with_append_true(self):
         """Test creating enrichment table with append=True."""
-        # First create the table
+        # First create the table (200 means job saved, runs async)
         response1 = self.enrichment_page.create_enrichment_table_from_url(
             session=self.session,
             base_url=self.base_url,
@@ -161,10 +156,9 @@ class TestEnrichmentTableURL:
             csv_url=self.TEST_CSV_URL,
             append=False
         )
-        assert response1.status_code in [200, 202]
+        assert response1.status_code == 200
 
-        # Always wait for first job to complete before appending
-        # Even 200 responses may have background processing
+        # Wait for first job to complete before appending
         first_job_result = self.enrichment_page.wait_for_url_enrichment_job(
             session=self.session,
             base_url=self.base_url,
@@ -188,7 +182,7 @@ class TestEnrichmentTableURL:
             )
             pytest.fail(f"First job failed: {status.get('error_message', 'unknown error') if status else 'unknown'}")
         elif first_job_result == "timeout":
-            # Check if job is still running - if so, we can't append yet
+            # Check if job is still processing - if so, we can't append yet
             status = self.enrichment_page.get_enrichment_table_url_status(
                 session=self.session,
                 base_url=self.base_url,
@@ -197,8 +191,8 @@ class TestEnrichmentTableURL:
                 org_id=self.ORG_ID,
                 table_name=self.table_name
             )
-            if status and status.get("status") in ["pending", "running"]:
-                pytest.skip("First job still running after timeout - cannot test append")
+            if status and status.get("status") in ["pending", "processing"]:
+                pytest.skip("First job still processing after timeout - cannot test append")
 
         # Now append more data
         response2 = self.enrichment_page.create_enrichment_table_from_url(
@@ -211,7 +205,7 @@ class TestEnrichmentTableURL:
             csv_url=self.TEST_CSV_URL,
             append=True
         )
-        assert response2.status_code in [200, 202], f"Append failed: {response2.status_code} {response2.text}"
+        assert response2.status_code == 200, f"Append failed: {response2.status_code} {response2.text}"
 
     def test_create_with_replace_failed_true(self):
         """Test creating enrichment table with replace_failed=True.
@@ -269,7 +263,7 @@ class TestEnrichmentTableURL:
                 append=False,
                 replace_failed=True
             )
-            assert response.status_code in [200, 202]
+            assert response.status_code == 200
         except AssertionError as e:
             # If "No failed job found", the test is inconclusive but not a failure
             if "No failed job found" in str(e):
@@ -297,7 +291,7 @@ class TestEnrichmentTableURL:
             assert "Failed to create enrichment table" in str(e)
             return  # Test passed - creation failed as expected
 
-        # If creation was accepted (200/202), the job should eventually fail
+        # If creation was accepted (200), the job should eventually fail
         # Wait for job to complete/fail
         job_result = self.enrichment_page.wait_for_url_enrichment_job(
             session=self.session,
