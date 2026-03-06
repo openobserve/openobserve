@@ -60,7 +60,7 @@ export default class ChartTypeSelector {
 
     // CRITICAL: Wait for stream list API call to complete after changing type
     await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-    await this.page.waitForTimeout(1000);
+    await this.page.locator('[data-test="index-dropdown-stream"]').waitFor({ state: "visible", timeout: 10000 });
   }
 
   // Stream select with retry mechanism (no page reload to preserve context)
@@ -73,10 +73,9 @@ export default class ChartTypeSelector {
       try {
         // Close any open dropdown first
         await this.page.keyboard.press("Escape");
-        await this.page.waitForTimeout(500);
 
+        await streamInput.waitFor({ state: "visible", timeout: 5000 });
         await streamInput.click();
-        await this.page.waitForTimeout(500);
 
         // Log all available options in dropdown for debugging
         const allOptions = await this.page.locator('[role="listbox"] [role="option"]').allTextContents();
@@ -84,7 +83,9 @@ export default class ChartTypeSelector {
 
         await streamInput.press("Control+a");
         await streamInput.fill(streamName);
-        await this.page.waitForTimeout(1500);
+
+        // Wait for dropdown options to filter
+        await this.page.locator('[role="listbox"]').waitFor({ state: "visible", timeout: 10000 });
 
         const streamOption = this.page
           .getByRole("option", { name: streamName, exact: true })
@@ -101,9 +102,9 @@ export default class ChartTypeSelector {
           testLogger.error(`FAILED after ${maxRetries} attempts. Final options: ${finalOptions.join(', ')}`);
           throw error;
         }
-        // Close dropdown and wait before retry (don't reload - loses context!)
+        // Close dropdown and wait for network before retry (don't reload - loses context!)
         await this.page.keyboard.press("Escape");
-        await this.page.waitForTimeout(3000);
+        await this.page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
       }
     }
   }
@@ -116,8 +117,6 @@ export default class ChartTypeSelector {
     );
     await searchInput.click();
     await searchInput.fill(fieldName);
-
-    await this.page.waitForTimeout(1000);
 
     const buttonSelectors = {
       x: "dashboard-add-x-data",
@@ -132,6 +131,9 @@ export default class ChartTypeSelector {
       value: "dashboard-value_for_maps-layout",
       firstcolumn: "dashboard-x-layout",
       othercolumn: "dashboard-y-layout",
+      source: "dashboard-add-source-data",
+      target: "dashboard-add-target-data",
+      sankeyvalue: "dashboard-add-value-data",
     };
 
     const buttonTestId = buttonSelectors[target];
@@ -142,9 +144,19 @@ export default class ChartTypeSelector {
 
     // Locate the specific field item container using the exact field name in the data-test attribute
     // The format is: field-list-item-{streamType}-{streamName}-{fieldName}
-    // We combine ^= (starts with) and $= (ends with) to ensure exact match
-    // Use .first() to handle self-join scenarios where the same field appears twice
-    const fieldItem = this.page.locator(`[data-test^="field-list-item-"][data-test$="-${fieldName}"]`).first();
+    // Fail fast on genuine suffix collisions (different data-test values)
+    const fieldItems = this.page.locator(`[data-test^="field-list-item-"][data-test$="-${fieldName}"]`);
+    // Wait for at least one match to appear after search filtering
+    await fieldItems.first().waitFor({ state: "visible", timeout: 5000 });
+    const matchCount = await fieldItems.count();
+    if (matchCount > 1) {
+      const attrs = await fieldItems.evaluateAll(els => els.map(e => e.getAttribute('data-test')));
+      const uniqueAttrs = [...new Set(attrs)];
+      if (uniqueAttrs.length > 1) {
+        throw new Error(`Ambiguous field match for "${fieldName}": ${attrs.join(', ')}`);
+      }
+    }
+    const fieldItem = fieldItems.first();
 
     // Now locate the button within that field item
     const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
@@ -173,6 +185,9 @@ export default class ChartTypeSelector {
       value: "dashboard-value_for_maps-layout",
       firstcolumn: "dashboard-x-layout",
       othercolumn: "dashboard-y-layout",
+      source: "dashboard-source-item",
+      target: "dashboard-target-item",
+      sankeyvalue: "dashboard-value-item",
     };
 
     const baseTestId = removeSelectors[target];
@@ -229,7 +244,6 @@ export default class ChartTypeSelector {
 
     const menuLocator = this.page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`);
     await menuLocator.waitFor({ state: "visible", timeout: 10000 });
-    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -240,16 +254,14 @@ export default class ChartTypeSelector {
     const dropdown = this.page.locator('[data-test="dashboard-function-dropdown"]').first();
     await dropdown.waitFor({ state: "visible", timeout: 10000 });
     await dropdown.click();
-    await this.page.waitForTimeout(300);
 
+    await this.page.locator('[role="listbox"]').waitFor({ state: "visible", timeout: 5000 });
     await this.page.keyboard.type(functionName);
-    await this.page.waitForTimeout(500);
 
     // Use case-insensitive contains match - filtering by typing already narrows options
     const option = this.page.getByRole("option", { name: new RegExp(functionName, 'i') }).first();
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
-    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -274,7 +286,8 @@ export default class ChartTypeSelector {
     await this.openYAxisFunctionPopup(alias);
     await this.selectFunction(functionName);
     await this.page.keyboard.press("Escape");
-    await this.page.waitForTimeout(500);
+    const menuLocator = this.page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`);
+    await menuLocator.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
   }
 
   // ===== RAW QUERY CONFIGURATION METHODS =====

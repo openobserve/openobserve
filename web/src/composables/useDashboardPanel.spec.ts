@@ -17,6 +17,7 @@ import queryService from "@/services/search";
 import * as zincutils from "@/utils/zincutils";
 import * as sqlUtils from "@/utils/query/sqlUtils";
 import * as convertDataIntoUnitValue from "@/utils/dashboard/convertDataIntoUnitValue";
+import * as panelValidation from "@/utils/dashboard/panelValidation";
 
 // Mock Vue lifecycle hooks to avoid warnings
 vi.mock("vue", async () => {
@@ -37,6 +38,7 @@ vi.mock("@/services/search");
 vi.mock("@/utils/zincutils");
 vi.mock("@/utils/query/sqlUtils");
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue");
+vi.mock("@/utils/dashboard/panelValidation");
 
 // Mock SQL parser
 const mockParser = {
@@ -96,7 +98,7 @@ describe("useDashboardPanel", () => {
     ]);
 
     // Mock validatePanel
-    vi.mocked(convertDataIntoUnitValue.validatePanel).mockImplementation(
+    vi.mocked(panelValidation.validatePanel).mockImplementation(
       () => {},
     );
 
@@ -438,7 +440,7 @@ describe("useDashboardPanel", () => {
         panel.validatePanel(errors, true);
       }).not.toThrow();
 
-      expect(convertDataIntoUnitValue.validatePanel).toHaveBeenCalled();
+      expect(panelValidation.validatePanel).toHaveBeenCalled();
     });
   });
 

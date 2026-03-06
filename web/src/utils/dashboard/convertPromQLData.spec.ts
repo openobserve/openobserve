@@ -1,17 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  convertPromQLData,
-  getPropsByChartTypeForSeries
-} from "./convertPromQLData";
+import { convertPromQLData } from "./convertPromQLData";
+import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 
 // Mock dependencies
 vi.mock("./convertDataIntoUnitValue", () => ({
-  calculateOptimalFontSize: vi.fn(() => 14),
-  calculateWidthText: vi.fn((text) => (text?.length || 0) * 8),
-  formatDate: vi.fn((date) => "2023-12-25 10:00:00"),
   formatUnitValue: vi.fn((value) => `${value.value}${value.unit}`),
-  getContrastColor: vi.fn(() => "#FFFFFF"),
-  applySeriesColorMappings: vi.fn(),
   getUnitValue: vi.fn((value) => ({ value: value?.toString() || "0", unit: "" })),
   calculateRightLegendWidth: vi.fn(() => 120),
   calculateBottomLegendHeight: vi.fn((legendCount, chartWidth, series, maxHeight, legendConfig, gridConfig, chartHeight) => {
@@ -22,8 +15,22 @@ vi.mock("./convertDataIntoUnitValue", () => ({
     }
     return 80;
   }),
+}));
+
+vi.mock("./chartDimensionUtils", () => ({
+  calculateOptimalFontSize: vi.fn(() => 14),
+  calculateWidthText: vi.fn((text) => (text?.length || 0) * 8),
   calculateDynamicNameGap: vi.fn(() => 25),
   calculateRotatedLabelBottomSpace: vi.fn(() => 0),
+}));
+
+vi.mock("./chartColorUtils", () => ({
+  getContrastColor: vi.fn(() => "#FFFFFF"),
+  applySeriesColorMappings: vi.fn(),
+}));
+
+vi.mock("./dateTimeUtils", () => ({
+  formatDate: vi.fn((date) => "2023-12-25 10:00:00"),
 }));
 
 vi.mock("date-fns-tz", () => ({

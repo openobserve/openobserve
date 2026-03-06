@@ -1091,22 +1091,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Metrics Tab Content -->
         <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
-          <!-- Refresh Button (shown when metrics data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.metricStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedMetrics') }}</span>
-            <q-btn
-              flat
-              dense
-              size="sm"
-              icon="refresh"
-              color="primary"
-              @click="refreshCorrelation"
-              :disable="correlationLoading"
-            >
-              <q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip>
-            </q-btn>
-          </div>
-
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
