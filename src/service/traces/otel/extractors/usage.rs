@@ -53,13 +53,15 @@ impl UsageExtractor {
             (GenAiAttributes::USAGE_TOTAL_TOKENS, "total"),
             (GenAiAttributes::USAGE_PROMPT_TOKENS, "input"),
             (GenAiAttributes::USAGE_COMPLETION_TOKENS, "output"),
+            // Canonical names match Langfuse/industry convention so users can define
+            // matching pricing keys without guessing internal normalizations.
             (
                 GenAiAttributes::USAGE_CACHE_READ_TOKENS,
-                "input_cached_tokens",
+                "cache_read_input_tokens",
             ),
             (
                 GenAiAttributes::USAGE_CACHE_WRITE_TOKENS,
-                "input_cache_creation",
+                "cache_creation_input_tokens",
             ),
         ];
 

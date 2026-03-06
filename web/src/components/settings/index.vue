@@ -135,6 +135,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </q-route-tab>
                 <q-route-tab
+                  data-test="model-pricing-tab"
+                  name="model_pricing"
+                  :to="{
+                    name: 'modelPricing',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  content-class="tab_content"
+                  icon="paid"
+                  label="LLM Model Pricing"
+                >
+                </q-route-tab>
+                <q-route-tab
                   v-if="config.isEnterprise == 'true'"
                   data-test="management-cipher-key-tab"
                   name="cipher-keys"

@@ -40,6 +40,7 @@ pub mod license;
 pub mod logs;
 pub mod mcp;
 pub mod metrics;
+pub mod model_pricing;
 pub mod organization;
 pub mod patterns;
 pub mod pipeline;

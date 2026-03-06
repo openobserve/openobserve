@@ -576,6 +576,10 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
+        // LLM Model Pricing
+        .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
+        .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
+
         // Metrics
         .route("/{org_id}/ingest/metrics/_json", post(metrics::ingest::json))
 
