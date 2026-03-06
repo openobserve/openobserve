@@ -192,7 +192,7 @@ import { useI18n } from "vue-i18n";
 import type { ChartType, ChartCategory } from "./customChartExampleTypes";
 import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 export default defineComponent({
   name: "CustomChartTypeSelector",

@@ -51,10 +51,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, defineAsyncComponent, computed } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  defineAsyncComponent,
+  computed,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { provide, inject, toRefs, onActivated } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
@@ -105,7 +111,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "logs"
+      "logs",
     );
     const { t } = useI18n();
     const store = useStore();
@@ -131,7 +137,14 @@ export default defineComponent({
     const panelEditorRef = ref<InstanceType<typeof PanelEditor> | null>(null);
 
     // Allowed chart types for logs visualization
-    const allowedChartTypes = ["area", "bar", "h-bar", "line", "scatter", "table"];
+    const allowedChartTypes = [
+      "area",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "table",
+    ];
 
     // Watch for external chart data changes
     watch(
@@ -139,7 +152,7 @@ export default defineComponent({
       async () => {
         chartData.value = JSON.parse(JSON.stringify(visualizeChartData.value));
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Handle chart type change with validation
@@ -161,7 +174,7 @@ export default defineComponent({
         isSimpleSelectAllQuery(logsPageQuery)
       ) {
         showErrorNotification(
-          "Select * query is not supported for visualization."
+          "Select * query is not supported for visualization.",
         );
         // Prevent the change by not updating the type
         return;
@@ -206,7 +219,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any
+        hoveredTime?: any,
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -256,7 +269,7 @@ export default defineComponent({
         // set errors into errorData
         props.errorData.errors = errors;
         showErrorNotification(
-          "There are some errors, please fix them and try again"
+          "There are some errors, please fix them and try again",
         );
         return;
       } else {

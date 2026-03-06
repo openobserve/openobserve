@@ -135,14 +135,18 @@
                 >
                   <!-- Error/Warning tooltips -->
                   <PanelErrorButtons
-                      :error="errorMessage"
-                      :maxQueryRangeWarning="maxQueryRangeWarning"
-                      :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-                      :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
-                      :isPartialData="isPartialData"
-                      :isPanelLoading="isPanelLoading"
-                      :lastTriggeredAt="lastTriggeredAt"
-                      :viewOnly="false"
+                    :error="errorMessage"
+                    :maxQueryRangeWarning="maxQueryRangeWarning"
+                    :limitNumberOfSeriesWarningMessage="
+                      limitNumberOfSeriesWarningMessage
+                    "
+                    :isCachedDataDifferWithCurrentTimeRange="
+                      isCachedDataDifferWithCurrentTimeRange
+                    "
+                    :isPartialData="isPartialData"
+                    :isPanelLoading="isPanelLoading"
+                    :lastTriggeredAt="lastTriggeredAt"
+                    :viewOnly="false"
                   />
                 </div>
                 <PanelSchemaRenderer
@@ -217,7 +221,7 @@ import {
 } from "../../../utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue";
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
@@ -339,8 +343,7 @@ export default defineComponent({
         }
 
         return;
-      } catch (error) {
-      }
+      } catch (error) {}
 
       // resize the chart when variables data is updated
       // because if variable requires some more space then need to resize chart
@@ -382,7 +385,9 @@ export default defineComponent({
       isPanelLoading.value = data;
     };
 
-    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (data: boolean) => {
+    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (
+      data: boolean,
+    ) => {
       isCachedDataDifferWithCurrentTimeRange.value = data;
     };
 
@@ -409,7 +414,10 @@ export default defineComponent({
         // replace the histogram interval in the query by finding histogram aggregation
         dashboardPanelData?.data?.queries?.forEach((query: any) => {
           const originalQuery = query.query;
-          const updatedQuery = replaceHistogramInterval(originalQuery, histogramInterval.value);
+          const updatedQuery = replaceHistogramInterval(
+            originalQuery,
+            histogramInterval.value,
+          );
 
           // Only update if the query actually changed
           if (updatedQuery !== originalQuery) {
@@ -495,24 +503,33 @@ export default defineComponent({
             // args[1] = interval (string like '5m', '1h', etc.)
 
             // Check if there's a second argument (the interval)
-            if (histogramFields.value[i].args.length > 1 && histogramFields.value[i].args[1]) {
+            if (
+              histogramFields.value[i].args.length > 1 &&
+              histogramFields.value[i].args[1]
+            ) {
               const intervalArg = histogramFields.value[i].args[1];
 
               // Extract interval value with explicit type checking
               let intervalValue: string | null = null;
 
-              if (typeof intervalArg === 'string') {
+              if (typeof intervalArg === "string") {
                 // Direct string value
                 intervalValue = intervalArg;
-              } else if (typeof intervalArg === 'object' && intervalArg !== null) {
+              } else if (
+                typeof intervalArg === "object" &&
+                intervalArg !== null
+              ) {
                 // Object with value property
-                if ('value' in intervalArg && typeof intervalArg.value === 'string') {
+                if (
+                  "value" in intervalArg &&
+                  typeof intervalArg.value === "string"
+                ) {
                   intervalValue = intervalArg.value;
                 }
               }
 
               // Set the histogram interval only if we have a valid non-empty string
-              if (intervalValue && intervalValue.trim() !== '') {
+              if (intervalValue && intervalValue.trim() !== "") {
                 histogramInterval.value = intervalValue;
               } else {
                 // No valid interval - use Auto mode
@@ -614,11 +631,17 @@ export default defineComponent({
         }
 
         // If parent passed variable values, use them to prevent API calls for those variables
-        if (props.initialVariableValues && props.initialVariableValues.values && props.initialVariableValues.values.length > 0) {
+        if (
+          props.initialVariableValues &&
+          props.initialVariableValues.values &&
+          props.initialVariableValues.values.length > 0
+        ) {
           // Update variablesManager with passed values
           props.initialVariableValues.values.forEach((passedVar: any) => {
             // Find and update the variable in the manager (global scope)
-            const globalVar = variablesManager.variablesData.global.find((v: any) => v.name === passedVar.name);
+            const globalVar = variablesManager.variablesData.global.find(
+              (v: any) => v.name === passedVar.name,
+            );
             if (globalVar) {
               globalVar.value = passedVar.value;
               globalVar.isVariablePartialLoaded = true;
@@ -643,8 +666,7 @@ export default defineComponent({
 
         // Commit the values immediately so they're used by the chart
         variablesManager.commitAll();
-      } catch (error) {
-      }
+      } catch (error) {}
 
       // if variables data is null, set it to empty list
       if (
@@ -819,7 +841,7 @@ export default defineComponent({
           currentPanelId.value,
           currentTabId.value || "",
         );
-        
+
         return {
           isVariablesLoading: variablesManager.isLoading.value,
           values: mergedVars,

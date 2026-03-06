@@ -17,7 +17,7 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: {
       data: {
@@ -65,15 +65,15 @@ describe("AddJoinPopUp", () => {
       global: {
         plugins: [Quasar, store, i18n],
         stubs: {
-            LeftJoinSvg: true,
-            LeftJoinTypeSvg: true,
-            LeftJoinLineSvg: true,
-            RightJoinSvg: true,
-            RightJoinTypeSvg: true,
-            RightJoinLineSvg: true,
-            InnerJoinTypeSvg: true,
-            StreamFieldSelect: true,
-        }
+          LeftJoinSvg: true,
+          LeftJoinTypeSvg: true,
+          LeftJoinLineSvg: true,
+          RightJoinSvg: true,
+          RightJoinTypeSvg: true,
+          RightJoinLineSvg: true,
+          InnerJoinTypeSvg: true,
+          StreamFieldSelect: true,
+        },
       },
       props: {
         mainStream: "default_stream",
@@ -96,7 +96,9 @@ describe("AddJoinPopUp", () => {
   });
 
   it("renders correctly", () => {
-    expect(wrapper.find('[data-test="dashboard-join-pop-up"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="dashboard-join-pop-up"]').exists()).toBe(
+      true,
+    );
     expect(wrapper.find(".join-header").exists()).toBe(true);
   });
 
@@ -125,7 +127,9 @@ describe("AddJoinPopUp", () => {
     expect(wrapper.props().modelValue.conditions.length).toBe(2);
 
     // Then remove one
-    const removeBtn = wrapper.find('[data-test="dashboard-join-condition-remove-0"]');
+    const removeBtn = wrapper.find(
+      '[data-test="dashboard-join-condition-remove-0"]',
+    );
     await removeBtn.trigger("click");
     expect(wrapper.props().modelValue.conditions.length).toBe(1);
   });
@@ -139,7 +143,9 @@ describe("AddJoinPopUp", () => {
   });
 
   it("handles stream selection change", async () => {
-    const selectElement = wrapper.find('[data-test="dashboard-config-panel-join-to"]');
+    const selectElement = wrapper.find(
+      '[data-test="dashboard-config-panel-join-to"]',
+    );
     if (selectElement.exists()) {
       // Test that changing stream updates modelValue
       await selectElement.trigger("update:model-value", "stream2");
@@ -226,7 +232,7 @@ describe("AddJoinPopUp", () => {
           RightJoinLineSvg: true,
           InnerJoinTypeSvg: true,
           StreamFieldSelect: true,
-        }
+        },
       },
       props: {
         mainStream: "default_stream",
@@ -256,7 +262,7 @@ describe("AddJoinPopUp", () => {
           RightJoinLineSvg: true,
           InnerJoinTypeSvg: true,
           StreamFieldSelect: true,
-        }
+        },
       },
       props: {
         mainStream: "default_stream",
@@ -335,11 +341,11 @@ describe("AddJoinPopUp", () => {
     // Update with complex nested structure
     condition.leftField = {
       streamAlias: "main_stream",
-      field: "nested.field.path"
+      field: "nested.field.path",
     };
     condition.rightField = {
       streamAlias: "joined_stream",
-      field: "another.nested.path"
+      field: "another.nested.path",
     };
     await wrapper.vm.$nextTick();
 
@@ -373,7 +379,9 @@ describe("AddJoinPopUp", () => {
     wrapper.vm.handleAddCondition(2);
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.props().modelValue.conditions.length).toBeGreaterThan(initialLength);
+    expect(wrapper.props().modelValue.conditions.length).toBeGreaterThan(
+      initialLength,
+    );
   });
 
   it("verifies main stream prop is used correctly", () => {

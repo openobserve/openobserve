@@ -323,7 +323,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
               :histogramQuery="storedHistogramQuery"
-            ></VisualizeLogsQuery>
+            >
+            </VisualizeLogsQuery>
           </div>
           <div
             v-if="searchObj.meta.logsVisualizeToggle == 'build'"
@@ -446,7 +447,7 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
@@ -3279,7 +3280,8 @@ export default defineComponent({
     margin: 0 !important;
     box-sizing: border-box !important;
     height: 100% !important;
-    overflow: visible !important; /* Changed from hidden to visible for button */
+    overflow: visible !important;
+    /* Changed from hidden to visible for button */
   }
 
   .logs-horizontal-splitter .q-splitter__before {

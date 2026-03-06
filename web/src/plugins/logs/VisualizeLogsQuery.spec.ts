@@ -13,9 +13,9 @@ installQuasar();
 const mockRouter = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'home', component: { template: '<div>Home</div>' } },
-    { path: '/logs', name: 'logs', component: { template: '<div>Logs</div>' } }
-  ]
+    { path: "/", name: "home", component: { template: "<div>Home</div>" } },
+    { path: "/logs", name: "logs", component: { template: "<div>Logs</div>" } },
+  ],
 });
 
 // Mock codemirror to prevent import errors
@@ -92,7 +92,7 @@ const mockDashboardPanelData = {
       startTime: Date.now() - 86400000, // 24 hours ago
       endTime: Date.now(),
       type: "relative",
-      period: "1d"
+      period: "1d",
     },
     stream: {
       customQueryFields: [{ name: "custom_field" }],
@@ -104,7 +104,7 @@ const mockDashboardPanelData = {
 const mockResetAggregationFunction = vi.fn();
 const mockValidatePanel = vi.fn();
 
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
     dashboardPanelData: mockDashboardPanelData,
     resetAggregationFunction: mockResetAggregationFunction,
@@ -133,7 +133,7 @@ vi.mock("@/utils/dashboard/checkConfigChangeApiCall", () => ({
   checkIfConfigChangeRequiredApiCallOrNot: vi.fn().mockReturnValue(false),
 }));
 
-// Mock lodash functions 
+// Mock lodash functions
 vi.mock("lodash-es", () => ({
   isEqual: vi.fn().mockReturnValue(true),
   cloneDeep: vi.fn().mockImplementation((obj) => {
@@ -150,8 +150,8 @@ vi.mock("lodash-es", () => ({
 vi.mock("@/utils/query/sqlUtils", () => {
   return {
     isSimpleSelectAllQuery: vi.fn((query: string) => {
-      if (!query || typeof query !== 'string') return false;
-      const normalizedQuery = query.trim().replace(/\s+/g, ' ');
+      if (!query || typeof query !== "string") return false;
+      const normalizedQuery = query.trim().replace(/\s+/g, " ");
       const selectAllPattern = /^select\s+\*\s+from\s+/i;
       return selectAllPattern.test(normalizedQuery);
     }),
@@ -184,7 +184,7 @@ describe("VisualizeLogsQuery Component", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     wrapper = mount(VisualizeLogsQuery, {
       props: defaultProps,
       global: {
@@ -206,10 +206,11 @@ describe("VisualizeLogsQuery Component", () => {
           AddToDashboard: true,
           CustomChartEditor: true,
           "q-splitter": {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+            template:
+              '<div><slot name="before"></slot><slot name="after"></slot></div>',
           },
           "q-splitter-panel": {
-            template: '<div><slot></slot></div>',
+            template: "<div><slot></slot></div>",
           },
         },
       },
@@ -232,9 +233,13 @@ describe("VisualizeLogsQuery Component", () => {
     });
 
     it("should initialize with correct props", () => {
-      expect(wrapper.props("visualizeChartData")).toEqual(defaultProps.visualizeChartData);
+      expect(wrapper.props("visualizeChartData")).toEqual(
+        defaultProps.visualizeChartData,
+      );
       expect(wrapper.props("errorData")).toEqual(defaultProps.errorData);
-      expect(wrapper.props("searchResponse")).toEqual(defaultProps.searchResponse);
+      expect(wrapper.props("searchResponse")).toEqual(
+        defaultProps.searchResponse,
+      );
       expect(wrapper.props("is_ui_histogram")).toBe(false);
     });
 
@@ -265,7 +270,7 @@ describe("VisualizeLogsQuery Component", () => {
           },
         },
       });
-      
+
       expect(testWrapper.props("is_ui_histogram")).toBe(false);
       testWrapper.unmount();
     });
@@ -359,17 +364,17 @@ describe("VisualizeLogsQuery Component", () => {
 
     it("should handle empty object", () => {
       wrapper.vm.metaDataValue({});
-      
+
       expect(wrapper.vm.metaData).toEqual({});
     });
 
     it("should overwrite previous metadata", () => {
       const firstMetadata = { fields: ["field1"] };
       const secondMetadata = { fields: ["field2", "field3"] };
-      
+
       wrapper.vm.metaDataValue(firstMetadata);
       expect(wrapper.vm.metaData).toEqual(firstMetadata);
-      
+
       wrapper.vm.metaDataValue(secondMetadata);
       expect(wrapper.vm.metaData).toEqual(secondMetadata);
     });
@@ -424,7 +429,9 @@ describe("VisualizeLogsQuery Component", () => {
 
       wrapper.vm.handleChartApiError(errorMessage);
 
-      expect(wrapper.props("errorData").errors).toContain("String error message");
+      expect(wrapper.props("errorData").errors).toContain(
+        "String error message",
+      );
     });
 
     it("should emit handleChartApiError event", () => {
@@ -448,19 +455,19 @@ describe("VisualizeLogsQuery Component", () => {
 
     it("should set hovered series name correctly", () => {
       wrapper.vm.hoveredSeriesState.setHoveredSeriesName("series1");
-      
+
       expect(wrapper.vm.hoveredSeriesState.hoveredSeriesName).toBe("series1");
     });
 
     it("should handle null series name", () => {
       wrapper.vm.hoveredSeriesState.setHoveredSeriesName(null);
-      
+
       expect(wrapper.vm.hoveredSeriesState.hoveredSeriesName).toBe("");
     });
 
     it("should set index values correctly", () => {
       wrapper.vm.hoveredSeriesState.setIndex(5, 2, 123, "2023-01-01");
-      
+
       expect(wrapper.vm.hoveredSeriesState.dataIndex).toBe(5);
       expect(wrapper.vm.hoveredSeriesState.seriesIndex).toBe(2);
       expect(wrapper.vm.hoveredSeriesState.panelId).toBe(123);
@@ -469,7 +476,7 @@ describe("VisualizeLogsQuery Component", () => {
 
     it("should handle null index values", () => {
       wrapper.vm.hoveredSeriesState.setIndex(null, null, null, null);
-      
+
       expect(wrapper.vm.hoveredSeriesState.dataIndex).toBe(-1);
       expect(wrapper.vm.hoveredSeriesState.seriesIndex).toBe(-1);
       expect(wrapper.vm.hoveredSeriesState.panelId).toBe(-1);
@@ -482,9 +489,9 @@ describe("VisualizeLogsQuery Component", () => {
       mockValidatePanel.mockImplementation((errors) => {
         // No errors added to array
       });
-      
+
       wrapper.vm.addToDashboard();
-      
+
       expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
     });
 
@@ -492,9 +499,9 @@ describe("VisualizeLogsQuery Component", () => {
       mockValidatePanel.mockImplementation((errors) => {
         errors.push("Validation error");
       });
-      
+
       wrapper.vm.addToDashboard();
-      
+
       expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
       expect(wrapper.props("errorData").errors).toEqual(["Validation error"]);
     });
@@ -530,7 +537,7 @@ describe("VisualizeLogsQuery Component", () => {
 
       // Set result metadata with converted histogram query
       wrapperWithHistogram.vm.onResultMetadataUpdate([
-        { converted_histogram_query: "SELECT histogram(...)" }
+        { converted_histogram_query: "SELECT histogram(...)" },
       ]);
 
       mockValidatePanel.mockImplementation((errors) => {
@@ -539,14 +546,16 @@ describe("VisualizeLogsQuery Component", () => {
 
       wrapperWithHistogram.vm.addToDashboard();
 
-      expect(wrapperWithHistogram.vm.dashboardPanelData.data.queries[0].query).toBe("SELECT histogram(...)");
+      expect(
+        wrapperWithHistogram.vm.dashboardPanelData.data.queries[0].query,
+      ).toBe("SELECT histogram(...)");
       wrapperWithHistogram.unmount();
     });
 
     it.skip("should not copy histogram query when is_ui_histogram is false", () => {
       // SKIPPED: onResultMetadataUpdate method moved to PanelEditor component
       wrapper.vm.onResultMetadataUpdate([
-        { converted_histogram_query: "SELECT histogram(...)" }
+        { converted_histogram_query: "SELECT histogram(...)" },
       ]);
 
       const originalQuery = wrapper.vm.dashboardPanelData.data.queries[0].query;
@@ -557,16 +566,18 @@ describe("VisualizeLogsQuery Component", () => {
 
       wrapper.vm.addToDashboard();
 
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toBe(originalQuery);
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toBe(
+        originalQuery,
+      );
     });
   });
 
   describe("addPanelToDashboard Function", () => {
     it("should close add to dashboard dialog", () => {
       wrapper.vm.showAddToDashboardDialog = true;
-      
+
       wrapper.vm.addPanelToDashboard();
-      
+
       expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
     });
   });
@@ -630,13 +641,21 @@ describe("VisualizeLogsQuery Component", () => {
   // SKIPPED: updateVrlFunctionFieldList method moved to PanelEditor component
   describe.skip("updateVrlFunctionFieldList Function", () => {
     it("should process field list for auto SQL queries", () => {
-      const fieldList = ["field1", "field2", "timestamp", "count", "custom_field"];
+      const fieldList = [
+        "field1",
+        "field2",
+        "timestamp",
+        "count",
+        "custom_field",
+      ];
 
       wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
-      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
+      expect(
+        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList,
+      ).toEqual([
         { name: "field1", type: "Utf8" },
-        { name: "field2", type: "Utf8" }
+        { name: "field2", type: "Utf8" },
       ]);
     });
 
@@ -646,16 +665,18 @@ describe("VisualizeLogsQuery Component", () => {
 
       wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
-      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
+      expect(
+        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList,
+      ).toEqual([
         { name: "field1", type: "Utf8" },
-        { name: "field2", type: "Utf8" }
+        { name: "field2", type: "Utf8" },
       ]);
     });
 
     it("should handle fields with isDerived=true by excluding from alias list", () => {
       wrapper.vm.dashboardPanelData.data.queries[0].fields.x = [
         { alias: "timestamp", isDerived: false },
-        { alias: "derived_field", isDerived: true }
+        { alias: "derived_field", isDerived: true },
       ];
 
       const fieldList = ["field1", "timestamp", "derived_field"];
@@ -663,25 +684,43 @@ describe("VisualizeLogsQuery Component", () => {
       wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
       // derived_field should not be in alias list, so it should be in VRL function list
-      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList).toContainEqual({
+      expect(
+        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList,
+      ).toContainEqual({
         name: "derived_field",
-        type: "Utf8"
+        type: "Utf8",
       });
     });
 
     it("should handle empty field list", () => {
       wrapper.vm.updateVrlFunctionFieldList([]);
 
-      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([]);
+      expect(
+        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList,
+      ).toEqual([]);
     });
 
     it("should handle all field types (x, y, z, breakdown, etc.)", () => {
-      const fieldList = ["vrl_field", "timestamp", "count", "level", "source", "lat", "lng", "weight", "src", "tgt", "val", "custom_field"];
+      const fieldList = [
+        "vrl_field",
+        "timestamp",
+        "count",
+        "level",
+        "source",
+        "lat",
+        "lng",
+        "weight",
+        "src",
+        "tgt",
+        "val",
+        "custom_field",
+      ];
 
       wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
       // vrl_field should remain after filtering out all the aliased fields and custom fields
-      const vrlFields = wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList;
+      const vrlFields =
+        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList;
       expect(vrlFields).toContainEqual({ name: "vrl_field", type: "Utf8" });
     });
   });
@@ -690,7 +729,8 @@ describe("VisualizeLogsQuery Component", () => {
   describe.skip("Computed Properties", () => {
     it("should compute isOutDated correctly when config changes", async () => {
       const { isEqual } = await import("lodash-es");
-      const { checkIfConfigChangeRequiredApiCallOrNot } = await import("@/utils/dashboard/checkConfigChangeApiCall");
+      const { checkIfConfigChangeRequiredApiCallOrNot } =
+        await import("@/utils/dashboard/checkConfigChangeApiCall");
 
       vi.mocked(isEqual).mockReturnValue(false);
       vi.mocked(checkIfConfigChangeRequiredApiCallOrNot).mockReturnValue(true);
@@ -745,10 +785,10 @@ describe("VisualizeLogsQuery Component", () => {
     it("should update query splitter when showQueryBar changes to false", async () => {
       wrapper.vm.dashboardPanelData.layout.showQueryBar = true;
       await wrapper.vm.$nextTick();
-      
+
       wrapper.vm.dashboardPanelData.layout.showQueryBar = false;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.dashboardPanelData.layout.querySplitter).toBe(41);
     });
 
@@ -756,7 +796,7 @@ describe("VisualizeLogsQuery Component", () => {
       // Test that expandedSplitterHeight can be set and retrieved
       wrapper.vm.expandedSplitterHeight = 60;
       expect(wrapper.vm.expandedSplitterHeight).toBe(60);
-      
+
       wrapper.vm.expandedSplitterHeight = null;
       expect(wrapper.vm.expandedSplitterHeight).toBe(null);
     });
@@ -765,24 +805,24 @@ describe("VisualizeLogsQuery Component", () => {
   describe("Data Watchers", () => {
     it("should update chartData when visualizeChartData prop changes", async () => {
       const newChartData = { type: "bar", data: { series: [1, 2, 3] } };
-      
+
       await wrapper.setProps({
-        visualizeChartData: newChartData
+        visualizeChartData: newChartData,
       });
-      
+
       expect(wrapper.vm.chartData).toEqual(newChartData);
     });
 
     it("should deep watch visualizeChartData changes", async () => {
-      const newChartData = { 
-        ...defaultProps.visualizeChartData, 
-        config: { title: "New Title" } 
+      const newChartData = {
+        ...defaultProps.visualizeChartData,
+        config: { title: "New Title" },
       };
-      
+
       await wrapper.setProps({
-        visualizeChartData: newChartData
+        visualizeChartData: newChartData,
       });
-      
+
       expect(wrapper.vm.chartData.config.title).toBe("New Title");
     });
   });
@@ -790,11 +830,11 @@ describe("VisualizeLogsQuery Component", () => {
   describe("Error Scenarios", () => {
     it("should handle missing resultMetaData gracefully in addToDashboard", () => {
       wrapper.vm.resultMetaData = null;
-      
+
       mockValidatePanel.mockImplementation((errors) => {
         // No errors
       });
-      
+
       expect(() => wrapper.vm.addToDashboard()).not.toThrow();
       expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
     });
@@ -803,7 +843,9 @@ describe("VisualizeLogsQuery Component", () => {
       // SKIPPED: updateVrlFunctionFieldList method moved to PanelEditor component
       wrapper.vm.dashboardPanelData.data.queries[0].fields = {};
 
-      expect(() => wrapper.vm.updateVrlFunctionFieldList(["field1", "field2"])).not.toThrow();
+      expect(() =>
+        wrapper.vm.updateVrlFunctionFieldList(["field1", "field2"]),
+      ).not.toThrow();
     });
 
     it.skip("should handle null dashboardPanelData gracefully", () => {
@@ -826,15 +868,17 @@ describe("VisualizeLogsQuery Component", () => {
     it("should provide hoveredSeriesState to child components", () => {
       // The provide is set up in the component, we can verify it exists
       expect(wrapper.vm.hoveredSeriesState).toBeDefined();
-      expect(typeof wrapper.vm.hoveredSeriesState.setHoveredSeriesName).toBe("function");
+      expect(typeof wrapper.vm.hoveredSeriesState.setHoveredSeriesName).toBe(
+        "function",
+      );
       expect(typeof wrapper.vm.hoveredSeriesState.setIndex).toBe("function");
     });
 
     it("should emit events correctly", () => {
       const errorMessage = "Test error";
-      
+
       wrapper.vm.handleChartApiError(errorMessage);
-      
+
       expect(wrapper.emitted()).toHaveProperty("handleChartApiError");
       expect(wrapper.emitted("handleChartApiError")[0]).toEqual([errorMessage]);
     });
@@ -843,7 +887,7 @@ describe("VisualizeLogsQuery Component", () => {
   describe("Edge Cases", () => {
     it("should handle undefined hoveredTime in setIndex", () => {
       wrapper.vm.hoveredSeriesState.setIndex(1, 2, 3);
-      
+
       expect(wrapper.vm.hoveredSeriesState.hoveredTime).toBe(null);
     });
 
@@ -856,7 +900,9 @@ describe("VisualizeLogsQuery Component", () => {
 
       const fieldList = ["field1", "field2", "custom_field"];
 
-      expect(() => wrapper.vm.updateVrlFunctionFieldList(fieldList)).not.toThrow();
+      expect(() =>
+        wrapper.vm.updateVrlFunctionFieldList(fieldList),
+      ).not.toThrow();
     });
 
     it.skip("should handle empty queries array", () => {
@@ -870,39 +916,62 @@ describe("VisualizeLogsQuery Component", () => {
   describe("Query Scenarios", () => {
     describe("Simple Query without GROUP BY", () => {
       beforeEach(() => {
-        wrapper.vm.dashboardPanelData.data.queries = [{
-          query: "SELECT timestamp, level, message FROM logs WHERE level='ERROR' ORDER BY timestamp DESC LIMIT 1000",
-          customQuery: true,
-          fields: {
-            x: [{ alias: "timestamp", isDerived: false }],
-            y: [{ alias: "count(*)", isDerived: false, aggregationFunction: "count" }],
-            z: [],
-            breakdown: []
-          }
-        }];
+        wrapper.vm.dashboardPanelData.data.queries = [
+          {
+            query:
+              "SELECT timestamp, level, message FROM logs WHERE level='ERROR' ORDER BY timestamp DESC LIMIT 1000",
+            customQuery: true,
+            fields: {
+              x: [{ alias: "timestamp", isDerived: false }],
+              y: [
+                {
+                  alias: "count(*)",
+                  isDerived: false,
+                  aggregationFunction: "count",
+                },
+              ],
+              z: [],
+              breakdown: [],
+            },
+          },
+        ];
       });
 
       it("should handle simple query execution", () => {
         const mockSearchResponse = {
           data: {
             hits: [
-              { timestamp: "2024-01-01T10:00:00Z", level: "ERROR", message: "Database connection failed" },
-              { timestamp: "2024-01-01T10:01:00Z", level: "ERROR", message: "Timeout occurred" }
+              {
+                timestamp: "2024-01-01T10:00:00Z",
+                level: "ERROR",
+                message: "Database connection failed",
+              },
+              {
+                timestamp: "2024-01-01T10:01:00Z",
+                level: "ERROR",
+                message: "Timeout occurred",
+              },
             ],
-            total: 2
-          }
+            total: 2,
+          },
         };
 
         wrapper.setProps({ searchResponse: mockSearchResponse });
-        
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("SELECT timestamp, level, message FROM logs");
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).not.toContain("GROUP BY");
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(true);
+
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
+          "SELECT timestamp, level, message FROM logs",
+        );
+        expect(
+          wrapper.vm.dashboardPanelData.data.queries[0].query,
+        ).not.toContain("GROUP BY");
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(
+          true,
+        );
       });
 
       it("should validate simple query structure", () => {
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
-        
+
         expect(query.fields.x).toHaveLength(1);
         expect(query.fields.x[0].alias).toBe("timestamp");
         expect(query.fields.breakdown).toHaveLength(0);
@@ -924,16 +993,25 @@ describe("VisualizeLogsQuery Component", () => {
 
     describe("Simple GROUP BY Query", () => {
       beforeEach(() => {
-        wrapper.vm.dashboardPanelData.data.queries = [{
-          query: "SELECT level, COUNT(*) as log_count FROM logs WHERE timestamp >= '2024-01-01' GROUP BY level ORDER BY log_count DESC",
-          customQuery: true,
-          fields: {
-            x: [{ alias: "level", isDerived: false }],
-            y: [{ alias: "log_count", isDerived: false, aggregationFunction: "count" }],
-            z: [],
-            breakdown: [{ alias: "level", isDerived: false }]
-          }
-        }];
+        wrapper.vm.dashboardPanelData.data.queries = [
+          {
+            query:
+              "SELECT level, COUNT(*) as log_count FROM logs WHERE timestamp >= '2024-01-01' GROUP BY level ORDER BY log_count DESC",
+            customQuery: true,
+            fields: {
+              x: [{ alias: "level", isDerived: false }],
+              y: [
+                {
+                  alias: "log_count",
+                  isDerived: false,
+                  aggregationFunction: "count",
+                },
+              ],
+              z: [],
+              breakdown: [{ alias: "level", isDerived: false }],
+            },
+          },
+        ];
       });
 
       it("should handle GROUP BY query execution", () => {
@@ -942,37 +1020,43 @@ describe("VisualizeLogsQuery Component", () => {
             hits: [
               { level: "ERROR", log_count: 150 },
               { level: "WARN", log_count: 89 },
-              { level: "INFO", log_count: 1205 }
+              { level: "INFO", log_count: 1205 },
             ],
-            total: 3
-          }
+            total: 3,
+          },
         };
 
         wrapper.setProps({ searchResponse: mockSearchResponse });
-        
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("GROUP BY level");
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("COUNT(*)");
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown).toHaveLength(1);
+
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
+          "GROUP BY level",
+        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
+          "COUNT(*)",
+        );
+        expect(
+          wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown,
+        ).toHaveLength(1);
       });
 
       it("should validate GROUP BY query fields", () => {
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
-        
+
         expect(query.fields.breakdown).toHaveLength(1);
         expect(query.fields.breakdown[0].alias).toBe("level");
         expect(query.fields.y[0].aggregationFunction).toBe("count");
       });
 
       it("should handle multiple GROUP BY columns", () => {
-        wrapper.vm.dashboardPanelData.data.queries[0].query = 
+        wrapper.vm.dashboardPanelData.data.queries[0].query =
           "SELECT service, level, COUNT(*) as log_count FROM logs GROUP BY service, level ORDER BY log_count DESC";
         wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown = [
           { alias: "service", isDerived: false },
-          { alias: "level", isDerived: false }
+          { alias: "level", isDerived: false },
         ];
 
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
-        
+
         expect(query.query).toContain("GROUP BY service, level");
         expect(query.fields.breakdown).toHaveLength(2);
       });
@@ -980,8 +1064,9 @@ describe("VisualizeLogsQuery Component", () => {
 
     describe("Common Table Expressions (CTEs) Query", () => {
       beforeEach(() => {
-        wrapper.vm.dashboardPanelData.data.queries = [{
-          query: `WITH error_logs AS (
+        wrapper.vm.dashboardPanelData.data.queries = [
+          {
+            query: `WITH error_logs AS (
             SELECT timestamp, service, message 
             FROM logs 
             WHERE level = 'ERROR' AND timestamp >= '2024-01-01'
@@ -996,19 +1081,20 @@ describe("VisualizeLogsQuery Component", () => {
           JOIN error_logs e ON s.service = e.service
           WHERE s.error_count > 10
           ORDER BY s.error_count DESC`,
-          customQuery: true,
-          fields: {
-            x: [{ alias: "service", isDerived: false }],
-            y: [{ alias: "error_count", isDerived: false }],
-            z: [{ alias: "message", isDerived: false }],
-            breakdown: [{ alias: "service", isDerived: false }]
-          }
-        }];
+            customQuery: true,
+            fields: {
+              x: [{ alias: "service", isDerived: false }],
+              y: [{ alias: "error_count", isDerived: false }],
+              z: [{ alias: "message", isDerived: false }],
+              breakdown: [{ alias: "service", isDerived: false }],
+            },
+          },
+        ];
       });
 
       it("should handle CTE query structure", () => {
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
-        
+
         expect(query.query).toContain("WITH error_logs AS");
         expect(query.query).toContain("service_errors AS");
         expect(query.query).toContain("SELECT s.service, s.error_count");
@@ -1016,7 +1102,7 @@ describe("VisualizeLogsQuery Component", () => {
 
       it("should validate CTE query fields", () => {
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
-        
+
         expect(query.fields.x[0].alias).toBe("service");
         expect(query.fields.y[0].alias).toBe("error_count");
         expect(query.fields.z[0].alias).toBe("message");
@@ -1026,25 +1112,40 @@ describe("VisualizeLogsQuery Component", () => {
         const mockSearchResponse = {
           data: {
             hits: [
-              { service: "auth-service", error_count: 25, message: "Authentication failed" },
-              { service: "payment-service", error_count: 18, message: "Payment processing error" },
-              { service: "user-service", error_count: 12, message: "User validation error" }
+              {
+                service: "auth-service",
+                error_count: 25,
+                message: "Authentication failed",
+              },
+              {
+                service: "payment-service",
+                error_count: 18,
+                message: "Payment processing error",
+              },
+              {
+                service: "user-service",
+                error_count: 12,
+                message: "User validation error",
+              },
             ],
-            total: 3
-          }
+            total: 3,
+          },
         };
 
         await wrapper.setProps({ searchResponse: mockSearchResponse });
-        
+
         expect(wrapper.props("searchResponse").data.hits).toHaveLength(3);
-        expect(wrapper.props("searchResponse").data.hits[0].error_count).toBe(25);
+        expect(wrapper.props("searchResponse").data.hits[0].error_count).toBe(
+          25,
+        );
       });
     });
 
     describe("WITH Query (Alternative CTE syntax)", () => {
       beforeEach(() => {
-        wrapper.vm.dashboardPanelData.data.queries = [{
-          query: `WITH RECURSIVE log_hierarchy AS (
+        wrapper.vm.dashboardPanelData.data.queries = [
+          {
+            query: `WITH RECURSIVE log_hierarchy AS (
             SELECT id, parent_id, message, level, 0 as depth
             FROM logs
             WHERE parent_id IS NULL
@@ -1055,19 +1156,20 @@ describe("VisualizeLogsQuery Component", () => {
             WHERE lh.depth < 5
           )
           SELECT * FROM log_hierarchy ORDER BY depth, id`,
-          customQuery: true,
-          fields: {
-            x: [{ alias: "id", isDerived: false }],
-            y: [{ alias: "depth", isDerived: false }],
-            z: [{ alias: "level", isDerived: false }],
-            breakdown: [{ alias: "level", isDerived: false }]
-          }
-        }];
+            customQuery: true,
+            fields: {
+              x: [{ alias: "id", isDerived: false }],
+              y: [{ alias: "depth", isDerived: false }],
+              z: [{ alias: "level", isDerived: false }],
+              breakdown: [{ alias: "level", isDerived: false }],
+            },
+          },
+        ];
       });
 
       it("should handle recursive WITH query", () => {
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
-        
+
         expect(query.query).toContain("WITH RECURSIVE log_hierarchy");
         expect(query.query).toContain("UNION ALL");
         expect(query.query).toContain("INNER JOIN log_hierarchy");
@@ -1077,16 +1179,34 @@ describe("VisualizeLogsQuery Component", () => {
         const mockSearchResponse = {
           data: {
             hits: [
-              { id: 1, parent_id: null, message: "Root log", level: "INFO", depth: 0 },
-              { id: 2, parent_id: 1, message: "Child log 1", level: "WARN", depth: 1 },
-              { id: 3, parent_id: 1, message: "Child log 2", level: "ERROR", depth: 1 }
+              {
+                id: 1,
+                parent_id: null,
+                message: "Root log",
+                level: "INFO",
+                depth: 0,
+              },
+              {
+                id: 2,
+                parent_id: 1,
+                message: "Child log 1",
+                level: "WARN",
+                depth: 1,
+              },
+              {
+                id: 3,
+                parent_id: 1,
+                message: "Child log 2",
+                level: "ERROR",
+                depth: 1,
+              },
             ],
-            total: 3
-          }
+            total: 3,
+          },
         };
 
         await wrapper.setProps({ searchResponse: mockSearchResponse });
-        
+
         expect(wrapper.props("searchResponse").data.hits[0].depth).toBe(0);
         expect(wrapper.props("searchResponse").data.hits[1].depth).toBe(1);
       });
@@ -1094,8 +1214,9 @@ describe("VisualizeLogsQuery Component", () => {
 
     describe("JOIN Query", () => {
       beforeEach(() => {
-        wrapper.vm.dashboardPanelData.data.queries = [{
-          query: `SELECT 
+        wrapper.vm.dashboardPanelData.data.queries = [
+          {
+            query: `SELECT 
             l.timestamp,
             l.message,
             l.level,
@@ -1107,29 +1228,38 @@ describe("VisualizeLogsQuery Component", () => {
           WHERE l.timestamp >= '2024-01-01'
             AND l.level IN ('ERROR', 'WARN')
           ORDER BY l.timestamp DESC`,
-          customQuery: true,
-          fields: {
-            x: [{ alias: "timestamp", isDerived: false }],
-            y: [{ alias: "count(*)", isDerived: false, aggregationFunction: "count" }],
-            breakdown: [
-              { alias: "level", isDerived: false },
-              { alias: "service_name", isDerived: false }
-            ]
-          }
-        }];
+            customQuery: true,
+            fields: {
+              x: [{ alias: "timestamp", isDerived: false }],
+              y: [
+                {
+                  alias: "count(*)",
+                  isDerived: false,
+                  aggregationFunction: "count",
+                },
+              ],
+              breakdown: [
+                { alias: "level", isDerived: false },
+                { alias: "service_name", isDerived: false },
+              ],
+            },
+          },
+        ];
       });
 
       it("should handle JOIN query structure", () => {
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
-        
+
         expect(query.query).toContain("LEFT JOIN users u ON l.user_id = u.id");
-        expect(query.query).toContain("INNER JOIN services s ON l.service_id = s.id");
+        expect(query.query).toContain(
+          "INNER JOIN services s ON l.service_id = s.id",
+        );
         expect(query.query).toContain("WHERE l.timestamp >= '2024-01-01'");
       });
 
       it("should validate JOIN query fields", () => {
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
-        
+
         expect(query.fields.breakdown).toHaveLength(2);
         expect(query.fields.breakdown[0].alias).toBe("level");
         expect(query.fields.breakdown[1].alias).toBe("service_name");
@@ -1139,29 +1269,33 @@ describe("VisualizeLogsQuery Component", () => {
         const mockSearchResponse = {
           data: {
             hits: [
-              { 
-                timestamp: "2024-01-01T10:00:00Z", 
-                message: "Service error", 
-                level: "ERROR", 
-                username: "john_doe", 
-                service_name: "auth-service" 
+              {
+                timestamp: "2024-01-01T10:00:00Z",
+                message: "Service error",
+                level: "ERROR",
+                username: "john_doe",
+                service_name: "auth-service",
               },
-              { 
-                timestamp: "2024-01-01T10:01:00Z", 
-                message: "Warning message", 
-                level: "WARN", 
-                username: null, 
-                service_name: "payment-service" 
-              }
+              {
+                timestamp: "2024-01-01T10:01:00Z",
+                message: "Warning message",
+                level: "WARN",
+                username: null,
+                service_name: "payment-service",
+              },
             ],
-            total: 2
-          }
+            total: 2,
+          },
         };
 
         await wrapper.setProps({ searchResponse: mockSearchResponse });
-        
-        expect(wrapper.props("searchResponse").data.hits[0].username).toBe("john_doe");
-        expect(wrapper.props("searchResponse").data.hits[1].username).toBe(null);
+
+        expect(wrapper.props("searchResponse").data.hits[0].username).toBe(
+          "john_doe",
+        );
+        expect(wrapper.props("searchResponse").data.hits[1].username).toBe(
+          null,
+        );
       });
 
       it("should handle complex JOIN with aggregation", () => {
@@ -1179,7 +1313,7 @@ describe("VisualizeLogsQuery Component", () => {
         `;
 
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
-        
+
         expect(query.query).toContain("COUNT(*) as error_count");
         expect(query.query).toContain("AVG(l.response_time)");
         expect(query.query).toContain("HAVING COUNT(*) > 5");
@@ -1188,8 +1322,9 @@ describe("VisualizeLogsQuery Component", () => {
 
     describe("UNION Query", () => {
       beforeEach(() => {
-        wrapper.vm.dashboardPanelData.data.queries = [{
-          query: `SELECT 'current' as period, level, COUNT(*) as log_count
+        wrapper.vm.dashboardPanelData.data.queries = [
+          {
+            query: `SELECT 'current' as period, level, COUNT(*) as log_count
           FROM logs 
           WHERE timestamp >= CURRENT_DATE - INTERVAL '1 day'
           GROUP BY level
@@ -1203,21 +1338,22 @@ describe("VisualizeLogsQuery Component", () => {
           GROUP BY level
           
           ORDER BY period, log_count DESC`,
-          customQuery: true,
-          fields: {
-            x: [{ alias: "level", isDerived: false }],
-            y: [{ alias: "log_count", isDerived: false }],
-            breakdown: [
-              { alias: "period", isDerived: false },
-              { alias: "level", isDerived: false }
-            ]
-          }
-        }];
+            customQuery: true,
+            fields: {
+              x: [{ alias: "level", isDerived: false }],
+              y: [{ alias: "log_count", isDerived: false }],
+              breakdown: [
+                { alias: "period", isDerived: false },
+                { alias: "level", isDerived: false },
+              ],
+            },
+          },
+        ];
       });
 
       it("should handle UNION ALL query structure", () => {
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
-        
+
         expect(query.query).toContain("UNION ALL");
         expect(query.query).toContain("SELECT 'current' as period");
         expect(query.query).toContain("SELECT 'previous' as period");
@@ -1232,21 +1368,21 @@ describe("VisualizeLogsQuery Component", () => {
               { period: "current", level: "INFO", log_count: 1567 },
               { period: "previous", level: "ERROR", log_count: 52 },
               { period: "previous", level: "WARN", log_count: 98 },
-              { period: "previous", level: "INFO", log_count: 1432 }
+              { period: "previous", level: "INFO", log_count: 1432 },
             ],
-            total: 6
-          }
+            total: 6,
+          },
         };
 
         await wrapper.setProps({ searchResponse: mockSearchResponse });
-        
-        const currentPeriodData = wrapper.props("searchResponse").data.hits.filter(
-          row => row.period === "current"
-        );
-        const previousPeriodData = wrapper.props("searchResponse").data.hits.filter(
-          row => row.period === "previous"
-        );
-        
+
+        const currentPeriodData = wrapper
+          .props("searchResponse")
+          .data.hits.filter((row) => row.period === "current");
+        const previousPeriodData = wrapper
+          .props("searchResponse")
+          .data.hits.filter((row) => row.period === "previous");
+
         expect(currentPeriodData).toHaveLength(3);
         expect(previousPeriodData).toHaveLength(3);
       });
@@ -1267,7 +1403,7 @@ describe("VisualizeLogsQuery Component", () => {
         `;
 
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
-        
+
         expect(query.query).toContain("UNION DISTINCT");
         expect(query.query).toContain("FROM archived_logs");
       });
@@ -1276,8 +1412,9 @@ describe("VisualizeLogsQuery Component", () => {
     describe("Subquery Scenarios", () => {
       describe("Subquery in SELECT clause", () => {
         beforeEach(() => {
-          wrapper.vm.dashboardPanelData.data.queries = [{
-            query: `SELECT 
+          wrapper.vm.dashboardPanelData.data.queries = [
+            {
+              query: `SELECT 
               service_name,
               error_count,
               (SELECT AVG(error_count) FROM (
@@ -1299,18 +1436,19 @@ describe("VisualizeLogsQuery Component", () => {
               GROUP BY service_name
             ) service_errors
             ORDER BY error_count DESC`,
-            customQuery: true,
-            fields: {
-              x: [{ alias: "service_name", isDerived: false }],
-              y: [{ alias: "error_count", isDerived: false }],
-              z: [{ alias: "error_ratio", isDerived: true }]
-            }
-          }];
+              customQuery: true,
+              fields: {
+                x: [{ alias: "service_name", isDerived: false }],
+                y: [{ alias: "error_count", isDerived: false }],
+                z: [{ alias: "error_ratio", isDerived: true }],
+              },
+            },
+          ];
         });
 
         it("should handle subquery in SELECT clause", () => {
           const query = wrapper.vm.dashboardPanelData.data.queries[0];
-          
+
           expect(query.query).toContain("(SELECT AVG(error_count) FROM");
           expect(query.query).toContain("FROM (");
           expect(query.query).toContain(") service_errors");
@@ -1320,25 +1458,45 @@ describe("VisualizeLogsQuery Component", () => {
           const mockSearchResponse = {
             data: {
               hits: [
-                { service_name: "auth-service", error_count: 25, avg_errors: 15.5, error_ratio: 161.29 },
-                { service_name: "payment-service", error_count: 18, avg_errors: 15.5, error_ratio: 116.13 },
-                { service_name: "user-service", error_count: 8, avg_errors: 15.5, error_ratio: 51.61 }
+                {
+                  service_name: "auth-service",
+                  error_count: 25,
+                  avg_errors: 15.5,
+                  error_ratio: 161.29,
+                },
+                {
+                  service_name: "payment-service",
+                  error_count: 18,
+                  avg_errors: 15.5,
+                  error_ratio: 116.13,
+                },
+                {
+                  service_name: "user-service",
+                  error_count: 8,
+                  avg_errors: 15.5,
+                  error_ratio: 51.61,
+                },
               ],
-              total: 3
-            }
+              total: 3,
+            },
           };
 
           await wrapper.setProps({ searchResponse: mockSearchResponse });
-          
-          expect(wrapper.props("searchResponse").data.hits[0].error_ratio).toBe(161.29);
-          expect(wrapper.props("searchResponse").data.hits[0].avg_errors).toBe(15.5);
+
+          expect(wrapper.props("searchResponse").data.hits[0].error_ratio).toBe(
+            161.29,
+          );
+          expect(wrapper.props("searchResponse").data.hits[0].avg_errors).toBe(
+            15.5,
+          );
         });
       });
 
       describe("Subquery in WHERE clause", () => {
         beforeEach(() => {
-          wrapper.vm.dashboardPanelData.data.queries = [{
-            query: `SELECT timestamp, message, level, service_name
+          wrapper.vm.dashboardPanelData.data.queries = [
+            {
+              query: `SELECT timestamp, message, level, service_name
             FROM logs
             WHERE service_name IN (
               SELECT service_name
@@ -1352,18 +1510,19 @@ describe("VisualizeLogsQuery Component", () => {
               FROM logs
             )
             ORDER BY timestamp DESC`,
-            customQuery: true,
-            fields: {
-              x: [{ alias: "timestamp", isDerived: false }],
-              y: [{ alias: "count(*)", isDerived: false }],
-              breakdown: [{ alias: "service_name", isDerived: false }]
-            }
-          }];
+              customQuery: true,
+              fields: {
+                x: [{ alias: "timestamp", isDerived: false }],
+                y: [{ alias: "count(*)", isDerived: false }],
+                breakdown: [{ alias: "service_name", isDerived: false }],
+              },
+            },
+          ];
         });
 
         it("should handle subquery in WHERE clause", () => {
           const query = wrapper.vm.dashboardPanelData.data.queries[0];
-          
+
           expect(query.query).toContain("WHERE service_name IN (");
           expect(query.query).toContain("AND timestamp >= (");
           expect(query.query).toContain("HAVING COUNT(*) > 10");
@@ -1372,8 +1531,9 @@ describe("VisualizeLogsQuery Component", () => {
 
       describe("EXISTS subquery", () => {
         beforeEach(() => {
-          wrapper.vm.dashboardPanelData.data.queries = [{
-            query: `SELECT DISTINCT l1.service_name, l1.level
+          wrapper.vm.dashboardPanelData.data.queries = [
+            {
+              query: `SELECT DISTINCT l1.service_name, l1.level
             FROM logs l1
             WHERE EXISTS (
               SELECT 1
@@ -1385,28 +1545,32 @@ describe("VisualizeLogsQuery Component", () => {
             )
             AND l1.level != 'ERROR'
             ORDER BY l1.service_name, l1.level`,
-            customQuery: true,
-            fields: {
-              x: [{ alias: "service_name", isDerived: false }],
-              y: [{ alias: "count(*)", isDerived: false }],
-              breakdown: [{ alias: "level", isDerived: false }]
-            }
-          }];
+              customQuery: true,
+              fields: {
+                x: [{ alias: "service_name", isDerived: false }],
+                y: [{ alias: "count(*)", isDerived: false }],
+                breakdown: [{ alias: "level", isDerived: false }],
+              },
+            },
+          ];
         });
 
         it("should handle EXISTS subquery", () => {
           const query = wrapper.vm.dashboardPanelData.data.queries[0];
-          
+
           expect(query.query).toContain("WHERE EXISTS (");
           expect(query.query).toContain("SELECT 1");
-          expect(query.query).toContain("WHERE l2.service_name = l1.service_name");
+          expect(query.query).toContain(
+            "WHERE l2.service_name = l1.service_name",
+          );
         });
       });
 
       describe("Correlated subquery", () => {
         beforeEach(() => {
-          wrapper.vm.dashboardPanelData.data.queries = [{
-            query: `SELECT 
+          wrapper.vm.dashboardPanelData.data.queries = [
+            {
+              query: `SELECT 
               l.service_name,
               l.timestamp,
               l.message,
@@ -1419,19 +1583,22 @@ describe("VisualizeLogsQuery Component", () => {
             WHERE l.level = 'ERROR'
               AND l.timestamp >= '2024-01-01'
             ORDER BY l.service_name, l.timestamp`,
-            customQuery: true,
-            fields: {
-              x: [{ alias: "timestamp", isDerived: false }],
-              y: [{ alias: "cumulative_errors", isDerived: true }],
-              breakdown: [{ alias: "service_name", isDerived: false }]
-            }
-          }];
+              customQuery: true,
+              fields: {
+                x: [{ alias: "timestamp", isDerived: false }],
+                y: [{ alias: "cumulative_errors", isDerived: true }],
+                breakdown: [{ alias: "service_name", isDerived: false }],
+              },
+            },
+          ];
         });
 
         it("should handle correlated subquery", () => {
           const query = wrapper.vm.dashboardPanelData.data.queries[0];
-          
-          expect(query.query).toContain("WHERE l2.service_name = l.service_name");
+
+          expect(query.query).toContain(
+            "WHERE l2.service_name = l.service_name",
+          );
           expect(query.query).toContain("AND l2.timestamp <= l.timestamp");
           expect(query.fields.y[0].isDerived).toBe(true);
         });
@@ -1445,7 +1612,8 @@ describe("VisualizeLogsQuery Component", () => {
       });
 
       it("should handle syntax errors in complex queries", () => {
-        wrapper.vm.dashboardPanelData.data.queries[0].query = "SELECT * FORM logs"; // Intentional typo
+        wrapper.vm.dashboardPanelData.data.queries[0].query =
+          "SELECT * FORM logs"; // Intentional typo
 
         const errorMessage = "Syntax error: unexpected token 'FORM'";
         wrapper.vm.handleChartApiError(errorMessage);
@@ -1454,16 +1622,20 @@ describe("VisualizeLogsQuery Component", () => {
       });
 
       it("should handle timeout errors for complex queries", () => {
-        const errorMessage = { message: "Query execution timeout after 30 seconds" };
+        const errorMessage = {
+          message: "Query execution timeout after 30 seconds",
+        };
 
         wrapper.vm.handleChartApiError(errorMessage);
 
-        expect(wrapper.props("errorData").errors).toContain("Query execution timeout after 30 seconds");
+        expect(wrapper.props("errorData").errors).toContain(
+          "Query execution timeout after 30 seconds",
+        );
       });
 
       it("should handle memory errors for large result sets", () => {
         const errorMessage = "Insufficient memory to execute query";
-        
+
         wrapper.vm.handleChartApiError(errorMessage);
 
         expect(wrapper.props("errorData").errors).toContain(errorMessage);
@@ -1476,18 +1648,18 @@ describe("VisualizeLogsQuery Component", () => {
           data: {
             hits: Array.from({ length: 10000 }, (_, i) => ({
               id: i,
-              timestamp: `2024-01-01T${String(Math.floor(i / 3600)).padStart(2, '0')}:${String(Math.floor((i % 3600) / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}Z`,
+              timestamp: `2024-01-01T${String(Math.floor(i / 3600)).padStart(2, "0")}:${String(Math.floor((i % 3600) / 60)).padStart(2, "0")}:${String(i % 60).padStart(2, "0")}Z`,
               level: ["INFO", "WARN", "ERROR"][i % 3],
-              message: `Log message ${i}`
+              message: `Log message ${i}`,
             })),
-            total: 10000
-          }
+            total: 10000,
+          },
         };
 
         expect(async () => {
           await wrapper.setProps({ searchResponse: largeResultSet });
         }).not.toThrow();
-        
+
         await wrapper.setProps({ searchResponse: largeResultSet });
         expect(wrapper.props("searchResponse").data.hits).toHaveLength(10000);
       });
@@ -1510,10 +1682,18 @@ describe("VisualizeLogsQuery Component", () => {
           ORDER BY action_count DESC
         `;
 
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("JOIN users u ON");
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("JOIN services s ON");
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("JOIN user_roles ur ON");
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("JOIN roles r ON");
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
+          "JOIN users u ON",
+        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
+          "JOIN services s ON",
+        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
+          "JOIN user_roles ur ON",
+        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
+          "JOIN roles r ON",
+        );
       });
     });
   });
@@ -1525,10 +1705,10 @@ describe("VisualizeLogsQuery Component", () => {
         "SELECT COUNT(*) FROM logs WHERE level = 'ERROR' GROUP BY service_name",
         "SELECT timestamp, message FROM logs ORDER BY timestamp DESC LIMIT 1000",
         "SELECT service_name, AVG(response_time) FROM logs GROUP BY service_name HAVING AVG(response_time) > 100",
-        "SELECT * FROM logs WHERE timestamp BETWEEN '2023-01-01' AND '2023-12-31'"
+        "SELECT * FROM logs WHERE timestamp BETWEEN '2023-01-01' AND '2023-12-31'",
       ];
 
-      sqlPatterns.forEach(query => {
+      sqlPatterns.forEach((query) => {
         // Test that each query pattern is a string
         expect(typeof query).toBe("string");
         expect(query.length).toBeGreaterThan(0);
@@ -1643,13 +1823,19 @@ describe("VisualizeLogsQuery Component", () => {
     it("should handle vrlFunctionFieldList length check correctly", () => {
       // Test empty array
       wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
-      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0).toBe(false);
+      expect(
+        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList.length >
+          0,
+      ).toBe(false);
 
       // Test with items
       wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
         { name: "field1", type: "Utf8" },
       ];
-      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0).toBe(true);
+      expect(
+        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList.length >
+          0,
+      ).toBe(true);
     });
 
     it("should allow switching with multiple VRL derived fields", () => {
