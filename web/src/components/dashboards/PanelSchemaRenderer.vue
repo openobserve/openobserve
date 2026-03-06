@@ -60,7 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @row-click="onChartClick"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
-          :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
+          :show-pagination="
+            panelSchema.config?.table_pagination && !store.state.printMode
+          "
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
         />
         <div
@@ -246,7 +248,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="crosslink-drilldown-menu"
-        :class="{ 'crosslink-drilldown-menu--dark': store.state.theme === 'dark' }"
+        :class="{
+          'crosslink-drilldown-menu--dark': store.state.theme === 'dark',
+        }"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
       >
@@ -255,13 +259,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="JSON.stringify(drilldown)"
         >
           <q-separator
-            v-if="drilldown._isCrossLink && index > 0 && !drilldownArray[index - 1]._isCrossLink"
+            v-if="
+              drilldown._isCrossLink &&
+              index > 0 &&
+              !drilldownArray[index - 1]._isCrossLink
+            "
           />
           <div
             class="crosslink-drilldown-menu-item"
             @click="openDrilldown(index)"
           >
-            <q-icon size="xs" class="q-mr-sm" :name="drilldown._isCrossLink ? 'open_in_new' : 'link'" />
+            <q-icon
+              size="xs"
+              class="q-mr-sm"
+              :name="drilldown._isCrossLink ? 'open_in_new' : 'link'"
+            />
             <span>{{ drilldown.name }}</span>
           </div>
         </template>
@@ -337,7 +349,7 @@ import {
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import {
   getAllDashboardsByFolderId,
   getDashboard,
@@ -553,7 +565,7 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey: any = inject(
       "dashboardPanelDataPageKey",
-      null // null default allows us to detect if key was provided
+      null, // null default allows us to detect if key was provided
     );
 
     // Only access the composable if we're in a context that provides a page key
@@ -1003,8 +1015,8 @@ export default defineComponent({
     // Chunks arrive ~300-400ms apart, so 350ms ensures updates every 2-3 chunks
     // This prevents excessive re-renders while showing progressive updates
     const convertPanelDataThrottled = throttle(convertPanelDataCommon, 350, {
-      leading: true,  // Call immediately on first invocation
-      trailing: true  // Ensure final call after throttle period
+      leading: true, // Call immediately on first invocation
+      trailing: true, // Ensure final call after throttle period
     });
 
     // Watch for panel schema changes to re-convert panel data
@@ -1046,9 +1058,15 @@ export default defineComponent({
 
     // Cross-linking: fetch cross-links when the executed query (with variables resolved) changes
     watch(
-      () => metadata.value?.queries?.[0]?.query || panelSchema.value?.queries?.[0]?.query,
+      () =>
+        metadata.value?.queries?.[0]?.query ||
+        panelSchema.value?.queries?.[0]?.query,
       async (newQuery: string) => {
-        if (!store.state.zoConfig?.enable_cross_linking || !newQuery || panelSchema.value?.queryType === "promql") {
+        if (
+          !store.state.zoConfig?.enable_cross_linking ||
+          !newQuery ||
+          panelSchema.value?.queryType === "promql"
+        ) {
           crossLinksData.value = { stream_links: [], org_links: [] };
           return;
         }
@@ -1092,7 +1110,7 @@ export default defineComponent({
         data,
         () => store?.state?.theme,
         () => store?.state?.timezone,
-        annotations
+        annotations,
       ],
       async () => {
         // emit vrl function field list
@@ -1125,8 +1143,8 @@ export default defineComponent({
           };
 
         // Check if this is the first chunk with actual data
-        const hasData = data.value?.length > 0 &&
-                       data.value[0]?.result?.length > 0;
+        const hasData =
+          data.value?.length > 0 && data.value[0]?.result?.length > 0;
 
         // Use throttled version during loading (streaming), immediate version when complete
         // This prevents excessive re-renders during PromQL data streaming
@@ -1470,7 +1488,6 @@ export default defineComponent({
       const crossLinkItems = getCrossLinkDrilldownItems();
       const shouldShowDrilldown = hasDrilldown || crossLinkItems.length > 0;
 
-
       if (shouldShowDrilldown) {
         drilldownParams = [params, args];
         const panelDrilldowns = panelSchema.value.config.drilldown ?? [];
@@ -1771,16 +1788,18 @@ export default defineComponent({
       for (const f of fields) {
         aliasMap[f.name] = f.alias || f.name;
       }
-      return url.replace(/\$?\{(\w+)\}/g, (_match: string, fieldName: string) => {
-        const resolved = aliasMap[fieldName] || fieldName;
-        return '${row.field["' + resolved + '"]}';
-      });
+      return url.replace(
+        /\$?\{(\w+)\}/g,
+        (_match: string, fieldName: string) => {
+          const resolved = aliasMap[fieldName] || fieldName;
+          return '${row.field["' + resolved + '"]}';
+        },
+      );
     };
 
     // Cross-linking: merge stream + org links with field-level replacement
     const getCrossLinkDrilldownItems = (): any[] => {
-      const { stream_links = [], org_links = [] } =
-        crossLinksData.value || {};
+      const { stream_links = [], org_links = [] } = crossLinksData.value || {};
 
       // Collect all fields covered by stream links
       const streamCoveredFields = new Set<string>();
@@ -1852,7 +1871,9 @@ export default defineComponent({
             ];
             for (const lf of linkFields) {
               const alias = lf.alias || lf.name;
-              const pf = panelFields.find((f: any) => f.alias === alias || f.label === lf.name);
+              const pf = panelFields.find(
+                (f: any) => f.alias === alias || f.label === lf.name,
+              );
               const val = rowData[alias] ?? rowData[lf.name];
               if (val !== undefined && val !== null) {
                 fieldName = lf.name;
@@ -1871,7 +1892,8 @@ export default defineComponent({
             const record: Record<string, any> = {};
             const queryResult = data.value?.[0]?.result;
             const xFields = panelSchema.value?.queries?.[0]?.fields?.x || [];
-            const breakdownFields = panelSchema.value?.queries?.[0]?.fields?.breakdown || [];
+            const breakdownFields =
+              panelSchema.value?.queries?.[0]?.fields?.breakdown || [];
 
             let xAxisValue: any;
             if (isPieOrDonut) {
@@ -1889,10 +1911,19 @@ export default defineComponent({
               for (const row of queryResult) {
                 let matches = true;
                 if (xFields.length > 0 && xAxisValue !== undefined) {
-                  if (String(row[xFields[0].alias]) !== String(xAxisValue)) matches = false;
+                  if (String(row[xFields[0].alias]) !== String(xAxisValue))
+                    matches = false;
                 }
-                if (matches && breakdownFields.length > 0 && seriesName && !isPieOrDonut) {
-                  if (String(row[breakdownFields[0].alias]) !== String(seriesName)) matches = false;
+                if (
+                  matches &&
+                  breakdownFields.length > 0 &&
+                  seriesName &&
+                  !isPieOrDonut
+                ) {
+                  if (
+                    String(row[breakdownFields[0].alias]) !== String(seriesName)
+                  )
+                    matches = false;
                 }
                 if (matches) {
                   Object.assign(record, row);
@@ -1929,8 +1960,14 @@ export default defineComponent({
 
           // Resolve the 6 fixed variables
           const resolvedUrl = rawUrl
-            .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
-            .replace(/\$\{field\.__value\}/g, encodeURIComponent(String(fieldValue)))
+            .replace(
+              /\$\{field\.__name\}/g,
+              encodeURIComponent(String(fieldName)),
+            )
+            .replace(
+              /\$\{field\.__value\}/g,
+              encodeURIComponent(String(fieldValue)),
+            )
             .replace(/\$\{start_time\}/g, String(startTime))
             .replace(/\$\{end_time\}/g, String(endTime))
             .replace(/\$\{query\}/g, encodeURIComponent(currentQuery))
@@ -2155,8 +2192,7 @@ export default defineComponent({
                 query: Object.fromEntries(logsUrl.searchParams.entries()),
               });
             }
-          } catch (error) {
-          }
+          } catch (error) {}
         };
 
         // need to change dynamic variables to it's value using current variables, current chart data(params)
@@ -2447,29 +2483,32 @@ export default defineComponent({
 
             // Iterate through each response item (multiple queries can produce multiple responses)
             // Use filteredData to exclude hidden queries
-            filteredData?.value?.forEach((promData: any, queryIndex: number) => {
-              if (!promData?.result || !Array.isArray(promData.result)) return;
+            filteredData?.value?.forEach(
+              (promData: any, queryIndex: number) => {
+                if (!promData?.result || !Array.isArray(promData.result))
+                  return;
 
-              // Iterate through each result (time series)
-              promData.result.forEach((series: any, seriesIndex: number) => {
-                const metricLabels = series.metric || {};
+                // Iterate through each result (time series)
+                promData.result.forEach((series: any, seriesIndex: number) => {
+                  const metricLabels = series.metric || {};
 
-                // Iterate through values array (timestamp, value pairs)
-                series.values.forEach((point: any) => {
-                  const timestamp = point[0];
-                  const value = point[1];
+                  // Iterate through values array (timestamp, value pairs)
+                  series.values.forEach((point: any) => {
+                    const timestamp = point[0];
+                    const value = point[1];
 
-                  // Create a row with timestamp, value, and all metric labels
-                  const row = {
-                    timestamp: timestamp,
-                    value: value,
-                    ...metricLabels,
-                  };
+                    // Create a row with timestamp, value, and all metric labels
+                    const row = {
+                      timestamp: timestamp,
+                      value: value,
+                      ...metricLabels,
+                    };
 
-                  flattenedData.push(row);
+                    flattenedData.push(row);
+                  });
                 });
-              });
-            });
+              },
+            );
 
             // Get all unique keys across all data points
             const allKeys = new Set();

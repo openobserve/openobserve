@@ -47,9 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="logs-visualize-toggle"
                 :class="[
-                  searchObj.meta.logsVisualizeToggle === 'visualize' ? 'selected' : '',
+                  searchObj.meta.logsVisualizeToggle === 'visualize'
+                    ? 'selected'
+                    : '',
                   'button button-center tw:rounded-none',
-                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32'
+                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32',
                 ]"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disable="isVisualizeDisabled"
@@ -70,9 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="logs-build-toggle"
                 :class="[
-                  searchObj.meta.logsVisualizeToggle === 'build' ? 'selected' : '',
-                  config.isEnterprise == 'true' ? 'button button-center tw:rounded-none' : 'button button-right tw:rounded-l-none!',
-                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32'
+                  searchObj.meta.logsVisualizeToggle === 'build'
+                    ? 'selected'
+                    : '',
+                  config.isEnterprise == 'true'
+                    ? 'button button-center tw:rounded-none'
+                    : 'button button-right tw:rounded-l-none!',
+                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32',
                 ]"
                 @click="onLogsVisualizeToggleUpdate('build')"
                 no-caps
@@ -106,9 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <!-- histogram toggle - always visible -->
-        <div
-          class="toolbar-toggle-container element-box-shadow"
-        >
+        <div class="toolbar-toggle-container element-box-shadow">
           <q-toggle
             data-test="logs-search-bar-show-histogram-toggle-btn"
             v-model="searchObj.meta.showHistogram"
@@ -142,8 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="sqlIcon"
-alt="SQL Mode" class="toolbar-icon" />
+            <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
             <q-tooltip v-if="isSqlModeDisabled">
               {{ t("search.sqlModeDisabledForVisualization") }}
             </q-tooltip>
@@ -153,9 +156,7 @@ alt="SQL Mode" class="toolbar-icon" />
           </q-toggle>
         </div>
         <!-- quick mode toggle - always visible -->
-        <div
-          class="toolbar-toggle-container element-box-shadow"
-        >
+        <div class="toolbar-toggle-container element-box-shadow">
           <q-toggle
             data-test="logs-search-bar-quick-mode-toggle-btn"
             v-model="searchObj.meta.quickMode"
@@ -169,8 +170,7 @@ alt="SQL Mode" class="toolbar-icon" />
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="quickModeIcon"
-alt="Quick Mode" class="toolbar-icon" />
+            <img :src="quickModeIcon" alt="Quick Mode" class="toolbar-icon" />
             <q-tooltip>
               {{ t("search.quickModeLabel") }}
             </q-tooltip>
@@ -314,8 +314,8 @@ alt="Quick Mode" class="toolbar-icon" />
 
         <q-btn
           data-test="logs-search-bar-more-options-btn"
-          class=" download-logs-btn q-px-sm element-box-shadow el-border "
-          style="padding: 0.25rem 0.25rem !important;"
+          class="download-logs-btn q-px-sm element-box-shadow el-border"
+          style="padding: 0.25rem 0.25rem !important"
           icon="menu"
         >
           <q-menu>
@@ -343,7 +343,6 @@ alt="Quick Mode" class="toolbar-icon" />
                 class="q-pa-sm saved-view-item download-menu-parent"
                 clickable
                 v-close-popup
-
                 @mouseenter="showDownloadMenu = true"
               >
                 <q-item-section class="cursor-pointer">
@@ -377,8 +376,11 @@ alt="Quick Mode" class="toolbar-icon" />
                         downloadLogs(searchObj.data.queryResults.hits, 'csv')
                       "
                     >
-                      <q-icon name="grid_on" size="14px"
-class="q-pr-sm q-pt-xs" />
+                      <q-icon
+                        name="grid_on"
+                        size="14px"
+                        class="q-pr-sm q-pt-xs"
+                      />
                       <q-item-section>
                         <q-item-label
                           class="tw:flex tw:items-center tw:gap-2 q-mr-md"
@@ -396,8 +398,11 @@ class="q-pr-sm q-pt-xs" />
                         downloadLogs(searchObj.data.queryResults.hits, 'json')
                       "
                     >
-                      <q-icon name="data_object" size="14px"
-class="q-pr-sm q-pt-xs" />
+                      <q-icon
+                        name="data_object"
+                        size="14px"
+                        class="q-pr-sm q-pt-xs"
+                      />
                       <q-item-section>
                         <q-item-label
                           class="tw:flex tw:items-center tw:gap-2 q-mr-md"
@@ -437,7 +442,9 @@ class="q-pr-sm q-pt-xs" />
                 class="q-pa-sm saved-view-item"
                 clickable
                 v-close-popup
-                :disable="!searchObj.data.query || searchObj.data.query.trim() === ''"
+                :disable="
+                  !searchObj.data.query || searchObj.data.query.trim() === ''
+                "
                 @click="openExplainDialog"
               >
                 <q-item-section v-close-popup>
@@ -558,138 +565,86 @@ class="q-pr-sm q-pt-xs" />
                 />
               </q-btn-dropdown>
             </q-btn-group>
-            <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize' || searchObj.meta.logsVisualizeToggle === 'build'">
+            <div
+              v-if="
+                searchObj.meta.logsVisualizeToggle === 'visualize' ||
+                searchObj.meta.logsVisualizeToggle === 'build'
+              "
+            >
               <div v-if="config.isEnterprise == 'true'" class="tw:flex">
                 <q-btn
-                v-if="
-                  visualizeSearchRequestTraceIds.length > 0
-                "
-                data-test="logs-search-bar-visualize-cancel-btn"
-                dense
-                flat
-                :title="t('search.cancel')"
-                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
-                @click="cancelVisualizeQueries"
-                >{{ t("search.cancel") }}</q-btn
-              >
-              <!-- Main action button: "Ask AI" when NL detected + AI bar not open, otherwise "Run Query" -->
-              <q-btn
-                  v-else
-                  data-test="logs-search-bar-visualize-refresh-btn"
+                  v-if="visualizeSearchRequestTraceIds.length > 0"
+                  data-test="logs-search-bar-visualize-cancel-btn"
                   dense
                   flat
-                  :title="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t('search.generateQueryTooltip') : t('search.runQuery')"
-                  :disable="isGeneratingSQL || ((isNaturalLanguageDetected && !searchObj.meta.nlpMode) && !searchObj.data.stream.selectedStream.length)"
-                  class="q-pa-none tw:h-[30px]  element-box-shadow"
-                  :class="[
-                    (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
-                    config.isEnterprise == 'true'
-                      ? 'search-button-enterprise-border-radius'
-                      : 'search-button-normal-border-radius'
-                  ]"
-                  :color="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'primary' : undefined"
-                  no-caps
-                  @click="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? handleGenerateSQLQuery() : handleRunQueryFn()"
-                  >
-                  {{ (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t("search.generateQuery") : t("search.runQuery") }}
-                </q-btn
+                  :title="t('search.cancel')"
+                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                  @click="cancelVisualizeQueries"
+                  >{{ t("search.cancel") }}</q-btn
                 >
-              <q-separator v-if="visualizeSearchRequestTraceIds.length === 0" class="tw:h-[29px] tw:w-[1px]" />
-              <q-btn-dropdown
-                v-if="visualizeSearchRequestTraceIds.length === 0"
-                flat
-                class="tw:h-[29px] search-button-dropdown"
-                :class="[
-                  (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-dropdown-button' : '',
-                  !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) && config.isEnterprise == 'true' &&
-                  visualizeSearchRequestTraceIds.length
-                    ? 'o2-color-cancel'
-                    : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-color-primary' : '',
-                  config.isEnterprise == 'true'
-                    ? 'search-button-dropdown-enterprise-border-radius'
-                    : 'search-button-normal-border-radius',
-                ]"
-                unelevated
-                dense
-              >
-                <!-- Normal mode or AI bar open: Refresh option -->
-                <template v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)">
-                  <q-btn
-                    data-test="logs-search-bar-refresh-btn"
-                    data-cy="search-bar-visuzlie-hard-refresh-button"
-                    dense
-                    flat
-                    no-caps
-                    :title="t('search.refreshCacheAndRunQuery')"
-                    class="q-pa-sm search-button-dropdown tw:text-[12px]"
-                    v-close-popup
-                    @click="handleRunQueryFn(true)"
-                    :disable="
-                      config.isEnterprise == 'true' &&
-                      !!visualizeSearchRequestTraceIds.length
-                    "
-                  >
-                    <q-icon name="refresh" class="q-mr-xs" />
-                    {{ t("search.refreshCacheAndRunQuery") }}
-                  </q-btn>
-                </template>
-
-                <!-- NLP Mode: No additional options -->
-                <template v-else>
-                  <q-list class="tw:min-w-[140px] tw:p-2">
-                    <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
-                      {{ t('nlMode.noAdditionalOptions') }}
-                    </q-item-label>
-                  </q-list>
-                </template>
-              </q-btn-dropdown>
-              </div>
-              <div v-else class="tw:flex">
-                <!-- Cancel button when query is running -->
-                <q-btn
-                v-if="
-                  visualizeSearchRequestTraceIds.length > 0
-                "
-                data-test="logs-search-bar-visualize-cancel-btn"
-                dense
-                flat
-                :title="t('search.cancel')"
-                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
-                @click="cancelVisualizeQueries"
-                >{{ t("search.cancel") }}</q-btn
-              >
-                <!-- Main action button -->
+                <!-- Main action button: "Ask AI" when NL detected + AI bar not open, otherwise "Run Query" -->
                 <q-btn
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
                   dense
                   flat
-                  :title="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t('search.generateQueryTooltip') : t('search.runQuery')"
-                  :disable="disable || isGeneratingSQL || ((isNaturalLanguageDetected && !searchObj.meta.nlpMode) && !searchObj.data.stream.selectedStream.length)"
-                  class="q-pa-none tw:h-[30px]  element-box-shadow"
+                  :title="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? t('search.generateQueryTooltip')
+                      : t('search.runQuery')
+                  "
+                  :disable="
+                    isGeneratingSQL ||
+                    (isNaturalLanguageDetected &&
+                      !searchObj.meta.nlpMode &&
+                      !searchObj.data.stream.selectedStream.length)
+                  "
+                  class="q-pa-none tw:h-[30px] element-box-shadow"
                   :class="[
-                    (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? 'o2-ai-generate-button'
+                      : 'o2-run-query-button o2-color-primary',
                     config.isEnterprise == 'true'
                       ? 'search-button-enterprise-border-radius'
-                      : 'search-button-normal-border-radius'
+                      : 'search-button-normal-border-radius',
                   ]"
-                  :color="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'primary' : undefined"
+                  :color="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? 'primary'
+                      : undefined
+                  "
                   no-caps
-                  @click="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? handleGenerateSQLQuery() : handleRunQueryFn()"
-                  >
-                  {{ (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t("search.generateQuery") : t("search.runQuery") }}
+                  @click="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? handleGenerateSQLQuery()
+                      : handleRunQueryFn()
+                  "
+                >
+                  {{
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? t("search.generateQuery")
+                      : t("search.runQuery")
+                  }}
                 </q-btn>
-                <q-separator v-if="visualizeSearchRequestTraceIds.length === 0" class="tw:h-[29px] tw:w-[1px]" />
+                <q-separator
+                  v-if="visualizeSearchRequestTraceIds.length === 0"
+                  class="tw:h-[29px] tw:w-[1px]"
+                />
                 <q-btn-dropdown
                   v-if="visualizeSearchRequestTraceIds.length === 0"
                   flat
                   class="tw:h-[29px] search-button-dropdown"
                   :class="[
-                    (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-dropdown-button' : '',
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) && config.isEnterprise == 'true' &&
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? 'o2-ai-dropdown-button'
+                      : '',
+                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                    config.isEnterprise == 'true' &&
                     visualizeSearchRequestTraceIds.length
                       ? 'o2-color-cancel'
-                      : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-color-primary' : '',
+                      : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                        ? 'o2-color-primary'
+                        : '',
                     config.isEnterprise == 'true'
                       ? 'search-button-dropdown-enterprise-border-radius'
                       : 'search-button-normal-border-radius',
@@ -698,7 +653,132 @@ class="q-pr-sm q-pt-xs" />
                   dense
                 >
                   <!-- Normal mode or AI bar open: Refresh option -->
-                  <template v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)">
+                  <template
+                    v-if="
+                      !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                    "
+                  >
+                    <q-btn
+                      data-test="logs-search-bar-refresh-btn"
+                      data-cy="search-bar-visuzlie-hard-refresh-button"
+                      dense
+                      flat
+                      no-caps
+                      :title="t('search.refreshCacheAndRunQuery')"
+                      class="q-pa-sm search-button-dropdown tw:text-[12px]"
+                      v-close-popup
+                      @click="handleRunQueryFn(true)"
+                      :disable="
+                        config.isEnterprise == 'true' &&
+                        !!visualizeSearchRequestTraceIds.length
+                      "
+                    >
+                      <q-icon name="refresh" class="q-mr-xs" />
+                      {{ t("search.refreshCacheAndRunQuery") }}
+                    </q-btn>
+                  </template>
+
+                  <!-- NLP Mode: No additional options -->
+                  <template v-else>
+                    <q-list class="tw:min-w-[140px] tw:p-2">
+                      <q-item-label
+                        class="tw:text-xs tw:text-gray-500 tw:text-center"
+                      >
+                        {{ t("nlMode.noAdditionalOptions") }}
+                      </q-item-label>
+                    </q-list>
+                  </template>
+                </q-btn-dropdown>
+              </div>
+              <div v-else class="tw:flex">
+                <!-- Cancel button when query is running -->
+                <q-btn
+                  v-if="visualizeSearchRequestTraceIds.length > 0"
+                  data-test="logs-search-bar-visualize-cancel-btn"
+                  dense
+                  flat
+                  :title="t('search.cancel')"
+                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                  @click="cancelVisualizeQueries"
+                  >{{ t("search.cancel") }}</q-btn
+                >
+                <!-- Main action button -->
+                <q-btn
+                  v-else
+                  data-test="logs-search-bar-visualize-refresh-btn"
+                  dense
+                  flat
+                  :title="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? t('search.generateQueryTooltip')
+                      : t('search.runQuery')
+                  "
+                  :disable="
+                    disable ||
+                    isGeneratingSQL ||
+                    (isNaturalLanguageDetected &&
+                      !searchObj.meta.nlpMode &&
+                      !searchObj.data.stream.selectedStream.length)
+                  "
+                  class="q-pa-none tw:h-[30px] element-box-shadow"
+                  :class="[
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? 'o2-ai-generate-button'
+                      : 'o2-run-query-button o2-color-primary',
+                    config.isEnterprise == 'true'
+                      ? 'search-button-enterprise-border-radius'
+                      : 'search-button-normal-border-radius',
+                  ]"
+                  :color="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? 'primary'
+                      : undefined
+                  "
+                  no-caps
+                  @click="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? handleGenerateSQLQuery()
+                      : handleRunQueryFn()
+                  "
+                >
+                  {{
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? t("search.generateQuery")
+                      : t("search.runQuery")
+                  }}
+                </q-btn>
+                <q-separator
+                  v-if="visualizeSearchRequestTraceIds.length === 0"
+                  class="tw:h-[29px] tw:w-[1px]"
+                />
+                <q-btn-dropdown
+                  v-if="visualizeSearchRequestTraceIds.length === 0"
+                  flat
+                  class="tw:h-[29px] search-button-dropdown"
+                  :class="[
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? 'o2-ai-dropdown-button'
+                      : '',
+                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                    config.isEnterprise == 'true' &&
+                    visualizeSearchRequestTraceIds.length
+                      ? 'o2-color-cancel'
+                      : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                        ? 'o2-color-primary'
+                        : '',
+                    config.isEnterprise == 'true'
+                      ? 'search-button-dropdown-enterprise-border-radius'
+                      : 'search-button-normal-border-radius',
+                  ]"
+                  unelevated
+                  dense
+                >
+                  <!-- Normal mode or AI bar open: Refresh option -->
+                  <template
+                    v-if="
+                      !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                    "
+                  >
                     <q-btn
                       data-test="logs-search-bar-refresh-btn"
                       data-cy="search-bar-visuzlie-hard-refresh-button"
@@ -722,8 +802,10 @@ class="q-pr-sm q-pt-xs" />
                   <!-- NL detected, AI bar not open: No additional options -->
                   <template v-else>
                     <q-list class="tw:min-w-[140px] tw:p-2">
-                      <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
-                        {{ t('nlMode.noAdditionalOptions') }}
+                      <q-item-label
+                        class="tw:text-xs tw:text-gray-500 tw:text-center"
+                      >
+                        {{ t("nlMode.noAdditionalOptions") }}
                       </q-item-label>
                     </q-list>
                   </template>
@@ -744,7 +826,11 @@ class="q-pr-sm q-pt-xs" />
                 dense
                 :title="t('search.cancel')"
                 class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
-                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
+                :class="
+                  config.isEnterprise == 'true'
+                    ? 'search-button-enterprise-border-radius'
+                    : 'search-button-normal-border-radius'
+                "
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -754,74 +840,112 @@ class="q-pr-sm q-pt-xs" />
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 dense
-                :title="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t('search.generateQueryTooltip') : t('search.runQuery')"
+                :title="
+                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                    ? t('search.generateQueryTooltip')
+                    : t('search.runQuery')
+                "
                 class="q-pa-none tw:h-[30px] element-box-shadow"
                 :class="[
-                  (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-generate-button' : 'o2-run-query-button o2-color-primary',
+                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                    ? 'o2-ai-generate-button'
+                    : 'o2-run-query-button o2-color-primary',
                   config.isEnterprise == 'true'
                     ? 'search-button-enterprise-border-radius'
-                    : 'search-button-normal-border-radius'
+                    : 'search-button-normal-border-radius',
                 ]"
-                :color="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'primary' : undefined"
+                :color="
+                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                    ? 'primary'
+                    : undefined
+                "
                 no-caps
-                @click="(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? handleGenerateSQLQuery() : handleRunQueryFn()"
+                @click="
+                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                    ? handleGenerateSQLQuery()
+                    : handleRunQueryFn()
+                "
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disable="
                   searchObj.loading == true ||
                   searchObj.loadingHistogram == true ||
                   isGeneratingSQL ||
-                  ((isNaturalLanguageDetected && !searchObj.meta.nlpMode) && !searchObj.data.stream.selectedStream.length)
+                  (isNaturalLanguageDetected &&
+                    !searchObj.meta.nlpMode &&
+                    !searchObj.data.stream.selectedStream.length)
                 "
-                >
-                {{ (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? t("search.generateQuery") : t("search.runQuery") }}
+              >
+                {{
+                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                    ? t("search.generateQuery")
+                    : t("search.runQuery")
+                }}
               </q-btn>
               <!-- Dropdown: "Ask AI" state only when NL detected + AI bar not open -->
-              <q-separator v-if="config.isEnterprise == 'true'" class="tw:h-[29px] tw:w-[1px]" />
+              <q-separator
+                v-if="config.isEnterprise == 'true'"
+                class="tw:h-[29px] tw:w-[1px]"
+              />
               <q-btn-dropdown
                 v-if="config.isEnterprise == 'true'"
                 flat
                 class="tw:h-[29px] search-button-dropdown"
                 :class="[
-                (isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-ai-dropdown-button' : '',
-                !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) && config.isEnterprise == 'true' &&
-                    (!!searchObj.data.searchRequestTraceIds.length ||
-                      !!searchObj.data.searchWebSocketTraceIds.length) &&
-                    (searchObj.loading == true ||
-                      searchObj.loadingHistogram == true) ? 'o2-color-cancel' : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) ? 'o2-color-primary' : '',
-                config.isEnterprise == 'true' ? 'search-button-dropdown-enterprise-border-radius' : 'search-button-normal-border-radius'
+                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                    ? 'o2-ai-dropdown-button'
+                    : '',
+                  !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                  config.isEnterprise == 'true' &&
+                  (!!searchObj.data.searchRequestTraceIds.length ||
+                    !!searchObj.data.searchWebSocketTraceIds.length) &&
+                  (searchObj.loading == true ||
+                    searchObj.loadingHistogram == true)
+                    ? 'o2-color-cancel'
+                    : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                      ? 'o2-color-primary'
+                      : '',
+                  config.isEnterprise == 'true'
+                    ? 'search-button-dropdown-enterprise-border-radius'
+                    : 'search-button-normal-border-radius',
                 ]"
-              unelevated dense >
-                  <!-- SQL Mode / AI bar open: Refresh option -->
-                  <template v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)">
-                    <q-btn
-                      data-test="logs-search-bar-refresh-btn"
-                      data-cy="search-bar-refresh-button"
-                      dense
-                      flat
-                      no-caps
-                      :title="t('search.refreshCacheAndRunQuery')"
-                      class="q-pa-sm tw:text-[12px] "
-                      v-close-popup
-                      @click="handleRunQueryFn(true)"
-                      :disable="
-                        searchObj.loading == true ||
-                        searchObj.loadingHistogram == true
-                      "
-                      >
-                      <q-icon name="refresh" class="q-mr-xs" />
-                      {{ t("search.refreshCacheAndRunQuery") }}
-                    </q-btn>
-                  </template>
-                  <!-- NL detected, AI bar not open: Empty menu -->
-                  <template v-else>
-                    <q-list class="tw:min-w-[140px] tw:p-2">
-                      <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
-                        No additional options
-                      </q-item-label>
-                    </q-list>
-                  </template>
+                unelevated
+                dense
+              >
+                <!-- SQL Mode / AI bar open: Refresh option -->
+                <template
+                  v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
+                >
+                  <q-btn
+                    data-test="logs-search-bar-refresh-btn"
+                    data-cy="search-bar-refresh-button"
+                    dense
+                    flat
+                    no-caps
+                    :title="t('search.refreshCacheAndRunQuery')"
+                    class="q-pa-sm tw:text-[12px]"
+                    v-close-popup
+                    @click="handleRunQueryFn(true)"
+                    :disable="
+                      searchObj.loading == true ||
+                      searchObj.loadingHistogram == true
+                    "
+                  >
+                    <q-icon name="refresh" class="q-mr-xs" />
+                    {{ t("search.refreshCacheAndRunQuery") }}
+                  </q-btn>
+                </template>
+                <!-- NL detected, AI bar not open: Empty menu -->
+                <template v-else>
+                  <q-list class="tw:min-w-[140px] tw:p-2">
+                    <q-item-label
+                      class="tw:text-xs tw:text-gray-500 tw:text-center"
+                    >
+                      No additional options
+                    </q-item-label>
+                  </q-list>
+                </template>
               </q-btn-dropdown>
-               <!-- Compact Auto Refresh Button -->
+              <!-- Compact Auto Refresh Button -->
               <auto-refresh-interval
                 class="q-ml-xs"
                 v-model="searchObj.meta.refreshInterval"
@@ -853,7 +977,12 @@ class="q-pr-sm q-pt-xs" />
           <template #before>
             <div
               class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
-              :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw:ml-[0.375rem]' : 'tw:ml-[0.375rem]'"
+              :class="
+                searchObj.data.transformType &&
+                searchObj.meta.showTransformEditor
+                  ? 'tw:ml-[0.375rem]'
+                  : 'tw:ml-[0.375rem]'
+              "
             >
               <!-- Unified Query Editor (with built-in AI bar) -->
               <unified-query-editor
@@ -864,9 +993,19 @@ class="q-pr-sm q-pt-xs" />
                 :suggestions="autoCompleteSuggestions"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
-                :show-ai-icon="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                :disable-ai="!searchObj.data.stream.selectedStream.length || isSqlModeDisabled"
-                :disable-ai-reason="!searchObj.data.stream.selectedStream.length ? t('search.selectStreamForAI') : t('search.nlpModeDisabledForVisualization')"
+                :show-ai-icon="
+                  config.isEnterprise == 'true' &&
+                  store.state.zoConfig.ai_enabled
+                "
+                :disable-ai="
+                  !searchObj.data.stream.selectedStream.length ||
+                  isSqlModeDisabled
+                "
+                :disable-ai-reason="
+                  !searchObj.data.stream.selectedStream.length
+                    ? t('search.selectStreamForAI')
+                    : t('search.nlpModeDisabledForVisualization')
+                "
                 data-test="logs-search-bar-query-editor"
                 v-model:query="searchObj.data.query"
                 data-test-prefix="logs-search-bar"
@@ -879,9 +1018,12 @@ class="q-pr-sm q-pt-xs" />
                     : ''
                 "
                 language="sql"
-                :readOnly="searchObj.meta.logsVisualizeToggle === 'build' && searchObj.meta.buildModeQueryEditorDisabled"
+                :readOnly="
+                  searchObj.meta.logsVisualizeToggle === 'build' &&
+                  searchObj.meta.buildModeQueryEditorDisabled
+                "
                 @update:query="updateQueryValue"
-                @update:nlp-mode="(val) => searchObj.meta.nlpMode = val"
+                @update:nlp-mode="(val) => (searchObj.meta.nlpMode = val)"
                 @run-query="handleRunQueryFn"
                 @keydown="handleKeyDown"
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
@@ -895,13 +1037,21 @@ class="q-pr-sm q-pt-xs" />
                 <span class="mode-label">Mode:</span>
                 <div class="mode-buttons">
                   <button
-                    :class="['mode-btn', { selected: searchObj.meta.buildModeQueryEditorDisabled }]"
+                    :class="[
+                      'mode-btn',
+                      { selected: searchObj.meta.buildModeQueryEditorDisabled },
+                    ]"
                     @click="onBuildModeToggle(true)"
                   >
                     Builder
                   </button>
                   <button
-                    :class="['mode-btn', { selected: !searchObj.meta.buildModeQueryEditorDisabled }]"
+                    :class="[
+                      'mode-btn',
+                      {
+                        selected: !searchObj.meta.buildModeQueryEditorDisabled,
+                      },
+                    ]"
                     @click="onBuildModeToggle(false)"
                   >
                     Custom
@@ -932,7 +1082,9 @@ class="q-pr-sm q-pt-xs" />
                       :nlp-mode="vrlEditorNlpMode"
                       :hide-nl-toggle="false"
                       :disable-ai="isVrlEditorDisabled"
-                      :disable-ai-reason="isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''"
+                      :disable-ai-reason="
+                        isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''
+                      "
                       :ai-placeholder="t('search.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :read-only="isVrlEditorDisabled"
@@ -944,8 +1096,10 @@ class="q-pr-sm q-pt-xs" />
                           ? 'empty-function'
                           : ''
                       "
-                      @update:query="searchObj.data.tempFunctionContent = $event"
-                      @update:nlp-mode="(val) => vrlEditorNlpMode = val"
+                      @update:query="
+                        searchObj.data.tempFunctionContent = $event
+                      "
+                      @update:nlp-mode="(val) => (vrlEditorNlpMode = val)"
                       @keydown="handleKeyDown"
                       @focus="
                         searchObj.meta.functionEditorPlaceholderFlag = false
@@ -1007,17 +1161,25 @@ class="q-pr-sm q-pt-xs" />
         size="10px"
         round
         @click="isFocused = !isFocused"
-        :class="searchObj.meta.showTransformEditor ? 'tw:right-[3.6rem]!' : 'tw:right-[4.2rem]!'"
+        :class="
+          searchObj.meta.showTransformEditor
+            ? 'tw:right-[3.6rem]!'
+            : 'tw:right-[4.2rem]!'
+        "
         class="q-pa-xs tw:absolute! tw:z-50 fullscreen-hover-btn"
         :style="{
-          top: (searchObj.meta.nlpMode && !searchObj.meta.showTransformEditor) ||
-               (vrlEditorNlpMode && searchObj.meta.showTransformEditor && searchObj.data.transformType === 'function')
-               ? '6.5rem' : '3.5rem'
+          top:
+            (searchObj.meta.nlpMode && !searchObj.meta.showTransformEditor) ||
+            (vrlEditorNlpMode &&
+              searchObj.meta.showTransformEditor &&
+              searchObj.data.transformType === 'function')
+              ? '6.5rem'
+              : '3.5rem',
         }"
       >
-      <Maximize size='0.8rem' v-if="!isFocused" />
-      <Minimize size="0.8rem" v-else />
-    </q-btn>
+        <Maximize size="0.8rem" v-if="!isFocused" />
+        <Minimize size="0.8rem" v-else />
+      </q-btn>
     </div>
 
     <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
@@ -1231,21 +1393,21 @@ class="q-pr-sm q-pt-xs" />
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          <div class="tw:flex tw:items-center ">
-          <span class="tw:mt-2">Update</span>
-          <q-toggle
-            data-test="saved-function-action-toggle"
-            v-bind:disable="functionOptions.length == 0"
-            name="saved_function_action"
-            v-model="isSavedFunctionAction"
-            true-value="create"
-            false-value="update"
-            label=""
-            size="lg"
-            class="o2-toggle-button-lg"
-            @change="savedFunctionName = ''"
-          />
-          <span class="tw:mt-2">Create</span>
+          <div class="tw:flex tw:items-center">
+            <span class="tw:mt-2">Update</span>
+            <q-toggle
+              data-test="saved-function-action-toggle"
+              v-bind:disable="functionOptions.length == 0"
+              name="saved_function_action"
+              v-model="isSavedFunctionAction"
+              true-value="create"
+              false-value="update"
+              label=""
+              size="lg"
+              class="o2-toggle-button-lg"
+              @change="savedFunctionName = ''"
+            />
+            <span class="tw:mt-2">Create</span>
           </div>
           <div v-if="isSavedFunctionAction == 'create'">
             <q-input
@@ -1410,14 +1572,20 @@ class="q-pr-sm q-pt-xs" />
       v-model="confirmUpdate"
     />
     <!-- Query Plan Dialog -->
-    <QueryPlanDialog
-      v-model="showExplainDialog"
-      :searchObj="searchObj"
-    />
+    <QueryPlanDialog v-model="showExplainDialog" :searchObj="searchObj" />
 
     <!-- Saved Views List Dialog -->
-    <q-dialog v-model="savedViewsListDialog" data-test="saved-views-list-dialog">
-      <q-card :style="localSavedViews.length > 0 ? 'width: 600px; max-width: 80vw' : 'width: 350px; max-width: 80vw'">
+    <q-dialog
+      v-model="savedViewsListDialog"
+      data-test="saved-views-list-dialog"
+    >
+      <q-card
+        :style="
+          localSavedViews.length > 0
+            ? 'width: 600px; max-width: 80vw'
+            : 'width: 350px; max-width: 80vw'
+        "
+      >
         <q-card-section class="row items-center q-pb-none q-pa-md">
           <div class="text-h6">{{ t("search.savedViewsLabel") }}</div>
           <q-space />
@@ -1432,7 +1600,11 @@ class="q-pr-sm q-pt-xs" />
               <q-item-section
                 class="column"
                 no-hover
-                :style="localSavedViews.length > 0 ? 'width: 60%; border-right: 1px solid lightgray' : 'width: 100%'"
+                :style="
+                  localSavedViews.length > 0
+                    ? 'width: 60%; border-right: 1px solid lightgray'
+                    : 'width: 100%'
+                "
               >
                 <q-table
                   data-test="log-search-saved-view-list-fields-table"
@@ -1447,7 +1619,7 @@ class="q-pr-sm q-pt-xs" />
                   class="saved-view-table full-height"
                   no-hover
                   :rows-per-page-options="[]"
-                  style="min-height: 420px; height: 420px;"
+                  style="min-height: 420px; height: 420px"
                   :hide-bottom="searchObj.data.savedViews.length == 0"
                 >
                   <template #top>
@@ -1463,7 +1635,7 @@ class="q-pr-sm q-pt-xs" />
                         :placeholder="t('search.searchSavedView')"
                       >
                         <template #prepend>
-                          <q-icon name="search"  />
+                          <q-icon name="search" />
                         </template>
                       </q-input>
                     </div>
@@ -1489,12 +1661,12 @@ class="q-pr-sm q-pt-xs" />
                   </template>
                   <template v-slot:body-cell-view_name="props">
                     <q-td :props="props" class="field_list" no-hover>
-                      <q-item
-                        class="q-pa-xs saved-view-item"
-                        clickable
-                      >
+                      <q-item class="q-pa-xs saved-view-item" clickable>
                         <q-item-section
-                          @click.stop="applySavedView(props.row); savedViewsListDialog = false"
+                          @click.stop="
+                            applySavedView(props.row);
+                            savedViewsListDialog = false;
+                          "
                           :title="props.row.view_name"
                         >
                           <q-item-label
@@ -1594,12 +1766,12 @@ class="q-pr-sm q-pt-xs" />
                   </template>
                   <template v-slot:body-cell-view_name="props">
                     <q-td :props="props" class="field_list q-pa-xs">
-                      <q-item
-                        class="q-pa-xs saved-view-item"
-                        clickable
-                      >
+                      <q-item class="q-pa-xs saved-view-item" clickable>
                         <q-item-section
-                          @click.stop="applySavedView(props.row); savedViewsListDialog = false"
+                          @click.stop="
+                            applySavedView(props.row);
+                            savedViewsListDialog = false;
+                          "
                         >
                           <q-item-label
                             class="ellipsis"
@@ -1706,11 +1878,11 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 // Lazy load CodeQueryEditor to avoid loading Monaco Editor eagerly
 const CodeQueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue")
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 // Unified QueryEditor for main query editor (with built-in AI bar)
 const UnifiedQueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue")
+  () => import("@/components/QueryEditor.vue"),
 );
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
@@ -1732,7 +1904,7 @@ import {
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { inject } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
@@ -1754,7 +1926,17 @@ import {
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import { Bookmark, ChartLine, ChartNoAxesColumn, RefreshCcw, ScanSearch, Share, Menu, Maximize, Minimize } from "lucide-vue-next";
+import {
+  Bookmark,
+  ChartLine,
+  ChartNoAxesColumn,
+  RefreshCcw,
+  ScanSearch,
+  Share,
+  Menu,
+  Maximize,
+  Minimize,
+} from "lucide-vue-next";
 import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
 
 const defaultValue: any = () => {
@@ -1911,14 +2093,14 @@ export default defineComponent({
         });
         return;
       }
-      if(!this.searchObj?.data?.customDownloadQueryObj?.query){
+      if (!this.searchObj?.data?.customDownloadQueryObj?.query) {
         this.$q.notify({
-            message: "Please run a query first before downloading.",
-            color: "negative",
-            position: "bottom",
-            timeout: 2000,
-          });
-          return;
+          message: "Please run a query first before downloading.",
+          color: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
+        return;
       }
       // const queryReq = this.buildSearch();
       this.searchObj.data.customDownloadQueryObj.query.from =
@@ -2006,7 +2188,8 @@ export default defineComponent({
       getHistogramTitle,
     } = useLogs();
 
-    const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams();
+    const { isStreamExists, isStreamFetched, getStreams, getStream } =
+      useStreams();
     const queryEditorRef = ref(null);
     const syntaxGuideRef = ref(null);
 
@@ -2228,13 +2411,15 @@ export default defineComponent({
       (newSqlMode, oldSqlMode) => {
         // Only act when SQL mode is turned ON (not when turning off)
         if (newSqlMode === true && oldSqlMode === false) {
-          console.log('[NL2Q-Handler] SQL mode enabled, turning off NLP mode (mutually exclusive)');
+          console.log(
+            "[NL2Q-Handler] SQL mode enabled, turning off NLP mode (mutually exclusive)",
+          );
           searchObj.meta.nlpMode = false;
           // Reset flags when switching to SQL mode
           hasInteractedWithAI.value = false;
           isNaturalLanguageDetected.value = false;
         }
-      }
+      },
     );
 
     // Watch NLP mode toggle - turn off SQL mode when NLP mode is enabled
@@ -2244,7 +2429,9 @@ export default defineComponent({
       (newNlpMode, oldNlpMode) => {
         if (newNlpMode === true && oldNlpMode === false) {
           // NLP mode turned ON
-          console.log('[NL2Q-Handler] NLP mode manually enabled, turning off SQL mode (mutually exclusive)');
+          console.log(
+            "[NL2Q-Handler] NLP mode manually enabled, turning off SQL mode (mutually exclusive)",
+          );
           searchObj.meta.sqlMode = false;
           // Reset detection flag when manually switching to NLP mode
           isNaturalLanguageDetected.value = false;
@@ -2256,12 +2443,14 @@ export default defineComponent({
           // So we don't emit auto-detection events when nlpMode prop is already true
         } else if (newNlpMode === false && oldNlpMode === true) {
           // NLP mode turned OFF - default to SQL mode
-          console.log('[NL2Q-Handler] NLP mode disabled, switching to SQL mode');
+          console.log(
+            "[NL2Q-Handler] NLP mode disabled, switching to SQL mode",
+          );
 
           // CRITICAL: Preserve the current editor content (e.g., AI-generated SQL)
           // Sync editorValue → query BEFORE enabling sqlMode, so the fullSQLMode
           // watcher in Index.vue doesn't rebuild the query from stale data.
-          const currentEditorValue = searchObj.data.editorValue || '';
+          const currentEditorValue = searchObj.data.editorValue || "";
           if (currentEditorValue.trim()) {
             searchObj.data.query = currentEditorValue;
           }
@@ -2273,7 +2462,7 @@ export default defineComponent({
           isNaturalLanguageDetected.value = false;
           hasInteractedWithAI.value = false;
         }
-      }
+      },
     );
 
     onBeforeUnmount(() => {
@@ -2359,7 +2548,7 @@ export default defineComponent({
       return columnNames;
     };
 
-   const updateQueryValue = (value: string) => {
+    const updateQueryValue = (value: string) => {
       // if (searchObj.meta.jobId != "") {
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
@@ -2897,7 +3086,11 @@ export default defineComponent({
       searchObj.data.actionId = actionId.id;
     };
 
-    const populateFunctionImplementation = (fnValue, flag = false, openEditor = true) => {
+    const populateFunctionImplementation = (
+      fnValue,
+      flag = false,
+      openEditor = true,
+    ) => {
       if (flag) {
         $q.notify({
           type: "positive",
@@ -2992,7 +3185,6 @@ export default defineComponent({
       loadSavedView();
       savedViewsListDialog.value = true;
     };
-
 
     // Common function to restore visualization data and sync to URL
     const restoreVisualizationData = async (visualizationData) => {
@@ -3167,7 +3359,6 @@ export default defineComponent({
                 searchObj.meta.functionEditorPlaceholderFlag = true;
               }
 
-
               //here we are getting data so we need to check here
               //before we set the time to the dateTimeRef.value we need to check if the startTime and endTime difference is greater than maxQueryRange in hours
               //solution will be we will do endTime - startTime and convert that difference into hours and check with both global and stream level maxQueryRange and if it is less than or equal to that we will keep that as it is
@@ -3180,13 +3371,18 @@ export default defineComponent({
 
               // Get max query range for all selected streams and take the minimum
               // Preference: stream max query range > global max query range
-              const globalMaxQueryRange = store.state.zoConfig.max_query_range || 0;
+              const globalMaxQueryRange =
+                store.state.zoConfig.max_query_range || 0;
               let effectiveMaxQueryRange = -1;
 
               if (selectedStreams && selectedStreams.length > 0) {
                 // Fetch all stream data in parallel
                 const streamDataPromises = selectedStreams.map((streamName) =>
-                  getStream(streamName, searchObj.data.stream.streamType, false)
+                  getStream(
+                    streamName,
+                    searchObj.data.stream.streamType,
+                    false,
+                  ),
                 );
 
                 try {
@@ -3194,7 +3390,10 @@ export default defineComponent({
 
                   // Extract max_query_range from each stream's settings
                   const streamMaxQueryRanges = streamDataList
-                    .map((streamData) => streamData?.settings?.max_query_range || 0)
+                    .map(
+                      (streamData) =>
+                        streamData?.settings?.max_query_range || 0,
+                    )
                     .filter((range) => range > 0); // Only consider positive values
 
                   // If we have stream-specific max query ranges, find the minimum (stream takes preference)
@@ -3206,7 +3405,8 @@ export default defineComponent({
                   }
                 } catch (error) {
                   // On error, fall back to global max query range
-                  effectiveMaxQueryRange = globalMaxQueryRange > 0 ? globalMaxQueryRange : -1;
+                  effectiveMaxQueryRange =
+                    globalMaxQueryRange > 0 ? globalMaxQueryRange : -1;
                 }
               } else if (globalMaxQueryRange > 0) {
                 // No selected streams, use global max query range
@@ -3220,27 +3420,33 @@ export default defineComponent({
                 searchObj.data.datetime?.endTime
               ) {
                 // Calculate time difference in hours
-                const startTimeMicros = parseInt(searchObj.data.datetime.startTime);
+                const startTimeMicros = parseInt(
+                  searchObj.data.datetime.startTime,
+                );
                 const endTimeMicros = parseInt(searchObj.data.datetime.endTime);
-                const timeDiffInHours = (endTimeMicros - startTimeMicros) / (60 * 60 * 1000000);
+                const timeDiffInHours =
+                  (endTimeMicros - startTimeMicros) / (60 * 60 * 1000000);
 
                 // Check if time difference exceeds effective max query range
                 if (timeDiffInHours > effectiveMaxQueryRange) {
                   // Adjust to current time - maxQueryRange
                   const currentTimeMicros = Date.now() * 1000; // Convert milliseconds to microseconds
-                  const maxQueryRangeMicros = effectiveMaxQueryRange * 60 * 60 * 1000000;
+                  const maxQueryRangeMicros =
+                    effectiveMaxQueryRange * 60 * 60 * 1000000;
 
-                  const adjustedStartTime = currentTimeMicros - maxQueryRangeMicros;
+                  const adjustedStartTime =
+                    currentTimeMicros - maxQueryRangeMicros;
                   const adjustedEndTime = currentTimeMicros;
 
                   // Get the current datetime type
-                  const currentType = searchObj.data.datetime.type || "relative";
+                  const currentType =
+                    searchObj.data.datetime.type || "relative";
 
                   // Build the complete datetime object with all required fields
                   const updatedDateTime = buildDateTimeObject(
                     adjustedStartTime,
                     adjustedEndTime,
-                    currentType
+                    currentType,
                   );
 
                   // Update searchObj.data.datetime with all fields
@@ -3249,11 +3455,14 @@ export default defineComponent({
 
                   if (currentType === "relative") {
                     // For relative type, update relativeTimePeriod
-                    searchObj.data.datetime.relativeTimePeriod = updatedDateTime.relativeTimePeriod;
+                    searchObj.data.datetime.relativeTimePeriod =
+                      updatedDateTime.relativeTimePeriod;
                   } else if (currentType === "absolute") {
                     // For absolute type, update selectedDate and selectedTime
-                    searchObj.data.datetime.selectedDate = updatedDateTime.selectedDate;
-                    searchObj.data.datetime.selectedTime = updatedDateTime.selectedTime;
+                    searchObj.data.datetime.selectedDate =
+                      updatedDateTime.selectedDate;
+                    searchObj.data.datetime.selectedTime =
+                      updatedDateTime.selectedTime;
                     searchObj.data.datetime.relativeTimePeriod = null;
                   }
                 }
@@ -3266,11 +3475,11 @@ export default defineComponent({
                 clearInterval(store.state.refreshIntervalID);
               }
               searchObj.data.stream.selectedStream.push(...selectedStreams);
-              // we dont need to update local log filter field because 
-              // if visualize is there for any saved views we will get right any previous local filter fields 
-              // they will get applied to the current visualize selected stream 
+              // we dont need to update local log filter field because
+              // if visualize is there for any saved views we will get right any previous local filter fields
+              // they will get applied to the current visualize selected stream
               // so we need to make sure we dont update that local filter fields when it is visualize
-              if(extractedObj.meta.logsVisualizeToggle ==  "logs"){
+              if (extractedObj.meta.logsVisualizeToggle == "logs") {
                 await updatedLocalLogFilterField();
               }
               await getStreams("logs", true);
@@ -3384,17 +3593,20 @@ export default defineComponent({
               } else {
                 clearInterval(store.state.refreshIntervalID);
               }
-              // we dont need to update local log filter field because 
-              // if visualize is there for any saved views we will get right any previous local filter fields 
-              // they will get applied to the current visualize selected stream 
+              // we dont need to update local log filter field because
+              // if visualize is there for any saved views we will get right any previous local filter fields
+              // they will get applied to the current visualize selected stream
               // so we need to make sure we dont update that local filter fields when it is visualize
-              if(extractedObj.meta.logsVisualizeToggle ==  "logs" ){
+              if (extractedObj.meta.logsVisualizeToggle == "logs") {
                 await updatedLocalLogFilterField();
               }
             }
 
             // Only reset function content if there's no function in the saved view
-            if (searchObj.meta.toggleFunction == false && !extractedObj.data.tempFunctionContent) {
+            if (
+              searchObj.meta.toggleFunction == false &&
+              !extractedObj.data.tempFunctionContent
+            ) {
               searchObj.config.fnSplitterModel = 100;
               resetFunctionContent();
             }
@@ -3413,7 +3625,7 @@ export default defineComponent({
                 searchObj.loading = true;
                 searchObj.meta.refreshHistogram = true;
                 // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
-                searchObj.communicationMethod = "streaming";                
+                searchObj.communicationMethod = "streaming";
                 await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
@@ -3434,7 +3646,11 @@ export default defineComponent({
               searchObj.data.stream.selectedFields =
                 extractedObj.data.resultGrid.colOrder[
                   searchObj.data.stream.selectedStream
-                ].filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || '_timestamp'));
+                ].filter(
+                  (_field) =>
+                    _field !==
+                    (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+                );
             } else {
               searchObj.data.stream.selectedFields =
                 extractedObj.data.stream.selectedFields;
@@ -3593,14 +3809,13 @@ export default defineComponent({
         delete savedSearchObj.data.savedViews;
         delete savedSearchObj.data.transforms;
 
-
         // Turn off all loaders before saving view
         savedSearchObj.loading = false;
         savedSearchObj.loadingHistogram = false;
         savedSearchObj.loadingCounter = false;
         savedSearchObj.loadingStream = false;
         savedSearchObj.loadingSavedView = false;
-        
+
         savedSearchObj.data.timezone = store.state.timezone;
 
         if (savedSearchObj.data.parsedQuery) {
@@ -4021,10 +4236,17 @@ export default defineComponent({
     const handleHistogramMode = () => {};
 
     const handleRunQueryFn = (clear_cache = false) => {
-      if (searchObj.meta.logsVisualizeToggle == "visualize" || searchObj.meta.logsVisualizeToggle == "patterns" || searchObj.meta.logsVisualizeToggle == "build") {
-        emit("handleRunQueryFn", typeof clear_cache === 'boolean' ? clear_cache : false);
+      if (
+        searchObj.meta.logsVisualizeToggle == "visualize" ||
+        searchObj.meta.logsVisualizeToggle == "patterns" ||
+        searchObj.meta.logsVisualizeToggle == "build"
+      ) {
+        emit(
+          "handleRunQueryFn",
+          typeof clear_cache === "boolean" ? clear_cache : false,
+        );
       } else {
-        handleRunQuery(typeof clear_cache === 'boolean' ? clear_cache : false);
+        handleRunQuery(typeof clear_cache === "boolean" ? clear_cache : false);
       }
     };
 
@@ -4175,7 +4397,10 @@ export default defineComponent({
         }
 
         // Generate query using buildSearch if query is empty or doesn't have SELECT
-        if (!searchObj.data.query || searchObj.data.query.toLowerCase().indexOf("select") < 0) {
+        if (
+          !searchObj.data.query ||
+          searchObj.data.query.toLowerCase().indexOf("select") < 0
+        ) {
           const queryBuild = buildSearch();
           const builtQuery = queryBuild?.query?.sql ?? "";
           if (builtQuery) {
@@ -4188,12 +4413,20 @@ export default defineComponent({
         await nextTick();
 
         // Enable quick mode if config allows (same as visualization)
-        const isSelectAllQuery = /^\s*select\s+\*\s+from\s+/i.test(searchObj.data.query || "");
-        const shouldEnableQuickMode = !searchObj.meta.sqlMode || isSelectAllQuery;
+        const isSelectAllQuery = /^\s*select\s+\*\s+from\s+/i.test(
+          searchObj.data.query || "",
+        );
+        const shouldEnableQuickMode =
+          !searchObj.meta.sqlMode || isSelectAllQuery;
         const isQuickModeDisabled = !searchObj.meta.quickMode;
-        const isQuickModeConfigEnabled = store.state.zoConfig.quick_mode_enabled === true;
+        const isQuickModeConfigEnabled =
+          store.state.zoConfig.quick_mode_enabled === true;
 
-        if (shouldEnableQuickMode && isQuickModeDisabled && isQuickModeConfigEnabled) {
+        if (
+          shouldEnableQuickMode &&
+          isQuickModeDisabled &&
+          isQuickModeConfigEnabled
+        ) {
           searchObj.meta.quickMode = true;
         }
       }
@@ -4323,7 +4556,10 @@ export default defineComponent({
         // if(searchObj.meta.jobId != ""){
         //   searchObj.meta.jobId = "";
         // }
-        if (!searchObj.data.stream.selectedStream || searchObj.data.stream.selectedStream.length === 0) {
+        if (
+          !searchObj.data.stream.selectedStream ||
+          searchObj.data.stream.selectedStream.length === 0
+        ) {
           $q.notify({
             type: "negative",
             message: "Please select a stream before scheduling a job",
@@ -4427,14 +4663,16 @@ export default defineComponent({
         searchObj.config.fnSplitterModel = 100;
       }
     };
-    //so if it is active we need light this is fixed 
+    //so if it is active we need light this is fixed
     //if it is inactive we will be having 2 conditions
     //1. if dark mode show light color
     //2.if light mode show dark color
     const visualizeIcon = computed(() => {
       return searchObj.meta.logsVisualizeToggle === "visualize"
         ? getImageURL("images/common/visualize_icon_light.svg")
-        : store.state.theme == 'dark' ? getImageURL("images/common/visualize_icon_light.svg") : getImageURL("images/common/visualize_icon_dark.svg");
+        : store.state.theme == "dark"
+          ? getImageURL("images/common/visualize_icon_light.svg")
+          : getImageURL("images/common/visualize_icon_dark.svg");
     });
     const histogramIcon = computed(() => {
       return store.state.theme === "dark"
@@ -4886,10 +5124,12 @@ export default defineComponent({
   font-size: 0.875rem; // 14px
   color: var(--o2-text-secondary);
 }
+
 .q-dark .q-btn {
   font-weight: 600;
   border: 0 solid rgba(255, 255, 255, 0.2);
 }
+
 .q-dark .file-type label,
 .q-dark .file-type .q-btn {
   color: var(--o2-text-secondary);
@@ -4994,30 +5234,39 @@ export default defineComponent({
 .q-dark .group-menu-btn {
   border: 0.0625rem solid var(--o2-border-color) !important;
 }
-.o2-run-query-button{
+
+.o2-run-query-button {
   font-size: 11px;
   font-weight: 500 !important;
   line-height: 16px !important;
   padding: 0px 0px !important;
   width: 74px !important;
-  transition: box-shadow 0.3s ease, opacity 0.2s ease;
+  transition:
+    box-shadow 0.3s ease,
+    opacity 0.2s ease;
   /* subtle default glow */
   // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
 }
-.o2-color-primary{
-    background-color: var(--o2-primary-btn-bg);
-    color: var(--o2-primary-btn-text);
-    &:hover {
+
+.o2-color-primary {
+  background-color: var(--o2-primary-btn-bg);
+  color: var(--o2-primary-btn-text);
+
+  &:hover {
     opacity: 0.9;
-    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+    box-shadow: 0 0 8px
+      color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
   }
 }
+
 .search-button-enterprise-border-radius {
   border-radius: 0.375rem 0px 0px 0.375rem !important;
 }
+
 .search-button-normal-border-radius {
   border-radius: 0.375rem;
 }
+
 .search-button-dropdown-enterprise-border-radius {
   border-radius: 0px 0.375rem 0.375rem 0px !important;
 }

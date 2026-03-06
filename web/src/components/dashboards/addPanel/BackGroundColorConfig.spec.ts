@@ -19,21 +19,22 @@ import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import { ref, reactive } from "vue";
 
 // Create reactive mock data that mimics the real composable structure
-const createMockDashboardPanelData = () => reactive({
-  data: {
-    config: {
-      background: {
-        type: "",
-        value: { color: "" },
+const createMockDashboardPanelData = () =>
+  reactive({
+    data: {
+      config: {
+        background: {
+          type: "",
+          value: { color: "" },
+        },
       },
     },
-  },
-});
+  });
 
 let mockDashboardPanelData = createMockDashboardPanelData();
 
-// Mock the composable with proper reactivity  
-vi.mock("@/composables/useDashboardPanel", () => ({
+// Mock the composable with proper reactivity
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
   }),
@@ -95,14 +96,14 @@ describe("BackGroundColorConfig", () => {
               </div>
             `,
             props: [
-              "modelValue", 
-              "options", 
-              "dense", 
-              "label", 
-              "stackLabel", 
-              "emitValue", 
+              "modelValue",
+              "options",
+              "dense",
+              "label",
+              "stackLabel",
+              "emitValue",
               "displayValue",
-              "outlined"
+              "outlined",
             ],
             emits: ["update:modelValue"],
             inheritAttrs: false,
@@ -115,9 +116,9 @@ describe("BackGroundColorConfig", () => {
   beforeEach(() => {
     // Reset mock data before each test
     mockDashboardPanelData = createMockDashboardPanelData();
-    
+
     // Reset mock data - the composable mock will use the updated mockDashboardPanelData automatically
-    
+
     mockT.mockClear();
   });
 
@@ -222,7 +223,7 @@ describe("BackGroundColorConfig", () => {
     it("should set background type and create config when config doesn't exist", () => {
       mockDashboardPanelData.data.config.background = null;
       wrapper.vm.backgroundType = "single";
-      
+
       expect(mockDashboardPanelData.data.config.background).toEqual({
         type: "single",
         value: { color: "" },
@@ -232,14 +233,14 @@ describe("BackGroundColorConfig", () => {
     it("should update existing background type", () => {
       mockDashboardPanelData.data.config.background.type = "";
       wrapper.vm.backgroundType = "single";
-      
+
       expect(mockDashboardPanelData.data.config.background.type).toBe("single");
     });
 
     it("should handle setting empty type", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       wrapper.vm.backgroundType = "";
-      
+
       expect(mockDashboardPanelData.data.config.background.type).toBe("");
     });
   });
@@ -277,7 +278,7 @@ describe("BackGroundColorConfig", () => {
     it("should set background color and create config when config doesn't exist", () => {
       mockDashboardPanelData.data.config.background = null;
       wrapper.vm.backgroundColor = "#ff0000";
-      
+
       expect(mockDashboardPanelData.data.config.background).toEqual({
         type: "single",
         value: { color: "#ff0000" },
@@ -287,21 +288,25 @@ describe("BackGroundColorConfig", () => {
     it("should update existing background color", () => {
       mockDashboardPanelData.data.config.background.value.color = "";
       wrapper.vm.backgroundColor = "#00ff00";
-      
-      expect(mockDashboardPanelData.data.config.background.value.color).toBe("#00ff00");
+
+      expect(mockDashboardPanelData.data.config.background.value.color).toBe(
+        "#00ff00",
+      );
     });
 
     it("should handle setting color when value object doesn't exist", () => {
       // Set up test case where value object doesn't exist - component expects value to be an object
       mockDashboardPanelData.data.config.background = {
-        type: "single", 
-        value: { color: "" }  // Component expects value to be an object with color property
+        type: "single",
+        value: { color: "" }, // Component expects value to be an object with color property
       };
-      
+
       wrapper.vm.backgroundColor = "#ff0000";
-      
+
       expect(mockDashboardPanelData.data.config.background.value).toBeDefined();
-      expect(mockDashboardPanelData.data.config.background.value.color).toBe("#ff0000");
+      expect(mockDashboardPanelData.data.config.background.value.color).toBe(
+        "#ff0000",
+      );
     });
   });
 
@@ -313,52 +318,52 @@ describe("BackGroundColorConfig", () => {
     it("should clear background color when type changes to empty", async () => {
       mockDashboardPanelData.data.config.background.type = "single";
       mockDashboardPanelData.data.config.background.value.color = "#ff0000";
-      
+
       wrapper.vm.backgroundType = "";
       // Manually trigger watcher behavior since watchers may not fire in tests
       wrapper.vm.backgroundColor = "";
       await flushPromises();
-      
+
       expect(wrapper.vm.backgroundColor).toBe("");
     });
 
     it("should set default color when type changes to single and no color exists", async () => {
       mockDashboardPanelData.data.config.background.type = "";
       mockDashboardPanelData.data.config.background.value.color = "";
-      
+
       wrapper.vm.backgroundType = "single";
       await flushPromises();
-      
+
       expect(wrapper.vm.backgroundColor).toBe("#808080");
     });
 
     it("should not override existing color when type changes to single", async () => {
       mockDashboardPanelData.data.config.background.type = "";
       mockDashboardPanelData.data.config.background.value.color = "#ff0000";
-      
+
       wrapper.vm.backgroundType = "single";
       await flushPromises();
-      
+
       expect(wrapper.vm.backgroundColor).toBe("#ff0000");
     });
 
     it("should not set default color when type changes from single to single", async () => {
       mockDashboardPanelData.data.config.background.type = "single";
       mockDashboardPanelData.data.config.background.value.color = "#ff0000";
-      
+
       wrapper.vm.backgroundType = "single";
       await flushPromises();
-      
+
       expect(wrapper.vm.backgroundColor).toBe("#ff0000");
     });
 
     it("should handle null/undefined color when setting default", async () => {
       mockDashboardPanelData.data.config.background.type = "";
       mockDashboardPanelData.data.config.background.value.color = null;
-      
+
       wrapper.vm.backgroundType = "single";
       await flushPromises();
-      
+
       expect(wrapper.vm.backgroundColor).toBe("#808080");
     });
 
@@ -366,15 +371,15 @@ describe("BackGroundColorConfig", () => {
       // Test that watcher doesn't trigger on initial mount
       mockDashboardPanelData.data.config.background.type = "single";
       mockDashboardPanelData.data.config.background.value.color = "";
-      
+
       const newWrapper = createWrapper();
       await flushPromises();
-      
+
       // With immediate: false, the watcher may still trigger during setup but the component
       // may have initialization logic that sets a default color for 'single' type
       // Accept either empty string or default color since both are valid behaviors
       expect(["", "#808080"]).toContain(newWrapper.vm.backgroundColor);
-      
+
       newWrapper.unmount();
     });
   });
@@ -391,7 +396,7 @@ describe("BackGroundColorConfig", () => {
     it("should render q-select with correct props", () => {
       wrapper = createWrapper();
       const qSelect = wrapper.find(".q-select-stub");
-      
+
       expect(qSelect.exists()).toBeTruthy();
       expect(wrapper.vm.colorModeOptions).toEqual([
         { label: "None", value: "" },
@@ -429,7 +434,7 @@ describe("BackGroundColorConfig", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       wrapper = createWrapper();
       const colorWrapper = wrapper.find(".color-input-wrapper");
-      
+
       expect(colorWrapper.exists()).toBeTruthy();
       expect(colorWrapper.attributes("style")).toContain("margin-top: 36px");
       expect(colorWrapper.attributes("style")).toContain("margin-left: 5px");
@@ -439,7 +444,7 @@ describe("BackGroundColorConfig", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       mockDashboardPanelData.data.config.background.value.color = "#ff0000";
       wrapper = createWrapper();
-      
+
       const colorInput = wrapper.find("input[type='color']");
       expect(colorInput.element.value).toBe("#ff0000");
     });
@@ -454,36 +459,38 @@ describe("BackGroundColorConfig", () => {
 
     it("should update background type when select changes", async () => {
       const select = wrapper.find(".select-element");
-      
+
       await select.setValue("single");
       await flushPromises();
-      
+
       expect(mockDashboardPanelData.data.config.background.type).toBe("single");
     });
 
     it("should update background color when color input changes", async () => {
       mockDashboardPanelData.data.config.background.type = "single";
       await wrapper.vm.$nextTick();
-      
+
       const colorInput = wrapper.find("input[type='color']");
       await colorInput.setValue("#00ff00");
-      
-      expect(mockDashboardPanelData.data.config.background.value.color).toBe("#00ff00");
+
+      expect(mockDashboardPanelData.data.config.background.value.color).toBe(
+        "#00ff00",
+      );
     });
 
     it("should handle form interactions correctly", async () => {
       const select = wrapper.find(".select-element");
-      
+
       // Change to single
       await select.setValue("single");
       await flushPromises();
-      
+
       expect(wrapper.find("input[type='color']").exists()).toBeTruthy();
-      
+
       // Change back to none
       await select.setValue("");
       await flushPromises();
-      
+
       expect(wrapper.find("input[type='color']").exists()).toBeFalsy();
     });
   });
@@ -493,7 +500,7 @@ describe("BackGroundColorConfig", () => {
       // Create wrapper with empty config
       mockDashboardPanelData.data.config = {};
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBeTruthy();
       expect(wrapper.vm.backgroundType).toBe("");
       expect(wrapper.vm.backgroundColor).toBe("");
@@ -504,10 +511,10 @@ describe("BackGroundColorConfig", () => {
       mockDashboardPanelData.data.config = {
         background: {
           type: "",
-          value: { color: "" }
-        }
+          value: { color: "" },
+        },
       };
-      
+
       expect(() => {
         wrapper = createWrapper();
       }).not.toThrow();
@@ -519,11 +526,11 @@ describe("BackGroundColorConfig", () => {
         config: {
           background: {
             type: "",
-            value: { color: "" }
-          }
-        }
+            value: { color: "" },
+          },
+        },
       };
-      
+
       expect(() => {
         wrapper = createWrapper();
       }).not.toThrow();
@@ -531,22 +538,22 @@ describe("BackGroundColorConfig", () => {
 
     it("should handle rapid type changes", async () => {
       wrapper = createWrapper();
-      
+
       for (let i = 0; i < 10; i++) {
         wrapper.vm.backgroundType = i % 2 === 0 ? "single" : "";
         await flushPromises();
       }
-      
+
       expect(wrapper.vm.backgroundType).toBe("");
     });
 
     it("should handle invalid color values", () => {
       wrapper = createWrapper();
-      
+
       expect(() => {
         wrapper.vm.backgroundColor = "invalid-color";
       }).not.toThrow();
-      
+
       expect(wrapper.vm.backgroundColor).toBe("invalid-color");
     });
   });
@@ -554,7 +561,7 @@ describe("BackGroundColorConfig", () => {
   describe("Component Lifecycle", () => {
     it("should initialize correctly with all required properties", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.vm.backgroundType).toBeDefined();
       expect(wrapper.vm.backgroundColor).toBeDefined();
       expect(wrapper.vm.colorModeOptions).toBeDefined();
@@ -563,11 +570,11 @@ describe("BackGroundColorConfig", () => {
 
     it("should maintain reactivity throughout lifecycle", async () => {
       wrapper = createWrapper();
-      
+
       const initialType = wrapper.vm.backgroundType;
       wrapper.vm.backgroundType = "single";
       await flushPromises();
-      
+
       expect(wrapper.vm.backgroundType).not.toBe(initialType);
       expect(wrapper.vm.backgroundType).toBe("single");
     });
@@ -575,9 +582,9 @@ describe("BackGroundColorConfig", () => {
     it("should cleanup correctly on unmount", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm;
-      
+
       wrapper.unmount();
-      
+
       expect(() => vm.backgroundType).not.toThrow();
     });
   });
@@ -585,16 +592,16 @@ describe("BackGroundColorConfig", () => {
   describe("Integration Tests", () => {
     it("should maintain state consistency across multiple operations", async () => {
       wrapper = createWrapper();
-      
+
       // Set type to single
       wrapper.vm.backgroundType = "single";
       await flushPromises();
       expect(wrapper.vm.backgroundColor).toBe("#808080");
-      
+
       // Change color
       wrapper.vm.backgroundColor = "#ff0000";
       expect(wrapper.vm.backgroundColor).toBe("#ff0000");
-      
+
       // Change type to none
       wrapper.vm.backgroundType = "";
       await flushPromises();
@@ -602,25 +609,27 @@ describe("BackGroundColorConfig", () => {
     });
 
     it("should work correctly with different provide keys", () => {
-      wrapper = createWrapper({ dashboardPanelDataPageKey: "custom-dashboard-key" });
-      
+      wrapper = createWrapper({
+        dashboardPanelDataPageKey: "custom-dashboard-key",
+      });
+
       expect(wrapper.exists()).toBeTruthy();
       expect(wrapper.vm.backgroundType).toBeDefined();
     });
 
     it("should handle complex state transitions", async () => {
       wrapper = createWrapper();
-      
+
       // Initial state
       expect(wrapper.vm.backgroundType).toBe("");
       expect(wrapper.vm.backgroundColor).toBe("");
-      
+
       // Set color first (should create config with type "single")
       wrapper.vm.backgroundColor = "#123456";
       // Manually set the expected state that the setter should create
       mockDashboardPanelData.data.config.background.type = "single";
       expect(mockDashboardPanelData.data.config.background.type).toBe("single");
-      
+
       // Change type (should trigger watcher to clear color)
       wrapper.vm.backgroundType = "";
       wrapper.vm.backgroundColor = ""; // Manually trigger watcher behavior
@@ -633,7 +642,7 @@ describe("BackGroundColorConfig", () => {
     it("should have color-input-wrapper styles applied", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       wrapper = createWrapper();
-      
+
       const colorWrapper = wrapper.find(".color-input-wrapper");
       expect(colorWrapper.exists()).toBeTruthy();
       expect(colorWrapper.classes()).toContain("color-input-wrapper");
@@ -642,7 +651,7 @@ describe("BackGroundColorConfig", () => {
     it("should have color input styles applied", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       wrapper = createWrapper();
-      
+
       const colorInput = wrapper.find("input[type='color']");
       expect(colorInput.exists()).toBeTruthy();
       expect(colorInput.attributes("type")).toBe("color");

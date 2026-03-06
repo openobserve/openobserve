@@ -7,7 +7,7 @@ import { createI18n } from "vue-i18n";
 import { createRouter, createMemoryHistory } from "vue-router";
 
 // Mock external dependencies
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
     dashboardPanelData: {
       data: {
@@ -132,7 +132,9 @@ describe("DashboardFiltersOption", () => {
     });
 
     it("should render filters section when not custom SQL query", () => {
-      const filtersSection = wrapper.find('[data-test="dashboard-filter-layout"]');
+      const filtersSection = wrapper.find(
+        '[data-test="dashboard-filter-layout"]',
+      );
       expect(filtersSection.exists()).toBe(true);
       expect(wrapper.find(".layout-name").text()).toBe("Filters");
     });
@@ -316,14 +318,18 @@ describe("DashboardFiltersOption", () => {
       it("should handle logical operator change for condition", () => {
         wrapper.vm.handleLogicalOperatorChange(0, "OR");
 
-        const condition = wrapper.vm.dashboardPanelData.data.queries[0].fields.filter.conditions[0];
+        const condition =
+          wrapper.vm.dashboardPanelData.data.queries[0].fields.filter
+            .conditions[0];
         expect(condition.logicalOperator).toBe("OR");
       });
 
       it("should handle logical operator change for group", () => {
         wrapper.vm.handleLogicalOperatorChange(1, "OR");
 
-        const group = wrapper.vm.dashboardPanelData.data.queries[0].fields.filter.conditions[1];
+        const group =
+          wrapper.vm.dashboardPanelData.data.queries[0].fields.filter
+            .conditions[1];
         expect(group.logicalOperator).toBe("OR");
         expect(group.conditions[0].logicalOperator).toBe("OR");
         expect(group.conditions[1].logicalOperator).toBe("OR");
@@ -331,7 +337,9 @@ describe("DashboardFiltersOption", () => {
       });
 
       it("should handle non-existing index", () => {
-        expect(() => wrapper.vm.handleLogicalOperatorChange(5, "OR")).not.toThrow();
+        expect(() =>
+          wrapper.vm.handleLogicalOperatorChange(5, "OR"),
+        ).not.toThrow();
       });
     });
 
@@ -358,7 +366,8 @@ describe("DashboardFiltersOption", () => {
           ],
         };
 
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.filter.conditions = [group];
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.filter.conditions =
+          [group];
         wrapper.vm.handleLogicalOperatorChange(0, "OR");
 
         expect(group.logicalOperator).toBe("OR");
@@ -499,7 +508,7 @@ describe("DashboardFiltersOption", () => {
 
         const result = newWrapper.vm.dashboardVariablesFilterItems(0);
         expect(result).toEqual([]);
-        
+
         newWrapper.unmount();
       });
     });
@@ -507,7 +516,9 @@ describe("DashboardFiltersOption", () => {
 
   describe("Conditional rendering", () => {
     it("should render filters when customQuery is false", () => {
-      expect(wrapper.find('[data-test="dashboard-filter-layout"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-filter-layout"]').exists(),
+      ).toBe(true);
     });
 
     it("should render Group component when topLevelGroup exists", () => {
@@ -515,11 +526,13 @@ describe("DashboardFiltersOption", () => {
     });
 
     it("should render layout name as Filters", () => {
-      expect(wrapper.find('.layout-name').text()).toBe("Filters");
+      expect(wrapper.find(".layout-name").text()).toBe("Filters");
     });
 
     it("should have correct test attribute", () => {
-      const filtersLayout = wrapper.find('[data-test="dashboard-filter-layout"]');
+      const filtersLayout = wrapper.find(
+        '[data-test="dashboard-filter-layout"]',
+      );
       expect(filtersLayout.exists()).toBe(true);
       expect(filtersLayout.classes()).toContain("axis-container");
       expect(filtersLayout.classes()).toContain("droppable");
@@ -637,7 +650,7 @@ describe("DashboardFiltersOption", () => {
       expect(wrapper.vm.showAddMenu).toBe(false);
       wrapper.vm.showAddMenu = true;
       expect(wrapper.vm.showAddMenu).toBe(true);
-      
+
       wrapper.vm.addFilter("condition");
       expect(wrapper.vm.showAddMenu).toBe(false);
     });
@@ -674,7 +687,9 @@ describe("DashboardFiltersOption", () => {
         ],
       };
 
-      wrapper.vm.dashboardPanelData.data.queries[0].fields.filter.conditions = [mockGroup];
+      wrapper.vm.dashboardPanelData.data.queries[0].fields.filter.conditions = [
+        mockGroup,
+      ];
       wrapper.vm.handleLogicalOperatorChange(0, "OR");
 
       mockGroup.conditions.forEach((condition) => {
@@ -689,12 +704,12 @@ describe("DashboardFiltersOption", () => {
     it("should handle map iteration in schemaOptions computed property", () => {
       const schemaOptions = wrapper.vm.schemaOptions;
       expect(schemaOptions).toHaveLength(2);
-      
+
       const expectedFields = [
         { name: "field1", type: "string" },
         { name: "field2", type: "number" },
       ];
-      
+
       expectedFields.forEach((field, index) => {
         expect(schemaOptions[index]).toEqual({
           label: field.name,
@@ -728,15 +743,17 @@ describe("DashboardFiltersOption", () => {
       });
 
       const result = testWrapper.vm.dashboardVariablesFilterItems(0);
-      
+
       expect(result).toHaveLength(4);
-      mockDashboardDataWithVariables.variables.list.forEach((variable, index) => {
-        expect(result[index].label).toBe(variable.name);
-        const expectedValue = variable.multiSelect 
-          ? `(\${${variable.name}})`
-          : `$${variable.name}`;
-        expect(result[index].value).toBe(expectedValue);
-      });
+      mockDashboardDataWithVariables.variables.list.forEach(
+        (variable, index) => {
+          expect(result[index].label).toBe(variable.name);
+          const expectedValue = variable.multiSelect
+            ? `(\${${variable.name}})`
+            : `$${variable.name}`;
+          expect(result[index].value).toBe(expectedValue);
+        },
+      );
 
       testWrapper.unmount();
     });
@@ -799,7 +816,7 @@ describe("DashboardFiltersOption", () => {
   describe("Additional edge cases for 100% coverage", () => {
     it("should handle different filter types in addFilter method", () => {
       wrapper.vm.addFilter("unknown");
-      
+
       const currentQuery = wrapper.vm.dashboardPanelData.data.queries[0];
       expect(currentQuery.fields.filter.conditions).toHaveLength(0);
       expect(wrapper.vm.showAddMenu).toBe(false);
@@ -876,7 +893,9 @@ describe("DashboardFiltersOption", () => {
         ],
       };
 
-      wrapper.vm.dashboardPanelData.data.queries[0].fields.filter.conditions = [complexGroup];
+      wrapper.vm.dashboardPanelData.data.queries[0].fields.filter.conditions = [
+        complexGroup,
+      ];
       wrapper.vm.handleLogicalOperatorChange(0, "OR");
 
       expect(complexGroup.conditions[0].logicalOperator).toBe("OR");
