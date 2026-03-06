@@ -30,8 +30,8 @@
         class="cross-link-item el-border tw:rounded-md q-mb-xs q-pa-sm"
         :data-test="`cross-link-item-${idx}`"
       >
-        <div class="tw:flex tw:justify-between tw:items-start">
-          <div class="tw:flex-1 tw:min-w-0">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div style="flex: 1; min-width: 0;">
             <!-- Name -->
             <div class="text-subtitle2 text-bold tw:truncate" :title="link.name" style="color: var(--o2-text-primary)">
               {{ link.name }}
@@ -59,7 +59,7 @@
             </div>
           </div>
           <!-- Actions -->
-          <div v-if="!readonly" class="tw:flex tw:items-center tw:gap-1 tw:ml-2 tw:shrink-0">
+          <div v-if="!readonly" style="display: flex; align-items: center; gap: 4px; margin-left: 8px; flex-shrink: 0;">
             <q-btn
               dense
               flat

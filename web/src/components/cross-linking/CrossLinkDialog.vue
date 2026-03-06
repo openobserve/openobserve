@@ -2,7 +2,7 @@
   <q-dialog v-model="dialogVisible" persistent>
     <q-card style="min-width: 500px">
       <q-card-section>
-        <div class="tw:flex tw:items-center tw:justify-between">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
           <div class="text-h6">
             {{ isEditing ? t("crossLinks.editCrossLink") : t("crossLinks.addCrossLink") }}
           </div>
@@ -13,8 +13,8 @@
       <q-card-section>
         <q-form @submit.prevent="onSubmit">
           <!-- Name -->
-          <div class="tw:mb-3">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.name") }} *</label>
+          <div style="margin-bottom: 12px;">
+            <label class="text-caption text-bold" style="display: block; margin-bottom: 4px; color: var(--o2-text-primary)">{{ t("crossLinks.name") }} *</label>
             <q-input
               v-model="form.name"
               dense
@@ -27,8 +27,8 @@
           </div>
 
           <!-- URL Template -->
-          <div class="tw:mb-3">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.urlTemplate") }} *</label>
+          <div style="margin-bottom: 12px;">
+            <label class="text-caption text-bold" style="display: block; margin-bottom: 4px; color: var(--o2-text-primary)">{{ t("crossLinks.urlTemplate") }} *</label>
             <q-input
               v-model="form.url"
               dense
@@ -38,18 +38,18 @@
               hide-bottom-space
               data-test="cross-link-url-input"
             />
-            <div class="tw:text-xs tw:mt-1" style="color: var(--o2-text-muted)">
+            <div class="text-caption" style="margin-top: 4px; color: var(--o2-text-muted)">
               {{ t("crossLinks.urlHint") }}
             </div>
           </div>
 
           <!-- Fields -->
-          <div class="tw:mb-2">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.fields") }} *</label>
-            <div class="tw:text-xs tw:mb-2" style="color: var(--o2-text-muted)">
+          <div style="margin-bottom: 8px;">
+            <label class="text-caption text-bold" style="display: block; margin-bottom: 4px; color: var(--o2-text-primary)">{{ t("crossLinks.fields") }} *</label>
+            <div class="text-caption" style="margin-bottom: 8px; color: var(--o2-text-muted)">
               {{ t("crossLinks.fieldsHint") }}
             </div>
-            <div v-if="form.fields.length > 0" class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2">
+            <div v-if="form.fields.length > 0" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
               <q-chip
                 v-for="(field, idx) in form.fields"
                 :key="idx"
@@ -62,7 +62,7 @@
                 <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
               </q-chip>
             </div>
-            <div class="tw:flex tw:gap-2 tw:items-center">
+            <div style="display: flex; gap: 8px; align-items: center;">
               <q-select
                 ref="fieldSelectRef"
                 v-if="availableFields.length > 0"
@@ -78,7 +78,7 @@
                 @keyup.enter="addField"
                 dense
                 borderless
-                class="tw:flex-1"
+                style="flex: 1;"
                 :placeholder="t('crossLinks.fieldSearchPlaceholder')"
                 hide-bottom-space
                 data-test="cross-link-field-input"
@@ -96,7 +96,7 @@
                 v-model="newFieldName"
                 dense
                 borderless
-                class="tw:flex-1"
+                style="flex: 1;"
                 :placeholder="t('crossLinks.fieldInputPlaceholder')"
                 @keyup.enter="addField"
                 hide-bottom-space
