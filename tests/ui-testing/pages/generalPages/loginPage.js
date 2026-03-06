@@ -1,5 +1,6 @@
 // loginPage.js
 import { expect } from '@playwright/test';
+const { isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
 export class LoginPage {
   constructor(page) {
     this.page = page;
@@ -17,6 +18,9 @@ export class LoginPage {
   }
 
   async loginAsInternalUser() {
+    // Cloud uses Dex OIDC — no internal user login form exists
+    if (isCloudEnvironment()) return;
+
     // Wait for page to stabilize before checking for internal login button
     await this.page.waitForLoadState('domcontentloaded');
 
@@ -39,6 +43,16 @@ export class LoginPage {
   }
 
   async login() {
+    // Cloud uses saved auth state (cookies from storageState) — no form login needed
+    if (isCloudEnvironment()) {
+      await this.page.goto(`${process.env["ZO_BASE_URL"]}/web/`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000
+      });
+      await this.page.waitForTimeout(2000);
+      return;
+    }
+
     // Wait for login form elements to be available
     await this.userIdInput.waitFor({ state: 'visible', timeout: 15000 });
     await this.passwordInput.waitFor({ state: 'visible', timeout: 15000 });

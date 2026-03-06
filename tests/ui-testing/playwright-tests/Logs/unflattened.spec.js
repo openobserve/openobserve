@@ -10,16 +10,24 @@ test.describe.configure({ mode: "serial" });
 const streamName = `stream${Date.now()}`;
 
 async function login(page) {
+  const { isCloudEnvironment } = require('../utils/cloud-auth.js');
+  if (isCloudEnvironment()) {
+    // Cloud uses saved auth state (cookies from storageState)
+    await page.goto(`${process.env["ZO_BASE_URL"]}/web/`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
+    await page.waitForTimeout(2000);
+    return;
+  }
   await page.goto(process.env["ZO_BASE_URL"]);
   if (await page.getByText('Login as internal user').isVisible()) {
     await page.getByText('Login as internal user').click();
-}
-  // Strategic 500ms wait for operation completion - this is functionally necessary
+  }
   await page.waitForTimeout(500);
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  //Enter Password
   await page.locator("label").filter({ hasText: "Password *" }).click();
   await page
     .locator('[data-cy="login-password"]')
