@@ -49,7 +49,7 @@ export class LoginPage {
         waitUntil: 'domcontentloaded',
         timeout: 30000
       });
-      await this.page.waitForTimeout(2000);
+      await this.page.waitForURL(/\/web\//, { timeout: 15000 });
       return;
     }
 

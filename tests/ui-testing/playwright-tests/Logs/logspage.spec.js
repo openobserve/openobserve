@@ -5,6 +5,7 @@ const logData = require("../../fixtures/log.json");
 const logsdata = require("../../../test-data/logs_data.json");
 const { waitUtils } = require('../utils/wait-helpers.js');
 const { ingestTestData: _ingestData } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Utility Functions
 
@@ -46,7 +47,7 @@ test.describe("Logs Page testcases", () => {
 
     // Navigate to logs page and setup for testing
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
     );
     await pm.logsPage.selectStream("e2e_automate");
     await applyQueryButton(pm);

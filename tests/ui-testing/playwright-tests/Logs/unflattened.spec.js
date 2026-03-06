@@ -5,6 +5,7 @@ import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
 // (unused CommonActions import removed)
 const testLogger = require('../utils/test-logger.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: "serial" });
 const streamName = `stream${Date.now()}`;
@@ -117,9 +118,9 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
 
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
     );
-    const orgName = process.env.ORGNAME || 'default';
+    const orgName = getOrgIdentifier();
     const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`);
     await pageManager.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
@@ -190,7 +191,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(5000);
 
     testLogger.info('Navigating to logs page to verify _o2_id field');
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForTimeout(1000);
 
     testLogger.info('Selecting e2e_automate stream in logs');
@@ -324,7 +325,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(5000);
 
     testLogger.info('Navigating to logs page to verify _o2_id field');
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForTimeout(1000);
 
     testLogger.info('Selecting e2e_automate stream in logs');

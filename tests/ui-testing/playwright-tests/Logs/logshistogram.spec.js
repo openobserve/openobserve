@@ -3,6 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
 const { ingestTestData } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe("Logs Histogram testcases", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -26,7 +27,7 @@ test.describe("Logs Histogram testcases", () => {
 
     // Navigate to logs page and setup for histogram testing
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
     );
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
@@ -34,7 +35,7 @@ test.describe("Logs Histogram testcases", () => {
     await page.waitForTimeout(1000);
 
     // Wait for initial search to complete
-    const orgName = process.env.ORGNAME || 'default';
+    const orgName = getOrgIdentifier();
     const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefreshButton();
     await allsearch;
@@ -69,7 +70,7 @@ test.describe("Logs Histogram testcases", () => {
     await pm.logsPage.waitForTimeout(1000);
 
     // Wait for search response before checking for error
-    const orgName = process.env.ORGNAME || 'default';
+    const orgName = getOrgIdentifier();
     const searchResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     await searchResponse;

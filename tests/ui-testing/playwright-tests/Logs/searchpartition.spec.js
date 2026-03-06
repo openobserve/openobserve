@@ -33,7 +33,7 @@ test.describe("Search Partition Tests", () => {
     
     // Navigate to logs page and setup for partition testing
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
     );
     await pm.logsPage.selectStream("e2e_automate");
     await applyQuery(pm);

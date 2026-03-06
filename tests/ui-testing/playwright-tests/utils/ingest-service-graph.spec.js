@@ -6,8 +6,6 @@
  * bypassing cloud-config.json (which may resolve to _meta).
  */
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const fs = require('fs');
 const testLogger = require('./test-logger.js');
 
 const {
@@ -71,16 +69,6 @@ test.describe('Service Graph Data Ingestion', () => {
       Authorization: `Basic ${basicAuth}`,
       'Content-Type': 'application/json',
     };
-
-    // Update cloud-config.json so other tools/scripts can use it
-    const configPath = path.join(__dirname, 'auth', 'cloud-config.json');
-    fs.writeFileSync(configPath, JSON.stringify({
-      orgIdentifier: orgId,
-      orgName: targetOrg.name,
-      userEmail: email,
-      passcode: passcode,
-    }, null, 2));
-    testLogger.info(`Updated cloud-config.json with org=${orgId}`);
 
     // Step 4: Verify auth works for ingestion
     const testResp = await page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
