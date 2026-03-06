@@ -240,6 +240,7 @@ const initializeFromQuery = async () => {
   }
 
   // If no query, use builder mode with selected stream
+  // Don't run query automatically - let user select fields and click Run Query
   if (!props.searchQuery || !props.searchQuery.trim()) {
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
@@ -248,6 +249,8 @@ const initializeFromQuery = async () => {
       await updateGroupedFields();
     }
     dashboardPanelData.data.queries[0].customQuery = false;
+    emit("initialized");
+    return;
   } else if (shouldUseCustomMode(props.searchQuery)) {
     // Complex query - use custom mode
     if (props.selectedStream) {
