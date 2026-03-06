@@ -536,23 +536,13 @@ impl FromRequest for AuthExtractor {
                 // Handle /v2 alert apis
                 if path_columns[0].eq(V2_API_PREFIX) {
                     if path_columns[2].eq("alerts") {
-                        if method.eq("POST") && path_columns[3].eq("generate_sql") {
-                            format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get(path_columns[2])
-                                    .map_or(path_columns[2], |model| model.key),
-                                path_columns[1]
-                            )
-                        } else {
-                            format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get(path_columns[2])
-                                    .map_or(path_columns[2], |model| model.key),
-                                path_columns[3]
-                            )
-                        }
+                        format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(path_columns[2])
+                                .map_or(path_columns[2], |model| model.key),
+                            path_columns[3]
+                        )
                     } else {
                         if method.eq("GET") {
                             method = "LIST".to_string();
@@ -839,6 +829,11 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/service_streams/_analytics")
                 || path.contains("/service_streams/_correlate")
                 || (url_len == 5 && path.ends_with("/patterns/extract"))
+                // Ignore permission check for generate_sql endpoint, we need to check it in handler
+                || (method.eq("POST")
+                    && path_columns[0].eq(V2_API_PREFIX)
+                    && path_columns[2].eq("alerts")
+                    && path_columns[3].eq("generate_sql"))
                 {
                     return Ok(AuthExtractor {
                         auth: auth_str.to_owned(),
