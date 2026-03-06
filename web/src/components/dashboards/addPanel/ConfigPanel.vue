@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="panelTimePickerRef"
               v-model="pickerValue"
               :auto-apply-dashboard="true"
-            :hide-relative-timezone="true"
+              :hide-relative-timezone="true"
               data-test="dashboard-config-panel-time-picker"
             />
             <q-tooltip
@@ -1088,18 +1088,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
       <q-input
-        v-if="
-          [
-            'area',
-            'bar',
-            'line',
-            'h-bar',
-            'h-stacked',
-            'scatter',
-            'area-stacked',
-            'stacked',
-          ].includes(dashboardPanelData.data.type) && !promqlMode
-        "
+        v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
         v-model.number="dashboardPanelData.data.config.top_results"
         :min="0"
         @update:model-value="
@@ -1150,18 +1139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         class="row items-center"
-        v-if="
-          [
-            'area',
-            'bar',
-            'line',
-            'h-bar',
-            'h-stacked',
-            'scatter',
-            'area-stacked',
-            'stacked',
-          ].includes(dashboardPanelData.data.type) && !promqlMode
-        "
+        v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
       >
         <q-toggle
           v-model="dashboardPanelData.data.config.top_results_others"
@@ -1253,11 +1231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-toggle
-        v-if="
-          ['area', 'line', 'area-stacked'].includes(
-            dashboardPanelData.data.type,
-          )
-        "
+        v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
         v-model="dashboardPanelData.data.config.connect_nulls"
         :label="t('dashboard.connectNullValues')"
         data-test="dashboard-config-connect-null-values"
@@ -1288,11 +1262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-input
-        v-if="
-          ['area', 'line', 'area-stacked', 'bar', 'stacked', 'table'].includes(
-            dashboardPanelData.data.type,
-          ) && !promqlMode
-        "
+        v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
         v-model="dashboardPanelData.data.config.no_value_replacement"
         :label="t('dashboard.noValueReplacement')"
         color="input-border"
@@ -1450,16 +1420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-input>
 
       <q-input
-        v-if="
-          dashboardPanelData.data.type != 'gauge' &&
-          dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.type != 'table' &&
-          dashboardPanelData.data.type != 'pie' &&
-          dashboardPanelData.data.type != 'donut' &&
-          dashboardPanelData.data.type != 'sankey' &&
-          dashboardPanelData.data.type != 'maps'
-        "
+        v-if="shouldShowAxisConfig(dashboardPanelData)"
         v-model.number="dashboardPanelData.data.config.axis_width"
         :label="t('common.axisWidth')"
         color="input-border"
@@ -1483,16 +1444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-toggle
-        v-if="
-          dashboardPanelData.data.type != 'gauge' &&
-          dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.type != 'table' &&
-          dashboardPanelData.data.type != 'pie' &&
-          dashboardPanelData.data.type != 'donut' &&
-          dashboardPanelData.data.type != 'sankey' &&
-          dashboardPanelData.data.type != 'maps'
-        "
+        v-if="shouldShowAxisConfig(dashboardPanelData)"
         v-model="dashboardPanelData.data.config.axis_border_show"
         :label="t('dashboard.showBorder')"
         data-test="dashboard-config-axis-border"
@@ -1509,18 +1461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         style="width: 100%; display: flex; gap: 16px"
-        v-if="
-          [
-            'area',
-            'area-stacked',
-            'bar',
-            'h-bar',
-            'line',
-            'scatter',
-            'stacked',
-            'h-stacked',
-          ].includes(dashboardPanelData.data.type)
-        "
+        v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
       >
         <q-input
           v-model.number="dashboardPanelData.data.config.y_axis_min"
@@ -1608,18 +1549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-select
-        v-if="
-          [
-            'area',
-            'area-stacked',
-            'bar',
-            'h-bar',
-            'line',
-            'scatter',
-            'stacked',
-            'h-stacked',
-          ].includes(dashboardPanelData.data.type)
-        "
+        v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
         borderless
         v-model="dashboardPanelData.data.config.label_option.position"
         :options="labelPositionOptions"
@@ -1662,18 +1592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-input
-        v-if="
-          [
-            'area',
-            'area-stacked',
-            'bar',
-            'h-bar',
-            'line',
-            'scatter',
-            'stacked',
-            'h-stacked',
-          ].includes(dashboardPanelData.data.type)
-        "
+        v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
         v-model.number="dashboardPanelData.data.config.label_option.rotate"
         :label="t('dashboard.labelRotate')"
         color="input-border"
@@ -1698,16 +1617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         style="width: 100%; display: flex; gap: 16px"
-        v-if="
-          [
-            'area',
-            'area-stacked',
-            'bar',
-            'line',
-            'scatter',
-            'stacked',
-          ].includes(dashboardPanelData.data.type)
-        "
+        v-if="shouldShowAxisLabelConfig(dashboardPanelData)"
       >
         <q-input
           v-model.number="dashboardPanelData.data.config.axis_label_rotate"
@@ -1807,11 +1717,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-select
-        v-if="
-          ['area', 'area-stacked', 'line'].includes(
-            dashboardPanelData.data.type,
-          )
-        "
+        v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
         borderless
         v-model="dashboardPanelData.data.config.show_symbol"
         :options="showSymbol"
@@ -1847,11 +1753,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-select
-        v-if="
-          ['area', 'area-stacked', 'line'].includes(
-            dashboardPanelData.data.type,
-          )
-        "
+        v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
         borderless
         v-model="dashboardPanelData.data.config.line_interpolation"
         :options="lineInterpolationOptions"
@@ -1886,15 +1788,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-input
-        v-if="
-          !promqlMode &&
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery &&
-          ['area', 'area-stacked', 'line'].includes(
-            dashboardPanelData.data.type,
-          )
-        "
+        v-if="shouldShowLineThickness(dashboardPanelData, promqlMode)"
         v-model.number="dashboardPanelData.data.config.line_thickness"
         :value="1.5"
         :min="0"
@@ -1921,9 +1815,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <Drilldown
         v-if="
-          !['html', 'markdown', 'geomap', 'maps'].includes(
-            dashboardPanelData.data.type,
-          ) && dashboardPanelDataPageKey !== 'logs'
+          shouldShowDrilldown(dashboardPanelData, dashboardPanelDataPageKey)
         "
         :variablesData="variablesData"
       />
@@ -1933,35 +1825,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
       <MarkLineConfig
-        v-if="
-          [
-            'area',
-            'area-stacked',
-            'bar',
-            'h-bar',
-            'line',
-            'scatter',
-            'stacked',
-            'h-stacked',
-          ].includes(dashboardPanelData.data.type)
-        "
+        v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
       />
     </div>
 
     <div
       v-if="
-        [
-          'area',
-          'bar',
-          'line',
-          'h-bar',
-          'h-stacked',
-          'scatter',
-          'area-stacked',
-          'stacked',
-        ].includes(dashboardPanelData.data.type) &&
-        !promqlMode &&
-        dashboardPanelDataPageKey !== 'logs'
+        shouldShowTimeShift(
+          dashboardPanelData,
+          promqlMode,
+          dashboardPanelDataPageKey,
+        )
       "
     >
       <div class="flex items-center q-mr-sm">
@@ -2086,6 +1960,15 @@ import {
   shouldShowLegendHeightUnitContainer,
   shouldApplyChartAlign,
   shouldShowGridlines,
+  shouldShowTopResultsConfig,
+  shouldShowAreaLineStyleConfig,
+  shouldShowNoValueReplacement,
+  shouldShowAxisConfig,
+  shouldShowCartesianAxisConfig,
+  shouldShowAxisLabelConfig,
+  shouldShowLineThickness,
+  shouldShowDrilldown,
+  shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
 
 export default defineComponent({
@@ -2900,6 +2783,15 @@ export default defineComponent({
       shouldShowLegendHeightUnitContainer,
       shouldApplyChartAlign,
       shouldShowGridlines,
+      shouldShowTopResultsConfig,
+      shouldShowAreaLineStyleConfig,
+      shouldShowNoValueReplacement,
+      shouldShowAxisConfig,
+      shouldShowCartesianAxisConfig,
+      shouldShowAxisLabelConfig,
+      shouldShowLineThickness,
+      shouldShowDrilldown,
+      shouldShowTimeShift,
       // Panel default time configuration (v4.0)
       useDefaultTime,
       panelTimeRange,
