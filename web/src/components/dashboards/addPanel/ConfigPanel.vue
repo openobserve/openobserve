@@ -543,7 +543,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </div>
       </div>
-      <div class="row items-center">
+      <div
+        v-if="dashboardPanelData.data.config.table_pivot_show_col_totals"
+        class="row items-center"
+      >
         <q-toggle
           v-model="dashboardPanelData.data.config.table_pivot_sticky_row_totals"
           :label="t('dashboard.pivotStickyRowTotals')"
@@ -554,9 +557,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.theme === 'dark'
               ? 'o2-toggle-button-lg-dark'
               : 'o2-toggle-button-lg-light'
-          "
-          :disable="
-            !dashboardPanelData.data.config.table_pivot_show_col_totals
           "
         />
         <div>
@@ -576,7 +576,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </div>
       </div>
-      <div class="row items-center">
+      <div
+        v-if="dashboardPanelData.data.config.table_pivot_show_row_totals"
+        class="row items-center"
+      >
         <q-toggle
           v-model="dashboardPanelData.data.config.table_pivot_sticky_col_totals"
           :label="t('dashboard.pivotStickyColTotals')"
@@ -587,9 +590,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.theme === 'dark'
               ? 'o2-toggle-button-lg-dark'
               : 'o2-toggle-button-lg-light'
-          "
-          :disable="
-            !dashboardPanelData.data.config.table_pivot_show_row_totals
           "
         />
         <div>
