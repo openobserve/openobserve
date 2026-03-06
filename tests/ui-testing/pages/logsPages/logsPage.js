@@ -8,7 +8,7 @@ import * as path from 'path';
 
 // Import testLogger for proper logging
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class LogsPage {
     constructor(page) {
@@ -336,7 +336,7 @@ export class LogsPage {
     // Navigation methods
     async navigateToLogs(orgIdentifier) {
         const logsUrl = '/web/logs'; // Using the same pattern as in test files
-        const orgId = orgIdentifier || process.env["ORGNAME"];
+        const orgId = orgIdentifier || getOrgIdentifier();
         const fullUrl = `${logsUrl}?org_identifier=${orgId}&fn_editor=true`;
 
 
@@ -432,22 +432,25 @@ export class LogsPage {
         // Wait for both streams to be available via API before attempting UI selection
         testLogger.debug(`selectIndexAndStreamJoinUnion: Waiting for streams to be available via API...`);
 
-        const streamAAvailable = await this.waitForStreamAvailable(streamA, 30000, 3000);
+        // Cloud environments need longer for streams to be indexed after ingestion
+        const streamWaitMs = isCloudEnvironment() ? 90000 : 30000;
+
+        const streamAAvailable = await this.waitForStreamAvailable(streamA, streamWaitMs, 3000);
         if (!streamAAvailable) {
-            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamA}' NOT FOUND via API after 30s`);
+            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamA}' NOT FOUND via API after ${streamWaitMs / 1000}s`);
             throw new Error(`Stream '${streamA}' not available. Ingestion may have failed.`);
         }
         testLogger.info(`selectIndexAndStreamJoinUnion: Stream '${streamA}' confirmed available`);
 
-        const streamBAvailable = await this.waitForStreamAvailable(streamB, 30000, 3000);
+        const streamBAvailable = await this.waitForStreamAvailable(streamB, streamWaitMs, 3000);
         if (!streamBAvailable) {
-            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamB}' NOT FOUND via API after 30s`);
+            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamB}' NOT FOUND via API after ${streamWaitMs / 1000}s`);
             throw new Error(`Stream '${streamB}' not available. Ingestion may have failed.`);
         }
         testLogger.info(`selectIndexAndStreamJoinUnion: Stream '${streamB}' confirmed available`);
 
         // Navigate to logs page to ensure fresh stream list
-        const orgId = process.env.ORGNAME;
+        const orgId = getOrgIdentifier();
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Navigating to logs page: ${logsUrl}`);
         await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch((e) => {
@@ -592,7 +595,7 @@ export class LogsPage {
         }
 
         // Navigate to logs page via URL to ensure fresh stream list (no page.reload which can cause issues)
-        const orgId = process.env.ORGNAME;
+        const orgId = getOrgIdentifier();
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
         await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
@@ -1172,7 +1175,7 @@ export class LogsPage {
     }
 
     async verifySearchPartitionResponse() {
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
         const searchPartitionPromise = this.page.waitForResponse(response =>
             response.url().includes(`/api/${orgName}/_search_partition`) &&
             response.request().method() === 'POST'
@@ -1190,7 +1193,7 @@ export class LogsPage {
 
     async captureSearchCalls() {
         const searchCalls = [];
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
 
         // Create the event listener function
         const responseHandler = async response => {
@@ -1218,7 +1221,7 @@ export class LogsPage {
     }
 
         async verifyStreamingModeResponse() {
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
         testLogger.debug("[DEBUG] Waiting for search response...");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
@@ -1252,7 +1255,7 @@ export class LogsPage {
     }
 
     async clickRunQueryButtonAndVerifyStreamingResponse() {
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
         testLogger.debug("[DEBUG] Setting up response listener before clicking run query button");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
