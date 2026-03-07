@@ -80,15 +80,6 @@ const test = baseTest.extend({
   page: async ({ context }, use) => {
     const page = await context.newPage();
     
-    // Add console logging for CI debugging
-    if (process.env.CI) {
-      page.on('console', (msg) => {
-        if (msg.type() === 'error') {
-          testLogger.error('Browser console error', { message: msg.text() });
-        }
-      });
-    }
-    
     // Add wait helpers to page
     page.waitHelpers = waitUtils.create(page);
     

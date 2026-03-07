@@ -8,6 +8,7 @@ import * as path from 'path';
 
 // Import testLogger for proper logging
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class LogsPage {
     constructor(page) {
@@ -335,7 +336,7 @@ export class LogsPage {
     // Navigation methods
     async navigateToLogs(orgIdentifier) {
         const logsUrl = '/web/logs'; // Using the same pattern as in test files
-        const orgId = orgIdentifier || process.env["ORGNAME"];
+        const orgId = orgIdentifier || getOrgIdentifier();
         const fullUrl = `${logsUrl}?org_identifier=${orgId}&fn_editor=true`;
 
 
@@ -431,22 +432,25 @@ export class LogsPage {
         // Wait for both streams to be available via API before attempting UI selection
         testLogger.debug(`selectIndexAndStreamJoinUnion: Waiting for streams to be available via API...`);
 
-        const streamAAvailable = await this.waitForStreamAvailable(streamA, 30000, 3000);
+        // Cloud environments need longer for streams to be indexed after ingestion
+        const streamWaitMs = isCloudEnvironment() ? 90000 : 30000;
+
+        const streamAAvailable = await this.waitForStreamAvailable(streamA, streamWaitMs, 3000);
         if (!streamAAvailable) {
-            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamA}' NOT FOUND via API after 30s`);
+            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamA}' NOT FOUND via API after ${streamWaitMs / 1000}s`);
             throw new Error(`Stream '${streamA}' not available. Ingestion may have failed.`);
         }
         testLogger.info(`selectIndexAndStreamJoinUnion: Stream '${streamA}' confirmed available`);
 
-        const streamBAvailable = await this.waitForStreamAvailable(streamB, 30000, 3000);
+        const streamBAvailable = await this.waitForStreamAvailable(streamB, streamWaitMs, 3000);
         if (!streamBAvailable) {
-            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamB}' NOT FOUND via API after 30s`);
+            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamB}' NOT FOUND via API after ${streamWaitMs / 1000}s`);
             throw new Error(`Stream '${streamB}' not available. Ingestion may have failed.`);
         }
         testLogger.info(`selectIndexAndStreamJoinUnion: Stream '${streamB}' confirmed available`);
 
         // Navigate to logs page to ensure fresh stream list
-        const orgId = process.env.ORGNAME;
+        const orgId = getOrgIdentifier();
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Navigating to logs page: ${logsUrl}`);
         await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch((e) => {
@@ -534,32 +538,29 @@ export class LogsPage {
         testLogger.debug(`waitForStreamAvailable: Waiting for stream ${streamName} to be available`);
         const startTime = Date.now();
 
-        // Get credentials from env
-        const apiUrl = process.env.INGESTION_URL;
-        const orgId = process.env.ORGNAME;
-        const authHeader = `Basic ${Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`).toString('base64')}`;
+        const apiUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
+        const orgId = getOrgIdentifier();
 
         while (Date.now() - startTime < maxWaitMs) {
             try {
-                // Use dynamic import for node-fetch
-                const fetchModule = await import('node-fetch');
-                const fetch = fetchModule.default;
+                // Use page.request which automatically includes browser session cookies
+                // This works on both cloud (cookie auth) and self-hosted (Basic Auth via storageState)
+                const response = await this.page.request.get(
+                    `${apiUrl}/api/${orgId}/streams`,
+                    { headers: getAuthHeaders() }
+                );
 
-                const response = await fetch(`${apiUrl}/api/${orgId}/streams`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': authHeader,
-                        'Content-Type': 'application/json'
+                if (response.ok()) {
+                    const data = await response.json();
+                    if (data.list) {
+                        const streamExists = data.list.some(s => s.name === streamName);
+                        if (streamExists) {
+                            testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
+                            return true;
+                        }
                     }
-                });
-
-                const data = await response.json();
-                if (response.status === 200 && data.list) {
-                    const streamExists = data.list.some(s => s.name === streamName);
-                    if (streamExists) {
-                        testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
-                        return true;
-                    }
+                } else {
+                    testLogger.debug(`waitForStreamAvailable: API returned ${response.status()}, retrying...`);
                 }
 
                 testLogger.debug(`waitForStreamAvailable: Stream ${streamName} not found yet, waiting ${pollIntervalMs}ms...`);
@@ -590,7 +591,7 @@ export class LogsPage {
         }
 
         // Navigate to logs page via URL to ensure fresh stream list (no page.reload which can cause issues)
-        const orgId = process.env.ORGNAME;
+        const orgId = getOrgIdentifier();
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
         await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
@@ -1033,9 +1034,9 @@ export class LogsPage {
         }
     }
 
-    async waitForSearchResultAndCheckText(expectedText) {
-        await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]');
-        await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toContainText(expectedText);
+    async waitForSearchResultAndCheckText(expectedText, timeout = 30000) {
+        await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { timeout });
+        await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toContainText(expectedText, { timeout });
     }
 
     async expectLogsTableRowCount(count) {
@@ -1170,7 +1171,7 @@ export class LogsPage {
     }
 
     async verifySearchPartitionResponse() {
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
         const searchPartitionPromise = this.page.waitForResponse(response =>
             response.url().includes(`/api/${orgName}/_search_partition`) &&
             response.request().method() === 'POST'
@@ -1188,7 +1189,7 @@ export class LogsPage {
 
     async captureSearchCalls() {
         const searchCalls = [];
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
 
         // Create the event listener function
         const responseHandler = async response => {
@@ -1216,7 +1217,7 @@ export class LogsPage {
     }
 
         async verifyStreamingModeResponse() {
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
         testLogger.debug("[DEBUG] Waiting for search response...");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
@@ -1250,7 +1251,7 @@ export class LogsPage {
     }
 
     async clickRunQueryButtonAndVerifyStreamingResponse() {
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
         testLogger.debug("[DEBUG] Setting up response listener before clicking run query button");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
@@ -1676,14 +1677,7 @@ export class LogsPage {
 
     // Ingestion methods - using page.request API to keep credentials in Node.js context
     async ingestLogs(orgId, streamName, logData) {
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
-
-        const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
-            "Content-Type": "application/json",
-        };
+        const headers = getAuthHeaders();
 
         const baseUrl = process.env.INGESTION_URL.endsWith('/')
             ? process.env.INGESTION_URL.slice(0, -1)
@@ -1797,15 +1791,8 @@ export class LogsPage {
      * @param {number} maxRetries - Maximum retry attempts (default: 5)
      */
     async ingestMultipleFields(streamName, dataObjects, maxRetries = 5) {
-        const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
-
-        const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
-            "Content-Type": "application/json",
-        };
+        const orgId = getOrgIdentifier();
+        const headers = getAuthHeaders();
 
         const baseUrl = process.env.INGESTION_URL.endsWith('/')
             ? process.env.INGESTION_URL.slice(0, -1)
@@ -2814,6 +2801,10 @@ export class LogsPage {
         return true;
     }
 
+    async isVrlEditorInputVisible() {
+        return await this.page.locator(this.fnEditor).locator('.inputarea').isVisible().catch(() => false);
+    }
+
     async clickPast6DaysButton() {
         return await this.page.locator(this.relative6DaysBtn).click();
     }
@@ -2866,6 +2857,10 @@ export class LogsPage {
     async isPaginationPageActive(pageNumber) {
         const classes = await this.getPaginationPageClasses(pageNumber);
         return classes && (classes.includes('bg-primary') || classes.includes('unelevated'));
+    }
+
+    async getActivePaginationPageText() {
+        return await this.page.locator(`${this.resultPagination} .q-btn--unelevated`).first().textContent({ timeout: 5000 }).catch(() => 'unknown');
     }
 
     async expectSQLPaginationNotVisible() {
@@ -4294,10 +4289,8 @@ export class LogsPage {
      */
     async ingestData(streamName, data) {
         const fetch = (await import('node-fetch')).default;
-        const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
+        const orgId = getOrgIdentifier();
+        const authHeaders = getAuthHeaders();
 
         testLogger.info('Ingesting data', { streamName, recordCount: data.length });
 
@@ -4311,10 +4304,7 @@ export class LogsPage {
             try {
                 const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Basic ${basicAuthCredentials}`,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: authHeaders,
                     body: JSON.stringify([record])  // Send as single-element array
                 });
 
@@ -4474,15 +4464,8 @@ export class LogsPage {
      */
     async severityColorIngestionToStream(streamName) {
         const severityColorData = require('../../../test-data/severity_color_data.json');
-        const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
-
-        const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
-            "Content-Type": "application/json",
-        };
+        const orgId = getOrgIdentifier();
+        const headers = getAuthHeaders();
 
         const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
 
@@ -4511,14 +4494,8 @@ export class LogsPage {
      * @returns {Promise<Object>} Response with status
      */
     async deleteStream(streamName) {
-        const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
-
-        const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
-        };
+        const orgId = getOrgIdentifier();
+        const headers = getAuthHeaders();
 
         const url = `${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}`;
 
@@ -5393,6 +5370,25 @@ export class LogsPage {
         if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await oneHourButton.click();
             return 'Last 1 hour';
+        } else {
+            await this.clickRelative15MinButton();
+            return 'Last 15 minutes';
+        }
+    }
+
+    /**
+     * Click the widest available relative time range for pagination tests.
+     * Tries: Last 1 hour → Last 12 hours → Last 15 minutes (fallback)
+     */
+    async clickWideRelativeTimeRangeOrFallback() {
+        const oneHourButton = this.page.getByText('Last 1 hour');
+        const twelveHourButton = this.page.getByText('Last 12 hours');
+        if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await oneHourButton.click();
+            return 'Last 1 hour';
+        } else if (await twelveHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await twelveHourButton.click();
+            return 'Last 12 hours';
         } else {
             await this.clickRelative15MinButton();
             return 'Last 15 minutes';

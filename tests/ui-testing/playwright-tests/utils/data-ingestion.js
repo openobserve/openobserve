@@ -1,5 +1,6 @@
 const testLogger = require('./test-logger.js');
 const logsdata = require("../../../test-data/logs_data.json");
+const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 
 /**
  * Ingest test data into a stream via API using Node.js context (secure)
@@ -8,7 +9,7 @@ const logsdata = require("../../../test-data/logs_data.json");
  * @returns {Promise<object>} - API response
  */
 async function ingestTestData(page, streamName = "e2e_automate") {
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
   const headers = getHeaders();
   const baseUrl = process.env.INGESTION_URL.endsWith('/')
     ? process.env.INGESTION_URL.slice(0, -1)
@@ -31,26 +32,13 @@ async function ingestTestData(page, streamName = "e2e_automate") {
 
 /**
  * Generates authentication headers for API requests.
- * Extracted from regression tests for reusability.
+ * Delegates to cloud-auth.js which handles both cloud (cookie-based) and
+ * self-hosted (Basic Auth) environments.
  *
- * SECURITY NOTE: Credentials are created in Node.js context and passed to
- * Playwright's page.request API which keeps them server-side. They are NOT
- * exposed to browser context or logged. Only response data is logged.
- *
- * @returns {Object} Headers object with Basic Authentication and Content-Type
- * @example
- * const headers = getHeaders();
- * // Returns: { Authorization: "Basic ...", Content-Type: "application/json" }
+ * @returns {Object} Headers object with appropriate auth for the environment
  */
 function getHeaders() {
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  return {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
+  return getAuthHeaders();
 }
 
 /**
@@ -98,7 +86,7 @@ async function sendRequest(page, url, payload, headers) {
  * @returns {Promise<object>} - API response with status and data
  */
 async function ingestCustomData(page, streamName, data) {
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
   const headers = getHeaders();
   const baseUrl = process.env.INGESTION_URL.endsWith('/')
     ? process.env.INGESTION_URL.slice(0, -1)
@@ -139,7 +127,7 @@ async function ingestCustomData(page, streamName, data) {
  * @returns {Promise<object>} - API response with status and data
  */
 async function enableLogPatternsExtraction(page, streamName) {
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
   const headers = getHeaders();
   const baseUrl = process.env.INGESTION_URL.endsWith('/')
     ? process.env.INGESTION_URL.slice(0, -1)
@@ -188,7 +176,7 @@ async function enableLogPatternsExtraction(page, streamName) {
  * @returns {Promise<boolean>} - True if data found, false if timed out
  */
 async function waitForStreamData(page, streamName, expectedMinCount = 1, maxWaitMs = 30000, pollIntervalMs = 2000) {
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
   const headers = getHeaders();
   const baseUrl = process.env.INGESTION_URL.endsWith('/')
     ? process.env.INGESTION_URL.slice(0, -1)

@@ -25,6 +25,7 @@
 
 const crypto = require('crypto');
 const testLogger = require('./test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 
 // ============================================================================
 // CONSTANTS
@@ -97,14 +98,7 @@ function msToNs(ms) {
 }
 
 function getHeaders() {
-  const basicAuthCredentials = Buffer.from(
-    `${process.env['ZO_ROOT_USER_EMAIL']}:${process.env['ZO_ROOT_USER_PASSWORD']}`
-  ).toString('base64');
-
-  return {
-    Authorization: `Basic ${basicAuthCredentials}`,
-    'Content-Type': 'application/json',
-  };
+  return getAuthHeaders();
 }
 
 function getBaseUrl() {
@@ -114,7 +108,7 @@ function getBaseUrl() {
 }
 
 function getOrgId() {
-  return process.env['ORGNAME'] || 'default';
+  return getOrgIdentifier() || 'default';
 }
 
 // ============================================================================
