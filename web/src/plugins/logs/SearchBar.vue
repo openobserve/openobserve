@@ -412,7 +412,6 @@ alt="SQL Mode" class="toolbar-icon" />
         >
           <q-tooltip>{{ t("search.resetFilters") }}</q-tooltip>
         </q-btn>
-
         <!-- this is the button group responsible for showing all the utilities -->
         <q-btn
           data-test="logs-search-bar-utilities-menu-btn"
