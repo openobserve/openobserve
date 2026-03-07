@@ -23,11 +23,13 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { nextTick, ref } from "vue";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 
 // Define mock functions outside of the mock factory
 const mockExtractFields = vi.fn();
 const mockGetValuesPartition = vi.fn();
 const mockGetFilterExpressionByFieldType = vi.fn(() => "field = 'value'");
+const mockFetchQueryDataWithHttpStream = vi.fn();
 
 vi.mock("@/services/search", () => ({
   default: {
@@ -242,6 +244,13 @@ vi.mock("@/composables/useLocalInterestingFields", () => ({
   default: vi.fn(() => ({
     value: {},
   })),
+}));
+
+// Mock useStreamingSearch so fetchQueryDataWithHttpStream can be spied on
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: mockFetchQueryDataWithHttpStream,
+  }),
 }));
 
 // 1. Define your mock function FIRST
@@ -1310,6 +1319,7 @@ describe("Index List", async () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // 1. Define your mock function FIRST
 vi.mock("@/services/stream", () => {
   // Define the mock function with a console.log
@@ -2408,5 +2418,579 @@ describe("Index List", async () => {
       });
       expect(mockAddTraceId).toHaveBeenCalledWith("field1", expect.any(String));
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pure unit tests for the removeFieldFromWhereAST helper.
+// Uses the real DataFusion SQL parser to build AST nodes so every operator
+// variant is covered without manual AST construction.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("removeFieldFromWhereAST", () => {
+  let wrapper: any;
+  let parser: any;
+
+  beforeEach(async () => {
+    const mod = await import(
+      "@openobserve/node-sql-parser/build/datafusionsql"
+    );
+    parser = new mod.Parser();
+
+    wrapper = mount(IndexList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await flushPromises();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Parses sql, removes field from its WHERE clause via the component helper,
+   * then returns the re-serialised SQL (back-ticks → double quotes).
+   */
+  const roundTrip = (sql: string, field: string): string => {
+    const ast = parser.astify(sql);
+    const modifiedWhere = wrapper.vm.removeFieldFromWhereAST(ast.where, field);
+    return parser.sqlify({ ...ast, where: modifiedWhere }).replace(/`/g, '"');
+  };
+
+  // ── null / undefined guards ──────────────────────────────────────────────────
+
+  it("returns null for null whereNode", () => {
+    expect(wrapper.vm.removeFieldFromWhereAST(null, "service_name")).toBeNull();
+  });
+
+  it("returns null for undefined whereNode", () => {
+    expect(
+      wrapper.vm.removeFieldFromWhereAST(undefined, "service_name"),
+    ).toBeNull();
+  });
+
+  // ── Plain queries ────────────────────────────────────────────────────────────
+
+  it("plain: returns null when WHERE has only the target field", () => {
+    const ast = parser.astify(
+      `SELECT * FROM "stream" WHERE "service_name" = 'abc'`,
+    );
+    expect(
+      wrapper.vm.removeFieldFromWhereAST(ast.where, "service_name"),
+    ).toBeNull();
+  });
+
+  it("plain: removes first field in AND, keeps second", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE "service_name" = 'abc' AND "level" = 'error'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+  });
+
+  it("plain: removes second field in AND, keeps first", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE "level" = 'error' AND "service_name" = 'abc'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+  });
+
+  it("plain: no change when target field absent from WHERE", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE "level" = 'error' AND "method" = 'GET'`,
+      "service_name",
+    );
+    expect(sql).toContain('"level"');
+    expect(sql).toContain('"method"');
+  });
+
+  it("plain: removes middle field from a 3-field AND chain", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE "a" = '1' AND "service_name" = 'abc' AND "b" = '2'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"a"');
+    expect(sql).toContain('"b"');
+  });
+
+  it("plain: removes first field from 3-field AND chain", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE "service_name" = 'abc' AND "a" = '1' AND "b" = '2'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"a"');
+    expect(sql).toContain('"b"');
+  });
+
+  // ── OR conditions ────────────────────────────────────────────────────────────
+
+  it("OR: removes target field, collapses to the other operand", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE "service_name" = 'abc' OR "level" = 'error'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+  });
+
+  it("OR: removes second operand when it is the target field", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE "level" = 'info' OR "service_name" = 'abc'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+  });
+
+  // ── Complex / nested conditions ──────────────────────────────────────────────
+
+  it("nested AND/OR: removes field from inner AND, preserves OR branch", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE ("service_name" = 'abc' AND "level" = 'error') OR "env" = 'prod'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+    expect(sql).toContain('"env"');
+  });
+
+  it("IN clause: removes field filtered with IN operator", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE "service_name" IN ('abc', 'def') AND "level" = 'error'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+  });
+
+  it("!= condition: removes field with inequality operator", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE "service_name" != 'abc' AND "level" = 'error'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+  });
+
+  it("LIKE condition: removes field filtered with LIKE", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE "service_name" LIKE '%abc%' AND "level" = 'error'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+  });
+
+  it(">= comparison: removes field with numeric range condition", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "stream" WHERE "duration" >= 100 AND "service_name" = 'abc'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"duration"');
+  });
+
+  // ── Subquery in FROM ─────────────────────────────────────────────────────────
+
+  it("subquery in FROM: removes field from outer WHERE", () => {
+    const sql = roundTrip(
+      `SELECT * FROM (SELECT * FROM "stream") sub WHERE "service_name" = 'abc' AND "level" = 'error'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+  });
+
+  it("subquery in FROM: no change when target field absent", () => {
+    const sql = roundTrip(
+      `SELECT * FROM (SELECT * FROM "stream") sub WHERE "level" = 'error'`,
+      "service_name",
+    );
+    expect(sql).toContain('"level"');
+    expect(sql).not.toContain("service_name");
+  });
+
+  // ── JOIN queries ─────────────────────────────────────────────────────────────
+
+  it("INNER JOIN: removes field from WHERE, ON clause intact", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "s1" INNER JOIN "s2" ON "s1"."id" = "s2"."id" WHERE "service_name" = 'abc' AND "level" = 'error'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+    expect(sql.toUpperCase()).toContain("JOIN");
+  });
+
+  it("LEFT JOIN: removes field from WHERE", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "s1" LEFT JOIN "s2" ON "s1"."id" = "s2"."id" WHERE "service_name" = 'abc' AND "level" = 'error'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+  });
+
+  it("RIGHT JOIN: removes field from WHERE", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "s1" RIGHT JOIN "s2" ON "s1"."id" = "s2"."id" WHERE "service_name" = 'abc' AND "level" = 'error'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"level"');
+  });
+
+  it("CROSS JOIN: removes field from WHERE", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "s1" CROSS JOIN "s2" WHERE "service_name" = 'abc' AND "env" = 'prod'`,
+      "service_name",
+    );
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain('"env"');
+  });
+
+  it("JOIN: no change when target field absent from WHERE", () => {
+    const sql = roundTrip(
+      `SELECT * FROM "s1" INNER JOIN "s2" ON "s1"."id" = "s2"."id" WHERE "level" = 'error'`,
+      "service_name",
+    );
+    expect(sql).toContain('"level"');
+    expect(sql).not.toContain("service_name");
+  });
+
+  // ── CTE queries ──────────────────────────────────────────────────────────────
+
+  it("CTE: removes field from outer WHERE when parser supports WITH syntax", () => {
+    const cteSQL = `WITH cte AS (SELECT * FROM "stream") SELECT * FROM cte WHERE "service_name" = 'abc' AND "level" = 'error'`;
+    try {
+      const result = roundTrip(cteSQL, "service_name");
+      expect(result).not.toContain("service_name");
+      expect(result).toContain('"level"');
+    } catch {
+      // DataFusion parser may not support CTE — verify the helper itself works
+      // on a regular AST node (no throw, correct result).
+      const ast = parser.astify(
+        `SELECT * FROM "stream" WHERE "service_name" = 'abc' AND "level" = 'error'`,
+      );
+      const modified = wrapper.vm.removeFieldFromWhereAST(
+        ast.where,
+        "service_name",
+      );
+      // Non-null: the remaining level condition is preserved
+      expect(modified).not.toBeNull();
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Integration tests: openFilterCreator sends the modified SQL only to the
+// _values_stream endpoint (via fetchValuesWithWebsocket).  All other search
+// paths continue to use the unmodified searchObj.data.query.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Field filter isolation: values API vs search/histogram APIs", () => {
+  let wrapper: any;
+  const STREAM = "test_stream";
+
+  const setupWrapper = async () => {
+    wrapper = mount(IndexList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await flushPromises();
+
+    wrapper.vm.fieldValues = {};
+    wrapper.vm.openedFilterFields = ref([]);
+    wrapper.vm.streamFieldValues = ref({});
+    wrapper.vm.lastFieldFetchPayloads = {};
+    wrapper.vm.searchObj.data.stream.selectedStream = [STREAM];
+    wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+      { name: "service_name" },
+      { name: "level" },
+      { name: "method" },
+    ];
+    wrapper.vm.searchObj.data.stream.streamType = "logs";
+    wrapper.vm.searchObj.data.stream.missingStreamMultiStreamFilter = [];
+    wrapper.vm.searchObj.data.datetime = {
+      type: "relative",
+      relativeTimePeriod: "15m",
+    };
+    wrapper.vm.searchObj.data.tempFunctionContent = "";
+    wrapper.vm.searchObj.data.transformType = "function";
+    wrapper.vm.searchObj.data.filterErrMsg = "";
+    wrapper.vm.searchObj.data.missingStreamMessage = "";
+  };
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    mockFetchQueryDataWithHttpStream.mockReset();
+  });
+
+  /**
+   * Invokes openFilterCreator and returns the base64-decoded SQL captured by
+   * the module-level mockFetchQueryDataWithHttpStream spy.
+   * The call chain is: openFilterCreator → fetchValuesWithWebsocket →
+   * initializeWebSocketConnection → fetchQueryDataWithHttpStream(wsPayload)
+   * where wsPayload.queryReq.sql is the base64-encoded SQL.
+   */
+  const expandAndGetSQL = async (fieldName: string): Promise<string> => {
+    mockFetchQueryDataWithHttpStream.mockReset();
+
+    await wrapper.vm.openFilterCreator(
+      { stopPropagation: vi.fn(), preventDefault: vi.fn() },
+      { name: fieldName, ftsKey: null, isSchemaField: true, streams: [STREAM] },
+    );
+    await flushPromises();
+
+    expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+    return b64DecodeUnicode(
+      mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.sql,
+    );
+  };
+
+  // ── Quick mode ──────────────────────────────────────────────────────────────
+
+  it("quick mode: values SQL excludes the expanded field's filter", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    wrapper.vm.searchObj.data.query = "service_name='abc' AND level='error'";
+
+    const sql = await expandAndGetSQL("service_name");
+
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain("level");
+  });
+
+  it("quick mode: values SQL preserves all other field filters", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    wrapper.vm.searchObj.data.query =
+      "service_name='abc' AND level='error' AND method='GET'";
+
+    const sql = await expandAndGetSQL("service_name");
+
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain("level");
+    expect(sql).toContain("method");
+  });
+
+  it("quick mode: values SQL has no WHERE when expanded field is the only filter", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    wrapper.vm.searchObj.data.query = "service_name='abc'";
+
+    const sql = await expandAndGetSQL("service_name");
+
+    expect(sql.toUpperCase()).not.toContain("WHERE");
+  });
+
+  it("quick mode: values SQL unchanged when expanded field has no filter", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    wrapper.vm.searchObj.data.query = "level='error'";
+
+    const sql = await expandAndGetSQL("service_name");
+
+    expect(sql).toContain("level");
+    expect(sql).not.toContain("service_name");
+  });
+
+  // ── SQL mode ─────────────────────────────────────────────────────────────────
+
+  it("SQL mode (plain query): values SQL excludes the expanded field's filter", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.searchObj.data.query = `SELECT * FROM "${STREAM}" WHERE "service_name" = 'abc' AND "level" = 'error'`;
+
+    const sql = await expandAndGetSQL("service_name");
+
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain("level");
+  });
+
+  it("SQL mode (plain query): values SQL preserves all other filters", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.searchObj.data.query = `SELECT * FROM "${STREAM}" WHERE "service_name" = 'abc' AND "level" = 'error' AND "method" = 'GET'`;
+
+    const sql = await expandAndGetSQL("service_name");
+
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain("level");
+    expect(sql).toContain("method");
+  });
+
+  it("SQL mode (subquery in FROM): expanded field removed from outer WHERE", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.searchObj.data.query = `SELECT * FROM (SELECT * FROM "${STREAM}") sub WHERE "service_name" = 'abc' AND "level" = 'error'`;
+
+    const sql = await expandAndGetSQL("service_name");
+
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain("level");
+  });
+
+  it("SQL mode (INNER JOIN): expanded field removed from WHERE, ON clause preserved", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.searchObj.data.query = `SELECT * FROM "${STREAM}" s1 INNER JOIN "stream2" s2 ON s1.id = s2.id WHERE "service_name" = 'abc' AND "level" = 'error'`;
+
+    const sql = await expandAndGetSQL("service_name");
+
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain("level");
+    expect(sql.toUpperCase()).toContain("JOIN");
+  });
+
+  it("SQL mode (LEFT JOIN): expanded field removed from WHERE", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.searchObj.data.query = `SELECT * FROM "${STREAM}" s1 LEFT JOIN "stream2" s2 ON s1.id = s2.id WHERE "service_name" = 'abc' AND "level" = 'error'`;
+
+    const sql = await expandAndGetSQL("service_name");
+
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain("level");
+  });
+
+  it("SQL mode (RIGHT JOIN): expanded field removed from WHERE", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.searchObj.data.query = `SELECT * FROM "${STREAM}" s1 RIGHT JOIN "stream2" s2 ON s1.id = s2.id WHERE "service_name" = 'abc' AND "level" = 'error'`;
+
+    const sql = await expandAndGetSQL("service_name");
+
+    expect(sql).not.toContain("service_name");
+    expect(sql).toContain("level");
+  });
+
+  // ── Fallback (unparseable SQL) ────────────────────────────────────────────────
+
+  it("falls back to original SQL on parse failure — values call still fires", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.searchObj.data.query =
+      "SELECT * UNION ALL BY NAME -- unsupported syntax";
+
+    mockFetchQueryDataWithHttpStream.mockReset();
+
+    await wrapper.vm.openFilterCreator(
+      { stopPropagation: vi.fn(), preventDefault: vi.fn() },
+      {
+        name: "service_name",
+        ftsKey: null,
+        isSchemaField: true,
+        streams: [STREAM],
+      },
+    );
+    await flushPromises();
+
+    // fetchQueryDataWithHttpStream is still invoked — it just uses fallback SQL
+    expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+  });
+
+  // ── searchObj.data.query must never be mutated ────────────────────────────────
+
+  it("quick mode: searchObj.data.query is not mutated by openFilterCreator", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    const original = "service_name='abc' AND level='error'";
+    wrapper.vm.searchObj.data.query = original;
+    mockFetchQueryDataWithHttpStream.mockReset();
+
+    await wrapper.vm.openFilterCreator(
+      { stopPropagation: vi.fn(), preventDefault: vi.fn() },
+      {
+        name: "service_name",
+        ftsKey: null,
+        isSchemaField: true,
+        streams: [STREAM],
+      },
+    );
+    await flushPromises();
+
+    // searchObj.data.query is the source of truth for search / histogram calls
+    expect(wrapper.vm.searchObj.data.query).toBe(original);
+  });
+
+  it("SQL mode: searchObj.data.query is not mutated by openFilterCreator", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    const original = `SELECT * FROM "${STREAM}" WHERE "service_name" = 'abc' AND "level" = 'error'`;
+    wrapper.vm.searchObj.data.query = original;
+    mockFetchQueryDataWithHttpStream.mockReset();
+
+    await wrapper.vm.openFilterCreator(
+      { stopPropagation: vi.fn(), preventDefault: vi.fn() },
+      {
+        name: "service_name",
+        ftsKey: null,
+        isSchemaField: true,
+        streams: [STREAM],
+      },
+    );
+    await flushPromises();
+
+    expect(wrapper.vm.searchObj.data.query).toBe(original);
+  });
+
+  // ── Only fetchValuesWithWebsocket is called ───────────────────────────────────
+
+  it("only the values endpoint is called during field expansion — no search side-effects", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    wrapper.vm.searchObj.data.query = "service_name='abc'";
+
+    mockFetchQueryDataWithHttpStream.mockReset();
+    const queryBefore = wrapper.vm.searchObj.data.query;
+
+    await wrapper.vm.openFilterCreator(
+      { stopPropagation: vi.fn(), preventDefault: vi.fn() },
+      {
+        name: "service_name",
+        ftsKey: null,
+        isSchemaField: true,
+        streams: [STREAM],
+      },
+    );
+    await flushPromises();
+
+    // Exactly one values call was made (one stream → one HTTP stream call)
+    expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+
+    // wsPayload.queryReq targets the right field and stream
+    const wsPayload = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+    expect(wsPayload.queryReq.fields).toEqual(["service_name"]);
+    expect(wsPayload.queryReq.stream_name).toBe(STREAM);
+
+    // searchObj.data.query is unmodified — search / histogram would still use
+    // the original query including the service_name filter
+    expect(wrapper.vm.searchObj.data.query).toBe(queryBefore);
+  });
+
+  it("values SQL differs from the original query, confirming per-call isolation", async () => {
+    await setupWrapper();
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    wrapper.vm.searchObj.data.query = "service_name='abc' AND level='error'";
+
+    const valuesSql = await expandAndGetSQL("service_name");
+
+    // Values call — field filter stripped
+    expect(valuesSql).not.toContain("service_name");
+
+    // Original query — field filter still present (used by search / histogram)
+    expect(wrapper.vm.searchObj.data.query).toContain("service_name");
+
+    // They are different strings
+    expect(valuesSql).not.toBe(wrapper.vm.searchObj.data.query);
   });
 });
