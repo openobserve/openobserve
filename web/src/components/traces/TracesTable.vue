@@ -28,7 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     Use 'oz-table__row--error' to render the red left-border error variant.
 
   Slots:
-    #loading              — shown while loading=true
+    #loading-banner       — shown as a sticky row above data rows while loading=true
+                            and rows are already present (use for inline progress indicator)
+    #loading              — shown while loading=true and rows array is empty
     #empty                — shown when rows is empty and loading=false
     #cell-{columnId}      — scoped slot for a specific column cell.
                             Slot props: { item: T, cell: Cell<T, unknown> }
@@ -36,35 +38,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   Events:
     row-click   — emitted when the user clicks a row
-    load-more   — emitted when the user scrolls within 300px of the bottom
-                  (use this to trigger server-side fetching of more pages)
 -->
 <template>
   <div
     ref="scrollerRef"
     class="tw:flex tw:flex-col tw:h-full tw:overflow-y-auto tw:overflow-x-auto"
-    @scroll.passive="handleScroll"
   >
     <!-- ── Sticky header ─────────────────────────────────────────────────── -->
     <div
-      class="tw:sticky tw:top-0 tw:z-[2] tw:min-h-[2.25rem] tw:min-w-max tw:shrink-0 tw:tracking-[0.125rem] tw:text-[var(--o2-text-3)] tw:bg-[var(--o2-card-bg-solid)]! tw:border-b tw:border-[var(--o2-border-color)]! row no-wrap items-center q-px-sm"
+      class="tw:sticky tw:top-0 tw:z-[2] tw:min-h-[2.25rem] tw:min-w-max tw:shrink-0 tw:tracking-[0.125rem] tw:text-[var(--o2-text-3)] tw:bg-[var(--o2-card-bg-solid)]! tw:border-b tw:border-[var(--o2-border-2)]! row no-wrap items-center q-px-sm"
     >
       <div
         v-for="header in table.getHeaderGroups()[0].headers"
         :key="header.id"
-        class="tw:px-2 tw:truncate text-caption text-weight-bold"
-        :class="getAlignClass(header.column)"
+        class="tw:px-2 tw:truncate text-caption text-weight-bold tw:select-none"
+        :class="[
+          getAlignClass(header.column, 'header'),
+          header.column.columnDef.meta?.sortable
+            ? 'tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-[0.25rem]'
+            : '',
+        ]"
         :style="getColumnStyle(header.column)"
+        @click="handleHeaderClick(header.column)"
       >
         <FlexRender
           :render="header.column.columnDef.header"
           :props="header.getContext()"
         />
+        <template v-if="header.column.columnDef.meta?.sortable">
+          <q-icon
+            v-if="SORT_FIELD_MAP[header.column.id] === sortBy"
+            :name="sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'"
+            data-test="traces-table-sort-icon-active"
+            size="0.85rem"
+            class="tw:text-[var(--o2-primary-color)]"
+          />
+          <q-icon
+            v-else
+            name="unfold_more"
+            data-test="traces-table-sort-icon-inactive"
+            size="0.85rem"
+            class="tw:opacity-40"
+          />
+        </template>
       </div>
     </div>
 
-    <!-- ── Virtual rows ───────────────────────────────────────────────────── -->
-    <template v-if="!loading && allRows.length">
+    <!-- ── Loading banner slot (rows already present, new fetch in progress) -->
+    <slot v-if="loading && allRows.length" name="loading-banner" />
+
+    <!-- ── Virtual rows (always shown when rows are available) ───────────── -->
+    <template v-if="allRows.length">
       <div
         class="tw:relative tw:w-full"
         :style="{ height: `${rowVirtualizer.getTotalSize()}px` }"
@@ -83,8 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="cell in allRows[virtualRow.index].getVisibleCells()"
             :key="cell.id"
-            class="tw:p-2 tw:overflow-hidden"
-            :class="getAlignClass(cell.column)"
+            class="tw:p-2 tw:overflow-hidden tw:text-ellipsis"
+            :class="getAlignClass(cell.column, 'cell')"
             :style="getColumnStyle(cell.column)"
           >
             <slot
@@ -121,6 +145,11 @@ declare module "@tanstack/vue-table" {
     width?: number;
     /** text alignment for both header and cell */
     align?: "left" | "center" | "right";
+    /** whether clicking the header triggers server-side sort */
+    sortable?: boolean;
+    /** custom column classes */
+    cellClass?: string;
+    headerClass?: string;
   }
 }
 export default {};
@@ -136,7 +165,6 @@ import {
   type Column,
 } from "@tanstack/vue-table";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import { debounce } from "quasar";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Props & emits
@@ -156,14 +184,19 @@ const props = withDefaults(
     rowClass?: (
       row: T,
     ) => string | string[] | Record<string, boolean> | undefined;
+    /** Active sort field name (backend field, e.g. "start_time" or "duration") */
+    sortBy?: string;
+    /** Active sort direction */
+    sortOrder?: "asc" | "desc";
+    /** Fixed row height in px, used by the virtualizer. Default: 40 */
+    rowHeight?: number;
   }>(),
-  { loading: false },
+  { loading: false, rowHeight: 40 },
 );
 
 const emit = defineEmits<{
   "row-click": [row: T];
-  /** Fired when the user scrolls within 300px of the bottom. */
-  "load-more": [];
+  "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
 }>();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -184,26 +217,35 @@ const allRows = computed(() => table.getRowModel().rows);
 // ─────────────────────────────────────────────────────────────────────────────
 // Virtual scroll
 // ─────────────────────────────────────────────────────────────────────────────
-const ROW_HEIGHT = 52; // matches the fixed row height in CSS
-
 const scrollerRef = ref<HTMLElement | null>(null);
 
 const rowVirtualizer = useVirtualizer(
   computed(() => ({
     count: allRows.value.length,
     getScrollElement: () => scrollerRef.value,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => props.rowHeight,
     overscan: 10,
   })),
 );
 
-const handleScroll = debounce(function () {
-  const el = scrollerRef.value;
-  if (!el) return;
-  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 300) {
-    emit("load-more");
+// ─────────────────────────────────────────────────────────────────────────────
+// Sort
+// ─────────────────────────────────────────────────────────────────────────────
+/** Maps column id → backend sort_by field name */
+const SORT_FIELD_MAP: Record<string, string> = {
+  timestamp: "start_time",
+  duration: "duration",
+};
+
+function handleHeaderClick(column: Column<T, unknown>) {
+  if (!column.columnDef.meta?.sortable) return;
+  const fieldName = SORT_FIELD_MAP[column.id] ?? column.id;
+  if (fieldName === props.sortBy) {
+    emit("sort-change", fieldName, props.sortOrder === "desc" ? "asc" : "desc");
+  } else {
+    emit("sort-change", fieldName, "desc");
   }
-}, 300);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column sizing helpers
@@ -220,11 +262,17 @@ function getColumnStyle(column: Column<T, unknown>): Record<string, string> {
   return { flex: `0 0 ${size}px`, width: `${size}px`, overflow: "hidden" };
 }
 
-function getAlignClass(column: Column<T, unknown>): string {
+function getAlignClass(
+  column: Column<T, unknown>,
+  type: "header" | "cell",
+): string {
   const a = column.columnDef.meta?.align;
-  if (a === "center") return "text-center";
-  if (a === "right") return "text-right";
-  return "";
+  const colClass =
+    column.columnDef.meta?.[type === "header" ? "headerClass" : "cellClass"] ??
+    "";
+  if (a === "center") return `${colClass} text-center`;
+  if (a === "right") return `${colClass} text-right`;
+  return colClass;
 }
 </script>
 

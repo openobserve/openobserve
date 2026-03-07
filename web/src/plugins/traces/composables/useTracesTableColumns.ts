@@ -35,16 +35,31 @@ export function useTracesTableColumns(showLlmColumns: Ref<boolean>) {
         id: "timestamp",
         header: "TIMESTAMP",
         size: 160,
+        meta: { sortable: true },
       },
       {
-        id: "service_operation",
-        header: "SERVICE & OPERATION",
-        meta: { grow: true, width: 320 },
+        id: "service",
+        header: "SERVICE",
+        meta: {
+          grow: true,
+          width: 180,
+          cellClass: "tw:text-[var(--o2-text-1)]",
+        },
+      },
+      {
+        id: "operation_name",
+        header: "OPERATION NAME",
+        meta: {
+          grow: true,
+          width: 200,
+          cellClass: "tw:text-[var(--o2-text-1)]",
+        },
       },
       {
         id: "duration",
         header: "DURATION",
         size: 120,
+        meta: { sortable: true },
       },
       {
         id: "spans",
