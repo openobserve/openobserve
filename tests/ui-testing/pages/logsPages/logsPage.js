@@ -1127,6 +1127,8 @@ export class LogsPage {
 
     // Histogram methods
     async toggleHistogram() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await this.page.locator(this.histogramToggle).click();
     }
 
@@ -1156,8 +1158,11 @@ export class LogsPage {
     }
 
     async verifyHistogramState() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const isHistogramOff = await this.page.locator(this.histogramToggle)
             .evaluate(el => el.getAttribute('aria-checked') === 'false');
+        await this.page.keyboard.press('Escape');
         expect(isHistogramOff).toBeTruthy();
     }
 
@@ -3113,6 +3118,8 @@ export class LogsPage {
     }
 
     async clickHistogramToggleDiv() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         return await this.page.locator(this.histogramToggleDiv).nth(2).click();
     }
 
@@ -3720,14 +3727,17 @@ export class LogsPage {
     }
 
     async ensureHistogramToggleState(desiredState) {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const histogramToggle = this.page.locator(this.histogramToggle);
         const isEnabled = await histogramToggle.getAttribute('aria-pressed');
-        
+
         if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
             await histogramToggle.click();
             await this.page.waitForTimeout(500);
             return true; // State was changed
         }
+        await this.page.keyboard.press('Escape');
         return false; // State was already correct
     }
 
@@ -5481,12 +5491,16 @@ export class LogsPage {
      * Bug #8928 - Histogram rendering
      */
     async enableHistogram() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const histogramToggle = this.page.locator(this.histogramToggle);
         const isPressed = await histogramToggle.getAttribute('aria-pressed').catch(() => 'false');
         if (isPressed === 'false') {
             await histogramToggle.click();
             await this.page.waitForTimeout(500);
             testLogger.info('Histogram enabled');
+        } else {
+            await this.page.keyboard.press('Escape');
         }
     }
 
@@ -5495,6 +5509,8 @@ export class LogsPage {
      * Bug #8928 - Histogram rendering
      */
     async toggleHistogram() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const histogramToggle = this.page.locator(this.histogramToggle);
         await histogramToggle.click();
         await this.page.waitForTimeout(500);
