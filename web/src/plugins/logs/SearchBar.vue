@@ -129,30 +129,6 @@ alt="SQL Mode" class="toolbar-icon" />
             </q-tooltip>
           </q-toggle>
         </div>
-        <!-- quick mode toggle - always visible -->
-        <div
-          class="toolbar-toggle-container element-box-shadow"
-        >
-          <q-toggle
-            data-test="logs-search-bar-quick-mode-toggle-btn"
-            v-model="searchObj.meta.quickMode"
-            @click="handleQuickMode"
-            class="o2-toggle-button-xs"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-          >
-            <img :src="quickModeIcon"
-alt="Quick Mode" class="toolbar-icon" />
-            <q-tooltip>
-              {{ t("search.quickModeLabel") }}
-            </q-tooltip>
-          </q-toggle>
-        </div>
         <q-btn-group class="q-ml-xs q-pa-none element-box-shadow el-border">
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
@@ -425,6 +401,18 @@ alt="Quick Mode" class="toolbar-icon" />
             {{ t("search.savedViewsLabel") }}
           </q-tooltip>
         </q-btn-group>
+        <!-- reset filters button - directly on toolbar -->
+        <q-btn
+          data-test="logs-search-bar-reset-filters-btn"
+          class="group-menu-btn element-box-shadow q-ml-xs"
+          no-caps
+          flat
+          icon="restart_alt"
+          @click="resetFilters"
+        >
+          <q-tooltip>{{ t("search.resetFilters") }}</q-tooltip>
+        </q-btn>
+
         <!-- this is the button group responsible for showing all the utilities -->
         <q-btn
           data-test="logs-search-bar-utilities-menu-btn"
@@ -476,11 +464,11 @@ alt="Quick Mode" class="toolbar-icon" />
 
               <q-separator />
 
-              <!-- Reset Filters -->
+              <!-- Quick Mode Toggle -->
               <q-item
                 clickable
-                @click="resetFilters"
-                data-test="logs-search-bar-reset-filters-btn"
+                @click="handleQuickMode"
+                data-test="logs-search-bar-quick-mode-toggle-btn"
                 class="q-pa-sm saved-view-item"
               >
                 <q-item-section>
@@ -490,14 +478,23 @@ alt="Quick Mode" class="toolbar-icon" />
                         width: 28px;
                         display: flex;
                         align-items: center;
-                        justify-content: center;
-                        margin-right: 8px;
-                        margin-left: 3px;
+                        margin-right: 12px;
                       "
                     >
-                      <q-icon name="restart_alt" size="20px" />
+                      <q-toggle
+                        v-model="searchObj.meta.quickMode"
+                        size="xs"
+                        flat
+                        class="o2-toggle-button-xs"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'o2-toggle-button-xs-dark'
+                            : 'o2-toggle-button-xs-light'
+                        "
+                        @click.stop="handleQuickMode"
+                      />
                     </div>
-                    {{ t("search.resetFilters") }}
+                    {{ t("search.quickModeLabel") }}
                   </q-item-label>
                 </q-item-section>
               </q-item>

@@ -1111,12 +1111,17 @@ export class LogsPage {
         await this.page.locator(this.sqlModeToggle).first().click();
     }
 
-    // Quick Mode methods
+    // Quick Mode methods (now inside the utilities hamburger menu)
     async verifyQuickModeToggle() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+        await this.page.keyboard.press('Escape');
     }
 
     async clickQuickModeToggle() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await this.page.locator(this.quickModeToggle).click();
     }
 
@@ -2096,11 +2101,7 @@ export class LogsPage {
     }
 
     async clickResetFiltersButton() {
-        // First open the utilities menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        // Wait for menu to be visible
-        await this.page.waitForTimeout(300);
-        // Then click reset filters button
+        // Reset filters button is now directly on the toolbar
         return await this.page.locator(this.resetFiltersButton).click({ force: true });
     }
 
@@ -3355,14 +3356,19 @@ export class LogsPage {
     }
 
     async enableQuickModeIfDisabled() {
-        // Enable quick mode toggle if it's not already enabled
-        const toggleButton = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
-        if (toggleButton) {
-            // Evaluate the class attribute to determine if the toggle is in the off state
-            const isSwitchedOff = await toggleButton.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        if (toggleInner) {
+            const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
             if (isSwitchedOff) {
-                await toggleButton.click();
+                await toggleInner.click();
+            } else {
+                await this.page.keyboard.press('Escape');
             }
+        } else {
+            await this.page.keyboard.press('Escape');
         }
     }
 
@@ -3468,16 +3474,21 @@ export class LogsPage {
 
     async addIncludeSearchTermFromLogDetails() {
         // Ensure Quick Mode is OFF for include/exclude buttons to work
-        const quickModeToggle = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] div').nth(1);
-        const quickModeClass = await quickModeToggle.getAttribute('class');
-        const isQuickModeOn = quickModeClass && quickModeClass.includes('text-primary');
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isQuickModeOn = toggleInner
+            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
+            : false;
 
         if (isQuickModeOn) {
             testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
-            await quickModeToggle.click();
+            await this.page.locator(this.quickModeToggle).click();
             await this.page.waitForTimeout(1000);
         } else {
             testLogger.info('Quick Mode is already OFF');
+            await this.page.keyboard.press('Escape');
         }
 
         // Check if there's a direct include button (newer UI)
@@ -3692,12 +3703,19 @@ export class LogsPage {
     }
 
     async ensureQuickModeState(desiredState) {
-        const quickModeToggle = this.page.locator(this.quickModeToggle);
-        const isEnabled = await quickModeToggle.getAttribute('aria-pressed');
-        
-        if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
-            await quickModeToggle.click();
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isOn = toggleInner
+            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
+            : false;
+
+        if (desiredState !== isOn) {
+            await this.page.locator(this.quickModeToggle).click();
             await this.page.waitForTimeout(500);
+        } else {
+            await this.page.keyboard.press('Escape');
         }
     }
 
@@ -3714,14 +3732,22 @@ export class LogsPage {
     }
 
     async getQuickModeToggleAttributes() {
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const quickModeToggle = this.page.locator(this.quickModeToggle);
         const ariaPressed = await quickModeToggle.getAttribute('aria-pressed');
         const classNames = await quickModeToggle.getAttribute('class');
+        await this.page.keyboard.press('Escape');
         return { ariaPressed, classNames };
     }
 
     async expectQuickModeToggleVisible() {
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+        await this.page.keyboard.press('Escape');
     }
 
     async waitForUI(timeout = 500) {
