@@ -1161,6 +1161,7 @@ export class LogsPage {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
         const isHistogramOff = await this.page.locator(this.histogramToggle)
+            .locator('[role="switch"]')
             .evaluate(el => el.getAttribute('aria-checked') === 'false');
         await this.page.keyboard.press('Escape');
         expect(isHistogramOff).toBeTruthy();
