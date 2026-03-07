@@ -183,7 +183,10 @@ import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import searchService from "@/services/search";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import { logsUtils } from "@/composables/useLogs/logsUtils";
+import {
+  logsUtils,
+  removeFieldFromWhereAST,
+} from "@/composables/useLogs/logsUtils";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -604,38 +607,6 @@ export default defineComponent({
      * For AND/OR chains, removes the matching branch and preserves the rest.
      * Returns null if the entire subtree references only the excluded field.
      */
-    const removeFieldFromWhereAST = (whereNode: any, fieldName: string): any => {
-      if (!whereNode) return null;
-
-      const operator = whereNode.operator?.toUpperCase();
-
-      if (operator === "AND" || operator === "OR") {
-        const newLeft = removeFieldFromWhereAST(whereNode.left, fieldName);
-        const newRight = removeFieldFromWhereAST(whereNode.right, fieldName);
-        if (newLeft === null && newRight === null) return null;
-        if (newLeft === null) return newRight;
-        if (newRight === null) return newLeft;
-        return { ...whereNode, left: newLeft, right: newRight };
-      }
-
-      // Check if the left side is a column_ref to the field being expanded.
-      // The DataFusion parser stores the column as an object:
-      //   { expr: { type: "default"|"double_quote_string", value: "fieldName" } }
-      // rather than a plain string.
-      if (whereNode.left?.type === "column_ref") {
-        const col = whereNode.left.column;
-        const colName =
-          typeof col === "string"
-            ? col.replace(/^"|"$/g, "")
-            : col?.expr?.value != null
-              ? String(col.expr.value)
-              : null;
-        if (colName === fieldName) return null;
-      }
-
-      return whereNode;
-    };
-
     /**
      * Single Stream
      * - Consider filter in sql and non sql mode, create sql query and fetch values
