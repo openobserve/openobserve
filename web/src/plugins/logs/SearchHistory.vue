@@ -153,6 +153,20 @@
                           font-weight: bolder;
                         "
                       />
+                      <q-btn
+                        @click.stop="goToInspector(props.row)"
+                        size="xs"
+                        label="Inspect"
+                        dense
+                        class="copy-btn tw:py-2 tw:px-2"
+                        icon="analytics"
+                        flat
+                        style="
+                          color: #5960b2;
+                          border: #5960b2 1px solid;
+                          font-weight: bolder;
+                        "
+                      />
                     </div>
                     <div class="tw:flex tw:items-start tw:justify-center">
                       <div class="scrollable-content expanded-sql">
@@ -686,6 +700,22 @@ export default defineComponent({
         query: queryObject,
       });
     };
+
+    const goToInspector = (row) => {
+      const rawTraceId = row.trace_id as string;
+      const trace_id = rawTraceId.includes("-")
+        ? rawTraceId.split("-")[0]
+        : rawTraceId;
+      const queryObject = {
+        trace_id,
+        org_identifier: row.org_id,
+      };
+
+      router.push({
+        path: "/logs/inspector",
+        query: queryObject,
+      });
+    };
     const changePagination = (val: { label: string; value: any }) => {
       if (val.label == "All") {
         val.value = dataToBeLoaded.value.length;
@@ -741,6 +771,7 @@ export default defineComponent({
       searchDateTimeRef,
       expandedRow,
       goToLogs,
+      goToInspector,
       triggerExpand,
       copyToClipboard,
       formatTime,

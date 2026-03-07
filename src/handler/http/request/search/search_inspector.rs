@@ -27,6 +27,7 @@ use config::{
         search::{Query as SearchQuery, SearchEventType},
         stream::StreamType,
     },
+    utils::time::now_micros,
 };
 use hashbrown::HashMap;
 use serde_json;
@@ -122,33 +123,37 @@ pub async fn get_search_profile(
 
     let stream_type = StreamType::Traces;
 
-    // Validate required parameters
-    let (query_trace_id, start_time, end_time) = match (
-        query.get("trace_id"),
-        query.get("start_time"),
-        query.get("end_time"),
-    ) {
-        (Some(query_trace_id), Some(start_time), Some(end_time)) => {
-            if query_trace_id.is_empty() || start_time.is_empty() || end_time.is_empty() {
-                return meta::http::HttpResponse::bad_request(
-                    "trace_id/start_time/end_time cannot be empty",
-                );
-            }
-            let start_time = start_time.parse::<i64>().unwrap_or(0);
-            let end_time = end_time.parse::<i64>().unwrap_or(0);
-            if start_time == 0 || end_time == 0 {
-                return meta::http::HttpResponse::bad_request(
-                    "start_time/end_time must be valid i64",
-                );
-            }
-            (query_trace_id, start_time, end_time)
-        }
+    let Some(query_trace_id) = query.get("trace_id") else {
+        return meta::http::HttpResponse::bad_request("trace_id is required");
+    };
+    let start_time_from_trace_id =
+        config::ider::get_start_time_from_trace_id(query_trace_id).unwrap_or(0);
+
+    let start_time = match query.get("start_time") {
+        Some(v) if !v.is_empty() => v.parse::<i64>().unwrap_or(0),
         _ => {
-            return meta::http::HttpResponse::bad_request(
-                "trace_id/start_time/end_time is required",
-            );
+            if start_time_from_trace_id > 0 {
+                start_time_from_trace_id - 60 * 1_000_000 // minus 1m
+            } else {
+                0
+            }
         }
     };
+    let end_time = match query.get("end_time") {
+        Some(v) if !v.is_empty() => v.parse::<i64>().unwrap_or(0),
+        _ => {
+            if start_time_from_trace_id > 0 {
+                std::cmp::min(now_micros(), start_time_from_trace_id + 3600 * 1_000_000) // plus 1h
+            } else {
+                0
+            }
+        }
+    };
+
+    // Validate required parameters
+    if start_time == 0 || end_time == 0 {
+        return meta::http::HttpResponse::bad_request("start_time/end_time must be valid i64");
+    }
 
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = config::meta::search::Request {
@@ -297,6 +302,9 @@ pub async fn get_search_profile(
                 events: vec![],
             };
 
+            let mut search_summary = Vec::new();
+            let mut stream_summary = Vec::new();
+
             for hit in res.hits {
                 if let Some(events_str) = hit.get("events")
                     && let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
@@ -311,14 +319,9 @@ pub async fn get_search_profile(
                                 extract_search_inspector_fields(event.name.as_str())
                             {
                                 if fields.component == Some("summary".to_string()) {
-                                    si.sql = fields.sql.unwrap();
-                                    let time_range = fields.time_range.unwrap_or_default();
-                                    si.start_time = time_range.0;
-                                    si.end_time = time_range.1;
-                                    si.total_duration = fields.duration.unwrap_or_default();
-                                    si.scan_size = fields.scan_size.unwrap_or_default();
-                                    si.scan_records = fields.scan_records.unwrap_or_default();
-                                    si.data_records = fields.data_records.unwrap_or_default();
+                                    search_summary.push(fields);
+                                } else if fields.component == Some("stream_summary".to_string()) {
+                                    stream_summary.push(fields);
                                 } else {
                                     fields.timestamp = Some(event._timestamp.to_string());
                                     inspectors.push(fields);
@@ -328,6 +331,38 @@ pub async fn get_search_profile(
                         .collect();
 
                     events.extend(inspectors);
+                }
+            }
+
+            if stream_summary.is_empty() {
+                for event in search_summary {
+                    si.sql = event.sql.unwrap();
+                    let time_range = event.time_range.unwrap_or_default();
+                    si.start_time = if si.start_time.is_empty() {
+                        time_range.0
+                    } else {
+                        si.start_time.clone().min(time_range.0)
+                    };
+                    si.end_time = si.end_time.clone().max(time_range.1);
+                    si.total_duration += event.duration.unwrap_or_default();
+                    si.scan_size += event.scan_size.unwrap_or_default();
+                    si.scan_records += event.scan_records.unwrap_or_default();
+                    si.data_records += event.data_records.unwrap_or_default();
+                }
+            } else {
+                for event in stream_summary {
+                    si.sql = event.sql.unwrap();
+                    let time_range = event.time_range.unwrap_or_default();
+                    si.start_time = if si.start_time.is_empty() {
+                        time_range.0
+                    } else {
+                        si.start_time.clone().min(time_range.0)
+                    };
+                    si.end_time = si.end_time.clone().max(time_range.1);
+                    si.total_duration += event.duration.unwrap_or_default();
+                    si.scan_size += event.scan_size.unwrap_or_default();
+                    si.scan_records += event.scan_records.unwrap_or_default();
+                    si.data_records += event.data_records.unwrap_or_default();
                 }
             }
 
@@ -396,6 +431,13 @@ fn organize_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspectorFie
             summary.duration = Some(duration);
             summary.search_role = Some("leader".to_string());
             summary.events = Some(group_leader_events(nested));
+            if let Some(events) = summary.events.as_ref()
+                && let Some(event) = events
+                    .iter()
+                    .find(|e| e.component == Some("remote scan streaming".to_string()))
+            {
+                summary.desc = Some(event.desc.clone().unwrap_or_default());
+            }
             summary
         },
     );
@@ -425,6 +467,13 @@ fn group_leader_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspecto
             summary.duration = Some(duration);
             summary.search_role = Some("follower".to_string());
             summary.events = Some(sort_events_by_timestamp(nested));
+            if let Some(events) = summary.events.as_ref()
+                && let Some(event) = events
+                    .iter()
+                    .find(|e| e.component == Some("remote scan streaming".to_string()))
+            {
+                summary.desc = Some(event.desc.clone().unwrap_or_default());
+            }
             summary
         },
     );
@@ -475,7 +524,11 @@ where
         if entry.0.is_empty() || ts < entry.0 {
             entry.0 = ts;
         }
-        entry.1 += dur;
+        if event.component.is_none()
+            || event.component.as_ref().unwrap() == ("remote scan streaming")
+        {
+            entry.1 += dur;
+        }
         entry.2.push(event);
     }
     groups
