@@ -865,6 +865,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rca-stream-content="rcaStreamContent"
           :formatted-rca-content="formattedRcaContent"
           :is-dark-mode="isDarkMode"
+          :analysis-in-flight="analysisInFlight"
           @trigger-rca="triggerRca"
         />
 
@@ -1358,6 +1359,36 @@ export default defineComponent({
       return !!incidentDetails.value?.topology_context?.suggested_root_cause;
     });
 
+    // True when a background AI analysis run has started but not yet completed.
+    // Updated whenever events are fetched (load, tab switch, reopen, etc.) — no polling.
+    const analysisInFlight = ref(false);
+
+    const checkAnalysisInFlight = async (incidentId: string) => {
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        const response = await incidentsService.getEvents(org, incidentId);
+        const events: any[] = response.data?.events || [];
+        let lastBegin = -1;
+        let lastComplete = -1;
+        for (const ev of events) {
+          if (ev.type === "ai_analysis_begin") lastBegin = ev.timestamp;
+          if (ev.type === "ai_analysis_complete") lastComplete = ev.timestamp;
+        }
+        const nowInFlight = lastBegin > lastComplete;
+
+        // Transition: banner was showing and analysis just finished — reload to pick up new report
+        if (analysisInFlight.value && !nowInFlight) {
+          analysisInFlight.value = false;
+          await loadDetails(incidentId);
+          timelineRefreshTrigger.value++;
+        } else {
+          analysisInFlight.value = nowInFlight;
+        }
+      } catch {
+        analysisInFlight.value = false;
+      }
+    };
+
     // Check if dark mode is active
     const isDarkMode = computed(() => {
       return store.state.theme === "dark";
@@ -1717,6 +1748,10 @@ export default defineComponent({
       ) {
         fetchCorrelatedStreams();
       }
+      // Switching to the Analysis tab re-checks in-flight state without polling
+      if (newTab === "incidentAnalysis" && incidentDetails.value?.id) {
+        checkAnalysisInFlight(incidentDetails.value.id);
+      }
     });
 
     // Computed property for SRE chat incident context
@@ -1972,6 +2007,9 @@ export default defineComponent({
         // Initialize editable status and severity from incident data
         editableStatus.value = response.data.status;
         editableSeverity.value = response.data.severity;
+
+        // Check if a background AI analysis is already running
+        await checkAnalysisInFlight(incidentId);
       } catch (error) {
         console.error("Failed to load incident details:", error);
         $q.notify({
@@ -2100,6 +2138,11 @@ export default defineComponent({
         // Refresh events in timeline if Activity tab is active
         if (activeTab.value === 'activity') {
           timelineRefreshTrigger.value++;
+        }
+
+        // Reopening may trigger a background RCA reanalysis — check immediately
+        if (newStatus === 'open' && incidentDetails.value?.id) {
+          await checkAnalysisInFlight(incidentDetails.value.id);
         }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
@@ -2386,6 +2429,7 @@ export default defineComponent({
 
         // Handle reanalysis prompt based on in-flight state
         if ('analysis_in_flight' in data) {
+          analysisInFlight.value = !!data.analysis_in_flight;
           if (data.analysis_in_flight) {
             $q.notify({
               type: "info",
@@ -2832,6 +2876,7 @@ export default defineComponent({
       rcaLoading,
       rcaStreamContent,
       hasExistingRca,
+      analysisInFlight,
       isDarkMode,
       activeTab,
       timelineRefreshTrigger,
