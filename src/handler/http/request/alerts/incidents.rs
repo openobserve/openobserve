@@ -216,6 +216,11 @@ pub async fn update_incident(
         UpdatePayload::Status { .. } if user_id == config::get_config().auth.root_user_email => {
             // Block status changes originating from the AI agent (root credentials).
             // Status management is a human action only.
+            //
+            // Known limitation: this also blocks any automation that happens to use root
+            // credentials for status updates. A more targeted approach (e.g. a dedicated
+            // service-account header) would be preferable in future but requires cross-repo
+            // changes; this guard is sufficient for the current threat model.
             return axum::response::Response::builder()
                 .status(axum::http::StatusCode::FORBIDDEN)
                 .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -441,7 +446,8 @@ pub async fn trigger_incident_rca(
         }
     }
 
-    // Emit AIAnalysisBegin
+    // Emit AIAnalysisBegin — all error paths below this point must emit Complete to
+    // clear the in-flight guard, otherwise it stays locked until the stale threshold.
     let _ = infra::table::incident_events::append(
         &org_id,
         &incident_id,
@@ -449,14 +455,29 @@ pub async fn trigger_incident_rca(
     )
     .await;
 
+    // Helper to emit AIAnalysisComplete on error paths.
+    macro_rules! clear_inflight_and_return {
+        ($resp:expr) => {{
+            let _ = infra::table::incident_events::append(
+                &org_id,
+                &incident_id,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
+            )
+            .await;
+            return $resp;
+        }};
+    }
+
     // Get incident with alerts
     let incident =
         match crate::service::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
             .await
         {
             Ok(Some(i)) => i,
-            Ok(None) => return MetaHttpResponse::not_found("Incident not found"),
-            Err(e) => return MetaHttpResponse::internal_error(e),
+            Ok(None) => {
+                clear_inflight_and_return!(MetaHttpResponse::not_found("Incident not found"))
+            }
+            Err(e) => clear_inflight_and_return!(MetaHttpResponse::internal_error(e)),
         };
 
     // Build RCA context — include previous analysis so the agent can build on it
@@ -482,19 +503,24 @@ pub async fn trigger_incident_rca(
     ) {
         Ok(c) => c,
         Err(e) => {
-            return MetaHttpResponse::internal_error(format!("Failed to create RCA client: {e}"));
+            clear_inflight_and_return!(MetaHttpResponse::internal_error(format!(
+                "Failed to create RCA client: {e}"
+            )))
         }
     };
 
     // Check agent health
     if let Err(e) = client.health().await {
-        return axum::response::Response::builder()
-            .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
-            .header(axum::http::header::CONTENT_TYPE, "application/json")
-            .body(axum::body::Body::from(
-                serde_json::json!({"error": format!("RCA agent not available: {e}")}).to_string(),
-            ))
-            .unwrap();
+        clear_inflight_and_return!(
+            axum::response::Response::builder()
+                .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .body(axum::body::Body::from(
+                    serde_json::json!({"error": format!("RCA agent not available: {e}")})
+                        .to_string(),
+                ))
+                .unwrap()
+        )
     }
 
     // User-initiated reanalysis: fire-and-forget — spawn agent in background, return 202
@@ -529,38 +555,16 @@ pub async fn trigger_incident_rca(
 
     // Choose streaming or non-streaming based on query parameter
     if query.stream {
-        // Start streaming RCA — emit AIAnalysisComplete best-effort after stream starts
+        // AIAnalysisComplete is emitted inside the stream closure (rca_service.rs)
+        // after the stream is fully drained, not here.
         let stream = match rca_service::analyze_incident_stream(client, context).await {
             Ok(s) => s,
             Err(e) => {
-                return MetaHttpResponse::internal_error(format!(
+                clear_inflight_and_return!(MetaHttpResponse::internal_error(format!(
                     "Failed to start RCA stream: {e}"
-                ));
+                )))
             }
         };
-
-        // Emit AIAnalysisComplete — stream confirmed started (best-effort)
-        let _ = infra::table::incident_events::append(
-            &org_id,
-            &incident_id,
-            config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
-        )
-        .await;
-
-        // Track usage: every explicitly-requested RCA is an IncidentReAnalysis event
-        crate::service::self_reporting::report_request_usage_stats(
-            config::meta::self_reporting::usage::RequestStats {
-                records: 1,
-                ..Default::default()
-            },
-            &org_id,
-            "",
-            config::meta::stream::StreamType::Metadata,
-            config::meta::self_reporting::usage::UsageType::IncidentReAnalysis,
-            0,
-            chrono::Utc::now().timestamp_micros(),
-        )
-        .await;
 
         axum::response::Response::builder()
             .status(axum::http::StatusCode::OK)
@@ -572,7 +576,9 @@ pub async fn trigger_incident_rca(
         let rca_content = match rca_service::analyze_incident(client, context).await {
             Ok(content) => content,
             Err(e) => {
-                return MetaHttpResponse::internal_error(format!("Failed to perform RCA: {e}"));
+                clear_inflight_and_return!(MetaHttpResponse::internal_error(format!(
+                    "Failed to perform RCA: {e}"
+                )))
             }
         };
 
@@ -584,20 +590,23 @@ pub async fn trigger_incident_rca(
         )
         .await;
 
-        // Track usage: every explicitly-requested RCA is an IncidentReAnalysis event
-        crate::service::self_reporting::report_request_usage_stats(
-            config::meta::self_reporting::usage::RequestStats {
-                records: 1,
-                ..Default::default()
-            },
-            &org_id,
-            "",
-            config::meta::stream::StreamType::Metadata,
-            config::meta::self_reporting::usage::UsageType::IncidentReAnalysis,
-            0,
-            chrono::Utc::now().timestamp_micros(),
-        )
-        .await;
+        // Usage: only count as reanalysis if explicitly requested; the initial analysis
+        // on a brand-new incident is already counted as IncidentCreation.
+        if query.reanalysis {
+            crate::service::self_reporting::report_request_usage_stats(
+                config::meta::self_reporting::usage::RequestStats {
+                    records: 1,
+                    ..Default::default()
+                },
+                &org_id,
+                "",
+                config::meta::stream::StreamType::Metadata,
+                config::meta::self_reporting::usage::UsageType::IncidentReAnalysis,
+                0,
+                chrono::Utc::now().timestamp_micros(),
+            )
+            .await;
+        }
 
         MetaHttpResponse::json(RcaResponse { rca_content })
     }

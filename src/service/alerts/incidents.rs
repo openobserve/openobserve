@@ -743,7 +743,7 @@ async fn find_or_create_incident(
                     if let Err(e) = trigger_rca_for_incident(
                         org_id_rca.clone(),
                         incident_id_rca.clone(),
-                        false,
+                        true, // lifecycle-triggered reanalysis — track usage
                         true, // begin already emitted above
                     )
                     .await
@@ -868,7 +868,7 @@ async fn find_or_create_incident(
                 .await;
                 tokio::spawn(async move {
                     if let Err(e) =
-                        trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), false, true) // begin already emitted above
+                        trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), true, true) // lifecycle reanalysis — track usage; begin already emitted above
                             .await
                     {
                         log::debug!(
