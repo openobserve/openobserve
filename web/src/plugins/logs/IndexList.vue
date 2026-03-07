@@ -600,6 +600,43 @@ export default defineComponent({
     }
 
     /**
+     * Recursively removes WHERE conditions that reference the given field from an AST node.
+     * For AND/OR chains, removes the matching branch and preserves the rest.
+     * Returns null if the entire subtree references only the excluded field.
+     */
+    const removeFieldFromWhereAST = (whereNode: any, fieldName: string): any => {
+      if (!whereNode) return null;
+
+      const operator = whereNode.operator?.toUpperCase();
+
+      if (operator === "AND" || operator === "OR") {
+        const newLeft = removeFieldFromWhereAST(whereNode.left, fieldName);
+        const newRight = removeFieldFromWhereAST(whereNode.right, fieldName);
+        if (newLeft === null && newRight === null) return null;
+        if (newLeft === null) return newRight;
+        if (newRight === null) return newLeft;
+        return { ...whereNode, left: newLeft, right: newRight };
+      }
+
+      // Check if the left side is a column_ref to the field being expanded.
+      // The DataFusion parser stores the column as an object:
+      //   { expr: { type: "default"|"double_quote_string", value: "fieldName" } }
+      // rather than a plain string.
+      if (whereNode.left?.type === "column_ref") {
+        const col = whereNode.left.column;
+        const colName =
+          typeof col === "string"
+            ? col.replace(/^"|"$/g, "")
+            : col?.expr?.value != null
+              ? String(col.expr.value)
+              : null;
+        if (colName === fieldName) return null;
+      }
+
+      return whereNode;
+    };
+
+    /**
      * Single Stream
      * - Consider filter in sql and non sql mode, create sql query and fetch values
      *
@@ -785,6 +822,29 @@ export default defineComponent({
           if (query_context !== "") {
             query_context = query_context == undefined ? "" : query_context;
 
+            // Build SQL with the expanded field's own filter condition removed so
+            // field value counts are not constrained by that filter.
+            const rawSQL = query_context.replace("[INDEX_NAME]", selectedStream);
+            let sqlForValues = rawSQL;
+            try {
+              const parsedForValues = fnParsedSQL(rawSQL);
+              if (parsedForValues?.from?.length > 0) {
+                const modifiedWhere = removeFieldFromWhereAST(
+                  parsedForValues.where,
+                  name,
+                );
+                const modifiedSQL = fnUnparsedSQL({
+                  ...parsedForValues,
+                  where: modifiedWhere,
+                }).replace(/`/g, '"');
+                if (modifiedSQL) {
+                  sqlForValues = modifiedSQL;
+                }
+              }
+            } catch {
+              // Fall back to original SQL if AST manipulation fails
+            }
+
             const fetchPayload = {
               fields: [name],
               size: store.state.zoConfig?.query_values_default_num || 10,
@@ -798,10 +858,7 @@ export default defineComponent({
               stream_name: selectedStream,
               stream_type: searchObj.data.stream.streamType,
               use_cache: (window as any).use_cache ?? true,
-              sql:
-                b64EncodeUnicode(
-                  query_context.replace("[INDEX_NAME]", selectedStream),
-                ) || "",
+              sql: b64EncodeUnicode(sqlForValues) || "",
             };
 
             // Store for reuse by searchFieldValues
@@ -1654,6 +1711,7 @@ export default defineComponent({
       hasUserDefinedSchemas,
       setPage,
       resetPagination,
+      removeFieldFromWhereAST,
     };
   },
 });
