@@ -92,6 +92,8 @@ export function isLLMTrace(data: any): boolean {
   // Check custom llm.* fields (stored with underscores after flatten)
   if (hasValue(data.llm_input)) return true;
   if (hasValue(data.llm_output)) return true;
+  if (hasValue(data.llm_usage)) return true;
+  if (hasValue(data.llm_cost)) return true;
   if (hasValue(data.llm_observation_type)) return true;
 
   // Check usage fields (OTEL standard, stored with underscores after flatten)
