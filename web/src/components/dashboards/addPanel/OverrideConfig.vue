@@ -48,7 +48,7 @@
 import { defineComponent, ref, inject, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 
 interface Column {
   alias: string;
@@ -144,7 +144,6 @@ export default defineComponent({
           alias: columnName,
           label: columnName,
         }));
-
       } else {
         const x = dashboardPanelData.data.queries[0].fields.x || [];
         const y = dashboardPanelData.data.queries[0].fields.y || [];
