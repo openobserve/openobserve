@@ -335,6 +335,8 @@ pub enum UsageEvent {
     Functions,
     Pipeline,
     RemotePipeline,
+    Incident,
+    IncidentReAnalysis,
     Other,
 }
 
@@ -346,6 +348,8 @@ impl std::fmt::Display for UsageEvent {
             UsageEvent::Functions => write!(f, "Functions"),
             UsageEvent::Pipeline => write!(f, "Pipeline"),
             UsageEvent::RemotePipeline => write!(f, "RemotePipeline"),
+            UsageEvent::Incident => write!(f, "Incident"),
+            UsageEvent::IncidentReAnalysis => write!(f, "IncidentReAnalysis"),
             UsageEvent::Other => write!(f, "Other"),
         }
     }
@@ -363,6 +367,10 @@ impl From<UsageType> for UsageEvent {
             UsageEvent::Pipeline
         } else if usage.is_remote_pipeline() {
             UsageEvent::RemotePipeline
+        } else if matches!(usage, UsageType::IncidentCreation) {
+            UsageEvent::Incident
+        } else if matches!(usage, UsageType::IncidentReAnalysis) {
+            UsageEvent::IncidentReAnalysis
         } else {
             UsageEvent::Other
         }
@@ -419,6 +427,10 @@ pub enum UsageType {
     Syslog,
     #[serde(rename = "enrichment_table")]
     EnrichmentTable,
+    #[serde(rename = "incident_creation")]
+    IncidentCreation,
+    #[serde(rename = "incident_reanalysis")]
+    IncidentReAnalysis,
 }
 
 impl UsageType {
@@ -465,6 +477,13 @@ impl UsageType {
     pub fn is_remote_pipeline(&self) -> bool {
         matches!(self, UsageType::RemotePipeline)
     }
+
+    pub fn is_incident(&self) -> bool {
+        matches!(
+            self,
+            UsageType::IncidentCreation | UsageType::IncidentReAnalysis
+        )
+    }
 }
 
 impl std::fmt::Display for UsageType {
@@ -494,6 +513,8 @@ impl std::fmt::Display for UsageType {
             UsageType::Retention => write!(f, "data_retention"),
             UsageType::Syslog => write!(f, "syslog"),
             UsageType::EnrichmentTable => write!(f, "enrichment_table"),
+            UsageType::IncidentCreation => write!(f, "incident_creation"),
+            UsageType::IncidentReAnalysis => write!(f, "incident_reanalysis"),
         }
     }
 }
