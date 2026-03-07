@@ -732,12 +732,19 @@ async fn find_or_create_incident(
             {
                 let org_id_rca = org_id.to_string();
                 let incident_id_rca = existing.id.clone();
+                // Emit Begin synchronously so the frontend sees it on the next poll
+                let _ = infra::table::incident_events::append(
+                    &org_id_rca,
+                    &incident_id_rca,
+                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                )
+                .await;
                 tokio::spawn(async move {
                     if let Err(e) = trigger_rca_for_incident(
                         org_id_rca.clone(),
                         incident_id_rca.clone(),
                         false,
-                        false,
+                        true, // begin already emitted above
                     )
                     .await
                     {
@@ -852,9 +859,16 @@ async fn find_or_create_incident(
             {
                 let org_id_rca = org_id.to_string();
                 let incident_id_rca = upgradeable_incident.id.clone();
+                // Emit Begin synchronously so the frontend sees it on the next poll
+                let _ = infra::table::incident_events::append(
+                    &org_id_rca,
+                    &incident_id_rca,
+                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                )
+                .await;
                 tokio::spawn(async move {
                     if let Err(e) =
-                        trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), false, false)
+                        trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), false, true) // begin already emitted above
                             .await
                     {
                         log::debug!(
@@ -1468,16 +1482,15 @@ pub async fn trigger_rca_for_incident(
     );
 
     // Emit AIAnalysisBegin only when the caller hasn't already done so
-    if !begin_already_emitted {
-        if let Err(e) = infra::table::incident_events::append(
+    if !begin_already_emitted
+        && let Err(e) = infra::table::incident_events::append(
             &org_id,
             &incident_id,
             config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
         )
         .await
-        {
-            log::error!("[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {incident_id}: {e}");
-        }
+    {
+        log::error!("[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {incident_id}: {e}");
     }
 
     // Create RCA agent client with root credentials
@@ -1620,10 +1633,18 @@ pub async fn update_status(
     if status == "open" {
         let org_id_rca = org_id.to_string();
         let incident_id_rca = incident_id.to_string();
+        // Emit Begin synchronously so the frontend sees it on the next poll
+        let _ = infra::table::incident_events::append(
+            &org_id_rca,
+            &incident_id_rca,
+            config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+        )
+        .await;
         tokio::spawn(async move {
             // reanalysis=true: bypass cooldown — incident was closed, context is fresh
             if let Err(e) =
-                trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), true, false).await
+                trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), true, true).await
+            // begin already emitted above
             {
                 log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
             }

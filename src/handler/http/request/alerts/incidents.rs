@@ -201,7 +201,7 @@ pub async fn get_incident(Path((org_id, incident_id)): Path<(String, String)>) -
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update an incident's title, severity, or status", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Update an incident's title or severity. Status changes (resolve, acknowledge, reopen) are NOT supported via this tool — they must be performed by a human in the UI.", "category": "alerts"}))
     )
 )]
 pub async fn update_incident(
@@ -213,6 +213,20 @@ pub async fn update_incident(
     let user_id = user_email.user_id;
 
     match body {
+        UpdatePayload::Status { .. } if user_id == config::get_config().auth.root_user_email => {
+            // Block status changes originating from the AI agent (root credentials).
+            // Status management is a human action only.
+            return axum::response::Response::builder()
+                .status(axum::http::StatusCode::FORBIDDEN)
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .body(axum::body::Body::from(
+                    serde_json::json!({
+                        "error": "Status changes via the API are not permitted for this user. Incident status must be managed by a human in the UI."
+                    })
+                    .to_string(),
+                ))
+                .unwrap();
+        }
         UpdatePayload::Title { title } => {
             if title.trim().is_empty() {
                 return MetaHttpResponse::bad_request("Title cannot be empty");
@@ -445,10 +459,18 @@ pub async fn trigger_incident_rca(
             Err(e) => return MetaHttpResponse::internal_error(e),
         };
 
-    // Build RCA context
+    // Build RCA context — include previous analysis so the agent can build on it
+    let previous_analysis = incident
+        .incident
+        .topology_context
+        .as_ref()
+        .and_then(|t| t.suggested_root_cause.as_deref())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
     let context = IncidentRcaContext {
         incident_id: incident.incident.id.clone(),
         org_id: incident.incident.org_id.clone(),
+        previous_analysis,
     };
 
     // Create RCA agent client
