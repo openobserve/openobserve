@@ -37,9 +37,7 @@ export class LogsQueryPage {
   }
 
   async clickResetFilters() {
-    // Reset filters button is now inside utilities menu
-    await this.page.locator(this.utilitiesMenuButton).click();
-    await this.page.waitForTimeout(300);
+    // Reset filters button is now directly on the toolbar
     await this.page.locator(this.resetFiltersButton).click();
   }
 
