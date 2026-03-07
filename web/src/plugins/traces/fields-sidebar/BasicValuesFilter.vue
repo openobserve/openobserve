@@ -267,6 +267,8 @@ const handleBeforeHide = () => {
   currentKeyword.value = "";
   resetFieldValues(props.row.name);
 };
+
+defineExpose({ buildSql });
 </script>
 
 <style lang="scss">
