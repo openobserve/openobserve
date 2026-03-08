@@ -207,12 +207,16 @@ vi.mock("@/composables/useTraces", () => ({
   }),
 }));
 
+// Hoisted so vi.mock factory can reference them and tests can override per-call
+const { mockGetStreams, mockGetStream } = vi.hoisted(() => ({
+  mockGetStreams: vi.fn(),
+  mockGetStream: vi.fn(),
+}));
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    getStreams: vi.fn(() => Promise.resolve(mockStreamList)),
-    getStream: vi.fn((streamName) =>
-      Promise.resolve(mockStreamList.list.find((s) => s.name === streamName)),
-    ),
+    getStreams: mockGetStreams,
+    getStream: mockGetStream,
   }),
 }));
 
@@ -260,6 +264,14 @@ describe("Index.vue (Main Traces Page)", () => {
   let wrapper: VueWrapper<any>;
 
   beforeEach(async () => {
+    // Set default stream mock implementations (tests can override with mockResolvedValueOnce)
+    mockGetStreams.mockResolvedValue(mockStreamList);
+    mockGetStream.mockImplementation((streamName: string) =>
+      Promise.resolve(
+        mockStreamList.list.find((s: any) => s.name === streamName),
+      ),
+    );
+
     // Reset mock data
     mockSearchObj.loading = false;
     mockSearchObj.loadingStream = false;
@@ -1121,14 +1133,8 @@ describe("Index.vue (Main Traces Page)", () => {
 
   describe("Edge Cases", () => {
     it("should handle empty stream list gracefully", async () => {
-      const mockGetStreams = vi.fn(() => Promise.resolve({ list: [] }));
-
-      vi.doMock("@/composables/useStreams", () => ({
-        default: () => ({
-          getStreams: mockGetStreams,
-          getStream: vi.fn(),
-        }),
-      }));
+      // Override just for this test — mockGetStreams is the shared vi.fn from vi.hoisted
+      mockGetStreams.mockResolvedValueOnce({ list: [] });
 
       wrapper = mount(Index, {
         attachTo: node,
