@@ -74,6 +74,10 @@ export interface IncidentWithAlerts extends Incident {
   alerts: IncidentAlert[];
 }
 
+export interface UpdateSeverityResponse extends Incident {
+  analysis_in_flight: boolean;
+}
+
 export interface ListIncidentsResponse {
   incidents: Incident[];
   total: number;
@@ -153,7 +157,7 @@ const incidents = {
     incident_id: string,
     updates: { title?: string; severity?: string }
   ) => {
-    return http().patch<Incident>(
+    return http().patch<Incident | UpdateSeverityResponse>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
       updates
     );
@@ -171,9 +175,15 @@ const incidents = {
   /**
    * Trigger RCA analysis and return the complete result
    */
-  triggerRca: (org_identifier: string, incident_id: string) => {
+  triggerRca: (
+    org_identifier: string,
+    incident_id: string,
+    params: { reanalysis?: boolean } = {}
+  ) => {
     return http().post<{ rca_content: string }>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
+      null,
+      { params }
     );
   },
 

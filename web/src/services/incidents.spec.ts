@@ -161,7 +161,9 @@ describe("incidents service", () => {
 
       expect(http).toHaveBeenCalled();
       expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/rca"
+        "/api/v2/test-org/alerts/incidents/incident-123/rca",
+        null,
+        { params: {} }
       );
     });
   });
