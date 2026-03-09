@@ -53,12 +53,14 @@ const UNIT_ALIASES: Record<string, string> = {
   usecs: "us",
   microsecond: "us",
   microseconds: "us",
+  micros: "us",
   // Milliseconds
   ms: "ms",
   msec: "ms",
   msecs: "ms",
   millisecond: "ms",
   milliseconds: "ms",
+  millis: "us",
   // Seconds
   s: "s",
   sec: "s",
@@ -222,7 +224,7 @@ const useDurationPercentiles = () => {
             start_time: payload.startTime,
             end_time: payload.endTime,
             from: 0,
-            size: 1,
+            size: 10,
           },
           encoding: "base64",
         },

@@ -120,6 +120,8 @@ import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboar
 import metrics from "./metrics.json";
 import { deepCopy, formatTimeWithSuffix } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
+import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import useParser from "@/composables/useParser";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -210,57 +212,6 @@ const showErrorOnly = computed({
 });
 const rangeFilters = computed(() => searchObj.meta.metricsRangeFilters);
 
-// Check if duration filter exists
-const hasDurationFilter = computed(() => {
-  // Force reactivity by accessing rangeFiltersVersion
-  rangeFiltersVersion.value;
-
-  let hasFilter = false;
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Duration") {
-      // Show analyze button if we have any duration filter (start or end)
-      if (filter.start !== null || filter.end !== null) {
-        hasFilter = true;
-      }
-    }
-  });
-  return hasFilter;
-});
-
-// Check if rate filter exists
-const hasRateFilter = computed(() => {
-  // Force reactivity by accessing rangeFiltersVersion
-  rangeFiltersVersion.value;
-
-  let hasFilter = false;
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Rate") {
-      // Show volume analyze button if we have any rate filter (start or end)
-      if (filter.start !== null || filter.end !== null) {
-        hasFilter = true;
-      }
-    }
-  });
-  return hasFilter;
-});
-
-// Check if error filter exists
-const hasErrorFilter = computed(() => {
-  // Force reactivity by accessing rangeFiltersVersion
-  rangeFiltersVersion.value;
-
-  let hasFilter = false;
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Errors") {
-      // Show error analyze button if we have any error filter (start or end)
-      if (filter.start !== null || filter.end !== null) {
-        hasFilter = true;
-      }
-    }
-  });
-  return hasFilter;
-});
-
 // Check if ANY RED panel has a time-based brush selection
 // This controls the visibility of the "Analyze Dimensions" button
 // - Button shows ONLY when user has made a brush selection on Rate, Duration, or Errors panel
@@ -293,6 +244,7 @@ const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuValue = ref(0);
 const contextMenuFieldName = ref("");
 const contextMenuData = ref<any>(null);
+const sqlParser = ref<any>(null);
 
 const getBaseFilters = () => {
   let baseFilters = [];
@@ -315,9 +267,15 @@ const getBaseFilters = () => {
     baseFilters.push("span_status = 'ERROR'");
   }
 
-  // Add user-provided filters from query editor
+  // Add user-provided filters from query editor, parsing any human-readable
+  // duration values (e.g. '1.50ms') back to raw microseconds for SQL.
   if (props.filter?.trim().length) {
-    baseFilters.push(props.filter.trim());
+    const parsed = parseDurationWhereClause(
+      props.filter.trim(),
+      sqlParser.value,
+      searchObj.data.stream.selectedStream.value,
+    );
+    baseFilters.push(typeof parsed === "string" ? parsed : props.filter.trim());
   }
 
   return baseFilters;
@@ -346,7 +304,17 @@ const loadDashboard = async () => {
       if (panel.title === "Errors") {
         const errorFilters = ["span_status = 'ERROR'"];
         if (props.filter?.trim().length) {
-          errorFilters.push(props.filter.trim());
+          // Parse human-readable duration values back to raw µs for SQL
+          const parsedFilter = parseDurationWhereClause(
+            props.filter.trim(),
+            sqlParser.value,
+            searchObj.data.stream.selectedStream.value,
+          );
+          errorFilters.push(
+            typeof parsedFilter === "string"
+              ? parsedFilter
+              : props.filter.trim(),
+          );
         }
 
         if (baseFilters.length) {
@@ -432,15 +400,18 @@ const emitFiltersToQueryEditor = () => {
 
   searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
     if (rangeFilter.panelTitle === "Duration") {
-      // Duration filter: use microseconds values from Y-axis
+      // Duration filter: format µs values as human-readable strings so they
+      // render nicely in the query editor and are decoded by parseDurationWhereClause.
       if (rangeFilter.start !== null && rangeFilter.end !== null) {
         filters.push(
-          `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
+          `duration >= '${formatTimeWithSuffix(rangeFilter.start)}' and duration <= '${formatTimeWithSuffix(rangeFilter.end)}'`,
         );
       } else if (rangeFilter.start !== null) {
-        filters.push(`duration >= ${rangeFilter.start}`);
+        filters.push(
+          `duration >= '${formatTimeWithSuffix(rangeFilter.start)}'`,
+        );
       } else if (rangeFilter.end !== null) {
-        filters.push(`duration <= ${rangeFilter.end}`);
+        filters.push(`duration <= '${formatTimeWithSuffix(rangeFilter.end)}'`);
       }
     } else if (rangeFilter.panelTitle === "Errors") {
       // Error filter: just add span_status check
@@ -738,7 +709,9 @@ const stopAutoRefresh = () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  const { sqlParser: loadSqlParser } = useParser();
+  sqlParser.value = await loadSqlParser();
   loadDashboard();
 });
 
