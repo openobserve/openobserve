@@ -134,7 +134,26 @@ jobs:
           # finally check the coverage data
           ./coverage.sh check
 
+  generate_unit_tests:
+    # Runs in parallel with backend_unit_tests.
+    # Skips when the push itself was made by the bot (prevents infinite loops after auto-commit).
+    # github.actor is only accessible in the caller, not inside workflow_call context.
+    if: github.actor != 'github-actions[bot]'
+    uses: ./.github/workflows/generate-unit-tests.yml
+    with:
+      event_name: ${{ github.event_name }}
+      base_ref: ${{ github.base_ref || 'main' }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   ui_unit_tests:
+    # Must wait for generate_unit_tests so the full test suite (including newly generated
+    # or updated spec files) is present before running coverage checks.
+    needs: [generate_unit_tests]
+    if: |
+      always() &&
+      (needs.generate_unit_tests.result == 'success' || needs.generate_unit_tests.result == 'skipped')
     runs-on:
       labels: ubicloud-standard-8
     permissions:
@@ -144,12 +163,17 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
+          # Fetch the latest commit on the branch so any tests committed by
+          # generate_unit_tests are included in the run.
+          ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 0
 
       - name: Check if frontend code has changes
         id: check_changes
         run: |
-          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -q "^web/"; then
+          # Compare against HEAD (not the original trigger SHA) so bot-committed
+          # test files are included in the diff.
+          if git diff --name-only origin/${{ github.base_ref || 'main' }} HEAD | grep -q "^web/"; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
