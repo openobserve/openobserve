@@ -10,6 +10,11 @@ These tests complement the E2E test in test_alerts.py by covering:
 - Error path tests for invalid parameters
 - Unauthorized access
 
+IMPORTANT: This file is named test_alerts_history.py (not test_alert_history.py)
+so it runs AFTER test_alerts.py alphabetically. The test_e2e_alert_history test
+in test_alerts.py creates the triggers stream by triggering an alert, which is
+required for these tests to pass.
+
 Note: Tests using sort_by/sort_order parameters require the triggers stream
 to exist. These tests are skipped if the stream doesn't exist yet.
 """
