@@ -1,13 +1,16 @@
 const fetch = require('node-fetch');
 const testLogger = require('../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../playwright-tests/utils/cloud-auth.js');
 
 class APICleanup {
     constructor() {
         this.baseUrl = process.env.ZO_BASE_URL;
-        this.org = process.env.ORGNAME;
+        this.org = getOrgIdentifier();
         this.email = process.env.ZO_ROOT_USER_EMAIL;
         this.password = process.env.ZO_ROOT_USER_PASSWORD;
-        this.authHeader = 'Basic ' + Buffer.from(`${this.email}:${this.password}`).toString('base64');
+        // Use centralized auth headers (cloud: no auth header, self-hosted: Basic auth)
+        const headers = getAuthHeaders();
+        this.authHeader = headers['Authorization'] || '';
     }
 
     /**

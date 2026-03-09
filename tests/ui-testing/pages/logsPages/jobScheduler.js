@@ -1,23 +1,18 @@
 import { expect } from '@playwright/test';
 import testLogger from '../../playwright-tests/utils/test-logger.js';
-// const { chromium } = require('playwright');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class JobSchedulerPage {
     constructor(page) {
         this.page = page;
-       
+
     }
 
- 
+
     async submitSearchJob() {
-        const orgId = process.env["ORGNAME"];
+        const orgId = getOrgIdentifier();
         const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`;
-        const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-        
-        const headers = {
-          "Authorization": `Basic ${basicAuthCredentials}`,
-          "Content-Type": "application/json",
-        }
+        const headers = getAuthHeaders();
        // Get current time and one minute ago
        const now = Date.now(); // Current time in milliseconds
        const oneMinuteAgo = now - 60 * 1000; // One minute ago in milliseconds
@@ -57,14 +52,9 @@ export class JobSchedulerPage {
       }
       
       async getTraceIdByJobId(jobId) {
-        const orgId = process.env["ORGNAME"];
+        const orgId = getOrgIdentifier();
         const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`;
-        const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-        
-        const headers = {
-          "Authorization": `Basic ${basicAuthCredentials}`,
-          "Content-Type": "application/json",
-        }
+        const headers = getAuthHeaders();
        
         // Make the GET request
         const response = await this.page.request.get(url, {
