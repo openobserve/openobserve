@@ -260,9 +260,22 @@ export default defineComponent({
       try {
         const orgId = store.state.selectedOrganization.identifier;
         const response = await dashboardsService.list_Folders(orgId);
-        const folders = response.data?.list || [];
+        let folders: any[] = response.data?.list || [];
 
-        folderOptions.value = folders.map((f: any) => ({
+        // Ensure default folder is always present and pinned at top (same as getFoldersList in commons.ts)
+        let defaultFolder = folders.find((f: any) => f.folderId === 'default');
+        folders = folders.filter((f: any) => f.folderId !== 'default');
+
+        if (!defaultFolder) {
+          defaultFolder = { name: 'default', folderId: 'default', description: 'default' };
+        }
+
+        const sorted = [
+          defaultFolder,
+          ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name)),
+        ];
+
+        folderOptions.value = sorted.map((f: any) => ({
           label: f.name,
           value: f.folderId,
         }));
