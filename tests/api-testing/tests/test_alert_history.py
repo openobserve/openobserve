@@ -194,11 +194,14 @@ def setup_alert_history(create_session, base_url):
         logger.info(f"Deleted template: {template_name}")
 
     # Delete the test stream to avoid orphaned streams accumulating across CI runs
+    # URL pattern: /api/{org_id}/streams/{stream_name}?type=logs
     resp = session.delete(
-        f"{base_url}api/{ORG_ID}/{stream_name}?type=logs"
+        f"{base_url}api/{ORG_ID}/streams/{stream_name}?type=logs"
     )
     if resp.status_code == 200:
         logger.info(f"Deleted stream: {stream_name}")
+    else:
+        logger.warning(f"Failed to delete stream {stream_name}: {resp.status_code}")
 
 
 @pytest.fixture(scope="module")
