@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Test timeout constants (in milliseconds)
 const FIVE_MINUTES_MS = 300000;
@@ -29,7 +30,7 @@ test.describe("Alerts UI Operations", () => {
     }
 
     await page.goto(
-      `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`
     );
   });
 
@@ -253,7 +254,7 @@ test.describe("Alerts & Incidents Page Navigation", { tag: '@enterprise' }, () =
         pm = new PageManager(page);
 
         // Navigate directly to alerts page
-        await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
         testLogger.info('Navigated to alerts page');
 

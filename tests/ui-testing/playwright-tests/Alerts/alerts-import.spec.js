@@ -2,6 +2,7 @@ const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Test timeout constants (in milliseconds)
 const FIVE_MINUTES_MS = 300000;
@@ -37,7 +38,7 @@ test.describe("Alerts Import/Export", () => {
 
     // Navigate to alerts page - stream will be available after page load
     await page.goto(
-      `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`
     );
 
     // Refresh page to ensure newly created stream appears in dropdowns

@@ -15,6 +15,7 @@ const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // ============================================================================
 // TEST DATA CONFIGURATION
@@ -37,29 +38,20 @@ const TEST_VRL_FUNCTION = `.test_field = "hello world"
 // API HELPER FUNCTIONS
 // ============================================================================
 
-function getAuthToken() {
-  return Buffer.from(
-    `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
-  ).toString('base64');
-}
-
 async function apiCall(page, method, path, body = null) {
   const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-  const authToken = getAuthToken();
+  const headers = getAuthHeaders();
 
-  return page.evaluate(async ({ url, method, authToken, body }) => {
+  return page.evaluate(async ({ url, method, headers, body }) => {
     const opts = {
       method,
-      headers: {
-        'Authorization': `Basic ${authToken}`,
-        'Content-Type': 'application/json'
-      }
+      headers,
     };
     if (body) opts.body = JSON.stringify(body);
     const resp = await fetch(url, opts);
     const data = await resp.json().catch(() => ({}));
     return { status: resp.status, data };
-  }, { url: `${baseUrl}${path}`, method, authToken, body });
+  }, { url: `${baseUrl}${path}`, method, headers, body });
 }
 
 // ============================================================================
@@ -67,7 +59,7 @@ async function apiCall(page, method, path, body = null) {
 // ============================================================================
 
 async function ensureTemplate(page) {
-  const org = process.env.ORGNAME || 'default';
+  const org = getOrgIdentifier();
   const resp = await apiCall(page, 'POST', `/api/${org}/alerts/templates`, {
     name: TEMPLATE_NAME,
     body: JSON.stringify({ text: "VRL Test Alert: {alert_name}" }),
@@ -79,7 +71,7 @@ async function ensureTemplate(page) {
 }
 
 async function ensureDestination(page) {
-  const org = process.env.ORGNAME || 'default';
+  const org = getOrgIdentifier();
   const resp = await apiCall(page, 'POST', `/api/${org}/alerts/destinations`, {
     name: DESTINATION_NAME,
     url: 'https://httpbin.org/post',
@@ -94,7 +86,7 @@ async function ensureDestination(page) {
 }
 
 async function createAlertWithVrl(page) {
-  const org = process.env.ORGNAME || 'default';
+  const org = getOrgIdentifier();
 
   // VRL function needs to be base64 encoded for the API
   const vrlBase64 = Buffer.from(TEST_VRL_FUNCTION).toString('base64');
@@ -138,7 +130,7 @@ async function createAlertWithVrl(page) {
 }
 
 async function getAlertByName(page, alertName, maxRetries = 3) {
-  const org = process.env.ORGNAME || 'default';
+  const org = getOrgIdentifier();
   // Retry loop for API propagation delay
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const listResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts?folder=default`);
@@ -165,7 +157,7 @@ async function getAlertByName(page, alertName, maxRetries = 3) {
 // ============================================================================
 
 async function cleanup(page, alertId) {
-  const org = process.env.ORGNAME || 'default';
+  const org = getOrgIdentifier();
 
   // Delete alert
   if (alertId) {
@@ -206,8 +198,8 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
   test.beforeEach(async ({ page }) => {
     pm = new PageManager(page);
     // Navigate to base URL first so page context is ready for API calls
-    await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState("networkidle");
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
   });
 
   test("VRL function should not be double-encoded in API @vrl @P1", async ({ page }) => {
@@ -266,8 +258,8 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     createdAlertId = getResp.alertId;
 
     // Navigate to alerts page
-    await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState("networkidle");
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
 
     // Use page object methods - search and select alert
     await pm.alertsPage.searchAlert(ALERT_NAME);
@@ -320,8 +312,8 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     createdAlertId = getResp.alertId;
 
     // Navigate to alerts and edit
-    await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState("networkidle");
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
 
     // Use page object methods
     await pm.alertsPage.searchAlert(ALERT_NAME);
@@ -360,7 +352,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     expect(await ensureTemplate(page)).toBe(true);
     expect(await ensureDestination(page)).toBe(true);
 
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const plainTextAlertName = `e2e_vrl_plaintext_${RUN_ID}`;
     const plainTextVrl = '.plain_text_vrl = "test"';
 
@@ -447,8 +439,8 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     putCapture = pm.alertsPage.setupPutRequestCapture();
 
     // Navigate to alerts and edit
-    await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState("networkidle");
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
 
     // Use page object methods
     await pm.alertsPage.searchAlert(ALERT_NAME);

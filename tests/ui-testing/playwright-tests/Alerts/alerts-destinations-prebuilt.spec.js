@@ -1,6 +1,7 @@
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Test timeout constants (in milliseconds)
 const DEFAULT_TIMEOUT_MS = 60000;
@@ -42,7 +43,7 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     }
 
     // Navigate directly to alert destinations page
-    await page.goto(`${process.env["ZO_BASE_URL"]}/web/settings/alert_destinations?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${process.env["ZO_BASE_URL"]}/web/settings/alert_destinations?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
     await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
