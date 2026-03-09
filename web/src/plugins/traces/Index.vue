@@ -935,9 +935,9 @@ async function getQueryData(
 }
 
 const cancelSearch = () => {
+  // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
+  window.dispatchEvent(new Event("cancelQuery"));
   if (!currentSearchTraceId) return;
-  if (tracesPartitionMap[currentSearchTraceId])
-    delete tracesPartitionMap[currentSearchTraceId];
   cancelStreamQueryBasedOnRequestId({
     trace_id: currentSearchTraceId,
     org_id: searchObj.organizationIdentifier,
