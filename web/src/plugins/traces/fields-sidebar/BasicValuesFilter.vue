@@ -79,6 +79,7 @@ import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
+import { removeFieldFromWhereAST, logsUtils } from "@/composables/useLogs/logsUtils";
 
 const props = defineProps({
   row: {
@@ -96,6 +97,7 @@ const store = useStore();
 const { searchObj } = useTraces();
 const { fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues } =
   useFieldValuesStream();
+const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
 
 const defaultValuesCount = computed(
   () => store.state.zoConfig?.query_values_default_num || 10,
@@ -150,7 +152,29 @@ const buildSql = () => {
     query_context = query_context.replace("[WHERE_CLAUSE]", "");
   }
 
-  return b64EncodeUnicode(query_context) || "";
+  // Remove the expanded field's own filter so value counts are not constrained
+  // by the condition the user is exploring.
+  let sqlForValues = query_context;
+  try {
+    const parsedForValues = fnParsedSQL(query_context);
+    if (parsedForValues?.from?.length > 0) {
+      const modifiedWhere = removeFieldFromWhereAST(
+        parsedForValues.where,
+        props.row.name,
+      );
+      const modifiedSQL = fnUnparsedSQL({
+        ...parsedForValues,
+        where: modifiedWhere,
+      }).replace(/`/g, '"');
+      if (modifiedSQL) {
+        sqlForValues = modifiedSQL;
+      }
+    }
+  } catch {
+    // Fall back to original SQL if AST manipulation fails
+  }
+
+  return b64EncodeUnicode(sqlForValues) || "";
 };
 
 const fetchValues = (from: number = 0, keyword: string = "") => {
@@ -243,6 +267,8 @@ const handleBeforeHide = () => {
   currentKeyword.value = "";
   resetFieldValues(props.row.name);
 };
+
+defineExpose({ buildSql });
 </script>
 
 <style lang="scss">

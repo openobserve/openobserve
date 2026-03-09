@@ -681,3 +681,230 @@ class DashboardPage:
         assert response.status_code == 200, f"Failed to create panel: {response.content.decode()}"
         dashboard_id = response.json()["v5"]["dashboardId"]
         return dashboard_id
+
+    def create_dashboard_with_time_shift(self, session, base_url, user_email, user_password, org_id, stream_name, folder_id, dashboard_name):
+        """Create a dashboard with time_shift (comparison against past data)."""
+        session.auth = HTTPBasicAuth(user_email, user_password)
+        headers = {
+            "Content-Type": "application/json",
+            "Custom-Header": "value"
+        }
+
+        payload = {
+            "version": 5,
+            "title": dashboard_name,
+            "description": "Dashboard with time shift comparison",
+            "role": "",
+            "owner": user_email,
+            "tabs": [
+                {
+                    "tabId": "default",
+                    "name": "Time Comparison",
+                    "panels": [
+                        {
+                            "id": "Panel_TimeShift_1",
+                            "type": "line",
+                            "title": "Count with Time Shift Comparison",
+                            "description": "Comparing current data vs 1h ago, 1d ago, 1w ago",
+                            "config": {
+                                "show_legends": True,
+                                "legends_position": "bottom",
+                                "decimals": 2,
+                                "line_thickness": 2,
+                                "show_symbol": True,
+                                "line_interpolation": "smooth",
+                                "connect_nulls": False
+                            },
+                            "queryType": "sql",
+                            "queries": [
+                                {
+                                    "query": f"SELECT histogram(_timestamp) as \"x_axis_1\", count(*) as \"y_axis_1\" FROM \"{stream_name}\" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+                                    "vrlFunctionQuery": "",
+                                    "customQuery": False,
+                                    "fields": {
+                                        "stream": stream_name,
+                                        "stream_type": "logs",
+                                        "x": [
+                                            {
+                                                "label": "Timestamp",
+                                                "alias": "x_axis_1",
+                                                "column": "_timestamp",
+                                                "aggregationFunction": "histogram",
+                                                "sortBy": "ASC"
+                                            }
+                                        ],
+                                        "y": [
+                                            {
+                                                "label": "Count",
+                                                "alias": "y_axis_1",
+                                                "column": "*",
+                                                "aggregationFunction": "count"
+                                            }
+                                        ],
+                                        "z": [],
+                                        "breakdown": [],
+                                        "filter": {
+                                            "filterType": "group",
+                                            "logicalOperator": "AND",
+                                            "conditions": []
+                                        }
+                                    },
+                                    "config": {
+                                        "promql_legend": "",
+                                        "layer_type": "line",
+                                        "time_shift": [
+                                            {"offSet": "1h"},
+                                            {"offSet": "1d"},
+                                            {"offSet": "1w"}
+                                        ]
+                                    }
+                                }
+                            ],
+                            "layout": {
+                                "x": 0,
+                                "y": 0,
+                                "w": 48,
+                                "h": 12,
+                                "i": 1
+                            }
+                        },
+                        {
+                            "id": "Panel_TimeShift_2",
+                            "type": "area",
+                            "title": "Error Rate Comparison",
+                            "description": "Error rate vs previous periods",
+                            "config": {
+                                "show_legends": True,
+                                "legends_position": "right",
+                                "decimals": 2,
+                                "line_thickness": 1.5,
+                                "show_symbol": False,
+                                "line_interpolation": "smooth"
+                            },
+                            "queryType": "sql",
+                            "queries": [
+                                {
+                                    "query": f"SELECT histogram(_timestamp) as \"x_axis_1\", count(*) as \"y_axis_1\" FROM \"{stream_name}\" WHERE code >= 400 GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+                                    "vrlFunctionQuery": "",
+                                    "customQuery": False,
+                                    "fields": {
+                                        "stream": stream_name,
+                                        "stream_type": "logs",
+                                        "x": [
+                                            {
+                                                "label": "Timestamp",
+                                                "alias": "x_axis_1",
+                                                "column": "_timestamp",
+                                                "aggregationFunction": "histogram",
+                                                "sortBy": "ASC"
+                                            }
+                                        ],
+                                        "y": [
+                                            {
+                                                "label": "Error Count",
+                                                "alias": "y_axis_1",
+                                                "column": "*",
+                                                "aggregationFunction": "count"
+                                            }
+                                        ],
+                                        "z": [],
+                                        "breakdown": [],
+                                        "filter": {
+                                            "filterType": "group",
+                                            "logicalOperator": "AND",
+                                            "conditions": []
+                                        }
+                                    },
+                                    "config": {
+                                        "promql_legend": "",
+                                        "layer_type": "area",
+                                        "time_shift": [
+                                            {"offSet": "24h"}
+                                        ]
+                                    }
+                                }
+                            ],
+                            "layout": {
+                                "x": 0,
+                                "y": 12,
+                                "w": 24,
+                                "h": 10,
+                                "i": 2
+                            }
+                        },
+                        {
+                            "id": "Panel_TimeShift_3",
+                            "type": "bar",
+                            "title": "Namespace Activity Comparison",
+                            "description": "Activity by namespace vs yesterday",
+                            "config": {
+                                "show_legends": True,
+                                "legends_position": "bottom",
+                                "decimals": 0
+                            },
+                            "queryType": "sql",
+                            "queries": [
+                                {
+                                    "query": f"SELECT kubernetes_namespace_name as \"x_axis_1\", count(*) as \"y_axis_1\" FROM \"{stream_name}\" GROUP BY x_axis_1 ORDER BY y_axis_1 DESC LIMIT 10",
+                                    "vrlFunctionQuery": "",
+                                    "customQuery": False,
+                                    "fields": {
+                                        "stream": stream_name,
+                                        "stream_type": "logs",
+                                        "x": [
+                                            {
+                                                "label": "Namespace",
+                                                "alias": "x_axis_1",
+                                                "column": "kubernetes_namespace_name"
+                                            }
+                                        ],
+                                        "y": [
+                                            {
+                                                "label": "Count",
+                                                "alias": "y_axis_1",
+                                                "column": "*",
+                                                "aggregationFunction": "count"
+                                            }
+                                        ],
+                                        "z": [],
+                                        "breakdown": [],
+                                        "filter": {
+                                            "filterType": "group",
+                                            "logicalOperator": "AND",
+                                            "conditions": []
+                                        }
+                                    },
+                                    "config": {
+                                        "promql_legend": "",
+                                        "layer_type": "bar",
+                                        "time_shift": [
+                                            {"offSet": "1d"}
+                                        ]
+                                    }
+                                }
+                            ],
+                            "layout": {
+                                "x": 24,
+                                "y": 12,
+                                "w": 24,
+                                "h": 10,
+                                "i": 3
+                            }
+                        }
+                    ]
+                }
+            ],
+            "variables": {
+                "list": [],
+                "showDynamicFilters": True
+            },
+            "defaultDatetimeDuration": {
+                "type": "relative",
+                "relativeTimePeriod": "6h"
+            }
+        }
+
+        response = session.post(f"{base_url}api/{org_id}/dashboards?folder={folder_id}", json=payload, headers=headers)
+        assert response.status_code == 200, f"Failed to create dashboard with time_shift: {response.content.decode()}"
+        dashboard_id = response.json()["v5"]["dashboardId"]
+        return dashboard_id
