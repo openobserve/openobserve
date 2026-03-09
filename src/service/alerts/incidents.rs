@@ -732,27 +732,39 @@ async fn find_or_create_incident(
             {
                 let org_id_rca = org_id.to_string();
                 let incident_id_rca = existing.id.clone();
-                // Emit Begin synchronously so the frontend sees it on the next poll
-                let _ = infra::table::incident_events::append(
-                    &org_id_rca,
-                    &incident_id_rca,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-                )
-                .await;
-                tokio::spawn(async move {
-                    if let Err(e) = trigger_rca_for_incident(
-                        org_id_rca.clone(),
-                        incident_id_rca.clone(),
-                        true, // lifecycle-triggered reanalysis — track usage
-                        true, // begin already emitted above
-                    )
+                let cooldown = o2_enterprise::enterprise::common::config::get_config()
+                    .incidents
+                    .reanalysis_cooldown_minutes;
+                let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
                     .await
-                    {
-                        log::debug!(
-                            "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
-                        );
-                    }
-                });
+                    .unwrap_or_default();
+                if !is_analysis_in_flight(&events, cooldown * 2) {
+                    // Emit Begin synchronously so the frontend sees it on the next poll
+                    let _ = infra::table::incident_events::append(
+                        &org_id_rca,
+                        &incident_id_rca,
+                        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                    )
+                    .await;
+                    tokio::spawn(async move {
+                        if let Err(e) = trigger_rca_for_incident(
+                            org_id_rca.clone(),
+                            incident_id_rca.clone(),
+                            true, // lifecycle-triggered reanalysis — track usage
+                            true, // begin already emitted above
+                        )
+                        .await
+                        {
+                            log::debug!(
+                                "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
+                            );
+                        }
+                    });
+                } else {
+                    log::debug!(
+                        "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping NewAlertTypeJoined trigger"
+                    );
+                }
             }
             return Ok(IncidentCorrelationOutcome::NewAlertTypeJoined {
                 incident_id: existing.id,
@@ -859,23 +871,39 @@ async fn find_or_create_incident(
             {
                 let org_id_rca = org_id.to_string();
                 let incident_id_rca = upgradeable_incident.id.clone();
-                // Emit Begin synchronously so the frontend sees it on the next poll
-                let _ = infra::table::incident_events::append(
-                    &org_id_rca,
-                    &incident_id_rca,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-                )
-                .await;
-                tokio::spawn(async move {
-                    if let Err(e) =
-                        trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), true, true) // lifecycle reanalysis — track usage; begin already emitted above
-                            .await
-                    {
-                        log::debug!(
-                            "[INCIDENTS::RCA] Reanalysis trigger failed after DimensionsUpgraded: {e}"
-                        );
-                    }
-                });
+                let cooldown = o2_enterprise::enterprise::common::config::get_config()
+                    .incidents
+                    .reanalysis_cooldown_minutes;
+                let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
+                    .await
+                    .unwrap_or_default();
+                if !is_analysis_in_flight(&events, cooldown * 2) {
+                    // Emit Begin synchronously so the frontend sees it on the next poll
+                    let _ = infra::table::incident_events::append(
+                        &org_id_rca,
+                        &incident_id_rca,
+                        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                    )
+                    .await;
+                    tokio::spawn(async move {
+                        if let Err(e) = trigger_rca_for_incident(
+                            org_id_rca,
+                            incident_id_rca.clone(),
+                            true,
+                            true,
+                        ) // lifecycle reanalysis; begin already emitted above
+                        .await
+                        {
+                            log::debug!(
+                                "[INCIDENTS::RCA] Reanalysis trigger failed after DimensionsUpgraded: {e}"
+                            );
+                        }
+                    });
+                } else {
+                    log::debug!(
+                        "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping DimensionsUpgraded trigger"
+                    );
+                }
             }
 
             return Ok(IncidentCorrelationOutcome::NewAlertTypeJoined {
@@ -954,12 +982,13 @@ async fn find_or_create_incident(
     crate::service::self_reporting::report_request_usage_stats(
         config::meta::self_reporting::usage::RequestStats {
             records: 1,
+            request_body: Some(serde_json::json!({"incident_id": incident.id}).to_string()),
             ..Default::default()
         },
         org_id,
         "",
         config::meta::stream::StreamType::Metadata,
-        config::meta::self_reporting::usage::UsageType::IncidentCreation,
+        config::meta::self_reporting::usage::UsageType::NewIncident,
         0,
         triggered_at,
     )
@@ -1550,6 +1579,9 @@ pub async fn trigger_rca_for_incident(
                 crate::service::self_reporting::report_request_usage_stats(
                     config::meta::self_reporting::usage::RequestStats {
                         records: 1,
+                        request_body: Some(
+                            serde_json::json!({"incident_id": incident_id}).to_string(),
+                        ),
                         ..Default::default()
                     },
                     &org_id,
@@ -1628,27 +1660,40 @@ pub async fn update_status(
         log::error!("[Incidents] Failed to record status event: {e}");
     }
 
-    // Trigger RCA reanalysis when incident is reopened — context is fresh
+    // Trigger RCA reanalysis when incident is reopened — context is fresh,
+    // cooldown is bypassed, but in-flight guard still applies.
     #[cfg(feature = "enterprise")]
     if status == "open" {
         let org_id_rca = org_id.to_string();
         let incident_id_rca = incident_id.to_string();
-        // Emit Begin synchronously so the frontend sees it on the next poll
-        let _ = infra::table::incident_events::append(
-            &org_id_rca,
-            &incident_id_rca,
-            config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-        )
-        .await;
-        tokio::spawn(async move {
-            // reanalysis=true: bypass cooldown — incident was closed, context is fresh
-            if let Err(e) =
-                trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), true, true).await
-            // begin already emitted above
-            {
-                log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
-            }
-        });
+        let cooldown = o2_enterprise::enterprise::common::config::get_config()
+            .incidents
+            .reanalysis_cooldown_minutes;
+        let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
+            .await
+            .unwrap_or_default();
+        if !is_analysis_in_flight(&events, cooldown * 2) {
+            // Emit Begin synchronously so the frontend sees it on the next poll
+            let _ = infra::table::incident_events::append(
+                &org_id_rca,
+                &incident_id_rca,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+            )
+            .await;
+            tokio::spawn(async move {
+                // reanalysis=true: bypass cooldown — incident was closed, context is fresh
+                if let Err(e) =
+                    trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), true, true).await
+                // begin already emitted above
+                {
+                    log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
+                }
+            });
+        } else {
+            log::debug!(
+                "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping Reopened trigger"
+            );
+        }
     }
 
     #[cfg(feature = "enterprise")]

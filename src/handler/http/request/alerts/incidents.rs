@@ -213,25 +213,6 @@ pub async fn update_incident(
     let user_id = user_email.user_id;
 
     match body {
-        UpdatePayload::Status { .. } if user_id == config::get_config().auth.root_user_email => {
-            // Block status changes originating from the AI agent (root credentials).
-            // Status management is a human action only.
-            //
-            // Known limitation: this also blocks any automation that happens to use root
-            // credentials for status updates. A more targeted approach (e.g. a dedicated
-            // service-account header) would be preferable in future but requires cross-repo
-            // changes; this guard is sufficient for the current threat model.
-            return axum::response::Response::builder()
-                .status(axum::http::StatusCode::FORBIDDEN)
-                .header(axum::http::header::CONTENT_TYPE, "application/json")
-                .body(axum::body::Body::from(
-                    serde_json::json!({
-                        "error": "Status changes via the API are not permitted for this user. Incident status must be managed by a human in the UI."
-                    })
-                    .to_string(),
-                ))
-                .unwrap();
-        }
         UpdatePayload::Title { title } => {
             if title.trim().is_empty() {
                 return MetaHttpResponse::bad_request("Title cannot be empty");
@@ -591,11 +572,12 @@ pub async fn trigger_incident_rca(
         .await;
 
         // Usage: only count as reanalysis if explicitly requested; the initial analysis
-        // on a brand-new incident is already counted as IncidentCreation.
+        // on a brand-new incident is already counted as NewIncident.
         if query.reanalysis {
             crate::service::self_reporting::report_request_usage_stats(
                 config::meta::self_reporting::usage::RequestStats {
                     records: 1,
+                    request_body: Some(serde_json::json!({"incident_id": incident_id}).to_string()),
                     ..Default::default()
                 },
                 &org_id,
