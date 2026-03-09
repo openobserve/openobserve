@@ -106,11 +106,8 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         // Verifies: multiple conditions can be added, AND is default, can toggle to OR
         const result = await pm.alertsPage.testConditionOperatorToggle(TEST_STREAM, uniqueSuffix);
 
-        if (result.toggleSuccessful) {
-            testLogger.info('Successfully toggled condition operator from AND to OR');
-        } else {
-            testLogger.warn('Toggle operator test completed with warnings', { message: result.message });
-        }
+        expect(result.toggleSuccessful, `Condition operator toggle failed: ${result.message || 'unknown reason'}`).toBe(true);
+        testLogger.info('Successfully toggled condition operator from AND to OR');
     });
 
     // ==================== BULK OPERATIONS TESTS ====================

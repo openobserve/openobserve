@@ -16,6 +16,7 @@ test.describe("Alerts UI Operations", () => {
   let validationInfra;
 
   test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     pm = new PageManager(page);
 
     if (!sharedRandomValue) {

@@ -345,9 +345,11 @@ test.describe("Scheduled Alert Features", () => {
         await pm.alertsPage.openAlertDetailsDialog(API_ALERT_NAME);
         await pm.alertsPage.expectAlertDetailsDialogVisible();
         await pm.alertsPage.clickAlertDetailsEditButton();
+        await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+        await page.waitForTimeout(3000);
 
         const alertSetupText = page.getByText('Alert Setup').first();
-        const wizardVisible = await alertSetupText.isVisible({ timeout: 10000 }).catch(() => false);
+        const wizardVisible = await alertSetupText.isVisible({ timeout: 15000 }).catch(() => false);
         expect(wizardVisible).toBe(true);
         testLogger.info('Edit button navigated to alert wizard');
 

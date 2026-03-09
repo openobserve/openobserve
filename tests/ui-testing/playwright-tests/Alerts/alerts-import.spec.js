@@ -17,6 +17,7 @@ test.describe("Alerts Import/Export", () => {
   let testStreamName; // Unique stream with custom columns for this test run
 
   test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     pm = new PageManager(page);
 
     if (!sharedRandomValue) {

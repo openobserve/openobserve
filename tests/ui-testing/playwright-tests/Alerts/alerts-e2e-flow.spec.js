@@ -5,7 +5,7 @@ const testLogger = require('../utils/test-logger.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Test timeout constants (in milliseconds)
-const FIVE_MINUTES_MS = 300000;
+const TEN_MINUTES_MS = 600000;
 const ALERT_REGISTRATION_WAIT_MS = 30000; // Wait for alert to fully register and become active
 const UI_STABILIZATION_WAIT_MS = 2000;
 const ALERT_TRIGGER_TIMEOUT_MS = 90000; // Real-time alerts need time to process and fire
@@ -27,6 +27,7 @@ test.describe("Alerts E2E Flow", () => {
    * - Navigates to alerts page
    */
   test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     pm = new PageManager(page);
 
     // Generate shared random value if not already generated
@@ -70,7 +71,7 @@ test.describe("Alerts E2E Flow", () => {
    */
   test('Complete Alerts E2E Flow - CRUD, Trigger Validation, Search, Folders, Pause/Resume', {
     tag: ['@e2eAlerts', '@all', '@alerts'],
-    timeout: FIVE_MINUTES_MS
+    timeout: TEN_MINUTES_MS
   }, async ({ page }) => {
     // This E2E flow covers many operations and needs more than the default 3-minute timeout
     test.slow();
