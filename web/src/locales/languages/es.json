@@ -2318,6 +2318,8 @@
     "namePlaceholder": "p. ej., Ver detalles de rastreo",
     "urlTemplate": "Plantilla de URL",
     "urlRequired": "La URL es obligatoria",
+    "urlPlaceholder": "p. ej., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "Usa {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Campos",
     "fieldsHint": "Mostrar enlace solo cuando hay al menos un campo en el registro",
     "fieldSearchPlaceholder": "Escriba para buscar o introduzca un campo personalizado",

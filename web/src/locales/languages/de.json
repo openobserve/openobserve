@@ -2318,6 +2318,8 @@
     "namePlaceholder": "z. B. Trace-Details anzeigen",
     "urlTemplate": "URL-Vorlage",
     "urlRequired": "URL ist erforderlich",
+    "urlPlaceholder": "z. B. https://example.com/trace/{'${field.__value}'}?von={'${start_time}'}&bis={'${end_time}'}",
+    "urlHint": "Verwenden Sie {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Felder",
     "fieldsHint": "Link nur anzeigen, wenn mindestens ein Feld im Datensatz vorhanden ist",
     "fieldSearchPlaceholder": "Geben Sie ein, um ein benutzerdefiniertes Feld zu suchen oder einzugeben",
