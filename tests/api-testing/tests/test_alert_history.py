@@ -10,19 +10,17 @@ These tests complement the E2E test in test_alerts.py by covering:
 - Error path tests for invalid parameters
 - Unauthorized access
 
-IMPORTANT: This file is named test_alerts_history.py (not test_alert_history.py)
-so it runs AFTER test_alerts.py alphabetically. The test_e2e_alert_history test
-in test_alerts.py creates the triggers stream by triggering an alert, which is
-required for these tests to pass.
-
 Note: Tests using sort_by/sort_order parameters require the triggers stream
-to exist. These tests are skipped if the stream doesn't exist yet.
+to exist. The ensure_triggers_stream fixture creates an alert and triggers it
+to ensure the stream exists before running tests.
 """
 
 import pytest
 import requests
 import logging
 import os
+import time
+import base64
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
@@ -30,6 +28,172 @@ logger = logging.getLogger(__name__)
 # Use TEST_ORG_ID to match conftest.py's DEFAULT_ORG_ID for consistency across tests
 # Falls back to "default" which is the standard test organization
 ORG_ID = os.environ.get("TEST_ORG_ID", "default")
+BASE_URL = os.environ.get("ZO_BASE_URL", "http://localhost:5080/")
+
+
+@pytest.fixture(scope="module")
+def ensure_triggers_stream(create_session, base_url):
+    """Ensure the triggers stream exists by creating and triggering a test alert.
+
+    This fixture is independent - it creates its own test data and cleans up after.
+    The triggers stream is created when an alert executes, which populates the
+    alert history that these tests query.
+    """
+    session = create_session
+    url = base_url
+    org_id = ORG_ID
+    headers = {"Content-Type": "application/json"}
+
+    # Generate unique names to avoid conflicts
+    timestamp = int(time.time() * 1000)
+    template_name = f"history_api_test_template_{timestamp}"
+    destination_name = f"history_api_test_dest_{timestamp}"
+    stream_name = f"history_api_test_stream_{timestamp}"
+    alert_name = f"history_api_test_alert_{timestamp}"
+
+    created_resources = {
+        "template": None,
+        "destination": None,
+        "stream": None,
+        "alert_id": None,
+    }
+
+    try:
+        # Step 1: Create template
+        template_payload = {
+            "name": template_name,
+            "body": '{"text": "{alert_name} triggered"}',
+            "isDefault": False,
+        }
+        resp = session.post(
+            f"{url}api/{org_id}/alerts/templates",
+            json=template_payload,
+            headers=headers,
+        )
+        if resp.status_code == 200:
+            created_resources["template"] = template_name
+            logger.info(f"Created template: {template_name}")
+        else:
+            logger.warning(f"Failed to create template: {resp.status_code} - {resp.text}")
+
+        # Step 2: Create destination
+        destination_payload = {
+            "name": destination_name,
+            "url": "http://localhost:9999/webhook",  # Dummy endpoint
+            "method": "post",
+            "skip_tls_verify": True,
+            "template": template_name,
+        }
+        resp = session.post(
+            f"{url}api/{org_id}/alerts/destinations",
+            json=destination_payload,
+            headers=headers,
+        )
+        if resp.status_code == 200:
+            created_resources["destination"] = destination_name
+            logger.info(f"Created destination: {destination_name}")
+        else:
+            logger.warning(f"Failed to create destination: {resp.status_code} - {resp.text}")
+
+        # Step 3: Create stream and ingest data
+        test_data = [
+            {"level": "error", "message": "Test error for alert history", "count": 100}
+        ]
+        resp = session.post(
+            f"{url}api/{org_id}/{stream_name}/_json",
+            json=test_data,
+            headers=headers,
+        )
+        if resp.status_code == 200:
+            created_resources["stream"] = stream_name
+            logger.info(f"Ingested data to stream: {stream_name}")
+        else:
+            logger.warning(f"Failed to ingest data: {resp.status_code} - {resp.text}")
+
+        # Wait for data to be indexed
+        time.sleep(3)
+
+        # Step 4: Create alert
+        now = datetime.now(timezone.utc)
+        start_time = (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        end_time = now.strftime("%Y-%m-%dT%H:%M:%S")
+
+        alert_payload = {
+            "name": alert_name,
+            "stream_type": "logs",
+            "stream_name": stream_name,
+            "query_condition": {
+                "type": "sql",
+                "conditions": None,
+                "sql": f'SELECT count(*) as count FROM "{stream_name}"',
+                "promql": None,
+                "promql_condition": None,
+                "aggregation": None,
+                "vrl_function": None,
+                "search_event_type": "DerivedStream",
+            },
+            "trigger_condition": {
+                "period": 1,
+                "operator": ">=",
+                "threshold": 0,
+                "frequency": 1,
+                "cron": "",
+                "frequency_type": "minutes",
+                "silence": 5,
+            },
+            "destinations": [destination_name],
+            "enabled": True,
+            "description": "Test alert for history API tests",
+        }
+        resp = session.post(
+            f"{url}api/v2/{org_id}/alerts",
+            json=alert_payload,
+            headers=headers,
+        )
+        if resp.status_code == 200:
+            # Get alert ID from response or list
+            resp_list = session.get(f"{url}api/v2/{org_id}/alerts")
+            if resp_list.status_code == 200:
+                for alert in resp_list.json().get("list", []):
+                    if alert["name"] == alert_name:
+                        created_resources["alert_id"] = alert["alert_id"]
+                        logger.info(f"Created alert: {alert_name} (ID: {alert['alert_id']})")
+                        break
+        else:
+            logger.warning(f"Failed to create alert: {resp.status_code} - {resp.text}")
+
+        # Step 5: Wait for alert to trigger (creates triggers stream entry)
+        logger.info("Waiting 35 seconds for alert to trigger...")
+        time.sleep(35)
+
+        # Verify triggers stream exists
+        resp = session.get(f"{url}api/v2/{org_id}/alerts/history?size=1")
+        if resp.status_code == 200:
+            logger.info("Triggers stream verified - alert history accessible")
+        else:
+            logger.warning(f"Triggers stream may not exist: {resp.status_code}")
+
+        yield created_resources
+
+    finally:
+        # Cleanup
+        logger.info("Cleaning up test resources...")
+
+        if created_resources["alert_id"]:
+            resp = session.delete(f"{url}api/v2/{org_id}/alerts/{created_resources['alert_id']}")
+            logger.info(f"Deleted alert: {resp.status_code}")
+
+        if created_resources["destination"]:
+            resp = session.delete(f"{url}api/{org_id}/alerts/destinations/{destination_name}")
+            logger.info(f"Deleted destination: {resp.status_code}")
+
+        if created_resources["template"]:
+            resp = session.delete(f"{url}api/{org_id}/alerts/templates/{template_name}")
+            logger.info(f"Deleted template: {resp.status_code}")
+
+        if created_resources["stream"]:
+            resp = session.delete(f"{url}api/{org_id}/streams/{stream_name}?type=logs")
+            logger.info(f"Deleted stream: {resp.status_code}")
 
 
 def is_stream_not_found_error(resp):
@@ -101,6 +265,7 @@ class TestAlertHistoryContract:
             logger.warning("No history entries found - skipping entry schema validation")
 
 
+@pytest.mark.usefixtures("ensure_triggers_stream")
 class TestAlertHistorySorting:
     """Tests for sort_by and sort_order parameters.
 
@@ -300,6 +465,7 @@ class TestAlertHistoryErrors:
         logger.info(f"Zero size parameter clamped to {body['size']}")
 
 
+@pytest.mark.usefixtures("ensure_triggers_stream")
 class TestAlertHistoryPaginationEdgeCases:
     """Edge case tests for pagination parameters."""
 
