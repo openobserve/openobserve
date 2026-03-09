@@ -18,11 +18,14 @@ import pytest
 import time
 import requests
 import logging
+import os
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
-ORG_ID = "default"
+# Use environment variable for org_id to support different CI configurations
+# Falls back to "default" which is the standard test organization
+ORG_ID = os.environ.get("ZO_ORG_ID", "default")
 
 
 def triggers_stream_exists(session, base_url):
@@ -297,7 +300,12 @@ class TestAlertHistorySorting:
 
     @pytest.mark.parametrize("sort_order", ["asc", "desc", "ASC", "DESC"])
     def test_sort_order_valid_values(self, create_session, base_url, sort_order):
-        """Validate asc/desc sort_order values (case-insensitive)."""
+        """Validate asc/desc sort_order values (case-insensitive).
+
+        API implementation uses to_lowercase() on sort_order before matching,
+        so uppercase variants are intentionally supported.
+        See: src/handler/http/request/alerts/history.rs line 229
+        """
         session = create_session
 
         resp = session.get(
@@ -361,7 +369,11 @@ class TestAlertHistoryErrors:
     """Error path tests for Alert History API."""
 
     def test_invalid_sort_by_field(self, create_session, base_url):
-        """Invalid sort_by field should return 400."""
+        """Invalid sort_by field should return 400.
+
+        API validates sort_by against whitelist and returns MetaHttpResponse::bad_request
+        for invalid fields. See: src/handler/http/request/alerts/history.rs lines 217-220
+        """
         session = create_session
 
         resp = session.get(
@@ -373,7 +385,11 @@ class TestAlertHistoryErrors:
         logger.info("Invalid sort_by correctly rejected with 400")
 
     def test_invalid_sort_order_value(self, create_session, base_url):
-        """Invalid sort_order value should return 400."""
+        """Invalid sort_order value should return 400.
+
+        API validates sort_order against "asc"/"desc" and returns MetaHttpResponse::bad_request
+        for invalid values. See: src/handler/http/request/alerts/history.rs lines 232-235
+        """
         session = create_session
 
         resp = session.get(
@@ -408,7 +424,12 @@ class TestAlertHistoryErrors:
         logger.info("Negative from parameter correctly clamped to 0")
 
     def test_zero_size_parameter(self, create_session, base_url):
-        """Zero size parameter should be clamped to minimum (1)."""
+        """Zero size parameter should be clamped to minimum (1).
+
+        API uses .clamp(1, 1000) on size parameter, so 0 is clamped to 1.
+        The response reflects the clamped value, not the requested value.
+        See: src/handler/http/request/alerts/history.rs line 170
+        """
         session = create_session
 
         resp = session.get(f"{base_url}api/{ORG_ID}/alerts/history?size=0")
@@ -417,7 +438,7 @@ class TestAlertHistoryErrors:
         )
 
         body = resp.json()
-        # Size should be clamped to at least 1
+        # Size should be clamped to at least 1 (API uses .clamp(1, 1000))
         assert body["size"] >= 1, f"Expected size>=1 (clamped), got {body['size']}"
         logger.info(f"Zero size parameter clamped to {body['size']}")
 
