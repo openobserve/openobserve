@@ -2621,7 +2621,8 @@
     "success": "成功",
     "today": "今日",
     "yesterday": "昨日",
-    "spanColorPalettePreview": "Span カラーパレットのプレビュー"
+    "spanColorPalettePreview": "Span カラーパレットのプレビュー",
+    "errorsFound": "エラートレース"
   },
   "actions": {
     "testAction": "アクションをテスト",

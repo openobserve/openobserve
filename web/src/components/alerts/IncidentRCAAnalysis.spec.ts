@@ -184,24 +184,17 @@ describe("IncidentRCAAnalysis", () => {
   });
 
   describe("Loading State", () => {
-    it("should show loading state when rcaLoading is true", () => {
+    it("should show in-flight banner when rcaLoading is true", () => {
       wrapper = mountComponent({ rcaLoading: true });
 
-      expect(existsByTestId(wrapper, "rca-loading-container")).toBe(true);
-      expect(existsByTestId(wrapper, "rca-loading-indicator")).toBe(true);
+      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
     });
 
-    it("should display loading spinner", () => {
+    it("should display loading text in the in-flight banner", () => {
       wrapper = mountComponent({ rcaLoading: true });
 
-      expect(existsByTestId(wrapper, "rca-spinner")).toBe(true);
-    });
-
-    it("should display loading text", () => {
-      wrapper = mountComponent({ rcaLoading: true });
-
-      const loadingText = findByTestId(wrapper, "rca-loading-text");
-      expect(loadingText.text()).toBe("Analysis in progress...");
+      const container = findByTestId(wrapper, "rca-inflight-container");
+      expect(container.text()).toContain("AI SRE Agent is analyzing this incident");
     });
 
     it("should show streaming content while loading", () => {
@@ -226,26 +219,24 @@ describe("IncidentRCAAnalysis", () => {
       expect(existsByTestId(wrapper, "rca-stream-content")).toBe(false);
     });
 
-    it("should apply dark mode styles to loading container", () => {
+    it("should apply dark mode styles to in-flight container", () => {
       wrapper = mountComponent({
         rcaLoading: true,
         isDarkMode: true,
       });
 
-      const container = findByTestId(wrapper, "rca-loading-container");
-      expect(container.classes()).toContain("tw:bg-gray-800");
-      expect(container.classes()).toContain("tw:border-gray-700");
+      const container = findByTestId(wrapper, "rca-inflight-container");
+      expect(container.classes()).toContain("tw:bg-indigo-900/20");
     });
 
-    it("should apply light mode styles to loading container", () => {
+    it("should apply light mode styles to in-flight container", () => {
       wrapper = mountComponent({
         rcaLoading: true,
         isDarkMode: false,
       });
 
-      const container = findByTestId(wrapper, "rca-loading-container");
-      expect(container.classes()).toContain("tw:bg-white");
-      expect(container.classes()).toContain("tw:border-gray-200");
+      const container = findByTestId(wrapper, "rca-inflight-container");
+      expect(container.classes()).toContain("tw:bg-indigo-50");
     });
   });
 
@@ -321,84 +312,61 @@ describe("IncidentRCAAnalysis", () => {
   });
 
   describe("Empty State", () => {
-    it("should show empty state when no analysis and not loading", () => {
+    it("should show trigger button (not an empty-state element) when no analysis and not loading", () => {
       wrapper = mountComponent({
         hasExistingRca: false,
         rcaLoading: false,
       });
 
-      expect(existsByTestId(wrapper, "rca-empty-state")).toBe(true);
+      // Empty state text is gone; the trigger button section takes its place
+      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(true);
+      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(false);
     });
 
-    it("should display empty state message", () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: false,
-      });
-
-      const emptyState = findByTestId(wrapper, "rca-empty-state");
-      expect(emptyState.text()).toBe("No analysis performed yet");
-    });
-
-    it("should not show empty state when loading", () => {
+    it("should not show trigger button when loading", () => {
       wrapper = mountComponent({
         hasExistingRca: false,
         rcaLoading: true,
       });
 
-      expect(existsByTestId(wrapper, "rca-empty-state")).toBe(false);
+      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(false);
     });
 
-    it("should not show empty state when analysis exists", () => {
+    it("should not show trigger button when analysis exists", () => {
       wrapper = mountComponent({
         hasExistingRca: true,
         rcaLoading: false,
       });
 
-      expect(existsByTestId(wrapper, "rca-empty-state")).toBe(false);
+      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(false);
     });
 
-    it("should apply dark mode styles to empty state", () => {
+    it("should show in-flight banner instead of trigger button when analysisInFlight", () => {
       wrapper = mountComponent({
         hasExistingRca: false,
         rcaLoading: false,
-        isDarkMode: true,
+        analysisInFlight: true,
       });
 
-      const emptyState = findByTestId(wrapper, "rca-empty-state");
-      expect(emptyState.classes()).toContain("tw:bg-gray-700");
-      expect(emptyState.classes()).toContain("tw:border-gray-600");
-      expect(emptyState.classes()).toContain("tw:text-gray-300");
-    });
-
-    it("should apply light mode styles to empty state", () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: false,
-        isDarkMode: false,
-      });
-
-      const emptyState = findByTestId(wrapper, "rca-empty-state");
-      expect(emptyState.classes()).toContain("tw:bg-gray-50");
-      expect(emptyState.classes()).toContain("tw:border-gray-200");
-      expect(emptyState.classes()).toContain("tw:text-gray-500");
+      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(false);
+      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
     });
   });
 
   describe("State Transitions", () => {
-    it("should transition from empty to loading", async () => {
+    it("should transition from trigger button to in-flight banner when loading starts", async () => {
       wrapper = mountComponent({
         hasExistingRca: false,
         rcaLoading: false,
       });
 
-      expect(existsByTestId(wrapper, "rca-empty-state")).toBe(true);
+      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(true);
 
       await wrapper.setProps({ rcaLoading: true });
       await flushPromises();
 
-      expect(existsByTestId(wrapper, "rca-empty-state")).toBe(false);
-      expect(existsByTestId(wrapper, "rca-loading-container")).toBe(true);
+      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(false);
+      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
     });
 
     it("should transition from loading to existing analysis", async () => {
@@ -408,7 +376,7 @@ describe("IncidentRCAAnalysis", () => {
         rcaLoading: true,
       });
 
-      expect(existsByTestId(wrapper, "rca-loading-container")).toBe(true);
+      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
 
       await wrapper.setProps({
         rcaLoading: false,
@@ -417,7 +385,7 @@ describe("IncidentRCAAnalysis", () => {
       });
       await flushPromises();
 
-      expect(existsByTestId(wrapper, "rca-loading-container")).toBe(false);
+      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(false);
       expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
     });
 
@@ -501,21 +469,21 @@ describe("IncidentRCAAnalysis", () => {
   });
 
   describe("Theme Switching", () => {
-    it("should update styles when switching from light to dark mode", async () => {
+    it("should update in-flight banner styles when switching from light to dark mode", async () => {
       wrapper = mountComponent({
         hasExistingRca: false,
-        rcaLoading: false,
+        rcaLoading: true,
         isDarkMode: false,
       });
 
-      const emptyStateBefore = findByTestId(wrapper, "rca-empty-state");
-      expect(emptyStateBefore.classes()).toContain("tw:bg-gray-50");
+      const bannerBefore = findByTestId(wrapper, "rca-inflight-container");
+      expect(bannerBefore.classes()).toContain("tw:bg-indigo-50");
 
       await wrapper.setProps({ isDarkMode: true });
       await flushPromises();
 
-      const emptyStateAfter = findByTestId(wrapper, "rca-empty-state");
-      expect(emptyStateAfter.classes()).toContain("tw:bg-gray-700");
+      const bannerAfter = findByTestId(wrapper, "rca-inflight-container");
+      expect(bannerAfter.classes()).toContain("tw:bg-indigo-900/20");
     });
 
     it("should apply correct dark mode styles during loading", () => {
@@ -524,8 +492,8 @@ describe("IncidentRCAAnalysis", () => {
         isDarkMode: true,
       });
 
-      const container = findByTestId(wrapper, "rca-loading-container");
-      expect(container.classes()).toContain("tw:bg-gray-800");
+      const container = findByTestId(wrapper, "rca-inflight-container");
+      expect(container.classes()).toContain("tw:bg-indigo-900/20");
     });
   });
 
@@ -541,7 +509,7 @@ describe("IncidentRCAAnalysis", () => {
 
       // Simulate loading state
       await wrapper.setProps({ rcaLoading: true, rcaStreamContent: "Analyzing..." });
-      expect(existsByTestId(wrapper, "rca-loading-container")).toBe(true);
+      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
 
       // Complete analysis
       const finalContent = createMockRcaContent().detailed;

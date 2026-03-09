@@ -2598,7 +2598,8 @@
     "success": "SUCCESSO",
     "today": "Oggi",
     "yesterday": "Ieri",
-    "spanColorPalettePreview": "Anteprima della palette di colori Span"
+    "spanColorPalettePreview": "Anteprima della palette di colori Span",
+    "errorsFound": "Tracce di errore"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
