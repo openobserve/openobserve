@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { computed } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 
@@ -142,6 +143,7 @@ describe("ConfigPanel", () => {
     vi.mocked(useDashboardPanelData).mockReturnValue({
       dashboardPanelData: props.dashboardPanelData || defaultProps.dashboardPanelData,
       promqlMode: !!options.promqlMode,
+      isPivotMode: computed(() => false),
       selectedStreamFields: props.dashboardPanelData?.meta?.stream?.selectedStreamFields || []
     });
     
