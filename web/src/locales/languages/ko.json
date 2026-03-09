@@ -744,7 +744,8 @@
     "yes_update_license": "예, 라이선스 업데이트",
     "no_keep_current": "아니요, 최신 상태로 유지",
     "feature_correlation_management": "상관관계 관리",
-    "feature_log_patterns": "로그 패턴"
+    "feature_log_patterns": "로그 패턴",
+    "environment_type": "환경 유형"
   },
   "login": {
     "userid": "사용자 ID",

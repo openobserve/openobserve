@@ -744,7 +744,8 @@
     "yes_update_license": "Ja, licentie bijwerken",
     "no_keep_current": "Nee, blijf op de hoogte",
     "feature_correlation_management": "Correlatiebeheer",
-    "feature_log_patterns": "Logpatronen"
+    "feature_log_patterns": "Logpatronen",
+    "environment_type": "Omgevingstype"
   },
   "login": {
     "userid": "Gebruikers-ID",

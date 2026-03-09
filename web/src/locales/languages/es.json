@@ -744,7 +744,8 @@
     "yes_update_license": "Sí, actualizar la licencia",
     "no_keep_current": "No, mantente al día",
     "feature_correlation_management": "Gestión de correlaciones",
-    "feature_log_patterns": "Patrones de registro"
+    "feature_log_patterns": "Patrones de registro",
+    "environment_type": "Tipo de entorno"
   },
   "login": {
     "userid": "ID de usuario",
