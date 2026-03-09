@@ -1278,9 +1278,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown = [];
+        // Keep breakdown fields — they are used for pivot table mode
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
@@ -2798,12 +2796,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     // First reset all existing fields in dashboardPanelData
     resetFields();
 
-    // For table chart type, merge breakdown fields into x fields
+    // Keep breakdown fields for table — they are used for pivot table mode
     const fieldsToProcess = { ...fields };
-    if (chartType === "table") {
-      fieldsToProcess.x = [...(fields.x || []), ...(fields.breakdown || [])];
-      fieldsToProcess.breakdown = [];
-    }
 
     // The add functions will automatically apply validation based on current chart type
     // Add X-axis fields
