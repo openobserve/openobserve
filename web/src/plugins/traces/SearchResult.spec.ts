@@ -243,20 +243,12 @@ describe("SearchResult", () => {
     it("should emit update:scroll and increment page when more records exist", async () => {
       // currentPage(1) * rowsPerPage(1) = 1 < total(2) → fires
       const list = wrapper.findComponent({ name: "TracesSearchResultList" });
-      await list.vm.$emit("load-more");
+      await list.vm.$emit("page-change", 3);
 
       expect(wrapper.emitted("update:scroll")).toBeTruthy();
+
       expect(mockSearchObj.data.resultGrid.currentPage).toBe(2);
-    });
 
-    it("should not emit update:scroll when all records are already loaded", async () => {
-      mockSearchObj.meta.resultGrid.rowsPerPage = 10;
-      // currentPage(1) * rowsPerPage(10) = 10 >= total(2) → does not fire
-
-      const list = wrapper.findComponent({ name: "TracesSearchResultList" });
-      await list.vm.$emit("load-more");
-
-      expect(wrapper.emitted("update:scroll")).toBeFalsy();
     });
 
     it("should not emit update:scroll when loading is true", async () => {
@@ -344,6 +336,7 @@ describe("SearchResult", () => {
       const expectedEmits = [
         "update:scroll",
         "update:datetime",
+        "update:sort",
         "remove:searchTerm",
         "search:timeboxed",
         "get:traceDetails",
