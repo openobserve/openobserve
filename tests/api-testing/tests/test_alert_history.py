@@ -19,13 +19,13 @@ import time
 import requests
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
-# Use environment variable for org_id to support different CI configurations
+# Use TEST_ORG_ID to match conftest.py's DEFAULT_ORG_ID for consistency across tests
 # Falls back to "default" which is the standard test organization
-ORG_ID = os.environ.get("ZO_ORG_ID", "default")
+ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 
 
 def triggers_stream_exists(session, base_url):
@@ -192,6 +192,13 @@ def setup_alert_history(create_session, base_url):
     )
     if resp.status_code == 200:
         logger.info(f"Deleted template: {template_name}")
+
+    # Delete the test stream to avoid orphaned streams accumulating across CI runs
+    resp = session.delete(
+        f"{base_url}api/{ORG_ID}/{stream_name}?type=logs"
+    )
+    if resp.status_code == 200:
+        logger.info(f"Deleted stream: {stream_name}")
 
 
 @pytest.fixture(scope="module")
@@ -483,8 +490,8 @@ class TestAlertHistoryPaginationEdgeCases:
         """Test time range filtering with sort parameters."""
         session = create_session
 
-        end_time = int(datetime.utcnow().timestamp() * 1_000_000)
-        start_time = int((datetime.utcnow() - timedelta(days=1)).timestamp() * 1_000_000)
+        end_time = int(datetime.now(timezone.utc).timestamp() * 1_000_000)
+        start_time = int((datetime.now(timezone.utc) - timedelta(days=1)).timestamp() * 1_000_000)
 
         resp = session.get(
             f"{base_url}api/{ORG_ID}/alerts/history"
