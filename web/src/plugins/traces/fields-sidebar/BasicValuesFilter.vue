@@ -46,7 +46,70 @@
     </template>
     <q-card>
       <q-card-section class="q-pl-md q-pr-xs q-py-xs">
+        <template v-if="row.name === 'duration'">
+          <!-- Percentile stats -->
+          <div
+            v-if="durationPercentilesLoading"
+            class="tw:flex tw:justify-center tw:py-[0.5rem]"
+          >
+            <q-spinner size="1rem" color="primary" />
+          </div>
+          <template v-else-if="hasPercentiles">
+            <div
+              v-for="p in PERCENTILE_LABELS"
+              :key="p.key"
+              class="tw:flex tw:items-center tw:justify-between tw:py-[0.15rem]"
+            >
+              <span
+                class="tw:text-[0.7rem] tw:text-[var(--o2-text-secondary)] tw:w-[2rem] tw:shrink-0"
+                >{{ p.label }}</span
+              >
+              <span
+                class="tw:text-[0.75rem] tw:flex-1 tw:text-right tw:pr-[0.25rem]"
+              >
+                {{ formatDuration(percentiles[p.key]) }}
+              </span>
+              <div class="tw:flex tw:gap-[0.15rem]">
+                <q-btn
+                  :data-test="`log-search-subfield-list-equal-${row.name}-field-btn`"
+                  size="0.25rem"
+                  round
+                  :title="`duration >= ${formatDuration(percentiles[p.key])}`"
+                  @click.stop="
+                    addSearchTerm(
+                      `duration>='${formatTimeWithSuffix(percentiles[p.key])}'`,
+                    )
+                  "
+                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                >
+                  <q-icon
+                    :name="outlinedArrowForwardIos"
+                    class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                  />
+                </q-btn>
+                <q-btn
+                  :data-test="`log-search-subfield-list-not-equal-${row.name}-field-btn`"
+                  size="0.25rem"
+                  round
+                  :title="`duration <= ${formatDuration(percentiles[p.key])}`"
+                  @click.stop="
+                    addSearchTerm(
+                      `duration<='${formatTimeWithSuffix(percentiles[p.key])}'`,
+                    )
+                  "
+                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                >
+                  <q-icon
+                    :name="outlinedArrowBackIos"
+                    class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                  />
+                </q-btn>
+              </div>
+            </div>
+          </template>
+        </template>
         <FieldValuesPanel
+          v-else
           ref="fieldValuesPanelRef"
           :field-name="row.name"
           :field-values="
@@ -71,15 +134,26 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import useTraces from "@/composables/useTraces";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
-import { removeFieldFromWhereAST, logsUtils } from "@/composables/useLogs/logsUtils";
+import {
+  removeFieldFromWhereAST,
+  logsUtils,
+} from "@/composables/useLogs/logsUtils";
+import useDurationPercentiles, {
+  parseDurationWhereClause,
+} from "@/composables/useDurationPercentiles";
+import useParser from "@/composables/useParser";
+import {
+  outlinedArrowBackIos,
+  outlinedArrowForwardIos,
+} from "@quasar/extras/material-icons-outlined";
 
 const props = defineProps({
   row: {
@@ -92,6 +166,46 @@ const isExpanded = ref(false);
 const fieldValuesPanelRef = ref();
 const currentFrom = ref(0);
 const currentKeyword = ref("");
+const sqlParser = ref<any>(null);
+
+onMounted(async () => {
+  const { sqlParser: loadSqlParser } = useParser();
+  sqlParser.value = await loadSqlParser();
+});
+
+const PERCENTILE_LABELS = [
+  { key: "p25", label: "P25" },
+  { key: "p50", label: "P50" },
+  { key: "p75", label: "P75" },
+  { key: "p95", label: "P95" },
+  { key: "p99", label: "P99" },
+] as const;
+
+const {
+  percentiles,
+  isLoading: durationPercentilesLoading,
+  fetchPercentiles,
+  cancelFetch: cancelPercentileFetch,
+} = useDurationPercentiles();
+
+const hasPercentiles = computed(() =>
+  PERCENTILE_LABELS.some((p) => percentiles.value[p.key] !== null),
+);
+
+/**
+ * Formats a raw microsecond value into a human-readable string with a dynamic
+ * unit: µs for sub-millisecond, ms up to 1 s, s above that.
+ */
+const formatDuration = (us: number | null): string => {
+  if (us === null) return "—";
+  if (us < 1_000) return `${Math.round(us)} µs`;
+  if (us < 1_000_000) {
+    const ms = us / 1_000;
+    return `${Number.isInteger(ms) ? ms : ms.toFixed(2)} ms`;
+  }
+  const s = us / 1_000_000;
+  return `${Number.isInteger(s) ? s : s.toFixed(2)} s`;
+};
 
 const store = useStore();
 const { searchObj } = useTraces();
@@ -116,6 +230,12 @@ const buildSql = () => {
   } else {
     whereClause = parseQuery[0].trim();
   }
+
+  whereClause = parseDurationWhereClause(
+    whereClause,
+    sqlParser.value,
+    searchObj.data.stream.selectedStream.value,
+  );
 
   let query_context =
     `SELECT * FROM "` +
@@ -199,10 +319,26 @@ const fetchValues = (from: number = 0, keyword: string = "") => {
   fetchFieldValues(fetchPayload);
 };
 
+const extractWhereClause = (): string => {
+  const query = searchObj.data.editorValue ?? "";
+  const parts = query.split("|");
+  return parts.length > 1 ? parts[1].trim() : parts[0].trim();
+};
+
 const openFilterCreator = (event: any, { ftsKey }: any) => {
   if (ftsKey) {
     event.stopPropagation();
     event.preventDefault();
+    return;
+  }
+
+  if (props.row.name === "duration") {
+    fetchPercentiles({
+      streamName: searchObj.data.stream.selectedStream.value,
+      startTime: searchObj.data.datetime.startTime,
+      endTime: searchObj.data.datetime.endTime,
+      whereClause: extractWhereClause(),
+    });
     return;
   }
 
@@ -261,6 +397,10 @@ const handleAddMultipleSearchTerms = (
 };
 
 const handleBeforeHide = () => {
+  if (props.row.name === "duration") {
+    cancelPercentileFetch();
+    return;
+  }
   cancelFieldStream(props.row.name);
   fieldValuesPanelRef.value?.reset();
   currentFrom.value = 0;

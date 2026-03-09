@@ -267,6 +267,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
+import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -594,6 +595,13 @@ function buildSearch() {
     }
 
     if (whereClause.trim() != "") {
+      // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
+      whereClause = parseDurationWhereClause(
+        whereClause,
+        parser,
+        searchObj.data.stream.selectedStream.value,
+      );
+
       whereClause = whereClause
         .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
         .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
@@ -610,6 +618,7 @@ function buildSearch() {
         "[WHERE_CLAUSE]",
         " WHERE " + whereClause,
       );
+      console.log("req.query.sql", req.query.sql);
     } else {
       builtWhereClause = "";
       req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
@@ -766,7 +775,15 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
     // Filters are already in editorValue (set by metrics dashboard brush selections)
-    const filter = searchObj.data.editorValue.trim();
+    let filter = searchObj.data.editorValue.trim();
+    try {
+      filter = parseDurationWhereClause(
+        filter,
+        parser,
+        searchObj.data.stream.selectedStream.value,
+      );
+    } catch (err) {}
+
     const combinedFilter = filter;
 
     if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();

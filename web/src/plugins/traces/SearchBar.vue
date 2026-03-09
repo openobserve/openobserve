@@ -19,7 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row tw:m-0! tw:p-[0.375rem]">
       <div class="float-right col flex items-center">
         <!-- Tab Toggle Buttons -->
-        <div v-if="store.state.zoConfig.service_graph_enabled" class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]">
+        <div
+          v-if="store.state.zoConfig.service_graph_enabled"
+          class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]"
+        >
           <div class="row">
             <div>
               <q-btn
@@ -46,9 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon="hub"
                 class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[2rem]"
               >
-                <q-tooltip>
-                  Service Graph
-                </q-tooltip>
+                <q-tooltip> Service Graph </q-tooltip>
               </q-btn>
             </div>
           </div>
@@ -111,7 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onErrorOnlyToggle"
             >
             </q-toggle>
-            <q-icon name="error" size="1.1rem" class="tw:mx-1 tw:text-red-500" />
+            <q-icon
+              name="error"
+              size="1.1rem"
+              class="tw:mx-1 tw:text-red-500"
+            />
             <q-tooltip>
               {{ t("traces.showErrorOnly") }}
             </q-tooltip>
@@ -629,7 +634,11 @@ export default defineComponent({
           if (currentQuery[1].trim() != "") {
             const fieldName = getFieldFromExpression(filter);
             const replaced = fieldName
-              ? replaceExistingFieldCondition(currentQuery[1], fieldName, filter)
+              ? replaceExistingFieldCondition(
+                  currentQuery[1],
+                  fieldName,
+                  filter,
+                )
               : currentQuery[1];
             if (replaced !== currentQuery[1]) {
               currentQuery[1] = replaced;
@@ -643,8 +652,12 @@ export default defineComponent({
         } else {
           const fieldName = getFieldFromExpression(filter);
           const replaced = fieldName
-            ? replaceExistingFieldCondition(currentQuery[0] as string, fieldName, filter)
-            : currentQuery[0] as string;
+            ? replaceExistingFieldCondition(
+                currentQuery[0] as string,
+                fieldName,
+                filter,
+              )
+            : (currentQuery[0] as string);
           if (replaced !== currentQuery[0]) {
             currentQuery[0] = replaced;
           } else {
