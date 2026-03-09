@@ -8,7 +8,7 @@ export class SanityPage {
         
         // Quick Mode locators
         this.quickModeToggleButton = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
-        this.quickModeToggleInner = '[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner';
+        this.quickModeToggleInner = '[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner';
         
         // Fields and Query Editor locators
         this.allFieldsButton = '[data-test="logs-all-fields-btn"]';

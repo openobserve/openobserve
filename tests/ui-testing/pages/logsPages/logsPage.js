@@ -1121,7 +1121,7 @@ export class LogsPage {
     async clickQuickModeToggle() {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        await this.page.locator(this.quickModeToggle).click();
+        await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
     }
 
     // Histogram methods
@@ -3477,7 +3477,7 @@ export class LogsPage {
 
         if (isQuickModeOn) {
             testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
-            await this.page.locator(this.quickModeToggle).click();
+            await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
             await this.page.waitForTimeout(1000);
         } else {
             testLogger.info('Quick Mode is already OFF');
@@ -3705,7 +3705,7 @@ export class LogsPage {
             : false;
 
         if (desiredState !== isOn) {
-            await this.page.locator(this.quickModeToggle).click();
+            await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
             await this.page.waitForTimeout(500);
         } else {
             await this.page.keyboard.press('Escape');
