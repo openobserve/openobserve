@@ -128,7 +128,9 @@ describe("BasicValuesFilter — buildSql()", () => {
   });
 
   it("should include all active filters from editorValue in the SQL", async () => {
-    wrapper = mountComponent("service_name");
+    // Mount with "method" so neither service_name nor status_code is the expanded
+    // field — buildSql() only strips the *expanded* field's own filter from the SQL.
+    wrapper = mountComponent("method");
     await flushPromises();
     mockSearchObj.data.editorValue =
       "service_name='svc-a' AND status_code='200'";
@@ -141,7 +143,8 @@ describe("BasicValuesFilter — buildSql()", () => {
   });
 
   it("should use the clause after '|' as WHERE for pipe-style editorValue", async () => {
-    wrapper = mountComponent("service_name");
+    // Mount with "method" so neither filter term gets stripped by buildSql().
+    wrapper = mountComponent("method");
     await flushPromises();
     mockSearchObj.data.editorValue =
       "match_all('trace') | service_name='svc-a' AND status_code='200'";

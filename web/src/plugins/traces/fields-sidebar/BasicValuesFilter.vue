@@ -58,12 +58,11 @@
             <div
               v-for="p in PERCENTILE_LABELS"
               :key="p.key"
-              class="tw:flex tw:items-center tw:justify-between tw:py-[0.15rem]"
+              class="tw:flex tw:items-center tw:justify-between tw:py-[0.15rem] tw:pl-[0.5rem]"
             >
-              <span
-                class="tw:text-[0.7rem] tw:text-[var(--o2-text-secondary)] tw:w-[2rem] tw:shrink-0"
-                >{{ p.label }}</span
-              >
+              <span class="tw:text-[0.75rem] tw:w-[2rem] tw:shrink-0">{{
+                p.label
+              }}</span>
               <span
                 class="tw:text-[0.75rem] tw:flex-1 tw:text-right tw:pr-[0.25rem]"
               >
@@ -136,7 +135,11 @@
 <script lang="ts" setup>
 import { computed, onMounted, ref } from "vue";
 import useTraces from "@/composables/useTraces";
-import { b64EncodeUnicode, formatTimeWithSuffix } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  b64DecodeUnicode,
+  formatTimeWithSuffix,
+} from "@/utils/zincutils";
 import { useStore } from "vuex";
 import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
@@ -299,12 +302,6 @@ const fetchValues = (from: number = 0, keyword: string = "") => {
   fetchFieldValues(fetchPayload);
 };
 
-const extractWhereClause = (): string => {
-  const query = searchObj.data.editorValue ?? "";
-  const parts = query.split("|");
-  return parts.length > 1 ? parts[1].trim() : parts[0].trim();
-};
-
 const openFilterCreator = (event: any, { ftsKey }: any) => {
   if (ftsKey) {
     event.stopPropagation();
@@ -313,11 +310,13 @@ const openFilterCreator = (event: any, { ftsKey }: any) => {
   }
 
   if (props.row.name === "duration") {
+    const decodedSql = b64DecodeUnicode(buildSql());
+    const whereMatch = decodedSql.match(/\bWHERE\b\s+([\s\S]+)$/i);
     fetchPercentiles({
       streamName: searchObj.data.stream.selectedStream.value,
       startTime: searchObj.data.datetime.startTime,
       endTime: searchObj.data.datetime.endTime,
-      whereClause: extractWhereClause(),
+      whereClause: whereMatch ? whereMatch[1].trim() : "",
     });
     return;
   }
