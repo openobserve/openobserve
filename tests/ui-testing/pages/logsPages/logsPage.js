@@ -3106,7 +3106,7 @@ export class LogsPage {
     async clickHistogramToggleDiv() {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        return await this.page.locator(this.histogramToggleDiv).nth(2).click();
+        return await this.page.locator(this.histogramToggle).click();
     }
 
     async expectQueryEditorContainsExpectedQuery(expectedQuery) {
