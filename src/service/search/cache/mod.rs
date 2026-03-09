@@ -42,6 +42,8 @@ use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use proto::cluster_rpc::SearchQuery;
