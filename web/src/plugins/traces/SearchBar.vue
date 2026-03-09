@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-search-bar-cancel-btn"
             dense
             :title="t('search.cancel')"
-            class="q-pa-none o2-run-query-button tw:bg-[var(--o2-cancel-query-bg)]! tw:h-[30px] element-box-shadow tw:leading-8!"
+            class="q-pa-none o2-run-query-button o2-color-primary tw:bg-[var(--o2-cancel-query-bg)]! tw:h-[30px] element-box-shadow tw:leading-8!"
             @click="cancelQueryData"
             >{{ t("search.cancel") }}</q-btn
           >
