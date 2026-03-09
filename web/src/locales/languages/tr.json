@@ -731,9 +731,9 @@
     "usage_information": "Kullanım Bilgisi",
     "license_allows_ingestion": "Lisansınız <strong>günde {limit} GB</strong> veri alımına izin verir.",
     "limit_exceeded_days": "Bu ay <strong class=\"{colorClass}\">{days} gün</strong> tarihinde limit aşıldı",
-    "limit_exceeded_warning": " (en fazla 3 gün izin verilir). Uygulama özelliği kısıtlanacak",
-    "limit_exceeded_info": " ({remaining} ödenek maksimum 3'ten kaldı)",
-    "no_limit_exceedances": "Bu ay sınır aşımı yok (ayda en fazla 3 izin verilir).",
+    "limit_exceeded_warning": " (en fazla {max} gün izin verilir). Uygulama özelliği kısıtlanacak",
+    "limit_exceeded_info": " ({remaining} ödenek maksimum {max}'ten kaldı)",
+    "no_limit_exceedances": "Bu ay sınır aşımı yok (ayda en fazla {max} izin verilir).",
     "usage_shows_zero_unlimited": "* Kullanım sınırsız planlar için% 0 gösterir",
     "license_updated_success": "Lisans başarıyla güncellendi",
     "failed_to_update_license": "Lisans güncellenemedi",
@@ -744,7 +744,8 @@
     "yes_update_license": "Evet, lisansı güncelle",
     "no_keep_current": "Hayır, güncel tut",
     "feature_correlation_management": "Korelasyon yönetimi",
-    "feature_log_patterns": "Günlük kalıpları"
+    "feature_log_patterns": "Günlük kalıpları",
+    "environment_type": "Ortam Türü"
   },
   "login": {
     "userid": "Kullanıcı Kimliği",

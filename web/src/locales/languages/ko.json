@@ -731,9 +731,9 @@
     "usage_information": "사용 정보",
     "license_allows_ingestion": "라이선스는 하루에 <strong>{limit} GB의</strong> 데이터 수집을 허용합니다.",
     "limit_exceeded_days": "이번 달 <strong class=\"{colorClass}\">{days} 일{plural} 일에</strong> 한도를 초과했습니다.",
-    "limit_exceeded_warning": " (최대 3일 허용).애플리케이션 기능이 제한됩니다.",
-    "limit_exceeded_info": " (최대 3개 중 {remaining} 개의 허용량 {plural} 개)",
-    "no_limit_exceedances": "이번 달에는 한도 초과가 없습니다 (월 최대 3회 허용).",
+    "limit_exceeded_warning": " (최대 {max}일 허용).애플리케이션 기능이 제한됩니다.",
+    "limit_exceeded_info": " (최대 {max}개 중 {remaining} 개의 허용량 {plural} 개)",
+    "no_limit_exceedances": "이번 달에는 한도 초과가 없습니다 (월 최대 {max}회 허용).",
     "usage_shows_zero_unlimited": "* 무제한 요금제의 사용량은 0% 로 표시됩니다.",
     "license_updated_success": "라이선스가 성공적으로 업데이트되었습니다",
     "failed_to_update_license": "라이선스 업데이트 실패",
@@ -744,7 +744,8 @@
     "yes_update_license": "예, 라이선스 업데이트",
     "no_keep_current": "아니요, 최신 상태로 유지",
     "feature_correlation_management": "상관관계 관리",
-    "feature_log_patterns": "로그 패턴"
+    "feature_log_patterns": "로그 패턴",
+    "environment_type": "환경 유형"
   },
   "login": {
     "userid": "사용자 ID",

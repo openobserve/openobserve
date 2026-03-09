@@ -121,6 +121,10 @@
                   <td class="text-weight-bold">{{ t('about.contact_email') }}</td>
                   <td>{{ licenseData.license.contact_email }}</td>
                 </tr>
+                <tr v-if="licenseData.license.environment_type">
+                  <td class="text-weight-bold">{{ t('about.environment_type') }}</td>
+                  <td>{{ licenseData.license.environment_type }}</td>
+                </tr>
               </tbody>
             </q-markup-table>
             <div class="tw:mt-3 tw:flex tw:gap-3">
@@ -208,7 +212,7 @@
                       <!-- Line 2: Exceeded Status -->
                       <div class="tw:flex tw:items-center tw:gap-2">
                         <q-icon
-                          v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 3"
+                          v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > limitBreachAllowedCount"
                           name="warning"
                           size="18px"
                           class="text-negative tw:flex-shrink-0"
@@ -231,13 +235,17 @@
                               colorClass: licenseData?.ingestion_exceeded > 30 ? 'text-negative' : 'text-warning',
                               days: licenseData?.ingestion_exceeded,
                               plural: licenseData?.ingestion_exceeded > 1 ? 's' : ''
-                            })"></span><span v-if="licenseData?.ingestion_exceeded > 3" class="warning-message" v-html="t('about.limit_exceeded_warning')"></span><span v-else class="info-message" v-html="t('about.limit_exceeded_info', {
-                              remaining: 3 - licenseData?.ingestion_exceeded,
-                              plural: (3 - licenseData?.ingestion_exceeded) > 1 ? 's' : ''
+                            })"></span><span v-if="licenseData?.ingestion_exceeded > limitBreachAllowedCount" class="warning-message" v-html="t('about.limit_exceeded_warning', {
+                              max: limitBreachAllowedCount,
+                              maxPlural: limitBreachAllowedCount > 1 ? 's' : ''
+                            })"></span><span v-else class="info-message" v-html="t('about.limit_exceeded_info', {
+                              remaining: limitBreachAllowedCount - licenseData?.ingestion_exceeded,
+                              plural: (limitBreachAllowedCount - licenseData?.ingestion_exceeded) > 1 ? 's' : '',
+                              max: limitBreachAllowedCount
                             })"></span>.
                           </span>
                           <span v-else>
-                            {{ t('about.no_limit_exceedances') }}
+                            {{ t('about.no_limit_exceedances', { max: limitBreachAllowedCount }) }}
                           </span>
                         </span>
                       </div>
@@ -494,6 +502,16 @@ export default defineComponent({
 
     const isIngestionUnlimited = computed(() => {
       return licenseData.value.license?.limits?.Ingestion?.typ === "Unlimited";
+    });
+
+    // For license version >= 2, use limit_breach_allowed_count from the license data.
+    // For version < 2 or when version is absent (v1), fall back to 3.
+    const limitBreachAllowedCount = computed(() => {
+      const version = licenseData.value.license?.version;
+      if (version !== undefined && version !== null && version >= 2) {
+        return licenseData.value.license?.limit_breach_allowed_count ?? 3;
+      }
+      return 3;
     });
 
     const ingestionUsagePercent = computed(() => {
@@ -784,6 +802,7 @@ export default defineComponent({
       currentTimeObj,
       ingestionLimitGB,
       generateUsageDashboard,
+      limitBreachAllowedCount,
     };
   },
 });
