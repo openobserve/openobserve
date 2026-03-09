@@ -8,7 +8,7 @@ export class SanityPage {
         
         // Quick Mode locators
         this.quickModeToggleButton = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
-        this.quickModeToggleInner = '[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner';
+        this.quickModeToggleInner = '[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner';
         
         // Fields and Query Editor locators
         this.allFieldsButton = '[data-test="logs-all-fields-btn"]';
@@ -186,13 +186,20 @@ export class SanityPage {
     }
 
     // Histogram Methods
-    async toggleHistogramOffAndOn() {
+    async clickHistogramToggle() {
+        // Histogram toggle is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await this.page.locator(this.histogramToggleButton).click();
+    }
+
+    async toggleHistogramOffAndOn() {
+        await this.clickHistogramToggle();
         await this.page.getByText("Showing 1").click();
         expect(
             await this.page.locator('[data-test="logs-search-result-bar-chart"]').isVisible()
         ).toBe(false);
-        await this.page.locator(this.histogramToggleDiv).nth(2).click();
+        await this.clickHistogramToggle();
         await this.page.waitForTimeout(2000);
         await expect(this.page.getByRole('heading', { name: 'No data found for histogram.' })).toBeVisible();
     }
@@ -292,9 +299,7 @@ export class SanityPage {
         
         await expect(this.page.getByText(/Showing 1 to 5/)).toBeVisible({ timeout: 15000 });
 
-        // Reset filters is now inside utilities menu, so open menu first
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(300);
+        // Reset filters button is now directly on the toolbar
         await this.page.locator(this.resetFiltersButton).click();
         await this.page.waitForLoadState('domcontentloaded');
     }
@@ -846,17 +851,9 @@ export class SanityPage {
             await this.page.waitForTimeout(2000);
         }
 
-        // Turn off histogram with error handling
-        try {
-            const histogramToggle = this.page.locator(this.histogramToggleDiv).nth(2);
-            await expect(histogramToggle).toBeVisible({ timeout: 15000 });
-            await histogramToggle.click({ timeout: 10000 });
-            await this.page.waitForTimeout(1000); // Brief wait for toggle effect
-        } catch (error) {
-            console.warn('Histogram toggle click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await this.page.locator(this.histogramToggleDiv).nth(2).click({ timeout: 10000 });
-        }
+        // Turn off histogram (now inside utilities hamburger menu)
+        await this.clickHistogramToggle();
+        await this.page.waitForTimeout(1000);
         
         // Click on result column with error handling
         try {
@@ -898,8 +895,8 @@ export class SanityPage {
     }
 
     async displayPaginationWhenOnlySQLWithResult() {
-        // Turn off histogram
-        await this.page.locator(this.histogramToggleDiv).nth(2).click();
+        // Turn off histogram (now inside utilities hamburger menu)
+        await this.clickHistogramToggle();
         await this.page.waitForTimeout(1000);
 
         // Enable SQL mode
