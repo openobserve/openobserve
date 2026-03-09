@@ -10,202 +10,197 @@ These tests complement the E2E test in test_alerts.py by covering:
 - Error path tests for invalid parameters
 - Unauthorized access
 
-Note: Tests using sort_by/sort_order parameters require the triggers stream
-to exist. The ensure_triggers_stream fixture creates an alert and triggers it
-to ensure the stream exists before running tests.
+The tests create an alert that triggers to populate the 'triggers' stream,
+ensuring tests can run in fresh CI environments.
 """
 
 import pytest
+import time
 import requests
 import logging
 import os
-import time
-import base64
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
-# Use TEST_ORG_ID to match conftest.py's DEFAULT_ORG_ID for consistency across tests
-# Falls back to "default" which is the standard test organization
 ORG_ID = os.environ.get("TEST_ORG_ID", "default")
-BASE_URL = os.environ.get("ZO_BASE_URL", "http://localhost:5080/")
+
+
+def triggers_stream_exists(session, base_url):
+    """Check if the triggers stream exists (alert history is available)."""
+    resp = session.get(f"{base_url}api/v2/{ORG_ID}/alerts/history?size=1")
+    if resp.status_code == 500 and "stream not found" in resp.text.lower():
+        return False
+    return resp.status_code == 200
 
 
 @pytest.fixture(scope="module")
-def ensure_triggers_stream(create_session, base_url):
-    """Ensure the triggers stream exists by creating and triggering a test alert.
-
-    This fixture is independent - it creates its own test data and cleans up after.
-    The triggers stream is created when an alert executes, which populates the
-    alert history that these tests query.
+def setup_alert_history(create_session, base_url):
+    """
+    Setup fixture that creates an alert and triggers it to populate the triggers stream.
+    This ensures alert history tests can run in fresh CI environments.
     """
     session = create_session
-    url = base_url
-    org_id = ORG_ID
-    headers = {"Content-Type": "application/json"}
 
-    # Generate unique names to avoid conflicts
+    # Check if triggers stream already exists
+    if triggers_stream_exists(session, base_url):
+        logger.info("Triggers stream already exists, skipping setup")
+        yield
+        return
+
+    logger.info("Triggers stream does not exist, creating alert to populate it...")
+
     timestamp = int(time.time() * 1000)
-    template_name = f"history_api_test_template_{timestamp}"
-    destination_name = f"history_api_test_dest_{timestamp}"
-    stream_name = f"history_api_test_stream_{timestamp}"
-    alert_name = f"history_api_test_alert_{timestamp}"
+    template_name = f"history_setup_template_{timestamp}"
+    destination_name = f"history_setup_dest_{timestamp}"
+    alert_name = f"history_setup_alert_{timestamp}"
+    stream_name = f"history_setup_stream_{timestamp}"
 
-    created_resources = {
-        "template": None,
-        "destination": None,
-        "stream": None,
-        "alert_id": None,
-    }
+    headers = {"Content-Type": "application/json"}
+    alert_id = None
 
     try:
         # Step 1: Create template
         template_payload = {
             "name": template_name,
-            "body": '{"text": "{alert_name} triggered"}',
+            "body": '{"text": "Alert triggered"}',
             "isDefault": False,
         }
         resp = session.post(
-            f"{url}api/{org_id}/alerts/templates",
+            f"{base_url}api/{ORG_ID}/alerts/templates",
             json=template_payload,
             headers=headers,
         )
-        if resp.status_code == 200:
-            created_resources["template"] = template_name
-            logger.info(f"Created template: {template_name}")
-        else:
-            logger.warning(f"Failed to create template: {resp.status_code} - {resp.text}")
+        assert resp.status_code == 200, f"Failed to create template: {resp.text}"
+        logger.info(f"Created template: {template_name}")
 
         # Step 2: Create destination
         destination_payload = {
-            "name": destination_name,
-            "url": "http://localhost:9999/webhook",  # Dummy endpoint
+            "url": "http://localhost:9999/webhook",
             "method": "post",
             "skip_tls_verify": True,
             "template": template_name,
+            "name": destination_name,
         }
         resp = session.post(
-            f"{url}api/{org_id}/alerts/destinations",
+            f"{base_url}api/{ORG_ID}/alerts/destinations",
             json=destination_payload,
             headers=headers,
         )
-        if resp.status_code == 200:
-            created_resources["destination"] = destination_name
-            logger.info(f"Created destination: {destination_name}")
-        else:
-            logger.warning(f"Failed to create destination: {resp.status_code} - {resp.text}")
+        assert resp.status_code == 200, f"Failed to create destination: {resp.text}"
+        logger.info(f"Created destination: {destination_name}")
 
-        # Step 3: Create stream and ingest data
-        test_data = [
-            {"level": "error", "message": "Test error for alert history", "count": 100}
+        # Step 3: Ingest logs that will trigger the alert
+        log_payload = [
+            {"level": "ERROR", "message": "Test error for alert history setup"},
+            {"level": "ERROR", "message": "Another test error for alert history setup"},
+            {"level": "ERROR", "message": "Third error to ensure threshold is met"},
         ]
         resp = session.post(
-            f"{url}api/{org_id}/{stream_name}/_json",
-            json=test_data,
+            f"{base_url}api/{ORG_ID}/{stream_name}/_json",
+            json=log_payload,
             headers=headers,
         )
-        if resp.status_code == 200:
-            created_resources["stream"] = stream_name
-            logger.info(f"Ingested data to stream: {stream_name}")
-        else:
-            logger.warning(f"Failed to ingest data: {resp.status_code} - {resp.text}")
+        assert resp.status_code == 200, f"Failed to ingest logs: {resp.text}"
+        logger.info(f"Ingested {len(log_payload)} logs to stream: {stream_name}")
 
         # Wait for data to be indexed
         time.sleep(3)
 
-        # Step 4: Create alert
-        now = datetime.now(timezone.utc)
-        start_time = (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
-        end_time = now.strftime("%Y-%m-%dT%H:%M:%S")
-
+        # Step 4: Create an alert using v2 API with SQL query type
         alert_payload = {
             "name": alert_name,
             "stream_type": "logs",
             "stream_name": stream_name,
+            "is_real_time": False,
             "query_condition": {
                 "type": "sql",
                 "conditions": None,
-                "sql": f'SELECT count(*) as count FROM "{stream_name}"',
+                "sql": f"SELECT count(*) as error_count FROM \"{stream_name}\" WHERE level='ERROR'",
                 "promql": None,
-                "promql_condition": None,
                 "aggregation": None,
-                "vrl_function": None,
-                "search_event_type": "DerivedStream",
             },
             "trigger_condition": {
                 "period": 1,
                 "operator": ">=",
-                "threshold": 0,
+                "threshold": 1,
+                "silence": 1,
                 "frequency": 1,
-                "cron": "",
                 "frequency_type": "minutes",
-                "silence": 5,
             },
             "destinations": [destination_name],
             "enabled": True,
-            "description": "Test alert for history API tests",
+            "description": "Setup alert for history tests",
         }
         resp = session.post(
-            f"{url}api/v2/{org_id}/alerts",
+            f"{base_url}api/v2/{ORG_ID}/alerts",
             json=alert_payload,
             headers=headers,
         )
-        if resp.status_code == 200:
-            # Get alert ID from response or list
-            resp_list = session.get(f"{url}api/v2/{org_id}/alerts")
-            if resp_list.status_code == 200:
-                for alert in resp_list.json().get("list", []):
-                    if alert["name"] == alert_name:
-                        created_resources["alert_id"] = alert["alert_id"]
-                        logger.info(f"Created alert: {alert_name} (ID: {alert['alert_id']})")
-                        break
-        else:
-            logger.warning(f"Failed to create alert: {resp.status_code} - {resp.text}")
+        assert resp.status_code == 200, f"Failed to create alert: {resp.text}"
+        logger.info(f"Created alert: {alert_name}")
 
-        # Step 5: Wait for alert to trigger (creates triggers stream entry)
-        logger.info("Waiting 35 seconds for alert to trigger...")
+        # Get alert ID for cleanup
+        resp_list = session.get(f"{base_url}api/v2/{ORG_ID}/alerts")
+        if resp_list.status_code == 200:
+            for alert in resp_list.json().get("list", []):
+                if alert["name"] == alert_name:
+                    alert_id = alert["alert_id"]
+                    logger.info(f"Alert ID: {alert_id}")
+                    break
+
+        # Step 5: Wait for alert to be evaluated and trigger
+        logger.info("Waiting for alert to be evaluated (35 seconds)...")
         time.sleep(35)
 
-        # Verify triggers stream exists
-        resp = session.get(f"{url}api/v2/{org_id}/alerts/history?size=1")
-        if resp.status_code == 200:
-            logger.info("Triggers stream verified - alert history accessible")
-        else:
-            logger.warning(f"Triggers stream may not exist: {resp.status_code}")
+        # Verify triggers stream now exists
+        max_retries = 3
+        for attempt in range(max_retries):
+            if triggers_stream_exists(session, base_url):
+                logger.info("Triggers stream created successfully!")
+                break
+            logger.info(f"Triggers stream not yet available, waiting (attempt {attempt + 1}/{max_retries})...")
+            time.sleep(10)
 
-        yield created_resources
+        yield
 
     finally:
         # Cleanup
-        logger.info("Cleaning up test resources...")
+        logger.info("Cleaning up alert history setup resources...")
 
-        if created_resources["alert_id"]:
-            resp = session.delete(f"{url}api/v2/{org_id}/alerts/{created_resources['alert_id']}")
+        # Delete alert using v2 API with alert_id
+        if alert_id:
+            resp = session.delete(f"{base_url}api/v2/{ORG_ID}/alerts/{alert_id}")
             logger.info(f"Deleted alert: {resp.status_code}")
 
-        if created_resources["destination"]:
-            resp = session.delete(f"{url}api/{org_id}/alerts/destinations/{destination_name}")
-            logger.info(f"Deleted destination: {resp.status_code}")
+        time.sleep(2)
 
-        if created_resources["template"]:
-            resp = session.delete(f"{url}api/{org_id}/alerts/templates/{template_name}")
-            logger.info(f"Deleted template: {resp.status_code}")
+        # Delete destination
+        resp = session.delete(f"{base_url}api/{ORG_ID}/alerts/destinations/{destination_name}")
+        logger.info(f"Deleted destination: {resp.status_code}")
 
-        if created_resources["stream"]:
-            resp = session.delete(f"{url}api/{org_id}/streams/{stream_name}?type=logs")
-            logger.info(f"Deleted stream: {resp.status_code}")
+        # Delete template
+        resp = session.delete(f"{base_url}api/{ORG_ID}/alerts/templates/{template_name}")
+        logger.info(f"Deleted template: {resp.status_code}")
 
-
-def is_stream_not_found_error(resp):
-    """Check if response is a 500 error due to missing triggers stream."""
-    return resp.status_code == 500 and "stream not found" in resp.text.lower()
+        # Delete stream
+        resp = session.delete(f"{base_url}api/{ORG_ID}/streams/{stream_name}?type=logs")
+        logger.info(f"Deleted stream: {resp.status_code}")
 
 
-class TestAlertHistoryContract:
-    """Contract tests for Alert History API - validates response schemas.
-
-    These tests don't use sort parameters, so they work even without triggers stream.
+@pytest.fixture(scope="module")
+def ensure_triggers_stream(setup_alert_history, create_session, base_url):
     """
+    Fixture that ensures triggers stream exists before tests run.
+    Uses setup_alert_history to create the stream if needed, then skips if still not available.
+    """
+    if not triggers_stream_exists(create_session, base_url):
+        pytest.skip("Triggers stream could not be created - alert may not have triggered")
+
+
+@pytest.mark.usefixtures("ensure_triggers_stream")
+class TestAlertHistoryContract:
+    """Contract tests for Alert History API - validates response schemas."""
 
     def test_response_schema_structure(self, create_session, base_url):
         """Validate GET /api/v2/{org_id}/alerts/history response has required fields."""
@@ -267,11 +262,7 @@ class TestAlertHistoryContract:
 
 @pytest.mark.usefixtures("ensure_triggers_stream")
 class TestAlertHistorySorting:
-    """Tests for sort_by and sort_order parameters.
-
-    These tests require the triggers stream to exist because the API
-    attempts to sort results which requires stream access.
-    """
+    """Tests for sort_by and sort_order parameters."""
 
     @pytest.mark.parametrize("sort_field", [
         "timestamp",
@@ -293,11 +284,6 @@ class TestAlertHistorySorting:
         session = create_session
 
         resp = session.get(f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_by={sort_field}&size=5")
-
-        # Skip if triggers stream doesn't exist (API returns 500 for sort queries without stream)
-        if is_stream_not_found_error(resp):
-            pytest.skip("Triggers stream not found - sort tests require alert history data")
-
         assert resp.status_code == 200, (
             f"Expected 200 for sort_by={sort_field}, got {resp.status_code}: {resp.text}"
         )
@@ -308,22 +294,12 @@ class TestAlertHistorySorting:
 
     @pytest.mark.parametrize("sort_order", ["asc", "desc", "ASC", "DESC"])
     def test_sort_order_valid_values(self, create_session, base_url, sort_order):
-        """Validate asc/desc sort_order values (case-insensitive).
-
-        API implementation uses to_lowercase() on sort_order before matching,
-        so uppercase variants are intentionally supported.
-        See: src/handler/http/request/alerts/history.rs line 229
-        """
+        """Validate asc/desc sort_order values (case-insensitive)."""
         session = create_session
 
         resp = session.get(
             f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_by=timestamp&sort_order={sort_order}&size=5"
         )
-
-        # Skip if triggers stream doesn't exist
-        if is_stream_not_found_error(resp):
-            pytest.skip("Triggers stream not found - sort tests require alert history data")
-
         assert resp.status_code == 200, (
             f"Expected 200 for sort_order={sort_order}, got {resp.status_code}: {resp.text}"
         )
@@ -339,11 +315,6 @@ class TestAlertHistorySorting:
         resp = session.get(
             f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_by=timestamp&sort_order=desc&size=10"
         )
-
-        # Skip if triggers stream doesn't exist
-        if is_stream_not_found_error(resp):
-            pytest.skip("Triggers stream not found - sort tests require alert history data")
-
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
         body = resp.json()
@@ -366,11 +337,6 @@ class TestAlertHistorySorting:
         resp = session.get(
             f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_by=timestamp&sort_order=asc&size=10"
         )
-
-        # Skip if triggers stream doesn't exist
-        if is_stream_not_found_error(resp):
-            pytest.skip("Triggers stream not found - sort tests require alert history data")
-
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
         body = resp.json()
@@ -387,15 +353,12 @@ class TestAlertHistorySorting:
             logger.warning("Not enough entries to verify ordering")
 
 
+@pytest.mark.usefixtures("ensure_triggers_stream")
 class TestAlertHistoryErrors:
     """Error path tests for Alert History API."""
 
     def test_invalid_sort_by_field(self, create_session, base_url):
-        """Invalid sort_by field should return 400.
-
-        API validates sort_by against whitelist and returns MetaHttpResponse::bad_request
-        for invalid fields. See: src/handler/http/request/alerts/history.rs lines 217-220
-        """
+        """Invalid sort_by field should return 400."""
         session = create_session
 
         resp = session.get(
@@ -407,11 +370,7 @@ class TestAlertHistoryErrors:
         logger.info("Invalid sort_by correctly rejected with 400")
 
     def test_invalid_sort_order_value(self, create_session, base_url):
-        """Invalid sort_order value should return 400.
-
-        API validates sort_order against "asc"/"desc" and returns MetaHttpResponse::bad_request
-        for invalid values. See: src/handler/http/request/alerts/history.rs lines 232-235
-        """
+        """Invalid sort_order value should return 400."""
         session = create_session
 
         resp = session.get(
@@ -441,17 +400,11 @@ class TestAlertHistoryErrors:
         )
 
         body = resp.json()
-        # From should be clamped to 0
         assert body["from"] == 0, f"Expected from=0 (clamped), got {body['from']}"
         logger.info("Negative from parameter correctly clamped to 0")
 
     def test_zero_size_parameter(self, create_session, base_url):
-        """Zero size parameter should be clamped to minimum (1).
-
-        API uses .clamp(1, 1000) on size parameter, so 0 is clamped to 1.
-        The response reflects the clamped value, not the requested value.
-        See: src/handler/http/request/alerts/history.rs line 170
-        """
+        """Zero size parameter should be clamped to minimum (1)."""
         session = create_session
 
         resp = session.get(f"{base_url}api/v2/{ORG_ID}/alerts/history?size=0")
@@ -460,7 +413,6 @@ class TestAlertHistoryErrors:
         )
 
         body = resp.json()
-        # Size should be clamped to at least 1 (API uses .clamp(1, 1000))
         assert body["size"] >= 1, f"Expected size>=1 (clamped), got {body['size']}"
         logger.info(f"Zero size parameter clamped to {body['size']}")
 
@@ -493,11 +445,6 @@ class TestAlertHistoryPaginationEdgeCases:
         resp = session.get(
             f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_by=timestamp&sort_order=desc&from=0&size=5"
         )
-
-        # Skip if triggers stream doesn't exist
-        if is_stream_not_found_error(resp):
-            pytest.skip("Triggers stream not found - sort tests require alert history data")
-
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
         body = resp.json()
@@ -518,11 +465,6 @@ class TestAlertHistoryPaginationEdgeCases:
             f"?start_time={start_time}&end_time={end_time}"
             f"&sort_by=timestamp&sort_order=asc&size=10"
         )
-
-        # Skip if triggers stream doesn't exist
-        if is_stream_not_found_error(resp):
-            pytest.skip("Triggers stream not found - sort tests require alert history data")
-
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
         body = resp.json()
