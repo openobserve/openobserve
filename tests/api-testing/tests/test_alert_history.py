@@ -10,9 +10,8 @@ These tests complement the E2E test in test_alerts.py by covering:
 - Error path tests for invalid parameters
 - Unauthorized access
 
-NOTE: These tests require the 'triggers' stream to exist, which is created
-when alerts are evaluated. In fresh CI environments, some tests may be skipped
-if no alert history exists yet.
+The tests create an alert that triggers to populate the 'triggers' stream,
+ensuring tests can run in fresh CI environments.
 """
 
 import pytest
@@ -34,15 +33,169 @@ def triggers_stream_exists(session, base_url):
     return resp.status_code == 200
 
 
-# Module-level check for triggers stream
 @pytest.fixture(scope="module")
-def check_triggers_stream(create_session, base_url):
-    """Check if triggers stream exists and skip tests if not."""
+def setup_alert_history(create_session, base_url):
+    """
+    Setup fixture that creates an alert and triggers it to populate the triggers stream.
+    This ensures alert history tests can run in fresh CI environments.
+    Reuses pattern from test_alerts.py test_e2e_createdestination.
+    """
+    session = create_session
+
+    # Check if triggers stream already exists
+    if triggers_stream_exists(session, base_url):
+        logger.info("Triggers stream already exists, skipping setup")
+        yield
+        return
+
+    logger.info("Triggers stream does not exist, creating alert to populate it...")
+
+    timestamp = int(time.time() * 1000)
+    template_name = f"history_setup_template_{timestamp}"
+    destination_name = f"history_setup_dest_{timestamp}"
+    alert_name = f"history_setup_alert_{timestamp}"
+    stream_name = f"history_setup_stream_{timestamp}"
+
+    headers = {"Content-Type": "application/json"}
+
+    # Step 1: Create template (using pattern from test_alerts.py)
+    template_payload = {
+        "name": template_name,
+        "body": '{"text": "Alert triggered"}',
+    }
+    resp = session.post(
+        f"{base_url}api/{ORG_ID}/alerts/templates",
+        json=template_payload,
+        headers=headers,
+    )
+    assert resp.status_code == 200, f"Failed to create template: {resp.text}"
+    logger.info(f"Created template: {template_name}")
+
+    # Step 2: Create destination with dummy URL "www" (from test_alerts.py pattern)
+    destination_payload = {
+        "url": "www",
+        "method": "post",
+        "skip_tls_verify": False,
+        "template": template_name,
+        "headers": {"test": "test"},
+        "name": destination_name,
+    }
+    resp = session.post(
+        f"{base_url}api/{ORG_ID}/alerts/destinations",
+        json=destination_payload,
+        headers=headers,
+    )
+    assert resp.status_code == 200, f"Failed to create destination: {resp.text}"
+    logger.info(f"Created destination: {destination_name}")
+
+    # Step 3: Ingest logs that will trigger the alert
+    log_payload = [
+        {"level": "ERROR", "message": "Test error for alert history setup"},
+        {"level": "ERROR", "message": "Another test error for alert history setup"},
+        {"level": "ERROR", "message": "Third error to ensure threshold is met"},
+    ]
+    resp = session.post(
+        f"{base_url}api/{ORG_ID}/{stream_name}/_json",
+        json=log_payload,
+        headers=headers,
+    )
+    assert resp.status_code == 200, f"Failed to ingest logs: {resp.text}"
+    logger.info(f"Ingested {len(log_payload)} logs to stream: {stream_name}")
+
+    # Step 4: Create an alert with low threshold to ensure it triggers
+    # Using period=1 minute, threshold=1 to trigger quickly
+    alert_payload = {
+        "name": alert_name,
+        "stream_type": "logs",
+        "stream_name": stream_name,
+        "is_real_time": False,
+        "query_condition": {
+            "conditions": [
+                {
+                    "column": "level",
+                    "operator": "=",
+                    "value": "ERROR",
+                    "id": "setup-condition",
+                }
+            ],
+            "sql": "",
+            "promql": None,
+            "type": "custom",
+            "aggregation": None,
+        },
+        "trigger_condition": {
+            "period": 1,  # 1 minute period
+            "operator": ">=",
+            "threshold": 1,  # Low threshold to ensure trigger
+            "silence": 1,
+        },
+        "destinations": [destination_name],
+        "context_attributes": {},
+        "enabled": True,
+        "description": "Setup alert for history tests",
+    }
+    resp = session.post(
+        f"{base_url}api/{ORG_ID}/{stream_name}/alerts",
+        json=alert_payload,
+        headers=headers,
+    )
+    assert resp.status_code == 200, f"Failed to create alert: {resp.text}"
+    logger.info(f"Created alert: {alert_name}")
+
+    # Step 5: Wait for alert to be evaluated and trigger
+    # CI has ZO_ALERT_SCHEDULE_INTERVAL=3, so wait enough time for evaluation
+    logger.info("Waiting for alert to be evaluated (15 seconds)...")
+    time.sleep(15)
+
+    # Verify triggers stream now exists
+    max_retries = 3
+    for attempt in range(max_retries):
+        if triggers_stream_exists(session, base_url):
+            logger.info("Triggers stream created successfully!")
+            break
+        logger.info(f"Triggers stream not yet available, waiting (attempt {attempt + 1}/{max_retries})...")
+        time.sleep(5)
+
+    yield
+
+    # Cleanup
+    logger.info("Cleaning up alert history setup resources...")
+
+    # Delete alert
+    resp = session.delete(
+        f"{base_url}api/{ORG_ID}/{stream_name}/alerts/{alert_name}?type=logs"
+    )
+    if resp.status_code == 200:
+        logger.info(f"Deleted alert: {alert_name}")
+
+    time.sleep(2)  # Wait for alert deletion to propagate
+
+    # Delete destination
+    resp = session.delete(
+        f"{base_url}api/{ORG_ID}/alerts/destinations/{destination_name}"
+    )
+    if resp.status_code == 200:
+        logger.info(f"Deleted destination: {destination_name}")
+
+    # Delete template
+    resp = session.delete(
+        f"{base_url}api/{ORG_ID}/alerts/templates/{template_name}"
+    )
+    if resp.status_code == 200:
+        logger.info(f"Deleted template: {template_name}")
+
+
+@pytest.fixture(scope="module")
+def ensure_triggers_stream(setup_alert_history, create_session, base_url):
+    """
+    Fixture that ensures triggers stream exists before tests run.
+    Uses setup_alert_history to create the stream if needed, then skips if still not available.
+    """
     if not triggers_stream_exists(create_session, base_url):
-        pytest.skip("Triggers stream does not exist - no alert history available yet")
+        pytest.skip("Triggers stream could not be created - alert may not have triggered")
 
 
-@pytest.mark.usefixtures("check_triggers_stream")
+@pytest.mark.usefixtures("ensure_triggers_stream")
 class TestAlertHistoryContract:
     """Contract tests for Alert History API - validates response schemas."""
 
@@ -104,7 +257,7 @@ class TestAlertHistoryContract:
             logger.warning("No history entries found - skipping entry schema validation")
 
 
-@pytest.mark.usefixtures("check_triggers_stream")
+@pytest.mark.usefixtures("ensure_triggers_stream")
 class TestAlertHistorySorting:
     """Tests for sort_by and sort_order parameters."""
 
@@ -197,7 +350,7 @@ class TestAlertHistorySorting:
             logger.warning("Not enough entries to verify ordering")
 
 
-@pytest.mark.usefixtures("check_triggers_stream")
+@pytest.mark.usefixtures("ensure_triggers_stream")
 class TestAlertHistoryErrors:
     """Error path tests for Alert History API."""
 
@@ -263,7 +416,7 @@ class TestAlertHistoryErrors:
         logger.info(f"Zero size parameter clamped to {body['size']}")
 
 
-@pytest.mark.usefixtures("check_triggers_stream")
+@pytest.mark.usefixtures("ensure_triggers_stream")
 class TestAlertHistoryPaginationEdgeCases:
     """Edge case tests for pagination parameters."""
 
