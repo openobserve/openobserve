@@ -4879,6 +4879,28 @@ export default defineComponent({
         this.searchObj.data.stream.selectedStream.length > 1
       );
     },
+    /**
+     * Returns the total result count formatted for display.
+     * - Shows "0" when no results are loaded.
+     * - Abbreviates large numbers: 1 000–999 999 → "Xk", ≥ 1 000 000 → "Xm".
+     * - Appends "+" when the backend signals there are more results
+     *   (scanSize > hits.length).
+     */
+    formatResultCount(): string {
+      const hits = this.searchObj.data.queryResults.hits ?? [];
+      const total = this.searchObj.data.queryResults.total ?? hits.length;
+
+      const fmt = (n: number): string => {
+        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}m`;
+        if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+        return String(n);
+      };
+
+      const hasMore =
+        (this.searchObj.data.queryResults.scanSize ?? 0) > hits.length;
+
+      return `${fmt(total)}${hasMore ? "+" : ""}`;
+    },
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
     },
