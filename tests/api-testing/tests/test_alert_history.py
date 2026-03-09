@@ -104,6 +104,7 @@ def setup_alert_history(create_session, base_url):
 
     # Step 4: Create an alert with low threshold to ensure it triggers
     # Using period=1 minute, threshold=1 to trigger quickly
+    # Use v2 API which is available on main branch
     alert_payload = {
         "name": alert_name,
         "stream_type": "logs",
@@ -135,12 +136,16 @@ def setup_alert_history(create_session, base_url):
         "description": "Setup alert for history tests",
     }
     resp = session.post(
-        f"{base_url}api/{ORG_ID}/{stream_name}/alerts",
+        f"{base_url}api/v2/{ORG_ID}/alerts",
         json=alert_payload,
         headers=headers,
     )
     assert resp.status_code == 200, f"Failed to create alert: {resp.text}"
-    logger.info(f"Created alert: {alert_name}")
+
+    # Get alert_id from response for cleanup
+    alert_data = resp.json()
+    alert_id = alert_data.get("alert_id")
+    logger.info(f"Created alert: {alert_name} (id: {alert_id})")
 
     # Step 5: Wait for alert to be evaluated and trigger
     # CI has ZO_ALERT_SCHEDULE_INTERVAL=3, so wait enough time for evaluation
@@ -161,12 +166,13 @@ def setup_alert_history(create_session, base_url):
     # Cleanup
     logger.info("Cleaning up alert history setup resources...")
 
-    # Delete alert
-    resp = session.delete(
-        f"{base_url}api/{ORG_ID}/{stream_name}/alerts/{alert_name}?type=logs"
-    )
-    if resp.status_code == 200:
-        logger.info(f"Deleted alert: {alert_name}")
+    # Delete alert using v2 API with alert_id
+    if alert_id:
+        resp = session.delete(
+            f"{base_url}api/v2/{ORG_ID}/alerts/{alert_id}"
+        )
+        if resp.status_code == 200:
+            logger.info(f"Deleted alert: {alert_name} (id: {alert_id})")
 
     time.sleep(2)  # Wait for alert deletion to propagate
 
