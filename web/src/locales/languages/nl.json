@@ -3062,8 +3062,6 @@
     "namePlaceholder": "bijv. Traceergegevens bekijken",
     "urlTemplate": "URL-sjabloon",
     "urlRequired": "URL is vereist",
-    "urlPlaceholder": "bijvoorbeeld https://example.com/trace/${field. __waarde}? van=$ {starttijd} &to=$ {eindtijd}",
-    "urlHint": "Gebruik $ {field. __name}, $ {veld. __value}, $ {start_time}, $ {end_time}, $ {query}, $ {query_encoded}",
     "fields": "Velden",
     "fieldsHint": "Link alleen tonen als er minstens één veld in de record aanwezig is",
     "fieldSearchPlaceholder": "Typ om te zoeken of voer een aangepast veld in",

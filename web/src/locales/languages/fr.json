@@ -3062,8 +3062,6 @@
     "namePlaceholder": "par exemple, Afficher les détails de la trace",
     "urlTemplate": "Modèle d'URL",
     "urlRequired": "L'URL est obligatoire",
-    "urlPlaceholder": "par exemple, https://example.com/trace/${field. __valeur} ? de=$ {start_time} &to=$ {end_time}",
-    "urlHint": "Utilisez $ {field. __name}, $ {field. __value}, $ {start_time}, $ {end_time}, $ {query}, $ {query_coded}",
     "fields": "Champs",
     "fieldsHint": "Afficher le lien uniquement lorsqu'au moins un champ est présent dans l'enregistrement",
     "fieldSearchPlaceholder": "Tapez pour rechercher ou entrez un champ personnalisé",

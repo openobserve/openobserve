@@ -3062,8 +3062,6 @@
     "namePlaceholder": "örn., İzleme Ayrıntılarını Görüntüle",
     "urlTemplate": "URL Şablonu",
     "urlRequired": "URL gerekli",
-    "urlPlaceholder": "örn., https://example.com/trace/${field. __değer}? from = $ {başlangıç zamanı} &to = $ {bitiş zamanı}",
-    "urlHint": "$ {alanı kullanın. __name}, $ {alan. __değer}, $ {başlangıç zamanı}, $ {bitiş zamanı}, $ {query}, $ {query_coded}",
     "fields": "Tarlalar",
     "fieldsHint": "Bağlantıyı yalnızca kayıtta en az bir alan varsa göster",
     "fieldSearchPlaceholder": "Arama yapmak veya özel alan girmek için yazın",
