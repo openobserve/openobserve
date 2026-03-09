@@ -141,7 +141,7 @@ pub async fn search(
         log::info!("[trace_id {trace_id}] Query hit full cache");
     }
 
-    let search_role = "cache".to_string();
+    let search_role = "leader".to_string();
 
     // Result caching check ends, start search
     let cache_took = start.elapsed().as_millis() as usize;
@@ -197,6 +197,7 @@ pub async fn search(
                     c_resp.deltas
                 ),
                 SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
                     .component("cacher:search deltas".to_string())
                     .search_role(search_role.clone())
@@ -299,6 +300,7 @@ pub async fn search(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("summary".to_string())
                 .search_role(search_role)
@@ -307,6 +309,9 @@ pub async fn search(
                     req.query.start_time.to_string(),
                     req.query.end_time.to_string()
                 ))
+                .scan_size(res.scan_size as usize)
+                .scan_records(res.scan_records as usize)
+                .data_records(res.hits.len())
                 .duration(start.elapsed().as_millis() as usize)
                 .build()
         )

@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       vertical
     >
       <template #before>
-        <div class="card-container tw:p-[0.325rem] tw:h-full">
+        <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto">
           <FieldList
             :fields="streamFields"
             :time-stamp="{

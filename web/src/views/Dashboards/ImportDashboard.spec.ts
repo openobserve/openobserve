@@ -34,7 +34,7 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((dashboard) => dashboard),
 }));
 
-vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
+vi.mock("@/utils/dashboard/panelValidation", () => ({
   validateDashboardJson: vi.fn(() => []),
 }));
 
@@ -618,7 +618,7 @@ describe("ImportDashboard.vue", () => {
   it("should test importFromJsonStr with validation errors", async () => {
     // Mock validateDashboardJson to return validation errors
     const mockValidateDashboardJson = vi.fn().mockReturnValue(["Invalid dashboard structure", "Missing required field"]);
-    vi.doMock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
+    vi.doMock("@/utils/dashboard/panelValidation", () => ({
       validateDashboardJson: mockValidateDashboardJson,
     }));
 

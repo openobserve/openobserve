@@ -96,10 +96,14 @@ vi.mock("@/services/search", () => ({
   },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
-  b64DecodeUnicode: vi.fn((str) => decodeURIComponent(str)),
-  b64EncodeUnicode: vi.fn((str) => encodeURIComponent(str)),
-}));
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    b64DecodeUnicode: vi.fn((str) => decodeURIComponent(str)),
+    b64EncodeUnicode: vi.fn((str) => encodeURIComponent(str)),
+  };
+});
 
 // Mock async components
 const MockQueryEditor = {

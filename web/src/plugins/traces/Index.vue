@@ -412,10 +412,12 @@ async function getStreamList() {
 function loadStreamLists() {
   try {
     const queryParams = router.currentRoute.value.query;
+    const previouslySelectedStream = searchObj.data.stream.selectedStream.value;
     searchObj.data.stream.streamLists = [];
     if (searchObj.data.streamResults.list.length > 0) {
       let lastUpdatedStreamTime = 0;
       let selectedStreamItemObj = {};
+      let foundPriorityMatch = false;
       searchObj.data.streamResults.list.map((item: any) => {
         let itemObj = {
           label: item.name,
@@ -425,7 +427,16 @@ function loadStreamLists() {
 
         if (queryParams.stream === item.name) {
           selectedStreamItemObj = itemObj;
+          foundPriorityMatch = true;
         } else if (
+          !foundPriorityMatch &&
+          !queryParams.stream &&
+          previouslySelectedStream === item.name
+        ) {
+          selectedStreamItemObj = itemObj;
+          foundPriorityMatch = true;
+        } else if (
+          !foundPriorityMatch &&
           !queryParams.stream &&
           item.stats.doc_time_max >= lastUpdatedStreamTime
         ) {
@@ -933,6 +944,9 @@ async function extractFields() {
 
       // Ignoring timestamp as start time is present
       let fields: any = {};
+      const schemaTypeMap = new Map(
+        schema.map((row: any) => [row.name, row.type]),
+      );
       Object.keys(importantFields).forEach((rowName) => {
         if (fields[rowName] == undefined) {
           fields[rowName] = {};
@@ -941,6 +955,7 @@ async function extractFields() {
             ftsKey: ftsKeys.has(rowName),
             showValues: !idFields[rowName],
             label: rowName === "duration" ? "duration (µs)" : rowName,
+            dataType: schemaTypeMap.get(rowName),
           });
         }
       });
@@ -955,6 +970,7 @@ async function extractFields() {
               name: row.name,
               ftsKey: ftsKeys.has(row.name),
               showValues: !idFields[row.name],
+              dataType: row.type,
             });
           }
         }
@@ -1110,16 +1126,6 @@ async function loadPageData() {
   await getStreamList();
 }
 
-function refreshStreamData() {
-  // searchObj.loading = true;
-  // this.searchObj.data.resultGrid.currentPage = 0;
-  // resetSearchObj();
-  // searchObj.organizationIdentifier =
-  //   store.state.selectedOrganization.identifier;
-  // //get stream list
-  // getStreamList();
-}
-
 onBeforeMount(async () => {
   restoreUrlQueryParams();
   // Restore active tab from URL query params
@@ -1134,7 +1140,7 @@ onBeforeMount(async () => {
     }
   }
   await importSqlParser();
-  if (searchObj.loading == false) {
+  if (!searchObj.loading) {
     await loadPageData();
   }
 });

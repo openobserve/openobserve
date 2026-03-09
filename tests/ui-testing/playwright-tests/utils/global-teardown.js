@@ -10,15 +10,10 @@ async function globalTeardown() {
   testLogger.info('Starting global teardown');
   
   try {
-    // Clean up authentication files if needed
-    const authFile = path.join(__dirname, 'auth', 'user.json');
-    
-    if (fs.existsSync(authFile)) {
-      testLogger.info('🗑️  Cleaning up authentication state');
-      // Optionally remove auth file - comment out if you want to keep it
-      // fs.unlinkSync(authFile);
-    }
-    
+    // Note: We intentionally do NOT delete user.json here.
+    // Global setup recreates it each run, and deleting it mid-run
+    // causes race conditions when multiple test files run in parallel.
+
     // Add any other cleanup tasks here
     testLogger.info('✅ Global teardown completed');
     

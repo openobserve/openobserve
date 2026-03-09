@@ -34,7 +34,7 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
-vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
+vi.mock("@/utils/dashboard/panelValidation", () => ({
   findFirstValidMappedValue: vi.fn().mockReturnValue(null),
 }));
 

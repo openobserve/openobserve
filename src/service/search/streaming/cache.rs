@@ -193,8 +193,11 @@ pub async fn handle_cache_responses_and_deltas(
     );
 
     // Process cached responses and deltas in sorted order
+    let mut req_no = 0;
     while cached_resp_iter.peek().is_some() || delta_iter.peek().is_some() {
         if let (Some(&delta), Some(cached)) = (delta_iter.peek(), cached_resp_iter.peek()) {
+            req_no += 1;
+
             // If the delta is before the current cached response time, fetch partitions
             log::info!(
                 "[HTTP2_STREAM trace_id {trace_id}] checking delta: {:?} with cached start_time: {:?}, end_time:{}",
@@ -214,6 +217,7 @@ pub async fn handle_cache_responses_and_deltas(
                 );
                 super::execution::process_delta(
                     req,
+                    req_no,
                     trace_id,
                     org_id,
                     stream_type,
@@ -264,6 +268,7 @@ pub async fn handle_cache_responses_and_deltas(
             log::info!("[HTTP2_STREAM trace_id {trace_id}] Processing remaining delta");
             super::execution::process_delta(
                 req,
+                req_no,
                 trace_id,
                 org_id,
                 stream_type,

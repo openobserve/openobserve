@@ -96,6 +96,7 @@ mod m20260121_00001_create_sourcemap_table;
 mod m20260131_000001_add_unique_constraint_templates_org_name;
 mod m20260212_000001_widen_incident_correlation_key;
 mod m20260214_000001_create_incident_events_table;
+mod m20260227_000001_add_alert_creates_incident;
 
 pub struct Migrator;
 
@@ -181,6 +182,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260131_000001_add_unique_constraint_templates_org_name::Migration),
             Box::new(m20260212_000001_widen_incident_correlation_key::Migration),
             Box::new(m20260214_000001_create_incident_events_table::Migration),
+            Box::new(m20260227_000001_add_alert_creates_incident::Migration),
         ]
     }
 }

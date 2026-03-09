@@ -413,6 +413,7 @@ pub fn handle_partial_response(mut res: Response) -> Response {
 #[allow(clippy::too_many_arguments)]
 pub async fn process_delta(
     req: &mut config::meta::search::Request,
+    req_no: usize,
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
@@ -479,8 +480,9 @@ pub async fn process_delta(
         }
 
         // use cache for delta search
+        let trace_id = format!("{trace_id}-{}", req_no + idx);
         let mut search_res = do_search(
-            trace_id,
+            &trace_id,
             org_id,
             stream_type,
             &req,
@@ -586,7 +588,7 @@ pub async fn process_delta(
                 &mut search_res,
                 org_id,
                 stream_name,
-                trace_id,
+                &trace_id,
             );
         }
 
@@ -623,7 +625,7 @@ pub async fn process_delta(
             );
             // pass original start_time and end_time partition end time
             let _ = send_partial_search_resp(
-                trace_id,
+                &trace_id,
                 "reached max query range limit",
                 new_start_time,
                 new_end_time,

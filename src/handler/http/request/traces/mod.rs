@@ -332,7 +332,7 @@ pub async fn get_latest_traces(
         .map_or("desc", |v| v.as_str())
         .to_string()
         .to_lowercase();
-    let sort_order_sql = if sort_order == "asc" { "ASC" } else { "DESC" };
+    let sort_order = if sort_order == "asc" { "ASC" } else { "DESC" };
 
     // search
     let query_sql = if is_llm_stream {
@@ -340,11 +340,11 @@ pub async fn get_latest_traces(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
-            sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
-            sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
-            sum(_o2_llm_cost_details_total) as llm_cost_details_total, \
-            FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+            sum(llm_usage_tokens_input) as llm_usage_details_input, \
+            sum(llm_usage_tokens_output) as llm_usage_details_output, \
+            sum(llm_usage_tokens_total) as llm_usage_details_total, \
+            sum(llm_usage_cost_total) as llm_cost_details_total, \
+            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
             FROM \"{stream_name}\""
         )
     } else {
@@ -356,8 +356,8 @@ pub async fn get_latest_traces(
         )
     };
     let sql_order_expr = match sort_by.as_str() {
-        "duration" => format!("zo_sql_duration {sort_order_sql}"),
-        "start_time" | "_timestamp" => format!("zo_sql_timestamp {sort_order_sql}"),
+        "duration" => format!("zo_sql_duration {sort_order}"),
+        "start_time" | "_timestamp" => format!("zo_sql_timestamp {sort_order}"),
         _ => {
             return MetaHttpResponse::bad_request(
                 "Invalid sort_by field, only support duration and start_time",
@@ -475,19 +475,19 @@ pub async fn get_latest_traces(
                 spans: [0, 0],
                 service_name: Vec::new(),
                 first_event: serde_json::Value::Null,
-                _o2_llm_usage_details_input: json::get_int_value(
+                llm_usage_tokens_input: json::get_int_value(
                     item.get("llm_usage_details_input").unwrap_or_default(),
                 ),
-                _o2_llm_usage_details_output: json::get_int_value(
+                llm_usage_tokens_output: json::get_int_value(
                     item.get("llm_usage_details_output").unwrap_or_default(),
                 ),
-                _o2_llm_usage_details_total: json::get_int_value(
+                llm_usage_tokens_total: json::get_int_value(
                     item.get("llm_usage_details_total").unwrap_or_default(),
                 ),
-                _o2_llm_cost_details_total: json::get_float_value(
+                llm_usage_cost_total: json::get_float_value(
                     item.get("llm_cost_details_total").unwrap_or_default(),
                 ),
-                _o2_llm_input: item.get("llm_input").cloned(),
+                llm_input: item.get("llm_input").cloned(),
             },
         );
     }
@@ -612,14 +612,14 @@ pub async fn get_latest_traces(
     let mut traces_data = traces_data.values().collect::<Vec<&TraceResponseItem>>();
     match sort_by.as_str() {
         "duration" => {
-            if sort_order == "asc" {
+            if sort_order == "ASC" {
                 traces_data.sort_by(|a, b| a.duration.cmp(&b.duration));
             } else {
                 traces_data.sort_by(|a, b| b.duration.cmp(&a.duration));
             }
         }
         _ => {
-            if sort_order == "asc" {
+            if sort_order == "ASC" {
                 traces_data.sort_by(|a, b| a.start_time.cmp(&b.start_time));
             } else {
                 traces_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
@@ -689,6 +689,8 @@ pub async fn get_latest_traces(
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
+        ("sort_by" = Option<String>, Query, description = "sort by field: start_time, duration (default: start_time)"),
+        ("sort_order" = Option<String>, Query, description = "sort order: asc, desc (default: desc)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
@@ -836,6 +838,26 @@ pub async fn get_latest_traces_stream(
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    let sort_by = query
+        .get("sort_by")
+        .map_or("start_time", |v| v.as_str())
+        .to_string()
+        .to_lowercase();
+    let sort_order = query
+        .get("sort_order")
+        .map_or("desc", |v| v.as_str())
+        .to_string()
+        .to_lowercase();
+    let sort_order = if sort_order == "asc" { "ASC" } else { "DESC" };
+    let sql_order_expr = match sort_by.as_str() {
+        "duration" => format!("zo_sql_duration {sort_order}"),
+        "start_time" | "_timestamp" => format!("zo_sql_timestamp {sort_order}"),
+        _ => {
+            return MetaHttpResponse::bad_request(
+                "Invalid sort_by field, only support duration and start_time",
+            );
+        }
+    };
 
     let use_cache = get_use_cache_from_request(&query);
 
@@ -853,6 +875,9 @@ pub async fn get_latest_traces_stream(
             from,
             size,
             timeout,
+            sort_by,
+            sort_order.to_string(),
+            sql_order_expr,
             is_llm_stream,
             use_cache,
             range_error,
@@ -913,6 +938,9 @@ async fn process_latest_traces_stream(
     from: i64,
     size: i64,
     timeout: i64,
+    sort_by: String,
+    sort_order: String,
+    sql_order_expr: String,
     is_llm_stream: bool,
     use_cache: bool,
     range_error: String,
@@ -943,11 +971,11 @@ async fn process_latest_traces_stream(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
-            sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
-            sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
-            sum(_o2_llm_cost_details_total) as llm_cost_details_total, \
-            FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+            sum(llm_usage_tokens_input) as llm_usage_details_input, \
+            sum(llm_usage_tokens_output) as llm_usage_details_output, \
+            sum(llm_usage_tokens_total) as llm_usage_details_total, \
+            sum(llm_usage_cost_total) as llm_cost_details_total, \
+            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
             FROM \"{stream_name}\""
         )
     } else {
@@ -959,9 +987,9 @@ async fn process_latest_traces_stream(
         )
     };
     let query_sql = if filter.is_empty() {
-        format!("{query_sql_base} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
+        format!("{query_sql_base} GROUP BY trace_id ORDER BY {sql_order_expr}")
     } else {
-        format!("{query_sql_base} WHERE {filter} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
+        format!("{query_sql_base} WHERE {filter} GROUP BY trace_id ORDER BY {sql_order_expr}")
     };
 
     // Build a base search request. from/size are set per-partition; leave at 0 here.
@@ -1212,19 +1240,19 @@ async fn process_latest_traces_stream(
                     spans: [0, 0],
                     service_name: Vec::new(),
                     first_event: serde_json::Value::Null,
-                    _o2_llm_usage_details_input: json::get_int_value(
+                    llm_usage_tokens_input: json::get_int_value(
                         item.get("llm_usage_details_input").unwrap_or_default(),
                     ),
-                    _o2_llm_usage_details_output: json::get_int_value(
+                    llm_usage_tokens_output: json::get_int_value(
                         item.get("llm_usage_details_output").unwrap_or_default(),
                     ),
-                    _o2_llm_usage_details_total: json::get_int_value(
+                    llm_usage_tokens_total: json::get_int_value(
                         item.get("llm_usage_details_total").unwrap_or_default(),
                     ),
-                    _o2_llm_cost_details_total: json::get_float_value(
+                    llm_usage_cost_total: json::get_float_value(
                         item.get("llm_cost_details_total").unwrap_or_default(),
                     ),
-                    _o2_llm_input: item.get("llm_input").cloned(),
+                    llm_input: item.get("llm_input").cloned(),
                 },
             );
         }
@@ -1348,7 +1376,22 @@ async fn process_latest_traces_stream(
 
         // Sort by start_time descending (Q2 may have refined start_time from actual span data).
         let mut partition_hits: Vec<&TraceResponseItem> = traces_data.values().collect();
-        partition_hits.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+        match sort_by.as_str() {
+            "duration" => {
+                if sort_order == "ASC" {
+                    partition_hits.sort_by(|a, b| a.duration.cmp(&b.duration));
+                } else {
+                    partition_hits.sort_by(|a, b| b.duration.cmp(&a.duration));
+                }
+            }
+            _ => {
+                if sort_order == "ASC" {
+                    partition_hits.sort_by(|a, b| a.start_time.cmp(&b.start_time));
+                } else {
+                    partition_hits.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+                }
+            }
+        }
 
         let deliverable: Vec<serde_json::Value> = partition_hits
             .iter()
@@ -1407,11 +1450,11 @@ struct TraceResponseItem {
     spans: [u16; 2],
     service_name: Vec<TraceServiceNameItem>,
     first_event: serde_json::Value,
-    _o2_llm_usage_details_input: i64,
-    _o2_llm_usage_details_output: i64,
-    _o2_llm_usage_details_total: i64,
-    _o2_llm_cost_details_total: f64,
-    _o2_llm_input: Option<serde_json::Value>,
+    llm_usage_tokens_input: i64,
+    llm_usage_tokens_output: i64,
+    llm_usage_tokens_total: i64,
+    llm_usage_cost_total: f64,
+    llm_input: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Default, Serialize)]

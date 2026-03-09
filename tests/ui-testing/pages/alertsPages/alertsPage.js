@@ -21,6 +21,7 @@ import { AlertCreationWizard } from './alertCreationWizard.js';
 import { AlertManagement } from './alertManagement.js';
 import { AlertBulkOperations } from './alertBulkOperations.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class AlertsPage {
     constructor(page) {
@@ -1853,8 +1854,9 @@ export class AlertsPage {
         const destinationFound = await pm.alertDestinationsPage.findDestinationAcrossPages(destinationName);
 
         if (!destinationFound) {
-            // Generate Basic auth header
-            const authHeader = this.commonActions.constructor.generateBasicAuthHeader(
+            // Generate Basic auth header using getAuthHeaders (supports cloud passcode)
+            const headers = getAuthHeaders();
+            const authHeader = headers['Authorization'] || this.commonActions.constructor.generateBasicAuthHeader(
                 process.env["ZO_ROOT_USER_EMAIL"],
                 process.env["ZO_ROOT_USER_PASSWORD"]
             );
@@ -2203,5 +2205,264 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked update button for alert', { alertName });
+    }
+
+    // ==================== VRL ENCODING METHODS ====================
+
+    /**
+     * Navigate to the VRL editor in alert wizard by opening the query editor dialog
+     * The VRL editor is inside the query editor dialog (not a separate tab)
+     */
+    async navigateToVrlEditor() {
+        // First, click on Step 2 (Conditions) if Continue button is visible
+        const continueBtn = this.page.locator('[data-test="add-alert-continue-btn"], button:has-text("Continue")').first();
+        if (await continueBtn.isVisible({ timeout: 3000 })) {
+            await continueBtn.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Clicked Continue to go to Step 2');
+        }
+
+        // Try multiple selectors for View Editor button
+        const viewEditorSelectors = [
+            this.locators.viewEditorButton,           // [data-test="step2-view-editor-btn"]
+            this.locators.goToViewEditorButton,       // [data-test="go-to-view-editor-btn"]
+            '[data-test="alert-view-editor-btn"]',    // Alternative selector
+            'button:has-text("View Editor")',         // Text-based fallback
+            '.view-editor-btn'                        // Class-based fallback
+        ];
+
+        for (const selector of viewEditorSelectors) {
+            const btn = this.page.locator(selector).first();
+            if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await btn.click();
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                await this.page.waitForTimeout(2000);
+                testLogger.info('Clicked View Editor button', { selector });
+                return true;
+            }
+        }
+
+        // Alternative: Try clicking on the SQL tab area first which might reveal VRL editor
+        const sqlTab = this.page.locator('[data-test="tab-sql"]');
+        if (await sqlTab.isVisible({ timeout: 3000 })) {
+            await sqlTab.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('Clicked SQL tab');
+
+            // Now try View Editor buttons again
+            for (const selector of viewEditorSelectors) {
+                const btn = this.page.locator(selector).first();
+                if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await btn.click();
+                    await this.page.waitForTimeout(2000);
+                    testLogger.info('Clicked View Editor after SQL tab', { selector });
+                    return true;
+                }
+            }
+        }
+
+        testLogger.warn('Could not navigate to VRL editor - View Editor button not visible');
+        return false;
+    }
+
+    /**
+     * Navigate to the Advanced tab in alert wizard (legacy method)
+     */
+    async navigateToAdvancedTab() {
+        return await this.navigateToVrlEditor();
+    }
+
+    /**
+     * Get VRL editor content from the alert wizard
+     * @returns {Promise<string|null>} The VRL content or null if not visible
+     */
+    async getVrlEditorContent() {
+        // Wait for the editor to appear
+        await this.page.waitForTimeout(3000);
+
+        // Primary selector: data-test="scheduled-alert-vrl-function-editor" contains the VRL Monaco editor
+        const vrlEditorSelector = '[data-test="scheduled-alert-vrl-function-editor"]';
+        const vrlEditorContainer = this.page.locator(vrlEditorSelector);
+
+        if (await vrlEditorContainer.isVisible({ timeout: 5000 }).catch(() => false)) {
+            // Find Monaco editor view-lines within the VRL editor container
+            const viewLines = vrlEditorContainer.locator('.view-lines').first();
+            if (await viewLines.isVisible({ timeout: 2000 }).catch(() => false)) {
+                const content = await viewLines.textContent();
+                testLogger.info('Retrieved VRL editor content from scheduled-alert-vrl-function-editor', { length: content?.length });
+                return content;
+            }
+            testLogger.warn('VRL editor container visible but .view-lines not found');
+        }
+
+        // Fallback: Try other VRL editor selectors
+        const fallbackSelectors = [
+            this.locators.vrlFunctionEditorDialog + ' .view-lines',
+            '#alert-editor-vrl .monaco-editor .view-lines',
+            '[data-test="alert-vrl-editor"] .view-lines'
+        ];
+
+        for (const selector of fallbackSelectors) {
+            const vrlEditor = this.page.locator(selector).first();
+            if (await vrlEditor.isVisible({ timeout: 2000 }).catch(() => false)) {
+                const content = await vrlEditor.textContent();
+                testLogger.info('Retrieved VRL editor content via fallback', { selector, length: content?.length });
+                return content;
+            }
+        }
+
+        // Last resort: Check all Monaco editors and find one with VRL-like content
+        const allEditorContents = await this.page.evaluate(() => {
+            const viewLines = document.querySelectorAll('.view-lines');
+            return Array.from(viewLines).map(el => ({
+                text: el.textContent?.substring(0, 200),
+                parent: el.closest('[data-test]')?.getAttribute('data-test') || el.closest('[id]')?.id || 'no-id'
+            }));
+        }).catch(() => []);
+        testLogger.info('All editor contents', { editors: JSON.stringify(allEditorContents) });
+
+        // Find VRL content by data-test attribute
+        for (const editor of allEditorContents) {
+            if (editor.parent === 'scheduled-alert-vrl-function-editor' ||
+                editor.parent?.includes('vrl') ||
+                editor.parent?.includes('function-editor')) {
+                testLogger.info('Found VRL content via fallback scan', { parent: editor.parent, content: editor.text });
+                return editor.text;
+            }
+        }
+
+        // Log detailed info for debugging when VRL editor not found
+        const availableParents = allEditorContents.map(e => e.parent).join(', ');
+        testLogger.error('VRL editor not found', {
+            availableParents: availableParents || 'none',
+            editorCount: allEditorContents.length,
+            hint: 'Expected data-test="scheduled-alert-vrl-function-editor" container'
+        });
+        return null;
+    }
+
+    /**
+     * Get VRL editor content and check for URL-encoded characters
+     * Returns the content and validity status - does NOT assert, caller must check
+     * @returns {Promise<{valid: boolean, content: string|null}>}
+     */
+    async getVrlEditorEncodingResult() {
+        const content = await this.getVrlEditorContent();
+        if (content) {
+            const hasEncodedChars = content.includes('%2F') || content.includes('%3D') ||
+                                    content.includes('%25') || content.includes('%22');
+            if (hasEncodedChars) {
+                testLogger.error('VRL editor contains URL-encoded characters', { content: content.substring(0, 100) });
+            } else {
+                testLogger.info('VRL editor content is not URL-encoded');
+            }
+            return { valid: !hasEncodedChars, content };
+        }
+        testLogger.warn('VRL editor not visible - content is null');
+        return { valid: false, content: null }; // Not visible, return false to signal missing editor
+    }
+
+    /**
+     * Click alert row by name in the alert list
+     * Uses specific data-test selector scoped to alert list table
+     * @param {string} alertName - Name of the alert to click
+     */
+    async clickAlertRow(alertName) {
+        // Use specific data-test selector scoped to alert list table
+        const alertTable = this.page.locator(this.locators.alertListTable);
+        const alertRow = alertTable.locator(`tr:has-text("${alertName}")`).first();
+        await expect(alertRow).toBeVisible({ timeout: 10000 });
+        await alertRow.click();
+        await this.page.waitForTimeout(2000);
+        testLogger.info('Clicked alert row', { alertName });
+    }
+
+    /**
+     * Navigate through wizard steps by clicking Continue button multiple times
+     * @param {number} times - Number of times to click Continue
+     */
+    async navigateThroughWizardSteps(times = 5) {
+        for (let i = 0; i < times; i++) {
+            const continueBtn = this.page.locator('[data-test="add-alert-continue-btn"], button:has-text("Continue")').first();
+            if (await continueBtn.isVisible({ timeout: 2000 })) {
+                await continueBtn.click();
+                await this.page.waitForTimeout(500);
+                testLogger.info('Clicked Continue button', { step: i + 1 });
+            }
+        }
+    }
+
+    /**
+     * Click the submit button in alert wizard
+     * @returns {Promise<boolean>} True if button was clicked, false if not enabled
+     */
+    async clickSubmitButton() {
+        const submitBtn = this.page.locator(this.locators.alertSubmitButton);
+        await this.page.waitForTimeout(2000);
+        if (await submitBtn.isEnabled()) {
+            await submitBtn.click();
+            await this.page.waitForTimeout(3000);
+            testLogger.info('Clicked submit button');
+            return true;
+        }
+        testLogger.info('Submit button not enabled');
+        return false;
+    }
+
+    /**
+     * Setup request interception for PUT requests on alerts
+     * Uses self-removing listener to prevent memory leaks
+     * @returns {{getCaptured: Function, dispose: Function}} Object with getCaptured getter and dispose cleanup
+     */
+    setupPutRequestCapture() {
+        let capturedRequest = null;
+        let disposed = false;
+        const requestHandler = (request) => {
+            if (disposed) return;
+            if (request.method() === 'PUT' && request.url().includes('/alerts/')) {
+                capturedRequest = {
+                    url: request.url(),
+                    body: request.postData()
+                };
+                testLogger.info('Captured PUT request', { url: request.url() });
+                // Remove listener after capturing to prevent accumulation
+                this.page.off('request', requestHandler);
+                disposed = true;
+            }
+        };
+        this.page.on('request', requestHandler);
+        return {
+            getCaptured: () => capturedRequest,
+            dispose: () => {
+                if (!disposed) {
+                    this.page.off('request', requestHandler);
+                    disposed = true;
+                    testLogger.info('Disposed PUT request listener');
+                }
+            }
+        };
+    }
+
+    /**
+     * Verify PUT request doesn't contain double-encoded VRL
+     * @param {object} capturedRequest - The captured request object
+     * @returns {boolean} True if no double-encoding found
+     */
+    verifyPutRequestNotDoubleEncoded(capturedRequest) {
+        if (!capturedRequest?.body) {
+            testLogger.warn('No PUT request body to verify - returning false');
+            return false;  // Return false to fail test when body is missing
+        }
+        const hasDoubleEncoding = capturedRequest.body.includes('%252F') ||
+                                  capturedRequest.body.includes('%253D') ||
+                                  capturedRequest.body.includes('%2522');
+        if (hasDoubleEncoding) {
+            testLogger.error('PUT request contains double-encoded VRL', {
+                body: capturedRequest.body.substring(0, 500)
+            });
+        } else {
+            testLogger.info('PUT request does not have double-encoded VRL');
+        }
+        return !hasDoubleEncoding;
     }
 }
