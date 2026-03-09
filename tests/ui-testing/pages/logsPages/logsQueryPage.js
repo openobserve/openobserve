@@ -37,9 +37,7 @@ export class LogsQueryPage {
   }
 
   async clickResetFilters() {
-    // Reset filters button is now inside utilities menu
-    await this.page.locator(this.utilitiesMenuButton).click();
-    await this.page.waitForTimeout(300);
+    // Reset filters button is now directly on the toolbar
     await this.page.locator(this.resetFiltersButton).click();
   }
 
@@ -58,13 +56,22 @@ export class LogsQueryPage {
   }
 
   async toggleHistogram() {
-    await this.page.waitForSelector(this.histogramToggle);
-    await this.page.locator(`${this.histogramToggle} div`).nth(2).click();
+    // Histogram toggle is now inside the utilities hamburger menu
+    await this.page.locator(this.utilitiesMenuButton).click();
+    await this.page.waitForTimeout(200);
+    await this.page.locator(this.histogramToggle).click();
   }
 
   async isHistogramOn() {
+    // Histogram toggle is now inside the utilities hamburger menu
+    await this.page.locator(this.utilitiesMenuButton).click();
+    await this.page.waitForTimeout(200);
     const histogramToggle = this.page.locator(this.histogramToggle);
-    return await histogramToggle.evaluate(el => el.getAttribute('aria-checked') === 'true');
+    const isOn = await histogramToggle
+      .locator('[role="switch"]')
+      .evaluate(el => el.getAttribute('aria-checked') === 'true');
+    await this.page.keyboard.press('Escape');
+    return isOn;
   }
 
   async ensureHistogramState(desiredState) {
