@@ -25,6 +25,8 @@ vi.mock("@/composables/useFieldValuesStream", () => ({
 
 const mockFetchPercentiles = vi.fn();
 const mockCancelPercentileFetch = vi.fn();
+// Kept as a vi.fn() so individual tests can assert on calls or override the return value.
+const mockParseDurationWhereClause = vi.fn((whereClause: string) => whereClause);
 
 vi.mock("@/composables/useDurationPercentiles", () => ({
   default: () => ({
@@ -36,8 +38,9 @@ vi.mock("@/composables/useDurationPercentiles", () => ({
     fetchPercentiles: mockFetchPercentiles,
     cancelFetch: mockCancelPercentileFetch,
   }),
-  // Pass-through — no SQL parser in tests, so duration values are left as-is.
-  parseDurationWhereClause: (whereClause: string) => whereClause,
+  // Delegates to the module-level vi.fn() so tests can inspect calls or change behaviour.
+  parseDurationWhereClause: (...args: Parameters<typeof mockParseDurationWhereClause>) =>
+    mockParseDurationWhereClause(...args),
 }));
 
 vi.mock("@/composables/useParser", () => ({
@@ -201,6 +204,8 @@ describe("BasicValuesFilter — openFilterCreator", () => {
     };
     mockFetchFieldValues.mockReset();
     mockFetchPercentiles.mockReset();
+    // Restore the default pass-through implementation before each test.
+    mockParseDurationWhereClause.mockImplementation((whereClause: string) => whereClause);
   });
 
   afterEach(() => {
@@ -265,6 +270,106 @@ describe("BasicValuesFilter — openFilterCreator", () => {
         startTime: 0,
         endTime: 1_000_000,
       }),
+    );
+  });
+
+  it("should exclude the duration field's own filter from the whereClause passed to fetchPercentiles", async () => {
+    // When editorValue contains only a duration filter, buildSql() strips it via
+    // removeFieldFromWhereAST. fetchPercentiles should receive an empty whereClause.
+    mockSearchObj.data.editorValue = "duration >= '1.50ms'";
+    wrapper = mountComponent("duration");
+    await flushPromises();
+
+    await wrapper.vm.openFilterCreator(
+      { stopPropagation: vi.fn(), preventDefault: vi.fn() },
+      { ftsKey: null },
+    );
+    await flushPromises();
+
+    expect(mockFetchPercentiles).toHaveBeenCalledWith(
+      expect.objectContaining({ whereClause: "" }),
+    );
+  });
+
+  it("should preserve non-duration filters in the whereClause passed to fetchPercentiles", async () => {
+    // service_name is not the duration field — it must survive the AST strip.
+    mockSearchObj.data.editorValue =
+      "service_name='svc-a' AND duration >= '1.50ms'";
+    wrapper = mountComponent("duration");
+    await flushPromises();
+
+    await wrapper.vm.openFilterCreator(
+      { stopPropagation: vi.fn(), preventDefault: vi.fn() },
+      { ftsKey: null },
+    );
+    await flushPromises();
+
+    const call = mockFetchPercentiles.mock.calls[0][0];
+    expect(call.whereClause).toContain("service_name");
+    // The duration condition itself must be stripped.
+    expect(call.whereClause).not.toMatch(/\bduration\b/);
+  });
+
+  it("should call parseDurationWhereClause with the extracted WHERE clause before building the SQL", async () => {
+    // parseDurationWhereClause is called inside buildSql() to convert human-readable
+    // duration strings (e.g. '1.50ms') back to raw µs before the SQL is assembled.
+    mockSearchObj.data.editorValue =
+      "service_name='svc-a' AND duration >= '1.50ms'";
+    wrapper = mountComponent("duration");
+    await flushPromises();
+
+    await wrapper.vm.openFilterCreator(
+      { stopPropagation: vi.fn(), preventDefault: vi.fn() },
+      { ftsKey: null },
+    );
+    await flushPromises();
+
+    // parseDurationWhereClause must have been called with the WHERE clause text
+    // and the stream name. The sqlParser value is null in tests because useParser
+    // resolves to null; we verify only the WHERE text and the stream name.
+    expect(mockParseDurationWhereClause).toHaveBeenCalledWith(
+      expect.stringContaining("duration"),
+      null,
+      "test_traces",
+    );
+  });
+
+  it("should pass the parseDurationWhereClause-converted whereClause to fetchPercentiles", async () => {
+    // Simulate parseDurationWhereClause converting '1.50ms' → 1500 so the
+    // resulting whereClause uses raw microseconds, not human-readable strings.
+    mockParseDurationWhereClause.mockImplementationOnce(() => "service_name='svc-a' AND duration >= 1500");
+    mockSearchObj.data.editorValue =
+      "service_name='svc-a' AND duration >= '1.50ms'";
+    wrapper = mountComponent("duration");
+    await flushPromises();
+
+    await wrapper.vm.openFilterCreator(
+      { stopPropagation: vi.fn(), preventDefault: vi.fn() },
+      { ftsKey: null },
+    );
+    await flushPromises();
+
+    // The duration filter is still stripped by removeFieldFromWhereAST after
+    // parseDurationWhereClause converts it to a numeric form.  Only the
+    // service_name condition should remain.
+    const call = mockFetchPercentiles.mock.calls[0][0];
+    expect(call.whereClause).toContain("service_name");
+    expect(call.whereClause).not.toMatch(/\bduration\b/);
+  });
+
+  it("should pass an empty whereClause to fetchPercentiles when editorValue is empty", async () => {
+    mockSearchObj.data.editorValue = "";
+    wrapper = mountComponent("duration");
+    await flushPromises();
+
+    await wrapper.vm.openFilterCreator(
+      { stopPropagation: vi.fn(), preventDefault: vi.fn() },
+      { ftsKey: null },
+    );
+    await flushPromises();
+
+    expect(mockFetchPercentiles).toHaveBeenCalledWith(
+      expect.objectContaining({ whereClause: "" }),
     );
   });
 });
