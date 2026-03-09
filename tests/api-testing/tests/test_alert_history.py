@@ -31,9 +31,14 @@ ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 def triggers_stream_exists(session, base_url):
     """Check if the triggers stream exists (alert history is available)."""
     resp = session.get(f"{base_url}api/{ORG_ID}/alerts/history?size=1")
+    logger.debug(f"Triggers stream check: status={resp.status_code}, response={resp.text[:200] if resp.text else 'empty'}")
     if resp.status_code == 500 and "stream not found" in resp.text.lower():
         return False
-    return resp.status_code == 200
+    if resp.status_code == 200:
+        body = resp.json()
+        logger.debug(f"Triggers stream exists: total={body.get('total', 0)} entries")
+        return True
+    return False
 
 
 @pytest.fixture(scope="module")
@@ -118,7 +123,7 @@ def setup_alert_history(create_session, base_url):
         logger.info(f"Ingested {len(log_payload)} logs to stream: {stream_name}")
 
         # Step 4: Create an alert with low threshold to ensure it triggers
-        # Using period=1 minute, threshold=1 to trigger quickly
+        # Using SQL query type which matches working patterns in test_alerts.py
         # Use v2 API which is available on main branch
         alert_payload = {
             "name": alert_name,
@@ -126,24 +131,22 @@ def setup_alert_history(create_session, base_url):
             "stream_name": stream_name,
             "is_real_time": False,
             "query_condition": {
-                "conditions": [
-                    {
-                        "column": "level",
-                        "operator": "=",
-                        "value": "ERROR",
-                        "id": "setup-condition",
-                    }
-                ],
-                "sql": "",
+                "type": "sql",
+                "conditions": None,
+                "sql": f"SELECT count(*) as error_count FROM \"{stream_name}\" WHERE level='ERROR'",
                 "promql": None,
-                "type": "custom",
                 "aggregation": None,
+                "search_event_type": "ui",
             },
             "trigger_condition": {
                 "period": 1,  # 1 minute period
+                "frequency": 1,  # Evaluate every 1 minute
+                "frequency_type": "minutes",
                 "operator": ">=",
                 "threshold": 1,  # Low threshold to ensure trigger
                 "silence": 1,
+                "cron": "",
+                "timezone": "UTC",
             },
             "destinations": [destination_name],
             "context_attributes": {},
@@ -161,20 +164,24 @@ def setup_alert_history(create_session, base_url):
         alert_data = resp.json()
         alert_id = alert_data.get("alert_id")
         logger.info(f"Created alert: {alert_name} (id: {alert_id})")
+        logger.info(f"Alert config: period=1min, frequency=1min, threshold=1, SQL query on stream {stream_name}")
 
         # Step 5: Wait for alert to be evaluated and trigger
-        # CI has ZO_ALERT_SCHEDULE_INTERVAL=3, so wait enough time for evaluation
-        logger.info("Waiting for alert to be evaluated (15 seconds)...")
-        time.sleep(15)
+        # The alert has period=1 (1 minute), so we need to wait at least 60+ seconds
+        # for the scheduled alert to be evaluated and trigger.
+        # CI has ZO_ALERT_SCHEDULE_INTERVAL=3 (seconds between alert scheduler runs)
+        logger.info("Waiting for alert to be evaluated (70 seconds for 1-minute period alert)...")
+        time.sleep(70)
 
         # Verify triggers stream now exists
-        max_retries = 3
+        # Use more retries with longer intervals since alert scheduling can be delayed
+        max_retries = 6
         for attempt in range(max_retries):
             if triggers_stream_exists(session, base_url):
                 logger.info("Triggers stream created successfully!")
                 break
             logger.info(f"Triggers stream not yet available, waiting (attempt {attempt + 1}/{max_retries})...")
-            time.sleep(5)
+            time.sleep(10)
 
         yield
 
