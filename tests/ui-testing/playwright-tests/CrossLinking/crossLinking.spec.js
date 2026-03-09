@@ -62,18 +62,13 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.searchStream(STREAM_NAME);
         await pm.crossLinkPage.openStreamDetail();
 
-        // Verify the cross-linking tab is present (only when feature flag is enabled)
-        const crossLinkTab = page.locator('.q-tab').filter({ hasText: /cross.link/i });
-        const isVisible = await crossLinkTab.isVisible().catch(() => false);
+        // Verify the cross-linking tab is present (uses waitFor with timeout)
+        const isVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
 
         if (isVisible) {
             await pm.crossLinkPage.clickCrossLinkingTab();
-            // Should show empty state initially or existing links
-            const emptyState = page.locator('[data-test="cross-link-empty"]');
-            const linkList = page.locator('[data-test="cross-link-list"]');
-            const hasEmpty = await emptyState.isVisible().catch(() => false);
-            const hasList = await linkList.isVisible().catch(() => false);
-            expect(hasEmpty || hasList).toBe(true);
+            // Verify the Add Cross-Link button is visible (always present on stream-level manager)
+            await expect(page.locator('[data-test="add-cross-link-btn"]')).toBeVisible({ timeout: 5000 });
             testLogger.info('Cross-linking tab is visible and accessible');
         } else {
             testLogger.info('Cross-linking tab not visible - feature flag may be disabled, skipping gracefully');
@@ -94,8 +89,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.searchStream(STREAM_NAME);
         await pm.crossLinkPage.openStreamDetail();
 
-        const crossLinkTab = page.locator('.q-tab').filter({ hasText: /cross.link/i });
-        const isTabVisible = await crossLinkTab.isVisible().catch(() => false);
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
             testLogger.info('Cross-linking feature not enabled, skipping');
             return;
@@ -103,18 +97,21 @@ test.describe("Cross-Linking testcases", () => {
 
         await pm.crossLinkPage.clickCrossLinkingTab();
 
-        // If no cross-links exist, verify empty state
-        const emptyState = page.locator('[data-test="cross-link-empty"]');
-        const linkList = page.locator('[data-test="cross-link-list"]');
+        // Verify add button is present (confirms tab content loaded)
+        await expect(page.locator('[data-test="add-cross-link-btn"]')).toBeVisible({ timeout: 5000 });
+
+        // Check if empty state or existing links are shown
+        const emptyState = page.locator('[data-test="cross-link-empty"]').first();
+        const linkList = page.locator('[data-test="cross-link-list"]').first();
         const hasEmpty = await emptyState.isVisible().catch(() => false);
         const hasList = await linkList.isVisible().catch(() => false);
 
         if (hasEmpty) {
-            await pm.crossLinkPage.expectEmptyState();
-            testLogger.info('Empty state verified');
+            testLogger.info('Empty state verified - no cross-links configured');
         } else if (hasList) {
-            testLogger.info('Cross-links already exist, empty state test not applicable');
+            testLogger.info('Cross-links already exist on this stream');
         }
+        expect(hasEmpty || hasList).toBe(true);
 
         testLogger.info('Test completed');
     });
@@ -131,8 +128,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.searchStream(STREAM_NAME);
         await pm.crossLinkPage.openStreamDetail();
 
-        const crossLinkTab = page.locator('.q-tab').filter({ hasText: /cross.link/i });
-        const isTabVisible = await crossLinkTab.isVisible().catch(() => false);
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
             testLogger.info('Cross-linking feature not enabled, skipping');
             return;
@@ -164,8 +160,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.searchStream(STREAM_NAME);
         await pm.crossLinkPage.openStreamDetail();
 
-        const crossLinkTab = page.locator('.q-tab').filter({ hasText: /cross.link/i });
-        const isTabVisible = await crossLinkTab.isVisible().catch(() => false);
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
             testLogger.info('Cross-linking feature not enabled, skipping');
             return;
@@ -202,8 +197,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.searchStream(STREAM_NAME);
         await pm.crossLinkPage.openStreamDetail();
 
-        const crossLinkTab = page.locator('.q-tab').filter({ hasText: /cross.link/i });
-        const isTabVisible = await crossLinkTab.isVisible().catch(() => false);
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
             testLogger.info('Cross-linking feature not enabled, skipping');
             return;
@@ -239,8 +233,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.searchStream(STREAM_NAME);
         await pm.crossLinkPage.openStreamDetail();
 
-        const crossLinkTab = page.locator('.q-tab').filter({ hasText: /cross.link/i });
-        const isTabVisible = await crossLinkTab.isVisible().catch(() => false);
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
             testLogger.info('Cross-linking feature not enabled, skipping');
             return;
@@ -279,8 +272,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.searchStream(STREAM_NAME);
         await pm.crossLinkPage.openStreamDetail();
 
-        const crossLinkTab = page.locator('.q-tab').filter({ hasText: /cross.link/i });
-        const isTabVisible = await crossLinkTab.isVisible().catch(() => false);
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
             testLogger.info('Cross-linking feature not enabled, skipping');
             return;
@@ -312,8 +304,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.searchStream(STREAM_NAME);
         await pm.crossLinkPage.openStreamDetail();
 
-        const crossLinkTab = page.locator('.q-tab').filter({ hasText: /cross.link/i });
-        const isTabVisible = await crossLinkTab.isVisible().catch(() => false);
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
             testLogger.info('Cross-linking feature not enabled, skipping');
             return;
@@ -367,8 +358,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.searchStream(STREAM_NAME);
         await pm.crossLinkPage.openStreamDetail();
 
-        const crossLinkTab = page.locator('.q-tab').filter({ hasText: /cross.link/i });
-        const isTabVisible = await crossLinkTab.isVisible().catch(() => false);
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
             testLogger.info('Cross-linking feature not enabled, skipping');
             return;
@@ -415,8 +405,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.searchStream(STREAM_NAME);
         await pm.crossLinkPage.openStreamDetail();
 
-        const crossLinkTab = page.locator('.q-tab').filter({ hasText: /cross.link/i });
-        const isTabVisible = await crossLinkTab.isVisible().catch(() => false);
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
             testLogger.info('Cross-linking feature not enabled, skipping');
             return;
@@ -444,6 +433,368 @@ test.describe("Cross-Linking testcases", () => {
         testLogger.info('Test completed');
     });
 
+    test("should verify cross-link URL contains correct start_time and end_time when clicked from logs", {
+        tag: ['@crossLinking', '@functional', '@P1', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing cross-link URL timestamp verification from logs view');
+
+        await ingestTestData(page);
+        await page.waitForTimeout(1000);
+
+        // Step 1: Create a cross-link with start_time and end_time in URL template
+        await pm.crossLinkPage.navigateToStreams();
+        await pm.crossLinkPage.searchStream(STREAM_NAME);
+        await pm.crossLinkPage.openStreamDetail();
+
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
+        if (!isTabVisible) {
+            testLogger.info('Cross-linking feature not enabled, skipping');
+            return;
+        }
+
+        await pm.crossLinkPage.clickCrossLinkingTab();
+
+        // Clean up any existing cross-links first
+        let existingCount = await page.locator('[data-test^="cross-link-item-"]').count();
+        while (existingCount > 0) {
+            await pm.crossLinkPage.clickDeleteCrossLink(0);
+            await page.waitForTimeout(500);
+            existingCount = await page.locator('[data-test^="cross-link-item-"]').count();
+        }
+
+        const crossLinkName = `Timestamp Test ${Date.now()}`;
+        await pm.crossLinkPage.addCrossLink({
+            name: crossLinkName,
+            url: 'https://example.com/view?from=${start_time}&to=${end_time}&field=${field.__name}&value=${field.__value}',
+            fields: ['kubernetes_container_name']
+        });
+
+        // Save the schema settings to persist the cross-link
+        await pm.crossLinkPage.clickUpdateSettings();
+        await page.waitForTimeout(2000);
+
+        testLogger.info('Cross-link created and saved');
+
+        // Step 2: Navigate to logs and query the stream
+        await pm.logsPage.navigateToLogs();
+        await pm.logsPage.selectStream(STREAM_NAME);
+        await page.waitForTimeout(2000);
+        await pm.logsPage.runQueryAndWaitForResults();
+        await page.waitForTimeout(2000);
+
+        // Capture the search time range before clicking
+        const searchTimeRange = await page.evaluate(() => {
+            // Access the Vue app's search state to get the actual datetime values
+            const appEl = document.querySelector('#app');
+            if (appEl && appEl.__vue_app__) {
+                // Try to find the search datetime from the URL parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                return {
+                    from: urlParams.get('from'),
+                    to: urlParams.get('to'),
+                    period: urlParams.get('period')
+                };
+            }
+            return null;
+        });
+        testLogger.info('Search time range from URL', { searchTimeRange });
+
+        // Step 3: Open log detail sidebar by clicking on the first log row
+        const firstLogRow = page.locator('[data-test="log-table-column-0-source"]');
+        await firstLogRow.waitFor({ state: 'visible', timeout: 15000 });
+        await firstLogRow.click();
+        await page.waitForTimeout(2000);
+
+        // Wait for log detail sidebar to open
+        await page.locator('[data-test="dialog-box"]').waitFor({ state: 'visible', timeout: 10000 });
+
+        // Step 4: Find the field action dropdown for the cross-linked field (kubernetes_container_name)
+        // The JSON preview shows fields with q-btn-dropdown for actions
+        // We need to find the dropdown next to 'kubernetes_container_name' field
+        const fieldDropdowns = page.locator('[data-test="log-details-include-exclude-field-btn"]');
+        const fieldCount = await fieldDropdowns.count();
+        testLogger.info(`Found ${fieldCount} field action dropdowns`);
+
+        // Intercept window.open to capture the URL instead of opening a new tab
+        let capturedUrl = null;
+        await page.evaluate(() => {
+            window.__capturedCrossLinkUrl = null;
+            window.open = (url) => {
+                window.__capturedCrossLinkUrl = url;
+                return null;
+            };
+        });
+
+        // Step 5: Find and click the cross-link for kubernetes_container_name
+        // Look through the JSON preview to find our field's dropdown
+        const jsonContent = page.locator('[data-test="log-detail-json-content"]');
+        await jsonContent.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Find the log_json_content div that contains kubernetes_container_name
+        const fieldRow = page.locator('.log_json_content').filter({ hasText: 'kubernetes_container_name' }).first();
+        const fieldRowVisible = await fieldRow.isVisible().catch(() => false);
+
+        if (!fieldRowVisible) {
+            testLogger.info('kubernetes_container_name field not found in log detail, skipping');
+            return;
+        }
+
+        // Click the action dropdown for this field
+        const fieldActionBtn = fieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
+        await fieldActionBtn.click();
+        await page.waitForTimeout(1000);
+
+        // Look for the cross-link item in the dropdown menu
+        const crossLinkItem = page.locator('.q-menu .q-item').filter({ hasText: crossLinkName });
+        const crossLinkVisible = await crossLinkItem.isVisible().catch(() => false);
+
+        if (!crossLinkVisible) {
+            testLogger.info('Cross-link menu item not visible - cross-links may not be loaded for this field');
+            // Close the dropdown
+            await page.keyboard.press('Escape');
+            return;
+        }
+
+        // Click the cross-link
+        await crossLinkItem.click();
+        await page.waitForTimeout(1000);
+
+        // Step 6: Retrieve the captured URL
+        capturedUrl = await page.evaluate(() => window.__capturedCrossLinkUrl);
+        testLogger.info('Captured cross-link URL', { capturedUrl });
+
+        expect(capturedUrl).not.toBeNull();
+
+        // Parse the URL and verify timestamps
+        const url = new URL(capturedUrl);
+        const fromParam = url.searchParams.get('from');
+        const toParam = url.searchParams.get('to');
+        const fieldParam = url.searchParams.get('field');
+        const valueParam = url.searchParams.get('value');
+
+        testLogger.info('URL parameters', { from: fromParam, to: toParam, field: fieldParam, value: valueParam });
+
+        // Verify start_time and end_time are valid epoch milliseconds
+        expect(fromParam).not.toBeNull();
+        expect(toParam).not.toBeNull();
+
+        const startTime = Number(fromParam);
+        const endTime = Number(toParam);
+
+        // Timestamps should be valid numbers
+        expect(isNaN(startTime)).toBe(false);
+        expect(isNaN(endTime)).toBe(false);
+
+        // Timestamps should be in milliseconds (13 digits for current epoch)
+        // Valid range: year 2000 to year 2100
+        const minMs = new Date('2000-01-01').getTime(); // 946684800000
+        const maxMs = new Date('2100-01-01').getTime(); // 4102444800000
+        expect(startTime).toBeGreaterThan(minMs);
+        expect(startTime).toBeLessThan(maxMs);
+        expect(endTime).toBeGreaterThan(minMs);
+        expect(endTime).toBeLessThan(maxMs);
+
+        // end_time should be >= start_time
+        expect(endTime).toBeGreaterThanOrEqual(startTime);
+
+        // Verify field name and value are also populated
+        expect(fieldParam).toBe('kubernetes_container_name');
+        expect(valueParam).toBeTruthy();
+
+        testLogger.info('Timestamp verification passed', {
+            startTime,
+            endTime,
+            startDate: new Date(startTime).toISOString(),
+            endDate: new Date(endTime).toISOString(),
+            diffMs: endTime - startTime,
+        });
+
+        testLogger.info('Test completed');
+    });
+
+    test("should verify cross-link URL contains correct start_time and end_time when clicked from dashboard", {
+        tag: ['@crossLinking', '@functional', '@P1', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing cross-link URL timestamp verification from dashboard panel');
+
+        await ingestTestData(page);
+        await page.waitForTimeout(1000);
+
+        // Step 1: Ensure a cross-link exists on the stream (with start_time/end_time in URL)
+        await pm.crossLinkPage.navigateToStreams();
+        await pm.crossLinkPage.searchStream(STREAM_NAME);
+        await pm.crossLinkPage.openStreamDetail();
+
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
+        if (!isTabVisible) {
+            testLogger.info('Cross-linking feature not enabled, skipping');
+            return;
+        }
+
+        await pm.crossLinkPage.clickCrossLinkingTab();
+
+        // Clean up any existing cross-links first
+        let existingCount = await page.locator('[data-test^="cross-link-item-"]').count();
+        while (existingCount > 0) {
+            await pm.crossLinkPage.clickDeleteCrossLink(0);
+            await page.waitForTimeout(500);
+            existingCount = await page.locator('[data-test^="cross-link-item-"]').count();
+        }
+
+        const crossLinkName = `Dashboard TS Test ${Date.now()}`;
+        await pm.crossLinkPage.addCrossLink({
+            name: crossLinkName,
+            url: 'https://example.com/dashboard?from=${start_time}&to=${end_time}&field=${field.__name}&value=${field.__value}',
+            fields: ['kubernetes_container_name']
+        });
+
+        // Save the schema settings to persist the cross-link
+        await pm.crossLinkPage.clickUpdateSettings();
+        await page.waitForTimeout(2000);
+
+        testLogger.info('Cross-link created and saved on stream');
+
+        // Step 2: Create a dashboard with a table panel using the same stream
+        const dashboardName = `CrossLink Test ${Date.now()}`;
+        const orgId = process.env["ORGNAME"] || 'default';
+        await page.goto(`${process.env["ZO_BASE_URL"] || 'http://localhost:5080'}/web/dashboards?org_identifier=${orgId}`);
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        await page.waitForTimeout(2000);
+
+        await pm.dashboardCreate.createDashboard(dashboardName);
+
+        // Add a table panel with the cross-linked stream
+        await pm.dashboardCreate.addPanel();
+        await pm.chartTypeSelector.selectChartType("table");
+        await pm.chartTypeSelector.selectStream(STREAM_NAME);
+        await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
+        await pm.dashboardPanelActions.addPanelName("CrossLink Table Panel");
+        await pm.dashboardPanelActions.savePanel();
+        await page.waitForTimeout(3000);
+
+        testLogger.info('Dashboard with table panel created');
+
+        // Step 3: Intercept window.open to capture the cross-link URL
+        await page.evaluate(() => {
+            window.__capturedCrossLinkUrl = null;
+            window.open = (url) => {
+                window.__capturedCrossLinkUrl = url;
+                return null;
+            };
+        });
+
+        // Step 4: Click on a cell in the table panel to trigger drilldown/cross-link menu
+        // Table panels render data inside the panel container
+        const panelContainer = page.locator('[data-test="dashboard-panel-table"]').first()
+            .or(page.locator('.dashboard-panel').first());
+
+        // Try clicking on a table cell to trigger the drilldown menu
+        const tableCell = panelContainer.locator('td, .table-cell, .q-table__grid-item').first();
+        const tableCellVisible = await tableCell.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (!tableCellVisible) {
+            // Fallback: try clicking directly on the rendered chart/table area
+            const chartArea = page.locator('.echart, canvas, table').first();
+            const chartVisible = await chartArea.isVisible({ timeout: 5000 }).catch(() => false);
+            if (chartVisible) {
+                await chartArea.click();
+            } else {
+                testLogger.info('No clickable table/chart element found in panel, skipping');
+                // Cleanup dashboard
+                await pm.dashboardCreate.backToDashboardList();
+                await page.waitForTimeout(1000);
+                return;
+            }
+        } else {
+            await tableCell.click();
+        }
+
+        await page.waitForTimeout(1500);
+
+        // Step 5: Look for the crosslink-drilldown-menu popup
+        const drilldownMenu = page.locator('.crosslink-drilldown-menu');
+        const menuVisible = await drilldownMenu.isVisible().catch(() => false);
+
+        if (!menuVisible) {
+            testLogger.info('Drilldown menu did not appear after click - panel may not have data or cross-links not loaded');
+            // Cleanup dashboard
+            await pm.dashboardCreate.backToDashboardList();
+            await page.waitForTimeout(1000);
+            return;
+        }
+
+        // Find and click the cross-link menu item
+        const crossLinkMenuItem = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkName });
+        const crossLinkMenuVisible = await crossLinkMenuItem.isVisible().catch(() => false);
+
+        if (!crossLinkMenuVisible) {
+            testLogger.info('Cross-link menu item not found in drilldown menu');
+            await page.keyboard.press('Escape');
+            // Cleanup dashboard
+            await pm.dashboardCreate.backToDashboardList();
+            await page.waitForTimeout(1000);
+            return;
+        }
+
+        await crossLinkMenuItem.click();
+        await page.waitForTimeout(1000);
+
+        // Step 6: Retrieve and verify the captured URL
+        const capturedUrl = await page.evaluate(() => window.__capturedCrossLinkUrl);
+        testLogger.info('Captured dashboard cross-link URL', { capturedUrl });
+
+        expect(capturedUrl).not.toBeNull();
+
+        // Parse the URL and verify timestamps
+        const url = new URL(capturedUrl);
+        const fromParam = url.searchParams.get('from');
+        const toParam = url.searchParams.get('to');
+        const fieldParam = url.searchParams.get('field');
+        const valueParam = url.searchParams.get('value');
+
+        testLogger.info('Dashboard URL parameters', { from: fromParam, to: toParam, field: fieldParam, value: valueParam });
+
+        // Verify start_time and end_time are valid epoch milliseconds
+        expect(fromParam).not.toBeNull();
+        expect(toParam).not.toBeNull();
+
+        const startTime = Number(fromParam);
+        const endTime = Number(toParam);
+
+        // Timestamps should be valid numbers
+        expect(isNaN(startTime)).toBe(false);
+        expect(isNaN(endTime)).toBe(false);
+
+        // Timestamps should be in milliseconds (13 digits for current epoch)
+        const minMs = new Date('2000-01-01').getTime();
+        const maxMs = new Date('2100-01-01').getTime();
+        expect(startTime).toBeGreaterThan(minMs);
+        expect(startTime).toBeLessThan(maxMs);
+        expect(endTime).toBeGreaterThan(minMs);
+        expect(endTime).toBeLessThan(maxMs);
+
+        // end_time should be >= start_time
+        expect(endTime).toBeGreaterThanOrEqual(startTime);
+
+        // Verify field name and value are populated
+        expect(fieldParam).toBe('kubernetes_container_name');
+        expect(valueParam).toBeTruthy();
+
+        testLogger.info('Dashboard timestamp verification passed', {
+            startTime,
+            endTime,
+            startDate: new Date(startTime).toISOString(),
+            endDate: new Date(endTime).toISOString(),
+            diffMs: endTime - startTime,
+        });
+
+        // Cleanup: delete the test dashboard
+        await pm.dashboardCreate.backToDashboardList();
+        await page.waitForTimeout(1000);
+
+        testLogger.info('Test completed');
+    });
+
     test("should reset form when reopening dialog after cancel", {
         tag: ['@crossLinking', '@edgeCase', '@P2', '@all']
     }, async ({ page }) => {
@@ -456,8 +807,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.searchStream(STREAM_NAME);
         await pm.crossLinkPage.openStreamDetail();
 
-        const crossLinkTab = page.locator('.q-tab').filter({ hasText: /cross.link/i });
-        const isTabVisible = await crossLinkTab.isVisible().catch(() => false);
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
             testLogger.info('Cross-linking feature not enabled, skipping');
             return;

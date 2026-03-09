@@ -47,34 +47,49 @@ export class CrossLinkPage {
 
     // Navigation methods
     async navigateToStreams() {
-        testLogger.debug('Navigating to streams page');
-        await this.page.locator(this.streamsMenuItem).click();
-        await this.page.waitForLoadState('domcontentloaded');
+        testLogger.debug('Navigating to streams page via URL');
+        const orgId = process.env["ORGNAME"] || 'default';
+        await this.page.goto(`${process.env["ZO_BASE_URL"] || 'http://localhost:5080'}/web/streams?org_identifier=${orgId}`);
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        await this.page.waitForTimeout(2000);
     }
 
     async searchStream(streamName) {
         testLogger.debug('Searching for stream', { streamName });
-        await this.page.getByPlaceholder(this.streamSearchPlaceholder).click();
-        await this.page.getByPlaceholder(this.streamSearchPlaceholder).fill(streamName);
-        await this.page.waitForLoadState('domcontentloaded');
+        const searchInput = this.page.getByPlaceholder(this.streamSearchPlaceholder);
+        await searchInput.waitFor({ state: 'visible', timeout: 10000 });
+        await searchInput.click();
+        await searchInput.fill(streamName);
+        await this.page.waitForTimeout(1500);
     }
 
     async openStreamDetail() {
         testLogger.debug('Opening stream details');
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         const btn = this.page.getByRole('button', { name: this.streamDetailButton }).first();
         await btn.waitFor({ state: 'visible', timeout: 15000 });
         await btn.click();
-        await this.page.waitForLoadState('domcontentloaded');
+        // Wait for the schema panel dialog to fully render with tabs
+        await this.page.waitForTimeout(3000);
+    }
+
+    async isCrossLinkingTabVisible() {
+        testLogger.debug('Checking if cross-linking tab is visible');
+        const tab = this.page.locator('.q-tab').filter({ hasText: /cross.link/i });
+        try {
+            await tab.waitFor({ state: 'visible', timeout: 5000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     async clickCrossLinkingTab() {
         testLogger.debug('Clicking cross-linking tab');
-        // Tab has name="crossLinking" but no data-test - use tab name attribute
         const tab = this.page.locator('.q-tab').filter({ hasText: /cross.link/i });
         await tab.waitFor({ state: 'visible', timeout: 10000 });
         await tab.click();
-        await this.page.waitForTimeout(500);
+        // Wait for cross-link tab content to render
+        await this.page.waitForTimeout(2000);
     }
 
     // CrossLinkManager methods
