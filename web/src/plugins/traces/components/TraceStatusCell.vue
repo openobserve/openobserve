@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{ backgroundColor: dotColor }"
     />
     <span
-      class="tw:text-[0.7rem] tw:tracking-[0.03em] tw:uppercase tw:font-bold"
+      class="tw:text-[0.7rem] tw:tracking-[0.03em] tw:leading-[1.0625rem] tw:uppercase tw:font-bold"
     >
       {{ label }}
     </span>
@@ -46,8 +46,8 @@ const hasErrors = computed(() => (props.item.errors ?? 0) > 0);
 
 const label = computed(() =>
   hasErrors.value
-    ? `${props.item.errors} ${props.item.errors !== 1 ? t('traces.errors') : t('traces.error')}`
-    : t('traces.success'),
+    ? `${props.item.errors} ${props.item.errors !== 1 ? t("traces.errors") : t("traces.error")}`
+    : t("traces.success"),
 );
 
 const pillBg = computed(() =>
@@ -55,14 +55,10 @@ const pillBg = computed(() =>
 );
 
 const pillColor = computed(() =>
-  hasErrors.value
-    ? "var(--q-negative, #c62828)"
-    : "var(--q-positive, #388e3c)",
+  hasErrors.value ? "var(--q-negative, #c62828)" : "var(--q-positive, #388e3c)",
 );
 
 const dotColor = computed(() =>
-  hasErrors.value
-    ? "var(--q-negative, #f44336)"
-    : "var(--q-positive, #4caf50)",
+  hasErrors.value ? "var(--q-negative, #f44336)" : "var(--q-positive, #4caf50)",
 );
 </script>

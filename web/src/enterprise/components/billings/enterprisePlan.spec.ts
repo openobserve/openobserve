@@ -87,7 +87,7 @@ describe('enterprisePlan.vue', () => {
   it('should initialize features array with correct structure', () => {
     const features = wrapper.vm.features;
     expect(Array.isArray(features)).toBe(true);
-    expect(features).toHaveLength(13);
+    expect(features).toHaveLength(19);
   });
 
   // Test 5: First feature has correct properties
@@ -101,7 +101,7 @@ describe('enterprisePlan.vue', () => {
   // Test 6: Second feature has correct properties
   it('should have correct second feature properties', () => {
     const secondFeature = wrapper.vm.features[1];
-    expect(secondFeature.name).toBe('Extended Data Retention');
+    expect(secondFeature.name).toBe('Premium support');
     expect(secondFeature.price).toBe('');
     expect(secondFeature.is_parent).toBe(true);
   });
@@ -109,7 +109,7 @@ describe('enterprisePlan.vue', () => {
   // Test 7: Third feature has correct properties
   it('should have correct third feature properties', () => {
     const thirdFeature = wrapper.vm.features[2];
-    expect(thirdFeature.name).toBe('Priority Support');
+    expect(thirdFeature.name).toBe('Deployment flexibility (Public Cloud, or Bring Your Own Cloud)');
     expect(thirdFeature.price).toBe('');
     expect(thirdFeature.is_parent).toBe(true);
   });
@@ -117,7 +117,7 @@ describe('enterprisePlan.vue', () => {
   // Test 8: Fourth feature has correct properties
   it('should have correct fourth feature properties', () => {
     const fourthFeature = wrapper.vm.features[3];
-    expect(fourthFeature.name).toBe('SSO (Single Sign On) with Custom Auth Providers');
+    expect(fourthFeature.name).toBe('Architecture reviews');
     expect(fourthFeature.price).toBe('');
     expect(fourthFeature.is_parent).toBe(true);
   });
@@ -125,17 +125,17 @@ describe('enterprisePlan.vue', () => {
   // Test 9: Fifth feature has correct properties
   it('should have correct fifth feature properties', () => {
     const fifthFeature = wrapper.vm.features[4];
-    expect(fifthFeature.name).toBe('(Okta, Microsoft Entra, etc)');
+    expect(fifthFeature.name).toBe('Volume discounts');
     expect(fifthFeature.price).toBe('');
-    expect(fifthFeature.is_parent).toBe(false);
+    expect(fifthFeature.is_parent).toBe(true);
   });
 
   // Test 10: Sixth feature has correct properties
   it('should have correct sixth feature properties', () => {
     const sixthFeature = wrapper.vm.features[5];
-    expect(sixthFeature.name).toBe('SLA Guarantees');
+    expect(sixthFeature.name).toBe('');
     expect(sixthFeature.price).toBe('');
-    expect(sixthFeature.is_parent).toBe(true);
+    expect(sixthFeature.is_parent).toBe(false);
   });
 
   // Test 11: All parent features have is_parent true
@@ -147,12 +147,12 @@ describe('enterprisePlan.vue', () => {
   // Test 12: All child features have is_parent false
   it('should have correct is_parent values for child features', () => {
     const childFeatures = wrapper.vm.features.filter((f: any) => f.is_parent === false);
-    expect(childFeatures).toHaveLength(8); // One child feature + 7 empty features
+    expect(childFeatures).toHaveLength(14); // 14 empty placeholder rows
   });
 
   // Test 13: Empty features have correct structure
   it('should have correct structure for empty features', () => {
-    const emptyFeatures = wrapper.vm.features.slice(6); // Last 7 features
+    const emptyFeatures = wrapper.vm.features.slice(5); // 14 empty placeholder rows
     emptyFeatures.forEach((feature: any) => {
       expect(feature.name).toBe('');
       expect(feature.price).toBe('');
@@ -204,7 +204,7 @@ describe('enterprisePlan.vue', () => {
   // Test 21: Features are rendered in template
   it('should render features in template', () => {
     // Test that features are properly exposed by the component
-    expect(wrapper.vm.features.length).toBe(13);
+    expect(wrapper.vm.features.length).toBe(19);
     
     // Verify features contain expected structure
     const firstFeature = wrapper.vm.features[0];

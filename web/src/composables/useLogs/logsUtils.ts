@@ -43,6 +43,49 @@ interface SQLColumn {
   };
   as?: string;
 }
+
+/**
+ * Recursively removes all WHERE conditions that reference `fieldName` from the
+ * given AST node.  Works with AND / OR chains of any depth.
+ *
+ * The DataFusion SQL parser stores column references as:
+ *   { type: "column_ref", column: { expr: { type: "...", value: "fieldName" } } }
+ * rather than a plain string, so we extract the name via `col?.expr?.value`.
+ *
+ * Returns `null` when the entire sub-tree has been removed (caller should treat
+ * a `null` WHERE as "no WHERE clause").
+ */
+export const removeFieldFromWhereAST = (
+  whereNode: any,
+  fieldName: string,
+): any => {
+  if (!whereNode) return null;
+
+  const operator = whereNode.operator?.toUpperCase();
+
+  if (operator === "AND" || operator === "OR") {
+    const newLeft = removeFieldFromWhereAST(whereNode.left, fieldName);
+    const newRight = removeFieldFromWhereAST(whereNode.right, fieldName);
+    if (newLeft === null && newRight === null) return null;
+    if (newLeft === null) return newRight;
+    if (newRight === null) return newLeft;
+    return { ...whereNode, left: newLeft, right: newRight };
+  }
+
+  if (whereNode.left?.type === "column_ref") {
+    const col = whereNode.left.column;
+    const colName =
+      typeof col === "string"
+        ? col.replace(/^"|"$/g, "")
+        : col?.expr?.value != null
+          ? String(col.expr.value)
+          : null;
+    if (colName === fieldName) return null;
+  }
+
+  return whereNode;
+};
+
 export const logsUtils = () => {
   const { searchObj } = searchState();
   let parser: Parser | null = new Parser();

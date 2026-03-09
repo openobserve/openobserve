@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <FieldTypeBadge :dataType="field.dataType" />
               <q-icon
                 class="field-expand-icon"
-                :name="isExpanded ? 'expand_less' : 'expand_more'"
+                :name="isExpanded ? 'expand_more' : 'chevron_right'"
                 size="1rem"
               />
             </span>

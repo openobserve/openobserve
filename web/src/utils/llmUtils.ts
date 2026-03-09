@@ -92,6 +92,8 @@ export function isLLMTrace(data: any): boolean {
   // Check custom llm.* fields (stored with underscores after flatten)
   if (hasValue(data.llm_input)) return true;
   if (hasValue(data.llm_output)) return true;
+  if (hasValue(data.llm_usage)) return true;
+  if (hasValue(data.llm_cost)) return true;
   if (hasValue(data.llm_observation_type)) return true;
 
   // Check usage fields (OTEL standard, stored with underscores after flatten)
@@ -490,8 +492,8 @@ export function extractLLMData(span: any): LLMData | null {
   const modelParams = parseModelParameters(
     span.llm_request_parameters || span.llm_model_parameters
   );
-  const usage = parseUsageDetails(span.llm_usage_tokens || span);
-  const cost = parseCostDetails(span.llm_usage_cost || {});
+  const usage = parseUsageDetails(span);
+  const cost = parseCostDetails(span);
   const evaluation = parseEvaluationScores(span);
 
   return {

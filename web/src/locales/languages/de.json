@@ -731,9 +731,9 @@
     "usage_information": "Informationen zur Nutzung",
     "license_allows_ingestion": "Ihre Lizenz erlaubt die Datenaufnahme von <strong>{limit} GB</strong> pro Tag.",
     "limit_exceeded_days": "Das Limit wurde am <strong class=\"{colorClass}\">{days} Tag {plural} in diesem Monat</strong> überschritten",
-    "limit_exceeded_warning": " (max. 3 Tage erlaubt). Die Anwendungsfunktion wird eingeschränkt",
-    "limit_exceeded_info": " ({remaining} Freibetrag {plural} übrig von maximal 3)",
-    "no_limit_exceedances": "In diesem Monat sind keine Grenzwertüberschreitungen möglich (maximal 3 pro Monat zulässig).",
+    "limit_exceeded_warning": " (max. {max} Tage erlaubt). Die Anwendungsfunktion wird eingeschränkt",
+    "limit_exceeded_info": " ({remaining} Freibetrag {plural} übrig von maximal {max})",
+    "no_limit_exceedances": "In diesem Monat sind keine Grenzwertüberschreitungen möglich (maximal {max} pro Monat zulässig).",
     "usage_shows_zero_unlimited": "* Die Nutzung zeigt 0% für unbegrenzte Tarife",
     "license_updated_success": "Lizenz wurde erfolgreich aktualisiert",
     "failed_to_update_license": "Lizenz konnte nicht aktualisiert werden",
@@ -744,7 +744,8 @@
     "yes_update_license": "Ja, Lizenz aktualisieren",
     "no_keep_current": "Nein, auf dem Laufenden bleiben",
     "feature_correlation_management": "Korrelationsmanagement",
-    "feature_log_patterns": "Muster protokollieren"
+    "feature_log_patterns": "Muster protokollieren",
+    "environment_type": "Art der Umgebung"
   },
   "login": {
     "userid": "Benutzer-ID",
@@ -2599,7 +2600,8 @@
     "success": "ERFOLG",
     "today": "Heute",
     "yesterday": "Gestern",
-    "spanColorPalettePreview": "Vorschau der Span-Farbpalette"
+    "spanColorPalettePreview": "Vorschau der Span-Farbpalette",
+    "errorsFound": "Fehlerspuren"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
