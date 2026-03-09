@@ -42,6 +42,8 @@ def setup_alert_history(create_session, base_url):
     Setup fixture that creates an alert and triggers it to populate the triggers stream.
     This ensures alert history tests can run in fresh CI environments.
     Reuses pattern from test_alerts.py test_e2e_createdestination.
+
+    Uses try/finally to ensure cleanup runs even if setup fails partway through.
     """
     session = create_session
 
@@ -61,147 +63,167 @@ def setup_alert_history(create_session, base_url):
 
     headers = {"Content-Type": "application/json"}
 
-    # Step 1: Create template (using pattern from test_alerts.py)
-    template_payload = {
-        "name": template_name,
-        "body": '{"text": "Alert triggered"}',
-    }
-    resp = session.post(
-        f"{base_url}api/{ORG_ID}/alerts/templates",
-        json=template_payload,
-        headers=headers,
-    )
-    assert resp.status_code == 200, f"Failed to create template: {resp.text}"
-    logger.info(f"Created template: {template_name}")
+    # Track which resources were successfully created for cleanup
+    created_template = False
+    created_destination = False
+    created_stream = False
+    alert_id = None
 
-    # Step 2: Create destination with dummy URL "www" (from test_alerts.py pattern)
-    destination_payload = {
-        "url": "www",
-        "method": "post",
-        "skip_tls_verify": False,
-        "template": template_name,
-        "headers": {"test": "test"},
-        "name": destination_name,
-    }
-    resp = session.post(
-        f"{base_url}api/{ORG_ID}/alerts/destinations",
-        json=destination_payload,
-        headers=headers,
-    )
-    assert resp.status_code == 200, f"Failed to create destination: {resp.text}"
-    logger.info(f"Created destination: {destination_name}")
-
-    # Step 3: Ingest logs that will trigger the alert
-    log_payload = [
-        {"level": "ERROR", "message": "Test error for alert history setup"},
-        {"level": "ERROR", "message": "Another test error for alert history setup"},
-        {"level": "ERROR", "message": "Third error to ensure threshold is met"},
-    ]
-    resp = session.post(
-        f"{base_url}api/{ORG_ID}/{stream_name}/_json",
-        json=log_payload,
-        headers=headers,
-    )
-    assert resp.status_code == 200, f"Failed to ingest logs: {resp.text}"
-    logger.info(f"Ingested {len(log_payload)} logs to stream: {stream_name}")
-
-    # Step 4: Create an alert with low threshold to ensure it triggers
-    # Using period=1 minute, threshold=1 to trigger quickly
-    # Use v2 API which is available on main branch
-    alert_payload = {
-        "name": alert_name,
-        "stream_type": "logs",
-        "stream_name": stream_name,
-        "is_real_time": False,
-        "query_condition": {
-            "conditions": [
-                {
-                    "column": "level",
-                    "operator": "=",
-                    "value": "ERROR",
-                    "id": "setup-condition",
-                }
-            ],
-            "sql": "",
-            "promql": None,
-            "type": "custom",
-            "aggregation": None,
-        },
-        "trigger_condition": {
-            "period": 1,  # 1 minute period
-            "operator": ">=",
-            "threshold": 1,  # Low threshold to ensure trigger
-            "silence": 1,
-        },
-        "destinations": [destination_name],
-        "context_attributes": {},
-        "enabled": True,
-        "description": "Setup alert for history tests",
-    }
-    resp = session.post(
-        f"{base_url}api/v2/{ORG_ID}/alerts",
-        json=alert_payload,
-        headers=headers,
-    )
-    assert resp.status_code == 200, f"Failed to create alert: {resp.text}"
-
-    # Get alert_id from response for cleanup
-    alert_data = resp.json()
-    alert_id = alert_data.get("alert_id")
-    logger.info(f"Created alert: {alert_name} (id: {alert_id})")
-
-    # Step 5: Wait for alert to be evaluated and trigger
-    # CI has ZO_ALERT_SCHEDULE_INTERVAL=3, so wait enough time for evaluation
-    logger.info("Waiting for alert to be evaluated (15 seconds)...")
-    time.sleep(15)
-
-    # Verify triggers stream now exists
-    max_retries = 3
-    for attempt in range(max_retries):
-        if triggers_stream_exists(session, base_url):
-            logger.info("Triggers stream created successfully!")
-            break
-        logger.info(f"Triggers stream not yet available, waiting (attempt {attempt + 1}/{max_retries})...")
-        time.sleep(5)
-
-    yield
-
-    # Cleanup
-    logger.info("Cleaning up alert history setup resources...")
-
-    # Delete alert using v2 API with alert_id
-    if alert_id:
-        resp = session.delete(
-            f"{base_url}api/v2/{ORG_ID}/alerts/{alert_id}"
+    try:
+        # Step 1: Create template (using pattern from test_alerts.py)
+        template_payload = {
+            "name": template_name,
+            "body": '{"text": "Alert triggered"}',
+        }
+        resp = session.post(
+            f"{base_url}api/{ORG_ID}/alerts/templates",
+            json=template_payload,
+            headers=headers,
         )
-        if resp.status_code == 200:
-            logger.info(f"Deleted alert: {alert_name} (id: {alert_id})")
+        assert resp.status_code == 200, f"Failed to create template: {resp.text}"
+        created_template = True
+        logger.info(f"Created template: {template_name}")
 
-    time.sleep(2)  # Wait for alert deletion to propagate
+        # Step 2: Create destination with dummy URL "www" (from test_alerts.py pattern)
+        destination_payload = {
+            "url": "www",
+            "method": "post",
+            "skip_tls_verify": False,
+            "template": template_name,
+            "headers": {"test": "test"},
+            "name": destination_name,
+        }
+        resp = session.post(
+            f"{base_url}api/{ORG_ID}/alerts/destinations",
+            json=destination_payload,
+            headers=headers,
+        )
+        assert resp.status_code == 200, f"Failed to create destination: {resp.text}"
+        created_destination = True
+        logger.info(f"Created destination: {destination_name}")
 
-    # Delete destination
-    resp = session.delete(
-        f"{base_url}api/{ORG_ID}/alerts/destinations/{destination_name}"
-    )
-    if resp.status_code == 200:
-        logger.info(f"Deleted destination: {destination_name}")
+        # Step 3: Ingest logs that will trigger the alert
+        log_payload = [
+            {"level": "ERROR", "message": "Test error for alert history setup"},
+            {"level": "ERROR", "message": "Another test error for alert history setup"},
+            {"level": "ERROR", "message": "Third error to ensure threshold is met"},
+        ]
+        resp = session.post(
+            f"{base_url}api/{ORG_ID}/{stream_name}/_json",
+            json=log_payload,
+            headers=headers,
+        )
+        assert resp.status_code == 200, f"Failed to ingest logs: {resp.text}"
+        created_stream = True
+        logger.info(f"Ingested {len(log_payload)} logs to stream: {stream_name}")
 
-    # Delete template
-    resp = session.delete(
-        f"{base_url}api/{ORG_ID}/alerts/templates/{template_name}"
-    )
-    if resp.status_code == 200:
-        logger.info(f"Deleted template: {template_name}")
+        # Step 4: Create an alert with low threshold to ensure it triggers
+        # Using period=1 minute, threshold=1 to trigger quickly
+        # Use v2 API which is available on main branch
+        alert_payload = {
+            "name": alert_name,
+            "stream_type": "logs",
+            "stream_name": stream_name,
+            "is_real_time": False,
+            "query_condition": {
+                "conditions": [
+                    {
+                        "column": "level",
+                        "operator": "=",
+                        "value": "ERROR",
+                        "id": "setup-condition",
+                    }
+                ],
+                "sql": "",
+                "promql": None,
+                "type": "custom",
+                "aggregation": None,
+            },
+            "trigger_condition": {
+                "period": 1,  # 1 minute period
+                "operator": ">=",
+                "threshold": 1,  # Low threshold to ensure trigger
+                "silence": 1,
+            },
+            "destinations": [destination_name],
+            "context_attributes": {},
+            "enabled": True,
+            "description": "Setup alert for history tests",
+        }
+        resp = session.post(
+            f"{base_url}api/v2/{ORG_ID}/alerts",
+            json=alert_payload,
+            headers=headers,
+        )
+        assert resp.status_code == 200, f"Failed to create alert: {resp.text}"
 
-    # Delete the test stream to avoid orphaned streams accumulating across CI runs
-    # URL pattern: /api/{org_id}/streams/{stream_name}?type=logs
-    resp = session.delete(
-        f"{base_url}api/{ORG_ID}/streams/{stream_name}?type=logs"
-    )
-    if resp.status_code == 200:
-        logger.info(f"Deleted stream: {stream_name}")
-    else:
-        logger.warning(f"Failed to delete stream {stream_name}: {resp.status_code}")
+        # Get alert_id from response for cleanup
+        alert_data = resp.json()
+        alert_id = alert_data.get("alert_id")
+        logger.info(f"Created alert: {alert_name} (id: {alert_id})")
+
+        # Step 5: Wait for alert to be evaluated and trigger
+        # CI has ZO_ALERT_SCHEDULE_INTERVAL=3, so wait enough time for evaluation
+        logger.info("Waiting for alert to be evaluated (15 seconds)...")
+        time.sleep(15)
+
+        # Verify triggers stream now exists
+        max_retries = 3
+        for attempt in range(max_retries):
+            if triggers_stream_exists(session, base_url):
+                logger.info("Triggers stream created successfully!")
+                break
+            logger.info(f"Triggers stream not yet available, waiting (attempt {attempt + 1}/{max_retries})...")
+            time.sleep(5)
+
+        yield
+
+    finally:
+        # Cleanup - always runs even if setup fails partway through
+        logger.info("Cleaning up alert history setup resources...")
+
+        # Delete alert using v2 API with alert_id
+        if alert_id:
+            resp = session.delete(
+                f"{base_url}api/v2/{ORG_ID}/alerts/{alert_id}"
+            )
+            if resp.status_code == 200:
+                logger.info(f"Deleted alert: {alert_name} (id: {alert_id})")
+            else:
+                logger.warning(f"Failed to delete alert {alert_name}: {resp.status_code}")
+
+            time.sleep(2)  # Wait for alert deletion to propagate
+
+        # Delete destination if it was created
+        if created_destination:
+            resp = session.delete(
+                f"{base_url}api/{ORG_ID}/alerts/destinations/{destination_name}"
+            )
+            if resp.status_code == 200:
+                logger.info(f"Deleted destination: {destination_name}")
+            else:
+                logger.warning(f"Failed to delete destination {destination_name}: {resp.status_code}")
+
+        # Delete template if it was created
+        if created_template:
+            resp = session.delete(
+                f"{base_url}api/{ORG_ID}/alerts/templates/{template_name}"
+            )
+            if resp.status_code == 200:
+                logger.info(f"Deleted template: {template_name}")
+            else:
+                logger.warning(f"Failed to delete template {template_name}: {resp.status_code}")
+
+        # Delete the test stream if it was created
+        # URL pattern: /api/{org_id}/streams/{stream_name}?type=logs
+        if created_stream:
+            resp = session.delete(
+                f"{base_url}api/{ORG_ID}/streams/{stream_name}?type=logs"
+            )
+            if resp.status_code == 200:
+                logger.info(f"Deleted stream: {stream_name}")
+            else:
+                logger.warning(f"Failed to delete stream {stream_name}: {resp.status_code}")
 
 
 @pytest.fixture(scope="module")
