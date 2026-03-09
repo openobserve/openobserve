@@ -3063,6 +3063,8 @@
     "namePlaceholder": "例:トレースの詳細を表示",
     "urlTemplate": "URL テンプレート",
     "urlRequired": "URL が必要です",
+    "urlPlaceholder": "例: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "{'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'} を使用",
     "fields": "フィールド",
     "fieldsHint": "レコードに少なくとも 1 つのフィールドが存在する場合にのみリンクを表示",
     "fieldSearchPlaceholder": "入力して検索するか、カスタムフィールドを入力します",

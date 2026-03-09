@@ -3063,6 +3063,8 @@
     "namePlaceholder": "예: 트레이스 세부 정보 보기",
     "urlTemplate": "URL 템플릿",
     "urlRequired": "URL이 필요합니다",
+    "urlPlaceholder": "예: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "{'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'} 사용",
     "fields": "필드",
     "fieldsHint": "레코드에 하나 이상의 필드가 있는 경우에만 링크 표시",
     "fieldSearchPlaceholder": "입력하여 검색하거나 사용자 지정 필드 입력",
