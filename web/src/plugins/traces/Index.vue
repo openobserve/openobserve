@@ -622,7 +622,6 @@ function buildSearch() {
         "[WHERE_CLAUSE]",
         " WHERE " + whereClause,
       );
-      console.log("req.query.sql", req.query.sql);
     } else {
       builtWhereClause = "";
       req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
