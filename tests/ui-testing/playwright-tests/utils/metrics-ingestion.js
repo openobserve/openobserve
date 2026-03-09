@@ -1,5 +1,5 @@
 const testLogger = require('./test-logger');
-const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('./cloud-auth');
 
 /**
  * OTLP Metrics Ingestion Module for OpenObserve E2E Tests
@@ -22,15 +22,18 @@ class MetricsIngestion {
             endpoint = `${baseUrl}/api/${orgName}/v1/metrics`;
         }
 
-        // Require environment variables - no fallback credentials
-        if (!process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD) {
-            throw new Error('ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD environment variables must be set');
+        // On cloud, auth is handled by getAuthHeaders() (email:passcode from cloud-config.json)
+        // On self-hosted, require ZO_ROOT_USER_EMAIL/ZO_ROOT_USER_PASSWORD
+        if (!isCloudEnvironment()) {
+            if (!process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD) {
+                throw new Error('ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD environment variables must be set');
+            }
         }
 
         this.config = {
             endpoint: endpoint,
-            username: process.env.ZO_ROOT_USER_EMAIL,
-            password: process.env.ZO_ROOT_USER_PASSWORD,
+            username: process.env.ZO_ROOT_USER_EMAIL || '',
+            password: process.env.ZO_ROOT_USER_PASSWORD || '',
             orgId: orgName,
             streamName: 'default'
         };
