@@ -73,8 +73,7 @@ export class LogsPage {
         this.exploreButtonRole = { role: 'button', name: 'Explore' };
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
-        this.listSavedViewsButton = '[data-test="logs-search-bar-list-saved-views-btn"]';
-        this.createSavedViewButton = '[data-test="logs-search-bar-create-saved-view-btn"]';
+        this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
         this.closeDialog = '[data-test="close-dialog"] > .q-btn__content';
@@ -1884,12 +1883,7 @@ export class LogsPage {
     }
 
     async clickSavedViewsButton() {
-        // This method is used to create a new saved view
-        // It should open the utilities menu and click "Create Saved View"
-        // This is the same as clickSaveViewButton but without the dialog cleanup
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(300);
-        return await this.page.locator(this.createSavedViewButton).click();
+        return await this.clickSaveViewButton();
     }
 
     async clickSavedViewsExpand() {
@@ -1932,29 +1926,20 @@ export class LogsPage {
             // This is expected on first load or when no data exists
         }
 
-        // Now it's safe to open the saved views dialog
-        // Open the utilities menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        // Wait for menu animation to complete and be visible
-        await this.page.waitForTimeout(300);
-        // Click list saved views button to show the saved views panel
-        await this.page.locator(this.listSavedViewsButton).click();
-        // Wait for dialog to open, render, and stabilize
-        await this.page.waitForTimeout(500);
+        // Now it's safe to open the saved views dropdown
+        await this.clickSavedViewsDropdownArrow();
     }
 
     async clickSaveViewButton() {
-        // Close any open dialogs first (e.g., saved views list dialog)
-        const escapeKey = 'Escape';
-        await this.page.keyboard.press(escapeKey);
+        // Close any open dialogs/menus first (e.g., saved views dropdown)
+        await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(200);
 
-        // Open the utilities menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(300);
-
-        // Click create saved view button
-        return await this.page.locator(this.createSavedViewButton).click();
+        // Saved views is now a split dropdown button on the toolbar.
+        // The left (first) button triggers the save dialog (fnSavedView).
+        const savedViewsGroup = this.page.locator(this.savedViewsDropdownBtn);
+        const saveButton = savedViewsGroup.locator('button').first();
+        return await saveButton.click();
     }
 
     async fillSavedViewName(name) {
@@ -5665,11 +5650,11 @@ export class LogsPage {
     }
 
     /**
-     * Get the saved views button locator (now utilities menu button)
-     * @returns {import('@playwright/test').Locator} Utilities menu button locator
+     * Get the saved views button group locator
+     * @returns {import('@playwright/test').Locator} Saved views split dropdown button locator
      */
     getSavedViewsButtonLocator() {
-        return this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+        return this.page.locator(this.savedViewsDropdownBtn);
     }
 
     /**
@@ -5677,15 +5662,14 @@ export class LogsPage {
      * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
-        const menuButton = this.page.locator(this.utilitiesMenuButton);
-        await menuButton.waitFor({ state: 'visible', timeout: 10000 });
-        await menuButton.click();
-        // Wait for menu to appear
-        await this.page.waitForTimeout(300);
-        // Click list saved views
-        await this.page.locator(this.listSavedViewsButton).click();
+        // Saved views are now a split dropdown button on the toolbar.
+        // Click the dropdown arrow (second button) to expand the saved views list.
+        const savedViewsGroup = this.page.locator(this.savedViewsDropdownBtn);
+        await savedViewsGroup.waitFor({ state: 'visible', timeout: 10000 });
+        const dropdownArrow = savedViewsGroup.locator('button[aria-label="Expand"], button[aria-haspopup="true"]').first();
+        await dropdownArrow.click();
         await this.page.waitForTimeout(500);
-        testLogger.info('Opened utilities menu and clicked List Saved Views');
+        testLogger.info('Clicked saved views dropdown arrow');
     }
 
     /**
@@ -5703,9 +5687,10 @@ export class LogsPage {
             testLogger.debug('Arrow click did not show search input, trying main button');
         }
 
-        // Fallback: try clicking the main button
+        // Fallback: retry the dropdown arrow click on the saved views button
         const btn = this.getSavedViewsButtonLocator();
-        await btn.click();
+        const dropdownArrow = btn.locator('button[aria-label="Expand"], button[aria-haspopup="true"]').first();
+        await dropdownArrow.click();
         await this.page.waitForTimeout(500);
     }
 
