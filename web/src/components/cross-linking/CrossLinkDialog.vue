@@ -32,14 +32,14 @@
             <q-input
               v-model="form.url"
               dense
-              :placeholder="t('crossLinks.urlPlaceholder')"
+              placeholder="e.g., https://example.com/trace/${field.__value}?from=${start_time}&to=${end_time}"
               :rules="[(val: string) => !!val || t('crossLinks.urlRequired')]"
               borderless
               hide-bottom-space
               data-test="cross-link-url-input"
             />
             <div class="text-caption" style="margin-top: 4px; color: var(--o2-text-muted)">
-              {{ t("crossLinks.urlHint") }}
+              Use ${field.__name}, ${field.__value}, ${start_time}, ${end_time}, ${query}, ${query_encoded}
             </div>
           </div>
 
