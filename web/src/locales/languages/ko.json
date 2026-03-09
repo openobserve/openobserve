@@ -2612,7 +2612,8 @@
     "success": "성공",
     "today": "오늘",
     "yesterday": "어제",
-    "spanColorPalettePreview": "스팬 컬러 팔레트 미리보기"
+    "spanColorPalettePreview": "스팬 컬러 팔레트 미리보기",
+    "errorsFound": "오류 추적"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",

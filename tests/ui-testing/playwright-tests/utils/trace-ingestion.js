@@ -5,6 +5,7 @@
 
 const crypto = require('crypto');
 const testLogger = require('./test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 
 /**
  * Generate a random hex string of specified byte length
@@ -236,15 +237,9 @@ function generateTrace(iteration) {
 async function ingestTraces(page, traceCount = 10) {
   testLogger.info(`Starting trace ingestion`, { traceCount });
 
-  const orgId = process.env["ORGNAME"] || "default";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
+  const orgId = getOrgIdentifier() || "default";
+  const headers = getAuthHeaders();
+  const baseUrl = (process.env.ZO_BASE_URL || process.env.INGESTION_URL).replace(/\/$/, '');
 
   const results = [];
   const traceIds = [];
@@ -254,44 +249,25 @@ async function ingestTraces(page, traceCount = 10) {
     traceIds.push(traceData.resourceSpans[0].scopeSpans[0].spans[0].traceId);
 
     try {
-      const response = await page.evaluate(async ({ url, headers, orgId, traceData }) => {
-        const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-        const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/v1/traces`, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify(traceData)
-        });
-
-        let data = null;
-        const contentType = fetchResponse.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          try {
-            const text = await fetchResponse.text();
-            data = text ? JSON.parse(text) : null;
-          } catch (e) {
-            data = { error: 'Failed to parse JSON response', text: await fetchResponse.text() };
-          }
-        } else {
-          data = { text: await fetchResponse.text() };
-        }
-
-        return {
-          status: fetchResponse.status,
-          data: data
-        };
-      }, {
-        url: process.env.ZO_BASE_URL || process.env.INGESTION_URL,
-        headers: headers,
-        orgId: orgId,
-        traceData: traceData
+      const response = await page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
+        headers,
+        data: traceData
       });
 
-      results.push(response);
+      const status = response.status();
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = { text: await response.text().catch(() => '') };
+      }
 
-      if (response.status !== 200) {
+      results.push({ status, data });
+
+      if (status !== 200) {
         testLogger.warn(`Trace ${i} ingestion returned non-200 status`, {
-          status: response.status,
-          response: response.data
+          status,
+          response: data
         });
       }
     } catch (error) {
@@ -300,7 +276,7 @@ async function ingestTraces(page, traceCount = 10) {
     }
 
     // Small delay between traces
-    await page.waitForTimeout(100);
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   const successCount = results.filter(r => r.status === 200).length;

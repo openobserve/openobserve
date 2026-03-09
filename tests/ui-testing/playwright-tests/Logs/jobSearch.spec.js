@@ -4,6 +4,7 @@ import { IngestionPage } from '../../pages/generalPages/ingestionPage.js';
 import { JobSchedulerPage } from '../../pages/logsPages/jobScheduler.js';
 import { LogsPage } from '../../pages/logsPages/logsPage.js';
 import { LogsPageEP } from '../../pages/logsPages/logsPageEP.js';
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -55,7 +56,7 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
     test("Create and Delete Job Search for schedule query", async ({ page }) => {
 
 
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/logs?action=search_scheduler&org_identifier=default&type=search_scheduler_list");
+        await page.goto((process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"]) + `/web/logs?action=search_scheduler&org_identifier=${getOrgIdentifier()}&type=search_scheduler_list`);
         await page.waitForTimeout(10000);
         const jobId = await jobSchedulerPage.submitSearchJob();
         console.log(`Job ID: ${jobId}`);
@@ -70,7 +71,7 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
     test("Create and restart Job Search for schedule query", async ({ page }) => {
 
 
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/logs?action=search_scheduler&org_identifier=default&type=search_scheduler_list");
+        await page.goto((process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"]) + `/web/logs?action=search_scheduler&org_identifier=${getOrgIdentifier()}&type=search_scheduler_list`);
         await page.waitForTimeout(10000);
         const jobId = await jobSchedulerPage.submitSearchJob();
         console.log(`Job ID: ${jobId}`);
@@ -86,7 +87,7 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
     test("Create and cancel Job Search for schedule query", async ({ page }) => {
 
 
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/logs?action=search_scheduler&org_identifier=default&type=search_scheduler_list");
+        await page.goto((process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"]) + `/web/logs?action=search_scheduler&org_identifier=${getOrgIdentifier()}&type=search_scheduler_list`);
         await page.waitForTimeout(10000);
         const jobId = await jobSchedulerPage.submitSearchJob();
         console.log(`Job ID: ${jobId}`);
@@ -100,7 +101,7 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
 
     test("Create and explore Job Search for schedule query", async ({ page }) => {
 
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/logs?action=search_scheduler&org_identifier=default&type=search_scheduler_list");
+        await page.goto((process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"]) + `/web/logs?action=search_scheduler&org_identifier=${getOrgIdentifier()}&type=search_scheduler_list`);
         await page.waitForTimeout(10000);
         const jobId = await jobSchedulerPage.submitSearchJob();
         console.log(`Job ID: ${jobId}`);
@@ -116,7 +117,7 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
 
     test("Create and view Job Search for schedule query details", async ({ page }) => {
 
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/logs?action=search_scheduler&org_identifier=default&type=search_scheduler_list");
+        await page.goto((process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"]) + `/web/logs?action=search_scheduler&org_identifier=${getOrgIdentifier()}&type=search_scheduler_list`);
         await page.waitForTimeout(10000);
         const jobId = await jobSchedulerPage.submitSearchJob();
         console.log(`Job ID: ${jobId}`);
@@ -137,7 +138,7 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
     }, async ({ page }) => {
 
         // Step 1: Navigate to search scheduler list
-        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/logs?action=search_scheduler&org_identifier=default&type=search_scheduler_list");
+        await page.goto((process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"]) + `/web/logs?action=search_scheduler&org_identifier=${getOrgIdentifier()}&type=search_scheduler_list`);
         await page.waitForTimeout(10000);
 
         // Step 2: Submit a search job via API
