@@ -104,14 +104,14 @@ describe("proPlan.vue", () => {
       });
     });
 
-    it("should have 9 parent items", () => {
+    it("should have 10 parent items", () => {
       const parents = wrapper.vm.features.filter((f: any) => f.is_parent);
-      expect(parents).toHaveLength(9);
+      expect(parents).toHaveLength(10);
     });
 
-    it("should have 7 child items", () => {
+    it("should have 6 child items", () => {
       const children = wrapper.vm.features.filter((f: any) => !f.is_parent);
-      expect(children).toHaveLength(7);
+      expect(children).toHaveLength(6);
     });
 
     it("first feature: Logs, Metrics, Traces header (parent, no price)", () => {

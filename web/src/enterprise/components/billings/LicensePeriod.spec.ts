@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import i18n from "@/locales";
@@ -50,13 +51,21 @@ const makeStore = (licenseExpiry: number | null | undefined) => ({
   },
 });
 
-const createWrapper = (storeOverride: any) =>
-  mount(LicensePeriod, {
+/**
+ * Creates a real Vuex store so that useStore() in the Composition API
+ * component resolves correctly (mocks: { $store } only works for Options API).
+ */
+const createTestStore = (zoConfig: Record<string, any>) =>
+  createStore({ state: { zoConfig } });
+
+const createWrapper = (storeOverride: any) => {
+  const testStore = createTestStore(storeOverride.state.zoConfig);
+  return mount(LicensePeriod, {
     global: {
-      plugins: [i18n],
-      mocks: { $store: storeOverride },
+      plugins: [i18n, testStore],
     },
   });
+};
 
 // ─── tests ──────────────────────────────────────────────────────────────────
 
