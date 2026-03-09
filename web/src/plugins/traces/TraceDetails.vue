@@ -834,7 +834,7 @@ export default defineComponent({
 
     const ChartData: any = ref({});
 
-    const leftWidth: Ref<number> = ref(250);
+    const leftWidth: Ref<number> = ref(460);
     const initialX: Ref<number> = ref(0);
     const initialWidth: Ref<number> = ref(0);
 
