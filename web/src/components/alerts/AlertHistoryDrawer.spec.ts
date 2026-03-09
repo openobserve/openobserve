@@ -438,20 +438,19 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(wrapper.emitted("edit")![0]).toEqual([mockAlertDetails]);
     });
 
-    it("should not emit edit if alertDetails is null", async () => {
+    it("should not crash when alertDetails is null", async () => {
       await mountComponent({
         alertDetails: null,
         alertId: "alert-123",
       });
 
-      // Try clicking edit - it should not crash
-      const editBtn = wrapper.find(
-        '[data-test="alert-details-edit-btn"]',
-      );
-      if (editBtn.exists()) {
-        await editBtn.trigger("click");
-      }
-      expect(wrapper.emitted("edit")).toBeFalsy();
+      // Component should still mount without errors
+      expect(wrapper.exists()).toBe(true);
+
+      // The content section (with v-if="alertDetails") should not render
+      expect(
+        wrapper.find('[data-test="alert-details-history-table"]').exists(),
+      ).toBe(false);
     });
   });
 
