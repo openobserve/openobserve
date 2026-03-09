@@ -207,16 +207,16 @@ vi.mock("@/composables/useTraces", () => ({
   }),
 }));
 
-const { mockGetStreams } = vi.hoisted(() => ({
+// Hoisted so vi.mock factory can reference them and tests can override per-call
+const { mockGetStreams, mockGetStream } = vi.hoisted(() => ({
   mockGetStreams: vi.fn(),
+  mockGetStream: vi.fn(),
 }));
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,
-    getStream: vi.fn((streamName) =>
-      Promise.resolve(mockStreamList.list.find((s) => s.name === streamName))
-    ),
+    getStream: mockGetStream,
   }),
 }));
 
@@ -264,15 +264,21 @@ describe("Index.vue (Main Traces Page)", () => {
   let wrapper: VueWrapper<any>;
 
   beforeEach(async () => {
-    // Reset mock data
+    // Set default stream mock implementations (tests can override with mockResolvedValueOnce)
     mockGetStreams.mockResolvedValue(mockStreamList);
+    mockGetStream.mockImplementation((streamName: string) =>
+      Promise.resolve(
+        mockStreamList.list.find((s: any) => s.name === streamName),
+      ),
+    );
+
+    // Reset mock data
     mockSearchObj.loading = false;
     mockSearchObj.loadingStream = false;
     mockSearchObj.data.stream.streamLists = [];
     mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
     mockSearchObj.data.queryResults = { hits: [] };
     mockSearchObj.data.errorMsg = "";
-    mockSearchObj.data.errorCode = 0;
     mockSearchObj.data.editorValue = "";
 
     // Mock router query params
@@ -510,7 +516,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(mockSearchObj.data.stream.selectedStream.value).toBe(
-        "test-stream"
+        "test-stream",
       );
     });
 
@@ -537,7 +543,9 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="logs-search-no-stream-selected-text"]').exists()
+        wrapper
+          .find('[data-test="logs-search-no-stream-selected-text"]')
+          .exists(),
       ).toBe(true);
     });
   });
@@ -575,7 +583,9 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="traces-search-result-not-found-text"]').exists()
+        wrapper
+          .find('[data-test="traces-search-result-not-found-text"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -659,7 +669,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="traces-search-error-message"]').exists()
+        wrapper.find('[data-test="traces-search-error-message"]').exists(),
       ).toBe(true);
     });
 
@@ -689,7 +699,9 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="traces-search-result-not-found-text"]').exists()
+        wrapper
+          .find('[data-test="traces-search-result-not-found-text"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -719,9 +731,9 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      expect(wrapper.find('[data-test="traces-search-error-20003"]').exists()).toBe(
-        true
-      );
+      expect(
+        wrapper.find('[data-test="traces-search-error-20003"]').exists(),
+      ).toBe(true);
     });
   });
 
@@ -748,7 +760,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       // Find and click collapse button
       const collapseBtn = wrapper.find(
-        '[data-test="logs-search-field-list-collapse-btn"]'
+        '[data-test="logs-search-field-list-collapse-btn"]',
       );
       expect(collapseBtn.exists()).toBe(true);
 
@@ -917,7 +929,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(mockSearchObj.data.editorValue).toBe(
-        "duration >= 100 AND service_name = 'test'"
+        "duration >= 100 AND service_name = 'test'",
       );
     });
 
@@ -1121,6 +1133,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
   describe("Edge Cases", () => {
     it("should handle empty stream list gracefully", async () => {
+      // Override just for this test — mockGetStreams is the shared vi.fn from vi.hoisted
       mockGetStreams.mockResolvedValueOnce({ list: [] });
 
       wrapper = mount(Index, {
