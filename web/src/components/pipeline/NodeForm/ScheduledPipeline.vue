@@ -2340,7 +2340,7 @@ const runQuery = async () => {
           page_type: selectedStreamType.value,
           validate: true,
         },
-        "derived_stream",
+        "ui",
       )
       .then((res: any) => {
         if (res.data.hits.length > 0) {
