@@ -68,9 +68,7 @@ pub async fn list(Path(org_id): Path<String>) -> Response {
 pub async fn get(Path((org_id, model_id)): Path<(String, String)>) -> Response {
     match model_pricing::get_by_id(&model_id).await {
         Ok(Some(item)) if item.org_id == org_id => MetaHttpResponse::json(item),
-        Ok(Some(_)) | Ok(None) => {
-            MetaHttpResponse::not_found("Model pricing definition not found")
-        }
+        Ok(Some(_)) | Ok(None) => MetaHttpResponse::not_found("Model pricing definition not found"),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
@@ -212,7 +210,7 @@ pub async fn delete(Path((org_id, model_id)): Path<(String, String)>) -> Respons
     match model_pricing::get_by_id(&model_id).await {
         Ok(Some(item)) if item.org_id == org_id => {}
         Ok(Some(_)) | Ok(None) => {
-            return MetaHttpResponse::not_found("Model pricing definition not found")
+            return MetaHttpResponse::not_found("Model pricing definition not found");
         }
         Err(e) => return MetaHttpResponse::internal_error(e),
     }

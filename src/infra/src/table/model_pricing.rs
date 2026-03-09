@@ -62,9 +62,7 @@ pub async fn put(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
     // When an ID is present, look up by ID first so renames don't orphan the old record.
     // Fall back to (org, name) lookup for new records without an ID.
     let existing = if let Some(ref id) = item.id {
-        Entity::find_by_id(id.to_string())
-            .one(client)
-            .await?
+        Entity::find_by_id(id.to_string()).one(client).await?
     } else {
         get_by_org_and_name(client, &item.org_id, &item.name).await?
     };

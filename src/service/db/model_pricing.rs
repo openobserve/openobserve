@@ -19,8 +19,8 @@
 //! The cache follows the standard OpenObserve watch/cache pattern:
 //! - `cache()` loads all entries from DB at startup.
 //! - `watch()` subscribes to coordinator events and updates the cache on every node.
-//! - Write operations emit coordinator events so all nodes stay in sync.
-//! User-defined models take priority over built-in models during cost calculation.
+//! - Write operations emit coordinator events so all nodes stay in sync. User-defined models take
+//!   priority over built-in models during cost calculation.
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -117,10 +117,10 @@ pub fn find_pricing_sync_at(
             continue;
         }
         // If valid_from is set, it must be <= span timestamp
-        if let (Some(span_ts), Some(valid_from)) = (span_ts_micros, entry.definition.valid_from) {
-            if valid_from > span_ts {
-                continue;
-            }
+        if let (Some(span_ts), Some(valid_from)) = (span_ts_micros, entry.definition.valid_from)
+            && valid_from > span_ts
+        {
+            continue;
         }
         // Pick the entry with the greatest valid_from (most recent applicable price)
         let is_better = match &best {

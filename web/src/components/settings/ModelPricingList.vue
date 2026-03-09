@@ -37,26 +37,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- Match pattern with live regex validation -->
-          <div>
-            <q-input
-              v-model="editingModel.match_pattern"
-              label="Match Pattern (Regex) *"
-              dense
-              outlined
-              :error="!!patternError"
-              :error-message="patternError"
-              :rules="[(val: string) => !!val?.trim() || 'Match pattern is required']"
-              hint='Exact case-insensitive match: (?i)^(modelname)$'
-              data-test="model-pricing-pattern-input"
-            />
-            <q-icon
-              v-if="patternPreview && !patternError"
-              name="check_circle"
-              color="positive"
-              size="18px"
-              style="margin-top: 2px"
-            />
-          </div>
+          <q-input
+            v-model="editingModel.match_pattern"
+            label="Match Pattern (Regex) *"
+            dense
+            outlined
+            :error="!!patternError"
+            :error-message="patternError"
+            :rules="[(val: string) => !!val?.trim() || 'Match pattern is required']"
+            hint='Exact case-insensitive match: (?i)^(modelname)$'
+            data-test="model-pricing-pattern-input"
+          >
+            <template #append>
+              <q-icon
+                v-if="patternPreview && !patternError"
+                name="check_circle"
+                color="positive"
+                size="18px"
+              />
+            </template>
+          </q-input>
 
           <!-- Tiers -->
           <div>
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Condition (non-default tiers) -->
               <div v-if="idx > 0 && tier.condition">
                 <div class="text-caption q-mb-xs" style="font-weight: 600">Apply when</div>
-                <div style="display: flex; gap: 8px; align-items: flex-start">
+                <div style="display: flex; gap: 8px; align-items: center">
                   <q-input
                     v-model="tier.condition.usage_key"
                     label="Usage Key"
@@ -105,13 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-select
                     v-model="tier.condition.operator"
                     :options="operators"
-                    label="Operator"
                     dense
                     outlined
                     options-dense
                     emit-value
                     map-options
-                    style="min-width: 120px; flex-shrink: 0"
+                    style="min-width: 100px; flex-shrink: 0"
                     :display-value="operators.find((o: any) => o.value === tier.condition.operator)?.label || ''"
                   />
                   <q-input
