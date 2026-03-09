@@ -2599,7 +2599,8 @@
     "success": "SUCCES",
     "today": "Vandaag",
     "yesterday": "Gisteren",
-    "spanColorPalettePreview": "Voorbeeld van het kleurenpalet van Span"
+    "spanColorPalettePreview": "Voorbeeld van het kleurenpalet van Span",
+    "errorsFound": "Foutsporen"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

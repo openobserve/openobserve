@@ -2599,7 +2599,8 @@
     "success": "BAŞARI",
     "today": "Bugün",
     "yesterday": "Dün",
-    "spanColorPalettePreview": "Span Renk Paleti Önizlemesi"
+    "spanColorPalettePreview": "Span Renk Paleti Önizlemesi",
+    "errorsFound": "Hata İzleri"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
