@@ -1,6 +1,7 @@
 import random
 import base64
 import io
+import time
 from pathlib import Path
 import json # For JSON parsing
 from requests.auth import HTTPBasicAuth
@@ -113,3 +114,109 @@ class EnrichmentPage:
         if response.status_code == 200:
             return enrichment_name  # or response.json()['id'] if the API returns an ID
         return None
+
+    def create_enrichment_table_from_url(self, session, base_url, user_email, user_password, org_id, table_name, csv_url, append=False, replace_failed=False):
+        """Create an enrichment table from a public URL.
+
+        Args:
+            session: requests session
+            base_url: API base URL
+            user_email: user email for auth
+            user_password: user password for auth
+            org_id: organization ID
+            table_name: name of the enrichment table
+            csv_url: public URL to CSV file (must start with http:// or https://)
+            append: whether to append data to existing table (default: False)
+            replace_failed: whether to replace failed records (default: False)
+
+        Returns:
+            response object (status 200 on success - job saved, runs async in background)
+        """
+        session.auth = HTTPBasicAuth(user_email, user_password)
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
+        payload = {
+            "url": csv_url,
+            "replace_failed": replace_failed
+        }
+
+        url = f"{base_url}api/{org_id}/enrichment_tables/{table_name}/url?append={str(append).lower()}"
+
+        response = session.post(url, headers=headers, json=payload)
+        assert response.status_code == 200, f"Failed to create enrichment table from URL: {response.status_code} {response.content.decode()}"
+        return response
+
+    def get_enrichment_table_url_status(self, session, base_url, user_email, user_password, org_id, table_name):
+        """Get the status of a URL-based enrichment table job.
+
+        Args:
+            session: requests session
+            base_url: API base URL
+            user_email: user email for auth
+            user_password: user password for auth
+            org_id: organization ID
+            table_name: name of the enrichment table
+
+        Returns:
+            dict with job status info
+        """
+        session.auth = HTTPBasicAuth(user_email, user_password)
+        headers = {'Accept': 'application/json'}
+
+        url = f"{base_url}api/{org_id}/enrichment_tables/status"
+        response = session.get(url, headers=headers)
+        assert response.status_code == 200, f"Failed to get enrichment table status: {response.status_code} {response.content.decode()}"
+
+        data = response.json()
+        # API may return:
+        # 1. Dict keyed by table_name: {"table1": {...}, "table2": {...}}
+        # 2. Dict with table_name as value: {"table_name": "...", "status": "..."}
+        # 3. List of status objects: [{"table_name": "...", "status": "..."}, ...]
+        if isinstance(data, dict):
+            # Check if it's keyed by table_name
+            if table_name in data:
+                result = data.get(table_name)
+                # Result could be a list of jobs for this table
+                if isinstance(result, list) and len(result) > 0:
+                    return result[0]  # Return most recent job
+                return result
+            # Check if it's a single status object
+            if data.get("table_name") == table_name:
+                return data
+        # Handle list format
+        if isinstance(data, list):
+            for status in data:
+                if isinstance(status, dict) and status.get("table_name") == table_name:
+                    return status
+        return None
+
+    def wait_for_url_enrichment_job(self, session, base_url, user_email, user_password, org_id, table_name, max_retries=12, delay=5):
+        """Wait for URL enrichment job to complete.
+
+        Args:
+            session: requests session
+            base_url: API base URL
+            user_email: user email for auth
+            user_password: user password for auth
+            org_id: organization ID
+            table_name: name of the enrichment table
+            max_retries: max number of status checks (default: 12)
+            delay: seconds between checks (default: 5)
+
+        Returns:
+            str: "completed" if job succeeded, "failed" if job failed, "timeout" if max retries exceeded
+        """
+        for _ in range(max_retries):
+            status = self.get_enrichment_table_url_status(session, base_url, user_email, user_password, org_id, table_name)
+            if status:
+                job_status = status.get("status", "")
+                if job_status == "completed":
+                    return "completed"
+                elif job_status == "failed":
+                    return "failed"
+            time.sleep(delay)
+
+        return "timeout"
