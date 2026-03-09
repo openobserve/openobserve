@@ -1030,7 +1030,10 @@ where
                 && path_columns[2].eq("alerts")
                 && path_columns[3].eq("generate_sql"))
             // rbac for history is done in handler, so ignore here
-            || (url_len == 3 && path_columns[1].eq("alerts") && path_columns[2].eq("history"))
+            || (url_len == 4
+                && path_columns[0].eq(V2_API_PREFIX)
+                && path_columns[2].eq("alerts")
+                && path_columns[3].eq("history"))
             {
                 return Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
