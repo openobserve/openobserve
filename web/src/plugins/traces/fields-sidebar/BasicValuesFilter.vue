@@ -231,11 +231,14 @@ const buildSql = () => {
     whereClause = parseQuery[0].trim();
   }
 
-  whereClause = parseDurationWhereClause(
+  const durationParseResult = parseDurationWhereClause(
     whereClause,
     sqlParser.value,
     searchObj.data.stream.selectedStream.value,
   );
+  if (typeof durationParseResult === "string") {
+    whereClause = durationParseResult;
+  }
 
   let query_context =
     `SELECT * FROM "` +
@@ -408,7 +411,7 @@ const handleBeforeHide = () => {
   resetFieldValues(props.row.name);
 };
 
-defineExpose({ buildSql });
+defineExpose({ buildSql, openFilterCreator });
 </script>
 
 <style lang="scss">

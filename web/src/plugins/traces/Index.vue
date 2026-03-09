@@ -596,11 +596,14 @@ function buildSearch() {
 
     if (whereClause.trim() != "") {
       // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
-      whereClause = parseDurationWhereClause(
+      const durationParseResult = parseDurationWhereClause(
         whereClause,
         parser,
         searchObj.data.stream.selectedStream.value,
       );
+      if (typeof durationParseResult === "string") {
+        whereClause = durationParseResult;
+      }
 
       whereClause = whereClause
         .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
@@ -726,7 +729,10 @@ const updateFieldValues = (data) => {
   });
 };
 
-async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
+async function getQueryData(
+  isPagination: boolean = false,
+  isSort: boolean = false,
+) {
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
@@ -776,13 +782,14 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
 
     // Filters are already in editorValue (set by metrics dashboard brush selections)
     let filter = searchObj.data.editorValue.trim();
-    try {
-      filter = parseDurationWhereClause(
-        filter,
-        parser,
-        searchObj.data.stream.selectedStream.value,
-      );
-    } catch (err) {}
+    const filterParseResult = parseDurationWhereClause(
+      filter,
+      parser,
+      searchObj.data.stream.selectedStream.value,
+    );
+    if (typeof filterParseResult === "string") {
+      filter = filterParseResult;
+    }
 
     const combinedFilter = filter;
 

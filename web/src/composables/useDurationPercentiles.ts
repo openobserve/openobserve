@@ -44,20 +44,73 @@ const DURATION_UNIT_MULTIPLIERS: Record<string, number> = {
  *   `duration >= '1.50ms'`    →  `duration >= 1500`
  *   `duration >= '2.50s'`     →  `duration >= 2500000`
  *   `duration >= '1.50m'`     →  `duration >= 90000000`
+/** Maps every accepted unit spelling to a canonical key in DURATION_UNIT_MULTIPLIERS. */
+const UNIT_ALIASES: Record<string, string> = {
+  // Microseconds
+  us: "us",
+  µs: "us",
+  usec: "us",
+  usecs: "us",
+  microsecond: "us",
+  microseconds: "us",
+  // Milliseconds
+  ms: "ms",
+  msec: "ms",
+  msecs: "ms",
+  millisecond: "ms",
+  milliseconds: "ms",
+  // Seconds
+  s: "s",
+  sec: "s",
+  secs: "s",
+  second: "s",
+  seconds: "s",
+  // Minutes
+  m: "m",
+  min: "m",
+  mins: "m",
+  minute: "m",
+  minutes: "m",
+};
+
+export type ParseDurationResult = string | { error: string };
+
+/**
+ * Converts duration comparisons in a WHERE clause that carry human-readable
+ * unit suffixes back to raw microseconds.
+ *
+ * Parses the clause into a SQL AST, walks the tree to locate duration binary
+ * expressions whose right-hand side is a quoted string (e.g. `'1.50ms'`),
+ * mutates each node to a numeric literal, then re-serialises with sqlify.
+ *
+ * Tolerates optional whitespace between the number and unit, and accepts all
+ * common unit aliases (e.g. "second", "seconds", "sec", "secs" → s).
+ *
+ * Returns `{ error }` when a duration value contains an unrecognised unit.
+ * Falls back to the original string if the SQL parser throws (malformed input).
+ *
+ * Examples:
+ *   `duration >= '100us'`       →  `duration >= 100`
+ *   `duration >= '1.50 ms'`     →  `duration >= 1500`
+ *   `duration >= '2 seconds'`   →  `duration >= 2000000`
+ *   `duration >= '1.50m'`       →  `duration >= 90000000`
+ *   `duration >= '5 lightyears'` → `{ error: 'Unknown duration unit: "lightyears"' }`
  */
 export const parseDurationWhereClause = (
   whereClause: string,
   parser: any,
   streamName: string = "x",
-): string => {
+): ParseDurationResult => {
   if (!parser || !whereClause.trim()) return whereClause;
 
   try {
     const fullSql = `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
     const ast = parser.astify(fullSql);
 
+    let unknownUnit: string | null = null;
+
     const processNode = (node: any) => {
-      if (!node || node.type !== "binary_expr") return;
+      if (!node || node.type !== "binary_expr" || unknownUnit) return;
 
       if (
         (node.left?.column === "duration" ||
@@ -65,13 +118,20 @@ export const parseDurationWhereClause = (
         (node.right?.type === "single_quote_string" ||
           node.right?.type === "string")
       ) {
-        const strVal = String(node.right.value);
-        // Order: ms before m, us before u
-        const match = strVal.match(/^(\d+(?:\.\d+)?)(ms|us|m|s)$/i);
+        const strVal = String(node.right.value).trim();
+        // Allow optional whitespace between number and unit; unit may be multi-char.
+        const match = strVal.match(/^(\d+(?:\.\d+)?)\s*([a-zµ]+)$/i);
         if (match) {
+          const rawUnit = match[2].toLowerCase();
+          const canonicalUnit = UNIT_ALIASES[rawUnit];
+          if (!canonicalUnit) {
+            unknownUnit = rawUnit;
+            return;
+          }
           const num = parseFloat(match[1]);
-          const unit = match[2].toLowerCase();
-          const us = Math.round(num * (DURATION_UNIT_MULTIPLIERS[unit] ?? 1));
+          const us = Math.round(
+            num * (DURATION_UNIT_MULTIPLIERS[canonicalUnit] ?? 1),
+          );
           // Mutate the AST node in place — replace quoted string with a numeric literal.
           node.right = { type: "number", value: us };
         }
@@ -82,6 +142,10 @@ export const parseDurationWhereClause = (
     };
 
     processNode(ast.where);
+
+    if (unknownUnit !== null) {
+      return { error: `Unknown duration unit: "${unknownUnit}"` };
+    }
 
     // Re-serialise the mutated AST and extract only the WHERE clause.
     const resultSql: string = parser.sqlify(ast);
