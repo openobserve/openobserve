@@ -94,14 +94,17 @@ export class AlertTemplatesPage {
         const templateText = `{
   "text": "{alert_name} is active. This is the alert url {alert_url}. This alert template has been created using a playwright automation script"`;
         
-        // Clear the template editor first
-        await this.page.locator(this.monacoEditorLocator).first().click();
-        await this.page.keyboard.press('Control+A');
+        // Clear the template editor and enter content
+        // Use .view-lines click + insertText to avoid Monaco auto-completion issues
+        const editorViewLines = this.page.locator('[data-test="template-body-editor"] .view-lines, .monaco-editor .view-lines').first();
+        await editorViewLines.click();
+        const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+        await this.page.keyboard.press(selectAllKey);
         await this.page.keyboard.press('Backspace');
-        await this.page.waitForTimeout(1000);
-        
-        // Enter the template content all at once
-        await this.page.keyboard.type(templateText);
+        await this.page.waitForTimeout(500);
+
+        // Use insertText to avoid Monaco auto-completion/bracket matching issues
+        await this.page.keyboard.insertText(templateText);
         await this.page.waitForTimeout(1000);
         
         await this.page.locator(this.templateSubmitButton).click();
@@ -227,14 +230,16 @@ export class AlertTemplatesPage {
         // JSON array format required for OpenObserve ingestion API
         const templateText = `[{"alert_name": "{alert_name}", "alert_type": "validation", "org_name": "{org_name}", "stream_name": "{stream_name}"}]`;
 
-        // Clear the template editor first
-        await this.page.locator(this.monacoEditorLocator).first().click();
-        await this.page.keyboard.press('Control+A');
+        // Clear the template editor and enter content
+        const editorViewLines = this.page.locator('[data-test="template-body-editor"] .view-lines, .monaco-editor .view-lines').first();
+        await editorViewLines.click();
+        const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+        await this.page.keyboard.press(selectAllKey);
         await this.page.keyboard.press('Backspace');
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForTimeout(500);
 
-        // Enter the template content
-        await this.page.keyboard.type(templateText);
+        // Use insertText to avoid Monaco auto-completion/bracket matching issues
+        await this.page.keyboard.insertText(templateText);
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.templateSubmitButton).click();

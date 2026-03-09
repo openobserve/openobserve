@@ -29,6 +29,8 @@ import { AlertDestinationsPage } from "./alertsPages/alertDestinationsPage.js";
 import { PipelinesPage } from "./pipelinesPages/pipelinesPage.js";
 import { LoginPage } from "./generalPages/loginPage.js";
 import { IngestionPage } from "./generalPages/ingestionPage.js";
+import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
+import { isCloudEnvironment } from "./cloudPages/cloud-env.js";
 import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
@@ -109,7 +111,7 @@ class PageManager {
     this.alertTemplatesPage = new AlertTemplatesPage(page);
     this.alertDestinationsPage = new AlertDestinationsPage(page);
     this.pipelinesPage = new PipelinesPage(page);
-    this.loginPage = new LoginPage(page);
+    this.loginPage = isCloudEnvironment() ? new CloudLoginPage(page) : new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
     this.ingestionConfigPage = new IngestionConfigPage(page);
 

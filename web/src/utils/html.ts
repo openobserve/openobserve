@@ -50,7 +50,9 @@
  * // Output: '{&quot;message&quot;: &quot;Success &amp; complete&quot;, &quot;html&quot;: &quot;&lt;div&gt;content&lt;/div&gt;&quot;}'
  */
 export function escapeHtml(str: string): string {
-  return str
+  if (str == null) return "";
+  const s = typeof str === "string" ? str : String(str);
+  return s
     .replace(/&/g, "&amp;") // Must be first: & → &amp;
     .replace(/</g, "&lt;") // Less than: < → &lt;
     .replace(/>/g, "&gt;") // Greater than: > → &gt;
