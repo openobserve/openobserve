@@ -60,7 +60,7 @@ const UNIT_ALIASES: Record<string, string> = {
   msecs: "ms",
   millisecond: "ms",
   milliseconds: "ms",
-  millis: "us",
+  millis: "ms",
   // Seconds
   s: "s",
   sec: "s",
