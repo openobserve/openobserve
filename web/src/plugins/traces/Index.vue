@@ -199,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="searchResultRef"
                   @update:datetime="setHistogramDate"
                   @update:scroll="getMoreData"
+                  @update:sort="runQueryOnSort"
                   @shareLink="copyTracesUrl"
                   @metrics:filters-updated="onMetricsFiltersUpdated"
                 />
@@ -304,6 +305,18 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
 // Track the current search stream so we can cancel it when a new search starts
 let currentSearchTraceId: string | null = null;
+// The processed WHERE clause from the last buildSearch() call — used for the count query
+let builtWhereClause = "";
+/**
+ * Tracks per-request streaming partition state.
+ * Each backend partition emits a search_response_metadata event; each chunk
+ * within that partition emits a search_response_hits event.
+ * We decide replace vs append using the same pattern as useSearchResponseHandler.
+ */
+const tracesPartitionMap: Record<
+  string,
+  { partition: number; chunks: Record<number, number> }
+> = {};
 
 searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
 
@@ -592,11 +605,13 @@ function buildSearch() {
         .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
         .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
 
+      builtWhereClause = whereClause;
       req.query.sql = req.query.sql.replace(
         "[WHERE_CLAUSE]",
         " WHERE " + whereClause,
       );
     } else {
+      builtWhereClause = "";
       req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
     }
 
@@ -622,6 +637,51 @@ function buildSearch() {
   }
 }
 
+function fetchTracesCount() {
+  const queryReq = searchObj.data.queryPayload;
+  if (!queryReq || !selectedStreamName.value) return;
+
+  const streamName = selectedStreamName.value;
+  const countSql = `select approx_distinct(trace_id) as trace_count, (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR')) as error_count FROM "${streamName}"${builtWhereClause ? " WHERE " + builtWhereClause : ""}`;
+  const countTraceId = getUUID().replace(/-/g, "");
+
+  fetchQueryDataWithHttpStream(
+    {
+      queryReq: {
+        query: {
+          sql: b64EncodeUnicode(countSql),
+          start_time: queryReq.query.start_time,
+          end_time: queryReq.query.end_time,
+          from: 0,
+          size: 1,
+        },
+        encoding: "base64",
+      },
+      type: "search",
+      pageType: "traces",
+      searchType: "ui",
+      traceId: countTraceId,
+      org_id: searchObj.organizationIdentifier,
+    },
+    {
+      data: (_payload: any, response: any) => {
+        const hits: any[] = response.content?.results?.hits || [];
+        if (hits.length > 0) {
+          const count = hits[0]?.trace_count ?? 0;
+          searchObj.data.queryResults.total = count;
+          searchObj.data.queryResults.errorCount = hits[0]?.error_count ?? 0;
+          searchObj.meta.resultGrid.showPagination = count > 0;
+        }
+      },
+      error: (_payload: any, _err: any) => {
+        console.error("Failed to fetch traces count");
+      },
+      complete: (_payload: any) => {},
+      reset: (_payload: any) => {},
+    },
+  );
+}
+
 const showTraceDetailsError = () => {
   showErrorNotification(
     `Trace ${router.currentRoute.value.query.trace_id} not found`,
@@ -635,20 +695,6 @@ const showTraceDetailsError = () => {
     },
   });
   return;
-};
-
-const buildTraceSearchQuery = (trace: string) => {
-  const req = getDefaultRequest();
-  req.query.from = 0;
-  req.query.size = 1000;
-  req.query.start_time = trace.trace_start_time - 30000000;
-  req.query.end_time = trace.trace_end_time + 30000000;
-
-  req.query.sql = b64EncodeUnicode(
-    `SELECT * FROM "${selectedStreamName.value}" WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
-  );
-
-  return req;
 };
 
 const updateFieldValues = (data) => {
@@ -671,7 +717,7 @@ const updateFieldValues = (data) => {
   });
 };
 
-async function getQueryData() {
+async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
@@ -680,10 +726,9 @@ async function getQueryData() {
     searchObj.data.errorDetail = "";
 
     searchObj.searchApplied = true;
+    searchObj.loading = true;
 
-    if (searchObj.data.resultGrid.currentPage == 0) {
-      searchObj.loading = true;
-      searchObj.data.queryResults = {};
+    if (!isPagination) {
       searchObj.data.sortedQueryResults = [];
       searchObj.data.histogram = {
         layout: {},
@@ -693,9 +738,18 @@ async function getQueryData() {
 
     let queryReq;
 
-    if (!searchObj.data.resultGrid.currentPage) {
+    if (!isPagination) {
       queryReq = buildSearch();
       searchObj.data.queryPayload = queryReq;
+      // Reset hits for a fresh search
+      searchObj.data.queryResults = {
+        hits: [],
+        total: 0,
+        from: 0,
+        size: queryReq.query.size,
+        took: 0,
+      };
+      searchObj.meta.resultGrid.showPagination = false;
     } else {
       queryReq = searchObj.data.queryPayload;
     }
@@ -709,31 +763,19 @@ async function getQueryData() {
       searchObj.data.resultGrid.currentPage *
       searchObj.meta.resultGrid.rowsPerPage;
 
-    let dismiss = null;
-    if (searchObj.data.resultGrid.currentPage) {
-      dismiss = $q.notify({
-        type: "positive",
-        message: t("traces.fetchingMoreTraces"),
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      });
-    }
+    queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
     // Filters are already in editorValue (set by metrics dashboard brush selections)
     const filter = searchObj.data.editorValue.trim();
     const combinedFilter = filter;
 
-    if (queryReq.query.from === 0) searchResultRef?.value?.getDashboardData();
+    if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {
+      if (tracesPartitionMap[currentSearchTraceId])
+        delete tracesPartitionMap[currentSearchTraceId];
+
       cancelStreamQueryBasedOnRequestId({
         trace_id: currentSearchTraceId,
         org_id: searchObj.organizationIdentifier,
@@ -744,17 +786,7 @@ async function getQueryData() {
     // Generate a unique ID for this search request
     const searchTraceId = getUUID().replace(/-/g, "");
     currentSearchTraceId = searchTraceId;
-
-    // Initialise results container on the first page
-    if (queryReq.query.from === 0) {
-      searchObj.data.queryResults = {
-        hits: [],
-        total: 0,
-        from: 0,
-        size: queryReq.query.size,
-        took: 0,
-      };
-    }
+    tracesPartitionMap[searchTraceId] = { partition: 0, chunks: {} };
 
     fetchQueryDataWithHttpStream(
       {
@@ -765,6 +797,8 @@ async function getQueryData() {
           end_time: queryReq.query.end_time,
           from: queryReq.query.from,
           size: queryReq.query.size,
+          sort_by: searchObj.meta.resultGrid.sortBy || "start_time",
+          sort_order: searchObj.meta.resultGrid.sortOrder || "desc",
         },
         type: "traces",
         traceId: searchTraceId,
@@ -772,10 +806,22 @@ async function getQueryData() {
       },
       {
         data: (_payload: any, response: any) => {
+          // Each metadata event signals a new backend partition — advance the counter
+          if (response.type === "search_response_metadata") {
+            tracesPartitionMap[searchTraceId].partition++;
+          }
+
           if (
             response.type === "search_response_metadata" ||
             response.type === "search_response_hits"
           ) {
+            // Track individual hit chunks within the current partition
+            if (response.type === "search_response_hits") {
+              const p = tracesPartitionMap[searchTraceId].partition;
+              tracesPartitionMap[searchTraceId].chunks[p] =
+                (tracesPartitionMap[searchTraceId].chunks[p] ?? 0) + 1;
+            }
+
             const rawHits: any[] = response.content?.results?.hits || [];
             if (rawHits.length === 0) return;
 
@@ -799,27 +845,23 @@ async function getQueryData() {
               }
             }
 
+            const partition = tracesPartitionMap[searchTraceId]?.partition ?? 1;
+            const chunkCount =
+              tracesPartitionMap[searchTraceId]?.chunks[partition] ?? 0;
+            const isChunkedHits = chunkCount > 1;
+            // appendResult: true when on a later partition or a later chunk within
+            // the current partition (mirrors useSearchResponseHandler logic)
+            const appendResult = partition > 1 || isChunkedHits;
+
             const formattedHits = formatTracesMetaData(rawHits);
-            if (!searchObj.data.queryResults.hits) {
-              searchObj.data.queryResults = {
-                hits: [],
-                total: 0,
-                from: queryReq.query.from,
-                size: queryReq.query.size,
-                took: 0,
-              };
+            // Replace hits on the first partition of a pagination fetch (clears the
+            // previous page) or on the very first data chunk of a fresh search
+            if ((isPagination && partition === 1) || !appendResult) {
+              searchObj.data.queryResults.hits = formattedHits;
+            } else {
+              searchObj.data.queryResults.hits.push(...formattedHits);
             }
-            searchObj.data.queryResults.hits.push(...formattedHits);
-            // Keep queryResults.from in sync so SearchResult.vue's onScroll gate
-            // (currentPage <= queryResults.from / rowsPerPage) allows further pages.
             searchObj.data.queryResults.from = queryReq.query.from;
-            // Use backend total when available (cumulative across partitions);
-            // fall back to hits.length only if not provided.
-            const backendTotal = response.content?.results?.total;
-            searchObj.data.queryResults.total =
-              backendTotal != null
-                ? backendTotal
-                : searchObj.data.queryResults.hits.length;
 
             updateFieldValues(rawHits);
             updateGridColumns();
@@ -827,7 +869,6 @@ async function getQueryData() {
         },
         error: (_payload: any, err: any) => {
           searchObj.loading = false;
-          if (dismiss) dismiss();
 
           const errData = err?.content || err;
           const { message, trace_id, code, error_detail } = errData ?? {};
@@ -844,11 +885,15 @@ async function getQueryData() {
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
           currentSearchTraceId = null;
+          delete tracesPartitionMap[searchTraceId];
         },
         complete: (_payload: any) => {
           searchObj.loading = false;
-          if (dismiss) dismiss();
           currentSearchTraceId = null;
+          delete tracesPartitionMap[searchTraceId];
+          if (!isPagination) {
+            fetchTracesCount();
+          }
         },
         reset: (_payload: any) => {
           searchObj.data.queryResults = {};
@@ -1176,6 +1221,12 @@ const runQueryFn = () => {
   getQueryData();
 };
 
+const runQueryOnSort = () => {
+  searchObj.data.resultGrid.currentPage = 0;
+  searchObj.runQuery = false;
+  getQueryData(false, true);
+};
+
 function restoreUrlQueryParams() {
   const queryParams = router.currentRoute.value.query;
 
@@ -1362,7 +1413,7 @@ const searchData = () => {
 
 const getMoreData = () => {
   if (searchObj.meta.refreshInterval == 0) {
-    getQueryData();
+    getQueryData(true);
 
     if (config.isCloud == "true") {
       segment.track("Button Click", {

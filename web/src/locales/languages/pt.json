@@ -731,9 +731,9 @@
     "usage_information": "Informações de uso",
     "license_allows_ingestion": "Sua licença permite <strong>{limit} GB</strong> de ingestão de dados por dia.",
     "limit_exceeded_days": "Limite excedido em <strong class=\"{colorClass}\">{dias} dias</strong> deste mês",
-    "limit_exceeded_warning": " (máximo de 3 dias permitidos). O recurso do aplicativo será restrito",
-    "limit_exceeded_info": " ({remaining} subsídio{plural} à esquerda de 3 no máximo)",
-    "no_limit_exceedances": "Nenhum limite excede este mês (máximo de 3 permitidos por mês).",
+    "limit_exceeded_warning": " (máximo de {max} dias permitidos). O recurso do aplicativo será restrito",
+    "limit_exceeded_info": " ({remaining} subsídio{plural} à esquerda de {max} no máximo)",
+    "no_limit_exceedances": "Nenhum limite excede este mês (máximo de {max} permitidos por mês).",
     "usage_shows_zero_unlimited": "* O uso mostra 0% para planos ilimitados",
     "license_updated_success": "Licença atualizada com sucesso",
     "failed_to_update_license": "Falha ao atualizar a licença",
@@ -744,7 +744,8 @@
     "yes_update_license": "Sim, atualize a licença",
     "no_keep_current": "Não, mantenha-se atualizado",
     "feature_correlation_management": "Gerenciamento de correlações",
-    "feature_log_patterns": "Padrões de registro"
+    "feature_log_patterns": "Padrões de registro",
+    "environment_type": "Tipo de ambiente"
   },
   "login": {
     "userid": "ID do usuário",
@@ -2599,7 +2600,8 @@
     "success": "SUCESSO",
     "today": "Hoje",
     "yesterday": "Ontem",
-    "spanColorPalettePreview": "Pré-visualização da paleta de cores Span"
+    "spanColorPalettePreview": "Pré-visualização da paleta de cores Span",
+    "errorsFound": "Traços de erro"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",

@@ -87,13 +87,8 @@ async queryJobSearch() {
 
 
 async clickJobID () {
-  const orgId = process.env["ORGNAME"];
-  const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-  
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  }
+  const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+  const orgId = getOrgIdentifier();
 
   // Intercept the network request and capture the response
   await this.page.route(

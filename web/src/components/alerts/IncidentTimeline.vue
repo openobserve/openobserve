@@ -147,34 +147,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <!-- For System Events: text, badge -->
                     <template v-else>
+                      <!-- AI events: "AI SRE" badge first, then message text -->
+                      <template v-if="event.type === 'ai_analysis_begin' || event.type === 'ai_analysis_complete'">
+                        <span
+                          class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold"
+                          :style="{
+                            backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
+                            border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
+                            color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
+                          }"
+                        >AI SRE</span>
+                        <span class="tw:text-sm"
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
+                          v-html="getInlineEventText(event)"
+                        ></span>
+                      </template>
                       <!-- For Alert events, show badge first -->
-                      <span
-                        v-if="event.type === 'Alert'"
-                        class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold"
-                        :style="{
-                          backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
-                          border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
-                          color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
-                        }"
-                      >
-                        {{ getEventBadgeText(event) }}
-                      </span>
-                      <span class="tw:text-sm"
-                        :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
-                        v-html="getInlineEventText(event)"
-                      ></span>
-                      <!-- For other system events (except Severity changes and Alert), show badge after text -->
-                      <span
-                        v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride' && event.type !== 'Alert'"
-                        class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold"
-                        :style="{
-                          backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
-                          border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
-                          color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
-                        }"
-                      >
-                        {{ getEventBadgeText(event) }}
-                      </span>
+                      <template v-else-if="event.type === 'Alert'">
+                        <span
+                          class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold"
+                          :style="{
+                            backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
+                            border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
+                            color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
+                          }"
+                        >
+                          {{ getEventBadgeText(event) }}
+                        </span>
+                        <span class="tw:text-sm"
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
+                          v-html="getInlineEventText(event)"
+                        ></span>
+                      </template>
+                      <!-- All other system events: text then badge (except severity changes) -->
+                      <template v-else>
+                        <span class="tw:text-sm"
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
+                          v-html="getInlineEventText(event)"
+                        ></span>
+                        <span
+                          v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
+                          class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold"
+                          :style="{
+                            backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
+                            border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
+                            color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
+                          }"
+                        >
+                          {{ getEventBadgeText(event) }}
+                        </span>
+                      </template>
                     </template>
                     <span class="tw:text-xs"
                       :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
@@ -560,10 +582,10 @@ const getInlineEventText = (event: any): string => {
       return "Correlation key was upgraded";
 
     case "ai_analysis_begin":
-      return "AI analysis started";
+      return "Started analyzing the incident";
 
     case "ai_analysis_complete":
-      return "AI analysis completed";
+      return "Finished the analysis";
 
     default:
       return "";

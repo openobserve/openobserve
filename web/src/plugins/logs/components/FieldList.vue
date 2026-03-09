@@ -65,14 +65,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : expandGroupRowsFieldCount[props.row.group]
             }})
           </div>
-          <q-icon
+          <q-btn
             v-if="expandGroupRowsFieldCount[props.row.group] > 0"
-            :name="
-              expandGroupRows[props.row.group] ? 'expand_less' : 'expand_more'
+            :icon="
+              expandGroupRows[props.row.group] ? 'expand_more' : 'chevron_right'
             "
-            size="1.25rem"
-            class="float-right q-mt-xs"
-          ></q-icon>
+            dense
+            size="xs"
+            flat
+            class="q-pa-none"
+          ></q-btn>
         </q-td>
       </q-tr>
 

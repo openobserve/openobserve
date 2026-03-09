@@ -183,7 +183,10 @@ import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import searchService from "@/services/search";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import { logsUtils } from "@/composables/useLogs/logsUtils";
+import {
+  logsUtils,
+  removeFieldFromWhereAST,
+} from "@/composables/useLogs/logsUtils";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -600,6 +603,11 @@ export default defineComponent({
     }
 
     /**
+     * Recursively removes WHERE conditions that reference the given field from an AST node.
+     * For AND/OR chains, removes the matching branch and preserves the rest.
+     * Returns null if the entire subtree references only the excluded field.
+     */
+    /**
      * Single Stream
      * - Consider filter in sql and non sql mode, create sql query and fetch values
      *
@@ -785,6 +793,29 @@ export default defineComponent({
           if (query_context !== "") {
             query_context = query_context == undefined ? "" : query_context;
 
+            // Build SQL with the expanded field's own filter condition removed so
+            // field value counts are not constrained by that filter.
+            const rawSQL = query_context.replace("[INDEX_NAME]", selectedStream);
+            let sqlForValues = rawSQL;
+            try {
+              const parsedForValues = fnParsedSQL(rawSQL);
+              if (parsedForValues?.from?.length > 0) {
+                const modifiedWhere = removeFieldFromWhereAST(
+                  parsedForValues.where,
+                  name,
+                );
+                const modifiedSQL = fnUnparsedSQL({
+                  ...parsedForValues,
+                  where: modifiedWhere,
+                }).replace(/`/g, '"');
+                if (modifiedSQL) {
+                  sqlForValues = modifiedSQL;
+                }
+              }
+            } catch {
+              // Fall back to original SQL if AST manipulation fails
+            }
+
             const fetchPayload = {
               fields: [name],
               size: store.state.zoConfig?.query_values_default_num || 10,
@@ -798,10 +829,7 @@ export default defineComponent({
               stream_name: selectedStream,
               stream_type: searchObj.data.stream.streamType,
               use_cache: (window as any).use_cache ?? true,
-              sql:
-                b64EncodeUnicode(
-                  query_context.replace("[INDEX_NAME]", selectedStream),
-                ) || "",
+              sql: b64EncodeUnicode(sqlForValues) || "",
             };
 
             // Store for reuse by searchFieldValues
@@ -1654,6 +1682,7 @@ export default defineComponent({
       hasUserDefinedSchemas,
       setPage,
       resetPagination,
+      removeFieldFromWhereAST,
     };
   },
 });

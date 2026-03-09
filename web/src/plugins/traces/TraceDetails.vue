@@ -834,7 +834,7 @@ export default defineComponent({
 
     const ChartData: any = ref({});
 
-    const leftWidth: Ref<number> = ref(250);
+    const leftWidth: Ref<number> = ref(460);
     const initialX: Ref<number> = ref(0);
     const initialWidth: Ref<number> = ref(0);
 
@@ -1845,6 +1845,15 @@ export default defineComponent({
     // Converting ns to ms
     const getFormattedSpan = (span: any) => {
       // Parse usage details from split fields
+      span = {
+        ...span,
+        llm_usage_details_input: span.llm_usage_tokens_input,
+        llm_usage_details_output: span.llm_usage_tokens_output,
+        llm_usage_details_total: span.llm_usage_tokens_total,
+        llm_cost_details_total: span.llm_usage_cost_total,
+        llm_input: span.llm_input || {},
+      };
+
       const usage = parseUsageDetails(span);
       const cost = parseCostDetails(span);
 

@@ -181,13 +181,9 @@ test.describe("Share Link Test Cases", () => {
     await pm.logsPage.selectStream(TEST_STREAM);
     await page.waitForTimeout(2000);
 
-    // Step 2: Toggle histogram
-    const histogramToggle = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
-    if (await histogramToggle.isVisible()) {
-      const toggleDiv = histogramToggle.locator('div').first();
-      await toggleDiv.click();
-      await page.waitForTimeout(1000);
-    }
+    // Step 2: Toggle histogram (now inside utilities hamburger menu)
+    await pm.logsPage.toggleHistogram();
+    await page.waitForTimeout(1000);
 
     // Step 3: Click refresh
     await pm.logsPage.clickRefresh();

@@ -112,7 +112,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 round
                 :data-test="`log-search-subfield-list-equal-${fieldName}-field-btn`"
               >
-                <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
+                <q-icon
+                  v-if="fieldName === 'duration'"
+                  :name="outlinedArrowForwardIos"
+                  class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                />
+                <q-icon v-else class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
                   <EqualIcon />
                 </q-icon>
               </q-btn>
@@ -124,7 +129,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 round
                 :data-test="`log-search-subfield-list-not-equal-${fieldName}-field-btn`"
               >
-                <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
+                <q-icon
+                  v-if="fieldName === 'duration'"
+                  :name="outlinedArrowBackIos"
+                  class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                />
+                <q-icon v-else class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
                   <NotEqualIcon />
                 </q-icon>
               </q-btn>
@@ -214,6 +224,10 @@ import { computed, ref, watch } from "vue";
 import { watchDebounced } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import {
+  outlinedArrowBackIos,
+  outlinedArrowForwardIos,
+} from "@quasar/extras/material-icons-outlined";
 import { formatLargeNumber } from "@/utils/zincutils";
 
 interface FieldValues {
