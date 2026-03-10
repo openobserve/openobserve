@@ -282,6 +282,46 @@ async function performGlobalIngestion(page, baseUrl) {
       testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
     }
   }
+
+  // Wait for streams to be indexed and visible in the API
+  // Cloud environments need time after ingestion before streams appear in UI dropdowns
+  testLogger.info('[alpha1] Waiting for streams to be indexed...');
+  const maxWaitMs = 90000; // 90 seconds max
+  const pollIntervalMs = 3000;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const streamsResult = await page.evaluate(async ({ url, orgId }) => {
+        const base = url.endsWith('/') ? url.slice(0, -1) : url;
+        const r = await fetch(`${base}/api/${orgId}/streams?type=logs&page_num=0&page_size=1000`);
+        if (!r.ok) return { ok: false, status: r.status };
+        const data = await r.json();
+        const names = (data.list || []).map(s => s.name);
+        return { ok: true, names };
+      }, { url: baseUrl, orgId });
+
+      if (streamsResult.ok) {
+        const hasE2e = streamsResult.names.includes('e2e_automate');
+        const hasAuto = streamsResult.names.includes('auto_playwright_stream');
+        if (hasE2e && hasAuto) {
+          testLogger.info(`[alpha1] Both streams indexed after ${Date.now() - startTime}ms`);
+          break;
+        }
+        testLogger.debug(`[alpha1] Streams not yet indexed (e2e_automate=${hasE2e}, auto_playwright_stream=${hasAuto}), waiting...`);
+      } else {
+        testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
+      }
+    } catch (e) {
+      testLogger.debug(`[alpha1] Error checking streams: ${e.message}`);
+    }
+
+    await page.waitForTimeout(pollIntervalMs);
+  }
+
+  if (Date.now() - startTime >= maxWaitMs) {
+    testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms — tests may fail on stream selection`);
+  }
 }
 
 module.exports = globalSetup;
