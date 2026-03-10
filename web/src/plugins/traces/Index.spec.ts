@@ -1548,6 +1548,47 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(callsWithNonEmpty.length).toBe(0);
     });
 
+    it("should pass only the WHERE-clause portion to parseDurationWhereClause when editorValue contains a pipe prefix", async () => {
+      const parseSpy = vi.mocked(
+        useDurationPercentilesModule.parseDurationWhereClause,
+      );
+      parseSpy.mockReturnValue("duration >= 1500");
+
+      // editorValue with a query-functions prefix before the pipe
+      mockSearchObj.data.editorValue = "someFunc | duration >= '1.50ms'";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      // parseDurationWhereClause must be called with only the part after the pipe,
+      // NOT with the full "someFunc | duration >= '1.50ms'" string.
+      const calls = parseSpy.mock.calls.filter(
+        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+      );
+      expect(calls.length).toBeGreaterThan(0);
+      for (const [clause] of calls) {
+        expect(clause).not.toContain("|");
+        expect(clause).not.toContain("someFunc");
+      }
+    });
+
     it("should keep original where clause when parseDurationWhereClause returns an error object", async () => {
       const parseSpy = vi.mocked(
         useDurationPercentilesModule.parseDurationWhereClause,

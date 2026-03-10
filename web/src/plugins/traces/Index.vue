@@ -780,8 +780,11 @@ async function getQueryData(
 
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
-    // Filters are already in editorValue (set by metrics dashboard brush selections)
-    let filter = searchObj.data.editorValue.trim();
+    // Filters are already in editorValue (set by metrics dashboard brush selections).
+    // Mirror buildSearch: split on | so only the WHERE-clause portion (after the pipe)
+    // is passed to parseDurationWhereClause, not the query-functions prefix.
+    const editorParts = searchObj.data.editorValue.trim().split("|");
+    let filter = (editorParts.length > 1 ? editorParts[1] : editorParts[0]).trim();
     const filterParseResult = parseDurationWhereClause(
       filter,
       parser,
