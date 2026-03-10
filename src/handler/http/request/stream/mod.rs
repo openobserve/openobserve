@@ -63,9 +63,9 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
-        ("keyword" = String, Query, description = "Keyword"),
-        ("offset" = u32, Query, description = "Offset"),
-        ("limit" = u32, Query, description = "Limit"),
+        ("keyword" = Option<String>, Query, description = "Keyword filter for field names (default: empty)"),
+        ("offset" = Option<u32>, Query, description = "Pagination offset (default: 0)"),
+        ("limit" = Option<u32>, Query, description = "Pagination limit (default: 0 = all)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),

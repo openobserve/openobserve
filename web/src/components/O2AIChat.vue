@@ -5537,6 +5537,30 @@ export default defineComponent({
     transition: transform 0.2s;
   }
 
+  .navigation-icon {
+    cursor: pointer;
+    margin-left: auto;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  .navigation-block {
+    margin: 4px 0;
+    &.light-mode {
+      background: rgba(66, 165, 245, 0.08);
+    }
+    &.dark-mode {
+      background: rgba(66, 165, 245, 0.12);
+    }
+
+    .navigation-block-btn {
+      font-size: 13px;
+    }
+  }
+
   .tool-call-details {
     margin-top: 10px;
     padding-top: 10px;
