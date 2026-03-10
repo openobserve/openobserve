@@ -297,15 +297,18 @@ pub async fn try_deduct(
             }
 
             // Broadcast new total to other nodes via coordinator events
-            let key = format!("{}{}", TRIAL_QUOTA_WATCHER_PREFIX, org_id);
-            let value = Bytes::from(new_total.to_string());
-            if let Err(e) =
-                infra::coordinator::events::put_event(&key, None, Some(value)).await
-            {
-                log::warn!(
-                    "[TRIAL_QUOTA] Failed to broadcast quota update for org={}: {e}",
-                    org_id
-                );
+            // Skip if single node — no other nodes to sync with
+            if !config::cluster::LOCAL_NODE.is_single_node() {
+                let key = format!("{}{}", TRIAL_QUOTA_WATCHER_PREFIX, org_id);
+                let value = Bytes::from(new_total.to_string());
+                if let Err(e) =
+                    infra::coordinator::events::put_event(&key, None, Some(value)).await
+                {
+                    log::warn!(
+                        "[TRIAL_QUOTA] Failed to broadcast quota update for org={}: {e}",
+                        org_id
+                    );
+                }
             }
 
             Ok(pool_limit - new_total)
@@ -379,6 +382,11 @@ pub async fn flush_to_db() {
 /// When a remote node deducts credits, it broadcasts the new org total.
 /// We update our local counter to the max of (local, remote) to stay in sync.
 pub async fn watch_cluster_events() {
+    if config::cluster::LOCAL_NODE.is_single_node() {
+        log::info!("[TRIAL_QUOTA] Single node mode, skipping cluster event watcher");
+        return;
+    }
+
     let events = match infra::coordinator::events::watch(TRIAL_QUOTA_WATCHER_PREFIX).await {
         Ok(ev) => ev,
         Err(e) => {
