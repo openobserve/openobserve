@@ -63,10 +63,10 @@
               >
                 {{ formatDuration(percentiles[p.key]) }}
               </span>
-              <div class="tw:flex tw:gap-[0.15rem]">
+              <div class="tw:flex">
                 <q-btn
                   :data-test="`log-search-subfield-list-equal-${row.name}-field-btn`"
-                  size="0.25rem"
+                  size="0.3rem"
                   round
                   :title="`duration >= ${formatDuration(percentiles[p.key])}`"
                   @click.stop="
@@ -74,7 +74,7 @@
                       `duration>='${formatTimeWithSuffix(percentiles[p.key])}'`,
                     )
                   "
-                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
                 >
                   <q-icon
                     :name="outlinedArrowForwardIos"
@@ -83,7 +83,7 @@
                 </q-btn>
                 <q-btn
                   :data-test="`log-search-subfield-list-not-equal-${row.name}-field-btn`"
-                  size="0.25rem"
+                  size="0.3rem"
                   round
                   :title="`duration <= ${formatDuration(percentiles[p.key])}`"
                   @click.stop="
@@ -91,7 +91,7 @@
                       `duration<='${formatTimeWithSuffix(percentiles[p.key])}'`,
                     )
                   "
-                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.625rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
                 >
                   <q-icon
                     :name="outlinedArrowBackIos"
@@ -101,13 +101,20 @@
               </div>
             </div>
           </template>
+          <!-- No values found -->
+          <div
+            v-else-if="!hasPercentiles"
+            class="q-pl-md q-py-xs text-subtitle2"
+          >
+            {{ percentileErrMsg || "No values found" }}
+          </div>
         </template>
         <FieldValuesPanel
           v-else
           ref="fieldValuesPanelRef"
           :field-name="row.name"
           :field-values="
-            fieldValues[row.name] || {
+            mappedFieldValues || {
               isLoading: false,
               values: [],
               hasMore: false,
@@ -128,7 +135,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, unref } from "vue";
 import useTraces from "@/composables/useTraces";
 import {
   b64EncodeUnicode,
@@ -147,6 +154,7 @@ import {
   outlinedArrowBackIos,
   outlinedArrowForwardIos,
 } from "@quasar/extras/material-icons-outlined";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 
 const props = defineProps({
   row: {
@@ -179,6 +187,7 @@ const {
   isLoading: durationPercentilesLoading,
   fetchPercentiles,
   cancelFetch: cancelPercentileFetch,
+  errMsg: percentileErrMsg,
 } = useDurationPercentiles();
 
 const hasPercentiles = computed(() =>
@@ -204,6 +213,28 @@ const store = useStore();
 const { searchObj } = useTraces();
 const { fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues } =
   useFieldValuesStream();
+
+const EMPTY_FIELD_VALUES = {
+  isLoading: false,
+  values: [],
+  hasMore: false,
+  errMsg: "",
+};
+
+const mappedFieldValues = computed(() => {
+  const entry = unref(fieldValues)[props.row?.name] ?? EMPTY_FIELD_VALUES;
+  if (props.row?.name !== "span_kind") return entry;
+  return {
+    ...entry,
+    values: entry.values.map((v: { key: string; count: number }) => ({
+      ...v,
+      label:
+        v.key === null || v.key === undefined || v.key === ""
+          ? "Unspecified"
+          : (SPAN_KIND_MAP[v.key] ?? v.key),
+    })),
+  };
+});
 
 const defaultValuesCount = computed(
   () => store.state.zoConfig?.query_values_default_num || 10,

@@ -187,7 +187,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tw:flex tw:items-center tw:space-x-2">
             <!-- Unified Search Input Group -->
-            <div v-if="activeTab !== 'flame-graph' && activeTab !== 'map'" class="unified-search-group">
+            <div
+              v-if="activeTab !== 'flame-graph' && activeTab !== 'map'"
+              class="unified-search-group"
+            >
               <div class="log-stream-search-input">
                 <q-input
                   v-model="searchQuery"
@@ -649,6 +652,11 @@ import {
   convertTraceServiceMapData,
 } from "@/utils/traces/convertTraceData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
+import {
+  SPAN_KIND_MAP,
+  SPAN_KIND_UNSPECIFIED,
+  SPAN_KIND_CLIENT,
+} from "@/utils/traces/constants";
 import { throttle } from "lodash-es";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -1476,7 +1484,10 @@ export default defineComponent({
             (event.type === "resource" && event.resource_status_code >= 400)
               ? "ERROR"
               : "OK",
-          span_kind: event.type === "resource" ? "3" : "0", // 3 = Client, 0 = Unspecified
+          span_kind:
+            event.type === "resource"
+              ? SPAN_KIND_CLIENT
+              : SPAN_KIND_UNSPECIFIED,
           // Store original RUM event data for reference
           rum_event_type: event.type,
           rum_session_id: event.session_id,
@@ -1717,12 +1728,12 @@ export default defineComponent({
       // After the tree is built, scroll the pre-selected span into view (e.g.
       // when arriving from spans search mode with a span_id in the URL).
       if (selectedSpanId.value) {
-        nextTick(() => {
+        setTimeout(() => {
           const el = document.querySelector(
             `[data-test="trace-tree-span-container-${selectedSpanId.value}"]`,
           );
           el?.scrollIntoView({ behavior: "smooth", block: "center" });
-        });
+        }, 300);
       }
     }
 
@@ -1907,23 +1918,10 @@ export default defineComponent({
     };
 
     const getSpanKind = (spanKind: string | null | undefined): string => {
-      // Handle missing or invalid span_kind
       if (spanKind === null || spanKind === undefined || spanKind === "") {
         return "Unspecified";
       }
-
-      const kindStr = String(spanKind);
-
-      const spanKindMapping: { [key: string]: string } = {
-        "0": "Unspecified",
-        "1": "Client",
-        "2": "Server",
-        "3": "Producer",
-        "4": "Consumer",
-        "5": "Internal",
-      };
-
-      return spanKindMapping[kindStr] || "Unknown";
+      return SPAN_KIND_MAP[String(spanKind)] || String(spanKind);
     };
 
     const closeSidebar = () => {

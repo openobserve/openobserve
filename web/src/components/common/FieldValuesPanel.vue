@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="ellipsis q-pr-xs"
                 style="width: calc(100% - 3.125rem)"
               >
-                {{ value.key }}
+                {{ value.label ?? value.key }}
               </div>
               <div
                 :title="String(value.count)"
@@ -244,7 +244,7 @@ import { formatLargeNumber } from "@/utils/zincutils";
 
 interface FieldValues {
   isLoading: boolean;
-  values: { key: string; count: number }[];
+  values: { key: string; count: number; label?: string }[];
   errMsg?: string;
   hasMore?: boolean;
 }
@@ -276,7 +276,7 @@ const emit = defineEmits<{
 
 const selectedValues = ref<string[]>([]);
 const valueSearchTerm = ref("");
-const cachedValues = ref<{ key: string; count: number }[]>([]);
+const cachedValues = ref<{ key: string; count: number; label?: string }[]>([]);
 
 // Cache original values whenever they arrive with no active search term.
 watch(

@@ -124,7 +124,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ t("traces.errorRetrievingTraces") }}
                     <q-btn
-                      v-if="searchObj.data.errorDetail"
+                      v-if="
+                        searchObj.data.errorDetail || searchObj?.data?.errorMsg
+                      "
                       @click="toggleErrorDetails"
                       size="sm"
                       class="o2-secondary-button q-ml-sm"
@@ -1061,6 +1063,7 @@ async function extractFields() {
         service_name: 1,
         span_status: 1,
         operation_name: 1,
+        span_kind: 1,
         trace_id: 1,
         span_id: 1,
         reference_parent_span_id: 1,
@@ -1360,8 +1363,11 @@ const restoreFiltersFromQuery = (node: any) => {
           (_value: { value: string }) => _value.value,
         );
       }
-      searchObj.data.stream.fieldValues[node.left.column].selectedValues =
-        values;
+      if (
+        searchObj.data.stream.fieldValues?.[node?.left?.column]?.selectedValues
+      )
+        searchObj.data.stream.fieldValues[node.left.column].selectedValues =
+          values;
     }
   }
 
