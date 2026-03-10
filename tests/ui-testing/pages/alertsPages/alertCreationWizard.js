@@ -1275,7 +1275,8 @@ export class AlertCreationWizard {
 
         // ==================== STEP 1: ALERT SETUP ====================
         await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout after addAlert click — continuing'));
 
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
@@ -1294,7 +1295,8 @@ export class AlertCreationWizard {
 
         // ==================== STEP 2: CONDITIONS + AGGREGATION ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout at Step 2 — continuing'));
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 2');
 
@@ -1381,12 +1383,14 @@ export class AlertCreationWizard {
 
         // ==================== STEP 3: COMPARE WITH PAST (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout at Step 3 — continuing'));
         await this.page.waitForTimeout(1000);
 
         // ==================== STEP 4: ALERT SETTINGS ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout at Step 4 — continuing'));
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 4: Settings');
 
@@ -1432,12 +1436,14 @@ export class AlertCreationWizard {
 
         // ==================== STEP 5: DEDUPLICATION (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout at Step 5 — continuing'));
         await this.page.waitForTimeout(500);
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout at Step 6 — continuing'));
         await this.page.waitForTimeout(500);
 
         // ==================== SUBMIT ====================

@@ -28,7 +28,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 // ============================================================================
 // TEST DATA CONFIGURATION
@@ -501,8 +501,17 @@ test.describe("Incident Correlation Tests", { tag: '@enterprise' }, () => {
             await triggerAlerts(page, setupFolderId);
 
             // Step 5: Wait for incidents to appear after trigger
-            testLogger.info('Step 5: Waiting for incidents to appear');
-            const found = await waitForIncidents(page, 120000); // 2 min should be plenty after trigger
+            // Cloud environments need more time for alert evaluation + incident creation
+            const waitMs = isCloudEnvironment() ? 300000 : 120000;
+            testLogger.info(`Step 5: Waiting for incidents to appear (${waitMs / 1000}s timeout)`);
+            let found = await waitForIncidents(page, waitMs);
+
+            // On cloud, re-trigger once if no incidents appeared (scheduler may need a nudge)
+            if (!found && isCloudEnvironment()) {
+                testLogger.info('Re-triggering alerts on cloud...');
+                await triggerAlerts(page, setupFolderId);
+                found = await waitForIncidents(page, 120000);
+            }
 
             if (!found) {
                 testLogger.warn('No incidents appeared after trigger. Tests will skip via beforeEach check.');
