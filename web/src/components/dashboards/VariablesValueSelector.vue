@@ -117,7 +117,6 @@ import {
   nextTick,
 } from "vue";
 import { defineComponent, reactive } from "vue";
-import streamService from "../../services/stream";
 import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
@@ -133,6 +132,10 @@ import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/varia
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getVariableKey } from "@/composables/dashboard/useVariablesManager";
+import {
+  useVariablesWatcher,
+  variableLog,
+} from "@/composables/dashboard/useVariableDebugger";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -263,106 +266,8 @@ export default defineComponent({
       return lookup;
     });
 
-// ================== FOR DEBUGGING PURPOSES ONLY ==================
-    // watch for changes in variablesData.values
-    let previousValues: any[] = [];
-    watch(
-      () => variablesData.values,
-      (newValues) => {
-        return;
-        // Track all changes to log them together
-        const changes: any[] = [];
-
-        // Compare each variable's properties
-        newValues.forEach((newVar: any, index: number) => {
-          const oldVar = previousValues[index];
-          if (!oldVar) {
-            changes.push({
-              variable: newVar.name,
-              type: "new_variable",
-            });
-            return;
-          }
-
-          // List of properties to watch
-          const propertiesToWatch = [
-            "value",
-            "isLoading",
-            "isVariablePartialLoaded",
-            "isVariableLoadingPending",
-            "options",
-          ];
-
-          // Check each property for changes
-          const variableChanges: any = {
-            name: newVar.name,
-            changes: [],
-          };
-
-          propertiesToWatch.forEach((prop) => {
-            // Get deep copies of values to avoid proxy objects
-            const newValue = JSON.parse(JSON.stringify(newVar[prop]));
-            const oldValue = JSON.parse(JSON.stringify(oldVar[prop]));
-
-            // For arrays (like options) or objects, compare stringified versions
-            const hasChanged =
-              Array.isArray(newValue) || typeof newValue === "object"
-                ? JSON.stringify(newValue) !== JSON.stringify(oldValue)
-                : newValue !== oldValue;
-
-            if (hasChanged) {
-              variableChanges.changes.push({
-                property: prop,
-                from: oldValue,
-                to: newValue,
-              });
-            }
-          });
-
-          if (variableChanges.changes.length > 0) {
-            changes.push(variableChanges);
-          }
-        });
-
-        // Log all changes together if there are any
-        if (changes.length > 0) {
-          console.group(`Variables changed at ${new Date().toISOString()}`);
-
-          changes.forEach((change) => {
-            if (change.type === "new_variable") {
-              console.log(`🆕 New variable added: ${change.variable}`);
-            } else {
-              console.groupCollapsed(`Variable: ${change.name}`);
-              change.changes.forEach((propertyChange: any) => {
-                console.log(
-                  `Property "${propertyChange.property}":`,
-                  "\nFrom:",
-                  typeof propertyChange.from === "object"
-                    ? JSON.stringify(propertyChange.from, null, 2)
-                    : propertyChange.from,
-                  "\nTo:",
-                  typeof propertyChange.to === "object"
-                    ? JSON.stringify(propertyChange.to, null, 2)
-                    : propertyChange.to,
-                );
-              });
-              console.groupEnd();
-            }
-          });
-
-          console.groupEnd();
-        }
-
-        // Store deep copy of current values for next comparison
-        previousValues = JSON.parse(JSON.stringify(newValues));
-      },
-      { deep: true },
-    );
-
-    const variableLog = (name: string, message: string) => {
-      // console.log(`[Variable: ${name}] ${message}`);
-    };
-
+    // ================== FOR DEBUGGING PURPOSES ONLY ==================
+    useVariablesWatcher(variablesData);
     // ================== [END] FOR DEBUGGING PURPOSES ONLY ==================
 
     // variables dependency graph
@@ -1609,29 +1514,6 @@ export default defineComponent({
     };
 
     /**
-     * Check if any of the dependent variables are loading
-     * @param {object} variableObject - the variable object
-     * @returns {boolean} - true if any of the dependent variables are loading, false otherwise
-     */
-    const isDependentVariableLoading = (variableObject: any) => {
-      const parentVariables =
-        variablesDependencyGraph[variableObject.name]?.parentVariables || [];
-
-      // If no parent variables, dependencies can't be loading
-      if (parentVariables.length === 0) return false;
-
-      // Check if any of the parent variables are loading or pending
-      return parentVariables.some((parentName: string) => {
-        const parentVariable = variablesData.values.find(
-          (v: any) => v.name === parentName,
-        );
-        return (
-          parentVariable?.isLoading || parentVariable?.isVariableLoadingPending
-        );
-      });
-    };
-
-    /**
      * Resets the state of the given variable.
      * @param {object} variableObject - The variable object to reset.
      */
@@ -2173,153 +2055,6 @@ export default defineComponent({
     };
 
     /**
-     * Extract REST API implementation to separate function.
-     * @param variableObject - The variable object containing query data.
-     * @param queryContext - The context for the query as a string.
-     * @returns The response from the stream service containing field values.
-     */
-    const fetchFieldValuesREST = async (
-      variableObject: any,
-      queryContext: string,
-    ) => {
-      // Resolve variable references in stream and field names
-      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
-      const resolvedField = resolveVariableValue(variableObject.query_data.field);
-
-      const payload = {
-        org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
-        stream_name: resolvedStream, // Resolved stream name
-        start_time: new Date(
-          props.selectedTimeDate?.start_time?.toISOString(),
-        ).getTime(), // Start time in milliseconds
-        end_time: new Date(
-          props.selectedTimeDate?.end_time?.toISOString(),
-        ).getTime(), // End time in milliseconds
-        fields: [resolvedField], // Resolved field name
-        size: variableObject.query_data.max_record_size || 10, // Maximum number of records
-        type: variableObject.query_data.stream_type, // Type of the stream
-        query_context: queryContext, // Encoded query context
-        no_count: true, // Flag to omit count
-      };
-
-      // Fetch field values from the stream service
-      return await streamService.fieldValues(payload);
-    };
-
-    /**
-     * Updates the options for a variable based on the result of a query to fetch field values.
-     * @param variableObject - The variable object containing query data.
-     * @param hits - The result from the stream service containing field values.
-     */
-    const updateVariableOptions = (variableObject: any, hits: any[]) => {
-      const fieldHit = hits.find(
-        (field: any) => field.field === variableObject.query_data.field,
-      );
-
-      if (fieldHit) {
-        // Extract the values for the specified field from the result
-        // Filter out undefined, null, and empty strings
-        const newOptions = fieldHit.values
-          .filter(
-            (value: any) =>
-              value.zo_sql_key !== undefined &&
-              value.zo_sql_key !== null &&
-              value.zo_sql_key !== "",
-          )
-          .map((value: any) => ({
-            label: value.zo_sql_key.toString(),
-            value: value.zo_sql_key.toString(),
-          }));
-
-        // Efficiently add the selected value to options if not present
-        if (variableObject.multiSelect && Array.isArray(variableObject.value)) {
-          const val = variableObject.value[0];
-          if (
-            val !== undefined &&
-            val !== null &&
-            !newOptions.some((opt) => opt.value === val) &&
-            val !== SELECT_ALL_VALUE
-          ) {
-            newOptions.push({ label: val, value: val });
-          }
-        } else if (
-          !variableObject.multiSelect &&
-          variableObject.value !== null &&
-          variableObject.value !== undefined &&
-          !newOptions.some((opt) => opt.value === variableObject.value) &&
-          variableObject.value !== SELECT_ALL_VALUE
-        ) {
-          newOptions.push({
-            label: variableObject.value,
-            value: variableObject.value,
-          });
-        }
-
-        variableObject.options = newOptions;
-
-        // Set default value
-        if (oldVariablesData[variableObject.name] !== undefined) {
-          const oldValues = Array.isArray(oldVariablesData[variableObject.name])
-            ? oldVariablesData[variableObject.name]
-            : [oldVariablesData[variableObject.name]];
-
-          // Check if this is a child variable
-          const isChildVariable =
-            variablesDependencyGraph[variableObject.name]?.parentVariables
-              ?.length > 0;
-
-          if (isChildVariable) {
-            // For child variables, only keep old values that exist in new options
-            const validOldValues = oldValues.filter((value: string) =>
-              newOptions.some((opt: { value: string }) => opt.value === value),
-            );
-
-            if (validOldValues.length > 0) {
-              // If we have valid old values, use them
-              variableObject.value = variableObject.multiSelect
-                ? validOldValues
-                : validOldValues[0];
-            } else {
-              // If no valid old values, use first non-blank option
-              const firstNonBlank = newOptions.find(
-                (opt: any) => opt.value !== "" && opt.label !== "<blank>",
-              );
-              variableObject.value = variableObject.multiSelect
-                ? firstNonBlank
-                  ? [firstNonBlank.value]
-                  : []
-                : firstNonBlank
-                  ? firstNonBlank.value
-                  : null;
-            }
-          } else {
-            // For non-child variables, preserve old values as before
-            if (variableObject.type === "custom") {
-              handleCustomVariablesLogic(variableObject, oldValues);
-            } else {
-              handleQueryValuesLogic(variableObject, oldValues);
-            }
-          }
-        } else {
-          // Set default value to the first non-blank option if no old values are available
-          const firstNonBlank = newOptions.find(
-            (opt: any) => opt.value !== "" && opt.label !== "<blank>",
-          );
-          variableObject.value = variableObject.multiSelect
-            ? firstNonBlank
-              ? [firstNonBlank.value]
-              : []
-            : firstNonBlank
-              ? firstNonBlank.value
-              : null;
-        }
-      } else {
-        // Reset variable state if no field values are available
-        resetVariableState(variableObject);
-      }
-    };
-
-    /**
      * Finalizes the variable loading process for a single variable.
      * @param {object} variableObject - The variable object containing query data.
      * @param {boolean} success - Whether the variable load was successful or not.
@@ -2359,25 +2094,6 @@ export default defineComponent({
           // Variable was already loaded, just update the flag
           variableObject.isVariablePartialLoaded = true;
         }
-
-        // Don't load child variables on dropdown open events
-        // Load child variables if any
-        // const childVariables =
-        //   variablesDependencyGraph[name]?.childVariables || [];
-        // if (childVariables.length > 0) {
-        //   const childVariableObjects = variablesData.values.filter(
-        //     (variable: any) => childVariables.includes(variable.name),
-        //   );
-
-        //   // Only load children if the parent value actually changed
-        //   if (oldVariablesData[name] !== variableObject.value) {
-        //     await Promise.all(
-        //       childVariableObjects.map((childVariable: any) =>
-        //         loadSingleVariableDataByName(childVariable),
-        //       ),
-        //     );
-        //   }
-        // }
 
         // Emit updated data
         emitVariablesData();
@@ -2528,12 +2244,6 @@ export default defineComponent({
       // console.log(JSON.stringify(independentVariables, null, 2));
       // console.groupEnd();
 
-      // Find all dependent variables (variables with dependencies)
-      const dependentVariables = variablesData.values.filter(
-        (variable: any) =>
-          variablesDependencyGraph[variable.name]?.parentVariables?.length > 0,
-      );
-
       try {
         // Load all independent variables
         await Promise.all(
@@ -2549,74 +2259,7 @@ export default defineComponent({
         );
       }
 
-      // const loadDependentVariables = async () => {
-      //   for (const variable of dependentVariables) {
-      //     // Find all parent variables of the current variable
-      //     const parentVariables =
-      //       variablesDependencyGraph[variable.name].parentVariables;
-      //     // Check if all parent variables are loaded
-      //     const areParentsLoaded = parentVariables.every(
-      //       (parentName: string) => {
-      //         const parentVariable = variablesData.values.find(
-      //           (v: any) => v.name === parentName,
-      //         );
-      //         return (
-      //           parentVariable &&
-      //           !parentVariable.isLoading &&
-      //           !parentVariable.isVariableLoadingPending &&
-      //           parentVariable.value !== null
-      //         );
-      //       },
-      //     );
-
-      //     // If all parent variables are loaded, load the current variable
-      //     if (areParentsLoaded) {
-      //       await loadSingleVariableDataByName(variable);
-      //     }
-      //   }
-      // };
-
-      // // Attempt to load dependent variables up to 3 times
-      // for (let attempt = 0; attempt < 3; attempt++) {
-      //   await loadDependentVariables();
-
-      //   // Check if all variables are loaded
-      //   const allLoaded = variablesData.values.every(
-      //     (variable: any) =>
-      //       !variable.isLoading && !variable.isVariableLoadingPending,
-      //   );
-
-      //   // If all variables are loaded, break the loop
-      //   if (allLoaded) break;
-      // }
-
       isLoading = false;
-    };
-
-    /**
-     * Sets the loading state for a variable and all its child nodes recursively.
-     * @param {string} currentVariable - The name of the current variable.
-     */
-    const setLoadingStateToAllChildNode = (currentVariable: string) => {
-      // Retrieve the child variables of the current variable
-      const childVariables =
-        variablesDependencyGraph[currentVariable]?.childVariables || [];
-
-      // Iterate over each child variable
-      for (const variableName of childVariables) {
-        // Find the variable object in the variablesData
-        const variableObj = variablesData.values.find(
-          (it: any) => it.name === variableName,
-        );
-
-        // Set the loading state for the variable
-        if (variableObj) {
-          variableObj.isVariableLoadingPending = true;
-
-          // Recursively set loading state for all child nodes
-          setLoadingStateToAllChildNode(variableObj.name);
-        }
-      }
     };
 
     /**
