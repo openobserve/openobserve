@@ -1465,6 +1465,7 @@ const onSearchModeChange = (mode: "traces" | "spans") => {
     from: 0,
     size: searchObj.meta.resultGrid.rowsPerPage,
     took: 0,
+    errorCount: 0,
   };
   getQueryData();
 };
@@ -1475,7 +1476,6 @@ const onFiltersReset = () => {
   // Brush selections already cleared in SearchBar.vue
   // metricsRangeFilters.clear() was called
   // No additional action needed here
-  console.log("Filters reset - brush selections cleared");
 };
 
 const isStreamSelected = computed(() => {
