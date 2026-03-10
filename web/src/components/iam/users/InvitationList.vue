@@ -15,18 +15,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full ">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="flex justify-between full-width tw:py-3 tw:px-4 items-center tw:h-[68px]">
-        <div class="q-table__title tw:font-[600]" data-test="invitation-title-text">
+  <div class="tw:w-full" :class="{ 'tw:h-full': !overlayMode }">
+    <div v-if="!overlayMode" class="card-container tw:mb-[0.625rem]">
+      <div
+        class="flex justify-between full-width tw:py-3 tw:px-4 items-center tw:h-[68px]"
+      >
+        <div
+          class="q-table__title tw:font-[600]"
+          data-test="invitation-title-text"
+        >
           {{ t("invitation.pendingInvitations") }}
         </div>
         <div class="tw:h-[36px]" />
       </div>
     </div>
+    <div
+      v-else
+      class="tw:text-[1.125rem] tw:font-[600] tw:mb-4 tw:text-gray-800"
+      data-test="invitation-title-text"
+    >
+      {{ t("invitation.pendingInvitations") }}
+    </div>
 
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-128px)]">
+    <div class="tw:w-full" :class="{ 'tw:h-full': !overlayMode }">
+      <div
+        :class="
+          overlayMode ? '' : 'card-container tw:h-[calc(100vh-128px)]'
+        "
+      >
         <q-table
           ref="qTable"
           :rows="invitations"
@@ -34,63 +50,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="token"
           :pagination="pagination"
           style="width: 100%"
-          :style="invitations.length > 0
+          :style="
+            !overlayMode && invitations.length > 0
               ? 'width: 100%; height: calc(100vh - 128px)'
-              : 'width: 100%'"
+              : 'width: 100%'
+          "
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
         >
-      <template #no-data>
-        <NoData></NoData>
-      </template>
-      <template v-slot:header="props">
-        <q-tr :props="props">
-          <q-th
-            v-for="col in props.cols"
-            :class="col.classes"
-            :key="col.name"
-            :props="props"
-          >
-            <span>{{ col.label }}</span>
-          </q-th>
-        </q-tr>
-      </template>
-      <template #body-cell-actions="props">
-        <q-td :props="props" side>
-          <q-btn
-            :label="t('invitation.accept')"
-            class="q-mr-sm o2-primary-button"
-            no-caps
-            dense
-            @click="acceptInvitation(props.row)"
-            :data-test="`accept-invitation-${props.row.token}`"
-          />
-          <q-btn
-            :label="t('invitation.reject')"
-            dense
-            class="o2-secondary-button"
-            no-caps
-            @click="rejectInvitation(props.row)"
-            :data-test="`reject-invitation-${props.row.token}`"
-          />
-        </q-td>
-      </template>
+          <template #no-data>
+            <NoData></NoData>
+          </template>
+          <template v-slot:header="props">
+            <q-tr :props="props">
+              <q-th
+                v-for="col in props.cols"
+                :class="col.classes"
+                :key="col.name"
+                :props="props"
+              >
+                <span>{{ col.label }}</span>
+              </q-th>
+            </q-tr>
+          </template>
+          <template #body-cell-actions="props">
+            <q-td :props="props" side>
+              <q-btn
+                :label="t('invitation.accept')"
+                class="q-mr-sm o2-primary-button"
+                no-caps
+                dense
+                @click="acceptInvitation(props.row)"
+                :data-test="`accept-invitation-${props.row.token}`"
+              />
+              <q-btn
+                :label="t('invitation.reject')"
+                dense
+                class="o2-secondary-button"
+                no-caps
+                @click="rejectInvitation(props.row)"
+                :data-test="`reject-invitation-${props.row.token}`"
+              />
+            </q-td>
+          </template>
 
-      <template #bottom="scope">
-      <div class="bottom-btn tw:h-[48px] tw:flex tw:w-full">
-          <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[250px] tw:mr-md">
-            {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
-          </div>
-        <QTablePagination
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
-        </div>
-        <!-- :maxRecordToReturn="maxRecordToReturn" -->
-        <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
-      </template>
+          <template #bottom="scope">
+            <div class="bottom-btn tw:h-[48px] tw:flex tw:w-full">
+              <div
+                class="o2-table-footer-title tw:flex tw:items-center tw:w-[250px] tw:mr-md"
+              >
+                {{ resultTotal }} {{ t("invitation.pendingInvitations") }}
+              </div>
+              <QTablePagination
+                :scope="scope"
+                :resultTotal="resultTotal"
+                :perPageOptions="perPageOptions"
+                position="bottom"
+                @update:changeRecordPerPage="changePagination"
+              />
+            </div>
+          </template>
         </q-table>
       </div>
     </div>
@@ -175,6 +193,10 @@ export default defineComponent({
     userEmail: {
       type: String,
       required: true,
+    },
+    overlayMode: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["invitations-processed"],

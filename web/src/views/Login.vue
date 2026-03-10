@@ -16,23 +16,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <login v-if="user.email == '' && !showInvitations" />
-  <div v-if="showInvitations && config.isCloud == 'true'">
-    <div class="flex relative-position tw:px-3 tw:pt-2">
-      <img
-        class="appLogo"
-        loading="lazy"
-        :src="
-          store?.state?.theme == 'dark'
-            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-            : getImageURL('images/common/openobserve_latest_light_2.svg')
-        "
+  <div
+    v-if="showInvitations && config.isCloud == 'true'"
+    class="invitation-login-bg"
+    :style="{
+      backgroundImage: `url(${getImageURL('images/common/bg-login.png')})`,
+    }"
+  >
+    <div class="invitation-overlay-card">
+      <div class="flex justify-center tw:mb-6">
+        <img
+          class="appLogo"
+          loading="lazy"
+          :src="
+            store?.state?.theme == 'dark'
+              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+              : getImageURL('images/common/openobserve_latest_light_2.svg')
+          "
+        />
+      </div>
+      <invitation-list
+        v-if="showInvitations"
+        :user-email="user.email"
+        :overlay-mode="true"
+        @invitations-processed="handleInvitationsProcessed"
       />
     </div>
-    <invitation-list
-      v-if="showInvitations"
-      :user-email="user.email"
-      @invitations-processed="handleInvitationsProcessed"
-    />
   </div>
 </template>
 
@@ -181,6 +190,14 @@ export default defineComponent({
             username: store.state.userInfo.email,
             type: "email",
           });
+          // If the user has no organizations, send them to the invitations page
+          if (
+            config.isCloud == "true" &&
+            (!res.data.data || res.data.data.length === 0)
+          ) {
+            router.push({ path: "/iam/invitations" });
+            return;
+          }
           // Check for pending invites
           setTimeout(() => {
             redirectUser();
@@ -412,9 +429,31 @@ export default defineComponent({
 
   &__mini {
     margin-right: 0.25rem;
-    // margin-left: 0.25rem;
     height: 30px;
     width: 30px;
   }
+}
+
+.invitation-login-bg {
+  width: 100vw;
+  height: 100vh;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 24px;
+}
+
+.invitation-overlay-card {
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  width: 100%;
+  max-width: 960px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
 }
 </style>
