@@ -187,11 +187,11 @@ async fn run_no_ingestion_daily() {
 
 async fn run_org_expiry_daily() {
     use o2_enterprise::enterprise::cloud::billings;
-    let now = chrono::Utc::now().timestamp_micros();
     let hr_micro = hour_micros(24);
     let mut interval = tokio::time::interval(tokio::time::Duration::from_hours(24));
     loop {
         interval.tick().await;
+        let now = chrono::Utc::now().timestamp_micros();
         log::info!("starting daily expiry reminder reporting");
         // get all orgs from db, which should be cached in memory
         let org_cache = { ORGANIZATIONS.read().await.clone() };
