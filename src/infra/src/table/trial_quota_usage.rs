@@ -13,51 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect};
 
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     table::entity::trial_quota_usage,
 };
-
-/// Batch upsert quota records. Uses INSERT ON CONFLICT to safely merge
-/// concurrent writes — takes the GREATEST usage_count to avoid losing
-/// deductions from other nodes.
-pub async fn batch_upsert(records: Vec<(String, String, i64)>) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let now = config::utils::time::now_micros();
-
-    for (org_id, feature, usage_count) in records {
-        // Try to find existing record
-        let existing = trial_quota_usage::Entity::find()
-            .filter(trial_quota_usage::Column::OrgId.eq(&org_id))
-            .filter(trial_quota_usage::Column::Feature.eq(&feature))
-            .one(db)
-            .await?;
-
-        match existing {
-            Some(model) => {
-                // Update: take the GREATEST usage_count
-                let new_count = model.usage_count.max(usage_count);
-                let mut active: trial_quota_usage::ActiveModel = model.into();
-                active.usage_count = Set(new_count);
-                active.updated_at = Set(now);
-                sea_orm::ActiveModelTrait::update(active, db).await?;
-            }
-            None => {
-                let model = trial_quota_usage::ActiveModel {
-                    org_id: Set(org_id),
-                    feature: Set(feature),
-                    usage_count: Set(usage_count),
-                    updated_at: Set(now),
-                    notified_checkpoint: Set(0),
-                };
-                sea_orm::ActiveModelTrait::insert(model, db).await?;
-            }
-        }
-    }
-    Ok(())
-}
 
 /// Batch increment quota records by delta. Each tuple is (org_id, feature, delta).
 /// Upserts: if the row exists, adds delta to usage_count; otherwise inserts with
@@ -67,22 +28,45 @@ pub async fn batch_increment(
     records: Vec<(String, String, i64)>,
 ) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let backend = db.get_database_backend();
     let now = config::utils::time::now_micros();
 
     for (org_id, feature, delta) in records {
-        let stmt = sea_orm::Statement::from_sql_and_values(
-            sea_orm::DatabaseBackend::Postgres,
-            r#"INSERT INTO trial_quota_usage (org_id, feature, usage_count, updated_at, notified_checkpoint)
-               VALUES ($1, $2, $3, $4, 0)
-               ON CONFLICT (org_id, feature)
-               DO UPDATE SET usage_count = trial_quota_usage.usage_count + $3, updated_at = $4"#,
-            [
+        let (sql, backend_type) = match backend {
+            sea_orm::DatabaseBackend::Postgres => (
+                r#"INSERT INTO trial_quota_usage (org_id, feature, usage_count, updated_at, notified_checkpoint)
+                   VALUES ($1, $2, $3, $4, 0)
+                   ON CONFLICT (org_id, feature)
+                   DO UPDATE SET usage_count = trial_quota_usage.usage_count + $3, updated_at = $4"#,
+                sea_orm::DatabaseBackend::Postgres,
+            ),
+            _ => (
+                r#"INSERT INTO trial_quota_usage (org_id, feature, usage_count, updated_at, notified_checkpoint)
+                   VALUES (?, ?, ?, ?, 0)
+                   ON CONFLICT (org_id, feature)
+                   DO UPDATE SET usage_count = trial_quota_usage.usage_count + ?, updated_at = ?"#,
+                sea_orm::DatabaseBackend::Sqlite,
+            ),
+        };
+
+        let values: Vec<sea_orm::Value> = match backend {
+            sea_orm::DatabaseBackend::Postgres => vec![
                 org_id.into(),
                 feature.into(),
                 delta.into(),
                 now.into(),
             ],
-        );
+            _ => vec![
+                org_id.into(),
+                feature.into(),
+                delta.into(),
+                now.into(),
+                delta.into(),
+                now.into(),
+            ],
+        };
+
+        let stmt = sea_orm::Statement::from_sql_and_values(backend_type, sql, values);
         db.execute(stmt).await?;
     }
     Ok(())
