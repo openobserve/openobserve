@@ -524,8 +524,7 @@ where
         if entry.0.is_empty() || ts < entry.0 {
             entry.0 = ts;
         }
-        if event.component.is_none()
-            || event.component.as_ref().unwrap() == ("remote scan streaming")
+        if event.component.is_none() || event.component.as_ref().unwrap() != "remote scan streaming"
         {
             entry.1 += dur;
         }
