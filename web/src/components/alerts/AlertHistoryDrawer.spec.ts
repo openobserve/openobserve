@@ -110,7 +110,7 @@ describe("AlertHistoryDrawer.vue", () => {
     wrapper = mount(AlertHistoryDrawer, {
       attachTo: node,
       props: {
-        alertDetails: propsData.alertDetails ?? mockAlertDetails,
+        alertDetails: "alertDetails" in propsData ? propsData.alertDetails : mockAlertDetails,
         alertId: propsData.alertId ?? "alert-123",
       },
       global: {
