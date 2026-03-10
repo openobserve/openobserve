@@ -292,14 +292,14 @@ async function performGlobalIngestion(page, baseUrl) {
 
   while (Date.now() - startTime < maxWaitMs) {
     try {
-      const streamsResult = await page.evaluate(async ({ url, orgId }) => {
+      const streamsResult = await page.evaluate(async ({ url, orgId, headers }) => {
         const base = url.endsWith('/') ? url.slice(0, -1) : url;
-        const r = await fetch(`${base}/api/${orgId}/streams?type=logs&page_num=0&page_size=1000`);
+        const r = await fetch(`${base}/api/${orgId}/streams?type=logs&page_num=0&page_size=1000`, { headers });
         if (!r.ok) return { ok: false, status: r.status };
         const data = await r.json();
         const names = (data.list || []).map(s => s.name);
         return { ok: true, names };
-      }, { url: baseUrl, orgId });
+      }, { url: baseUrl, orgId, headers });
 
       if (streamsResult.ok) {
         const hasE2e = streamsResult.names.includes('e2e_automate');
