@@ -39,7 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-container flex content-center ellipsis q-pr-sm"
                 :title="props.row.name"
               >
-                <div class="field_label ellipsis tw:flex tw:items-center tw:pl-[calc(1.5rem+3px)]">
+                <div
+                  class="field_label ellipsis tw:flex tw:items-center tw:pl-[1.2rem]"
+                >
                   {{ props.row.name }}
                 </div>
                 <div
