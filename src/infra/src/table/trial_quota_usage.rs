@@ -24,9 +24,7 @@ use crate::{
 /// Upserts: if the row exists, adds delta to usage_count; otherwise inserts with
 /// usage_count = delta. Uses INSERT ... ON CONFLICT to be atomic and safe for
 /// concurrent flushes from multiple nodes.
-pub async fn batch_increment(
-    records: Vec<(String, String, i64)>,
-) -> Result<(), sea_orm::DbErr> {
+pub async fn batch_increment(records: Vec<(String, String, i64)>) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let backend = db.get_database_backend();
     let now = config::utils::time::now_micros();
@@ -50,12 +48,9 @@ pub async fn batch_increment(
         };
 
         let values: Vec<sea_orm::Value> = match backend {
-            sea_orm::DatabaseBackend::Postgres => vec![
-                org_id.into(),
-                feature.into(),
-                delta.into(),
-                now.into(),
-            ],
+            sea_orm::DatabaseBackend::Postgres => {
+                vec![org_id.into(), feature.into(), delta.into(), now.into()]
+            }
             _ => vec![
                 org_id.into(),
                 feature.into(),

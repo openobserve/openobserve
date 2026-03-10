@@ -1735,8 +1735,14 @@ pub async fn update_status(
             .await;
             tokio::spawn(async move {
                 // reanalysis=true: bypass cooldown — incident was closed, context is fresh
-                if let Err(e) =
-                    trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), true, true, "system@openobserve.ai".to_string()).await
+                if let Err(e) = trigger_rca_for_incident(
+                    org_id_rca,
+                    incident_id_rca.clone(),
+                    true,
+                    true,
+                    "system@openobserve.ai".to_string(),
+                )
+                .await
                 // begin already emitted above
                 {
                     log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
