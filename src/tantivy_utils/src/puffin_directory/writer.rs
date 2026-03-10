@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,7 +27,7 @@ use tantivy::{
 };
 
 use super::{FOOTER_CACHE, footer_cache::build_footer_cache};
-use crate::service::tantivy::{
+use crate::{
     puffin::{BlobTypes, writer::PuffinBytesWriter},
     puffin_directory::{ALLOWED_FILE_EXT, META_JSON},
 };
