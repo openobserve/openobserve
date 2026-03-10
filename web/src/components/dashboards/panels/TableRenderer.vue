@@ -92,66 +92,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:body-cell="props">
         <q-td
           :props="props"
-          :style="[getStyle(props), getStickyColumnStyle(props.col), getStickyTotalColumnStyle(props.col)]"
-          :class="{ 'sticky-column': props.col.sticky, 'pivot-total-col': stickyColTotals && props.col._isTotalColumn }"
+          :style="[
+            getStyle(props),
+            getStickyColumnStyle(props.col),
+            getStickyTotalColumnStyle(props.col),
+            isPivotMergeNoBorder(props.row, props.col) ? { 'border-bottom': '0 none' } : {},
+          ]"
+          :class="{
+            'sticky-column': props.col.sticky,
+            'pivot-total-col': stickyColTotals && props.col._isTotalColumn,
+          }"
           :data-col-index="props.col.__colIndex"
           class="copy-cell-td"
         >
-          <!-- Copy button on left for numeric/right-aligned columns -->
-          <q-btn
-            v-if="
-              props.col.align === 'right' && shouldShowCopyButton(props.value)
-            "
-            :icon="
-              isCellCopied(props.rowIndex, props.col.name)
-                ? 'check'
-                : 'content_copy'
-            "
-            dense
-            size="xs"
-            no-caps
-            flat
-            class="copy-btn q-mr-xs"
-            @click.stop="
-              copyCellContent(props.value, props.rowIndex, props.col.name)
-            "
-          >
-          </q-btn>
-          <!-- Use JsonFieldRenderer if column is marked as JSON -->
-          <JsonFieldRenderer
-            v-if="props.col.showFieldAsJson"
-            :value="props.value"
-          />
-          <!-- Otherwise show normal value -->
-          <template v-else>
-            {{
-              props.value === "undefined" || props.value === null
-                ? ""
-                : props.col.format
-                  ? props.col.format(props.value, props.row)
-                  : props.value
-            }}
+          <template v-if="!isPivotMergeHidden(props.row, props.col)">
+            <div>
+              <!-- Copy button on left for numeric/right-aligned columns -->
+              <q-btn
+                v-if="
+                  props.col.align === 'right' && shouldShowCopyButton(props.value)
+                "
+                :icon="
+                  isCellCopied(props.rowIndex, props.col.name)
+                    ? 'check'
+                    : 'content_copy'
+                "
+                dense
+                size="xs"
+                no-caps
+                flat
+                class="copy-btn q-mr-xs"
+                @click.stop="
+                  copyCellContent(props.value, props.rowIndex, props.col.name)
+                "
+              >
+              </q-btn>
+              <!-- Use JsonFieldRenderer if column is marked as JSON -->
+              <JsonFieldRenderer
+                v-if="props.col.showFieldAsJson"
+                :value="props.value"
+              />
+              <!-- Otherwise show normal value -->
+              <template v-else>
+                {{
+                  props.value === "undefined" || props.value === null
+                    ? ""
+                    : props.col.format
+                      ? props.col.format(props.value, props.row)
+                      : props.value
+                }}
+              </template>
+              <!-- Copy button on right for non-numeric columns -->
+              <q-btn
+                v-if="
+                  props.col.align !== 'right' && shouldShowCopyButton(props.value)
+                "
+                :icon="
+                  isCellCopied(props.rowIndex, props.col.name)
+                    ? 'check'
+                    : 'content_copy'
+                "
+                dense
+                size="xs"
+                no-caps
+                flat
+                class="copy-btn q-ml-xs"
+                @click.stop="
+                  copyCellContent(props.value, props.rowIndex, props.col.name)
+                "
+              >
+              </q-btn>
+            </div>
           </template>
-          <!-- Copy button on right for non-numeric columns -->
-          <q-btn
-            v-if="
-              props.col.align !== 'right' && shouldShowCopyButton(props.value)
-            "
-            :icon="
-              isCellCopied(props.rowIndex, props.col.name)
-                ? 'check'
-                : 'content_copy'
-            "
-            dense
-            size="xs"
-            no-caps
-            flat
-            class="copy-btn q-ml-xs"
-            @click.stop="
-              copyCellContent(props.value, props.rowIndex, props.col.name)
-            "
-          >
-          </q-btn>
         </q-td>
       </template>
 
@@ -289,6 +301,115 @@ export default defineComponent({
     const pivotRowColumns = computed(() => {
       return props.data?.columns?.filter((c: any) => c._isRowField) || [];
     });
+
+    // Reactive row merge map for pivot tables.
+    // Uses string keys (x-field values) instead of object references because
+    // Vue 3 reactive proxies break Map identity lookups.
+    //
+    // Algorithm: identify consecutive groups per column (hierarchically).
+    // The first row of each group shows the value; subsequent rows hide it.
+    // Bottom borders are removed within a group so it looks like one tall cell.
+    const pivotMergeMap = computed(() => {
+      const map = new Map<
+        string,
+        Record<string, { hideContent: boolean; hideBorder: boolean }>
+      >();
+
+      const rowCols = pivotRowColumns.value;
+      if (rowCols.length === 0) return map;
+
+      let rows = (props.data?.rows || []).filter(
+        (r: any) => !r.__isTotalRow,
+      );
+      if (rows.length === 0) return map;
+
+      const getRowKey = (row: any) =>
+        rowCols.map((c: any) => String(row[c.name] ?? "")).join("|||");
+
+      // Re-sort to match q-table's display order
+      const sortBy = pagination.value.sortBy;
+      const descending = pagination.value.descending;
+
+      if (sortBy) {
+        const col = props.data?.columns?.find(
+          (c: any) => c.name === sortBy,
+        );
+        rows = [...rows].sort((a: any, b: any) => {
+          const va = a[sortBy];
+          const vb = b[sortBy];
+          let result: number;
+          if (col?.sort) {
+            result = col.sort(va, vb, a, b);
+          } else if (typeof va === "number" && typeof vb === "number") {
+            result = va - vb;
+          } else {
+            result = String(va ?? "").localeCompare(String(vb ?? ""));
+          }
+          return descending ? -result : result;
+        });
+      }
+
+      // For each row-field column, find consecutive groups.
+      // A group = consecutive rows with same value in this column AND all
+      // parent (left-side) columns.
+      // First row shows the value, all others hide it.
+      for (let colIdx = 0; colIdx < rowCols.length; colIdx++) {
+        const col = rowCols[colIdx];
+        let groupStart = 0;
+
+        for (let i = 0; i <= rows.length; i++) {
+          let sameGroup = i < rows.length;
+          if (sameGroup) {
+            for (let p = 0; p <= colIdx; p++) {
+              if (
+                rows[i][rowCols[p].name] !==
+                rows[groupStart][rowCols[p].name]
+              ) {
+                sameGroup = false;
+                break;
+              }
+            }
+          }
+
+          // End of a group — process it
+          if (!sameGroup) {
+            const size = i - groupStart;
+
+            if (size > 1) {
+              for (let r = groupStart; r < i; r++) {
+                const key = getRowKey(rows[r]);
+                if (!map.has(key)) map.set(key, {});
+                map.get(key)![col.name] = {
+                  hideContent: r !== groupStart, // first row shows value
+                  hideBorder: r < i - 1, // all except last in group
+                };
+              }
+            }
+
+            groupStart = i;
+          }
+        }
+      }
+
+      return map;
+    });
+
+    const pivotRowKey = (row: any) =>
+      pivotRowColumns.value
+        .map((c: any) => String(row[c.name] ?? ""))
+        .join("|||");
+
+    const isPivotMergeHidden = (row: any, col: any): boolean => {
+      if (!col._isRowField) return false;
+      const info = pivotMergeMap.value.get(pivotRowKey(row));
+      return info?.[col.name]?.hideContent === true;
+    };
+
+    const isPivotMergeNoBorder = (row: any, col: any): boolean => {
+      if (!col._isRowField) return false;
+      const info = pivotMergeMap.value.get(pivotRowKey(row));
+      return info?.[col.name]?.hideBorder === true;
+    };
 
     // Sticky totals support (separate controls for row and column)
     const stickyRowTotals = computed(() => {
@@ -563,7 +684,12 @@ export default defineComponent({
       return sorted;
     });
 
-    const pagination = ref({
+    const pagination = ref<{
+      rowsPerPage: number;
+      page: number;
+      sortBy?: string;
+      descending?: boolean;
+    }>({
       rowsPerPage: props.showPagination ? props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
       page: 1,
     });
@@ -597,6 +723,8 @@ export default defineComponent({
       shouldShowCopyButton,
       pivotHeaderLevels,
       pivotRowColumns,
+      isPivotMergeHidden,
+      isPivotMergeNoBorder,
       getRowClass,
       stickyRowTotals,
       stickyColTotals,
