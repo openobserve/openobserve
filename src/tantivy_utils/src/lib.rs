@@ -13,20 +13,5 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub use tantivy_utils::puffin_directory::*;
-
-pub mod caching_directory {
-    pub use tantivy_utils::puffin_directory::caching_directory::*;
-}
-
-pub mod footer_cache {
-    pub use tantivy_utils::puffin_directory::footer_cache::*;
-}
-
-pub mod reader {
-    pub use tantivy_utils::puffin_directory::reader::*;
-}
-
-pub mod writer {
-    pub use tantivy_utils::puffin_directory::writer::*;
-}
+pub mod puffin;
+pub mod puffin_directory;

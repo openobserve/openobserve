@@ -13,7 +13,7 @@
       "panels": [
         {
           "id": "Panel_ID1425310",
-          "type": "line",
+          "type": "scatter",
           "title": "Duration",
           "description": "",
           "config": {
@@ -79,7 +79,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp) AS x_axis, approx_percentile_cont(duration, 0.50) AS p50, approx_percentile_cont(duration, 0.50) AS p75, approx_percentile_cont(duration, 0.95) AS p95, approx_percentile_cont(duration, 0.99) AS p99 FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY x_axis ORDER BY x_axis ASC",
+              "query": "SELECT histogram(_timestamp) AS x_axis, approx_percentile_cont(duration, 0.50) AS p50, approx_percentile_cont(duration, 0.75) AS p75, approx_percentile_cont(duration, 0.95) AS p95, approx_percentile_cont(duration, 0.99) AS p99 FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY x_axis ORDER BY x_axis ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
