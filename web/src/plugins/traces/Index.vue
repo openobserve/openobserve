@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:activeTab="activeTab = $event"
           @error-only-toggled="onErrorOnlyToggled"
           @filters-reset="onFiltersReset"
+          @cancel-query="cancelSearch"
         />
       </div>
 
@@ -267,6 +268,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
+import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -594,6 +596,16 @@ function buildSearch() {
     }
 
     if (whereClause.trim() != "") {
+      // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
+      const durationParseResult = parseDurationWhereClause(
+        whereClause,
+        parser,
+        searchObj.data.stream.selectedStream.value,
+      );
+      if (typeof durationParseResult === "string") {
+        whereClause = durationParseResult;
+      }
+
       whereClause = whereClause
         .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
         .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
@@ -717,7 +729,10 @@ const updateFieldValues = (data) => {
   });
 };
 
-async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
+async function getQueryData(
+  isPagination: boolean = false,
+  isSort: boolean = false,
+) {
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
@@ -765,8 +780,20 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
 
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
-    // Filters are already in editorValue (set by metrics dashboard brush selections)
-    const filter = searchObj.data.editorValue.trim();
+    // Filters are already in editorValue (set by metrics dashboard brush selections).
+    // Mirror buildSearch: split on | so only the WHERE-clause portion (after the pipe)
+    // is passed to parseDurationWhereClause, not the query-functions prefix.
+    const editorParts = searchObj.data.editorValue.trim().split("|");
+    let filter = (editorParts.length > 1 ? editorParts[1] : editorParts[0]).trim();
+    const filterParseResult = parseDurationWhereClause(
+      filter,
+      parser,
+      searchObj.data.stream.selectedStream.value,
+    );
+    if (typeof filterParseResult === "string") {
+      filter = filterParseResult;
+    }
+
     const combinedFilter = filter;
 
     if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
@@ -908,6 +935,18 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     searchObj.data.errorDetail = "";
   }
 }
+
+const cancelSearch = () => {
+  // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
+  window.dispatchEvent(new Event("cancelQuery"));
+  if (!currentSearchTraceId) return;
+  cancelStreamQueryBasedOnRequestId({
+    trace_id: currentSearchTraceId,
+    org_id: searchObj.organizationIdentifier,
+  });
+  currentSearchTraceId = null;
+  searchObj.loading = false;
+};
 
 /**
  *
