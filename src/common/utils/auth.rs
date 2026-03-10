@@ -899,6 +899,19 @@ where
                         path_columns[4]
                     )
                 }
+            } else if path_columns[0].eq(V2_API_PREFIX)
+                && path_columns[2].eq("alerts")
+                && path_columns[url_len - 1].eq("trigger")
+            {
+                // For v2/default/alerts/3ATPoRfPdc0n1mEcORhMHV4h56n/trigger api to trigger
+                // destination
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
+                    path_columns[3]
+                )
             }
             //  this is specifically for enabling alerts
             else if !(path_columns[1].eq("pipelines") && path_columns[3].eq("backfill"))
