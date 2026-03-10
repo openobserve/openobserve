@@ -396,12 +396,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(service_graph::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());
-    // Register anomaly detection callbacks on all enterprise nodes so that
-    // manual training/detection triggered via the HTTP API (which can land on
-    // any node) can execute queries and write results without needing the
-    // alert-manager role.  Only the scheduler itself is alert-manager-only.
     #[cfg(feature = "enterprise")]
-    {
+    if LOCAL_NODE.is_alert_manager() {
+        // Register the OSS search layer as the query executor for anomaly detection.
+        // Must happen before start_scheduler() so the training/detection jobs can
+        // call execute_anomaly_query() via the registered callback.
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id| {
                 Box::pin(async move {
@@ -503,9 +502,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 })
             },
         );
-    }
-    #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_alert_manager() {
+
         // Ensure every enabled anomaly config has a live detection trigger after restart.
         // Handles: trigger row missing, or stuck in Processing from a previous crash.
         crate::service::anomaly_detection::recover_detection_triggers_on_startup().await;
