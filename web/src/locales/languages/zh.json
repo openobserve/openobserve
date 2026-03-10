@@ -2069,7 +2069,7 @@
     "noStreamSelected": "未选择任何直播",
     "resultsIncludeAllWindows": "结果包括所有多窗口新增内容",
     "runQueryForOutput": "请单击 “运行查询” 以查看输出",
-    "applyVRLForOutput": "请单击 Apply VRL 查看组合输出"
+    "applyVRLForOutput": "请单击 Apply VRL 查看组合输出",
     "anomalyDetection": "异常检测",
     "newAnomalyDetection": "新的异常检测",
     "editAnomalyDetection": "编辑异常检测",

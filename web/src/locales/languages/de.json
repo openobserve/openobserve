@@ -2069,7 +2069,7 @@
     "noStreamSelected": "Kein Stream ausgewählt",
     "resultsIncludeAllWindows": "Die Ergebnisse beinhalten alle Ergänzungen mit mehreren Fenstern",
     "runQueryForOutput": "Bitte klicken Sie auf Abfrage ausführen, um die Ausgabe zu sehen",
-    "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen"
+    "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen",
     "anomalyDetection": "Erkennung von Anomalien",
     "newAnomalyDetection": "Erkennung neuer Anomalien",
     "editAnomalyDetection": "Anomalieerkennung bearbeiten",

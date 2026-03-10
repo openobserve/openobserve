@@ -2086,7 +2086,7 @@
     "noStreamSelected": "ストリームが選択されていません",
     "resultsIncludeAllWindows": "結果にはマルチウィンドウの追加がすべて含まれます",
     "runQueryForOutput": "[クエリの実行] をクリックして出力を確認してください",
-    "applyVRLForOutput": "結合された出力を確認するには、[VRL を適用] をクリックしてください"
+    "applyVRLForOutput": "結合された出力を確認するには、[VRL を適用] をクリックしてください",
     "anomalyDetection": "異常検知",
     "newAnomalyDetection": "新しい異常検出",
     "editAnomalyDetection": "異常検出の編集",

@@ -2069,7 +2069,7 @@
     "noStreamSelected": "Geen stream geselecteerd",
     "resultsIncludeAllWindows": "De resultaten omvatten alle toevoegingen met meerdere vensters",
     "runQueryForOutput": "Klik op Query uitvoeren om de uitvoer te zien",
-    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien"
+    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien",
     "anomalyDetection": "Detectie van afwijkingen",
     "newAnomalyDetection": "Nieuwe detectie van afwijkingen",
     "editAnomalyDetection": "Anomaliedetectie bewerken",

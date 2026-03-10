@@ -2069,7 +2069,7 @@
     "noStreamSelected": "선택한 스트림 없음",
     "resultsIncludeAllWindows": "결과에는 모든 다중 창 추가 사항이 포함됩니다.",
     "runQueryForOutput": "결과를 보려면 [쿼리 실행] 을 클릭하십시오.",
-    "applyVRLForOutput": "VRL 적용을 클릭하여 결합된 출력을 확인하십시오."
+    "applyVRLForOutput": "VRL 적용을 클릭하여 결합된 출력을 확인하십시오.",
     "anomalyDetection": "이상 징후 탐지",
     "newAnomalyDetection": "새로운 이상 탐지",
     "editAnomalyDetection": "이상 탐지 편집",
