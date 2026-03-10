@@ -335,7 +335,7 @@ class MetricsIngestion {
             // Use cloud-compatible auth for local, manual auth for external
             const headers = useExternal
                 ? { 'Authorization': `Basic ${Buffer.from(`${config.username}:${config.password}`).toString('base64')}` }
-                : { 'Authorization': getAuthHeaders()['Authorization'] };
+                : getAuthHeaders();
 
             // Try a simple GET to the base API endpoint
             const baseUrl = config.endpoint.replace('/v1/metrics', '');
