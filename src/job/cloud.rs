@@ -31,9 +31,21 @@ use crate::{common::meta::telemetry, service::stream::get_streams};
 // interval for checking and reporting no ingestion events
 const NO_INGESTION_REPORT_INTERVAL: u64 = 3600;
 
+/// DB flush interval for trial quota deductions (seconds).
+const TRIAL_QUOTA_FLUSH_INTERVAL: u64 = 10;
+
 pub fn start() {
     tokio::spawn(async move { run_no_ingestion().await });
     tokio::spawn(async move { run_ai_quota_check().await });
+}
+
+/// Start trial quota background jobs (flush + cluster sync).
+/// Must run on ALL nodes, not just alert_manager.
+pub fn start_trial_quota_jobs() {
+    tokio::spawn(async move { run_trial_quota_flush().await });
+    tokio::spawn(async move {
+        crate::service::trial_quota::watch_cluster_events().await;
+    });
 }
 
 async fn run_no_ingestion() {
@@ -122,6 +134,16 @@ async fn report_org_no_ingestion(start_hour: i64, duration: &str) {
         }
     }
     log::info!("check for no ingestion for duration {duration} completed");
+}
+
+async fn run_trial_quota_flush() {
+    let mut interval =
+        tokio::time::interval(tokio::time::Duration::from_secs(TRIAL_QUOTA_FLUSH_INTERVAL));
+    interval.tick().await; // skip first immediate tick
+    loop {
+        interval.tick().await;
+        crate::service::trial_quota::flush_to_db().await;
+    }
 }
 
 async fn run_ai_quota_check() {

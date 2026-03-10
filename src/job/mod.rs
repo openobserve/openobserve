@@ -563,10 +563,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         });
     }
 
-    // Initialize AI credits from DB (cloud only)
+    // Initialize AI credits from DB and start quota jobs (cloud only)
     #[cfg(feature = "cloud")]
     {
         crate::service::trial_quota::init_from_db().await;
+        cloud::start_trial_quota_jobs();
     }
 
     // additional for cloud

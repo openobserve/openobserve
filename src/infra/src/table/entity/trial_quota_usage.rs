@@ -8,7 +8,6 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub feature: String,
     pub usage_count: i64,
-    pub usage_limit: i64,
     pub updated_at: i64,
     pub notified_checkpoint: i16,
 }

@@ -28,12 +28,6 @@ impl MigrationTrait for Migration {
                             .default(0),
                     )
                     .col(
-                        ColumnDef::new(TrialQuotaUsage::UsageLimit)
-                            .big_integer()
-                            .not_null()
-                            .default(1000),
-                    )
-                    .col(
                         ColumnDef::new(TrialQuotaUsage::UpdatedAt)
                             .big_integer()
                             .not_null()
@@ -68,7 +62,6 @@ enum TrialQuotaUsage {
     OrgId,
     Feature,
     UsageCount,
-    UsageLimit,
     UpdatedAt,
     NotifiedCheckpoint,
 }
