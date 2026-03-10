@@ -142,8 +142,11 @@
 <script lang="ts" setup>
 import { ref } from "vue";
 import useTraces from "@/composables/useTraces";
-import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
-import streamService from "@/services/stream";
+import {
+  b64EncodeUnicode,
+  formatLargeNumber,
+  generateTraceContext,
+} from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
@@ -153,6 +156,7 @@ import {
   outlinedArrowBackIos,
   outlinedArrowForwardIos,
 } from "@quasar/extras/material-icons-outlined";
+import useStreamingSearch from "@/composables/useStreamingSearch";
 
 const props = defineProps({
   row: {
@@ -168,117 +172,115 @@ const store = useStore();
 const $q = useQuasar();
 
 const { searchObj } = useTraces();
+const { fetchQueryDataWithHttpStream } = useStreamingSearch();
 
 const addSearchTerm = (term: string) => {
   searchObj.data.stream.addToFilter = term;
 };
 
-const openFilterCreator = (event: any, { name, ftsKey }: any) => {
+/**
+ * Remove conditions referencing `fieldName` from a flat AND-chained WHERE
+ * string.  Returns an empty string when all conditions are removed.
+ */
+const removeFieldFromWhere = (
+  whereClause: string,
+  fieldName: string,
+): string => {
+  const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
+  const remaining = whereClause
+    .split(/\s+AND\s+/i)
+    .filter((cond) => !fieldPattern.test(cond.trim()));
+  return remaining.join(" AND ");
+};
+
+/**
+ * Build base64-encoded SQL for field-value queries with the expanded field's
+ * own filter excluded from the WHERE clause so value counts are unbiased.
+ */
+const buildSql = (): string => {
+  const fieldName = props.row.name;
+  const query = searchObj.data.editorValue;
+  const parts = query.split("|");
+  const whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+
+  const streamName = searchObj.data.stream.selectedStream.value;
+  let sql = `SELECT * FROM "${streamName}"`;
+
+  if (whereClause !== "") {
+    const filteredWhere = removeFieldFromWhere(whereClause, fieldName);
+    if (filteredWhere.trim() !== "") {
+      sql += ` WHERE ${filteredWhere}`;
+    }
+  }
+
+  return b64EncodeUnicode(sql) || "";
+};
+
+const openFilterCreator = (event: any, { ftsKey }: any) => {
   if (ftsKey) {
     event.stopPropagation();
     event.preventDefault();
     return;
   }
 
-  fieldValues.value[name] = {
-    isLoading: true,
-    values: [],
+  const fieldName = props.row.name;
+
+  fieldValues.value[fieldName] = { isLoading: true, values: [] };
+
+  const sql = buildSql();
+  const { traceId } = generateTraceContext();
+
+  const queryReq = {
+    sql,
+    fields: [fieldName],
+    size: store.state.zoConfig?.query_values_default_num || 10,
+    start_time: searchObj.data.datetime.startTime,
+    end_time: searchObj.data.datetime.endTime,
+    stream_name: searchObj.data.stream.selectedStream.value,
+    type: "traces",
   };
 
-  try {
-    let query_context = "";
-    let query = searchObj.data.editorValue;
-    let parseQuery = query.split("|");
-    let whereClause = "";
-    if (parseQuery.length > 1) {
-      whereClause = parseQuery[1].trim();
-    } else {
-      whereClause = parseQuery[0].trim();
-    }
-
-    query_context =
-      `SELECT * FROM "` +
-      searchObj.data.stream.selectedStream.value +
-      `" [WHERE_CLAUSE]`;
-
-    if (whereClause.trim() != "") {
-      whereClause = whereClause
-        .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-        .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-        .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-      whereClause = whereClause
-        .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-        .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-        .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-        .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
-
-      const parsedSQL = whereClause.split(" ");
-      searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-        parsedSQL.forEach((node: any, index: any) => {
-          if (node == field.name) {
-            node = node.replaceAll('"', "");
-            parsedSQL[index] = '"' + node + '"';
-          }
-        });
-      });
-
-      whereClause = parsedSQL.join(" ");
-
-      // query_context = query_context.replace(
-      //   "[WHERE_CLAUSE]",
-      //   " WHERE " + whereClause,
-      // );
-      query_context = query_context
-        .split("[WHERE_CLAUSE]")
-        .join(" WHERE " + whereClause);
-    } else {
-      query_context = query_context.replace("[WHERE_CLAUSE]", "");
-    }
-    query_context = b64EncodeUnicode(query_context) || "";
-
-    fieldValues.value[name] = {
-      isLoading: true,
-      values: [],
-    };
-
-    streamService
-      .fieldValues({
-        org_identifier: store.state.selectedOrganization.identifier,
-        stream_name: searchObj.data.stream.selectedStream.value,
-        start_time: searchObj.data.datetime.startTime,
-        end_time: searchObj.data.datetime.endTime,
-        fields: [name],
-        size: store.state.zoConfig?.query_values_default_num || 10,
-        type: "traces",
-        query_context,
-      })
-      .then((res: any) => {
-        if (res.data.hits.length) {
-          fieldValues.value[name]["values"] = res.data.hits
-            .find((field: any) => field.field === name)
-            .values.map((value: any) => {
-              return {
+  fetchQueryDataWithHttpStream(
+    {
+      queryReq,
+      type: "values",
+      traceId,
+      org_id: store.state.selectedOrganization?.identifier,
+    },
+    {
+      data: (_payload: any, response: any) => {
+        if (response?.hits?.length) {
+          const fieldData = response.hits.find(
+            (f: any) => f.field === fieldName,
+          );
+          if (fieldData?.values) {
+            fieldValues.value[fieldName]["values"] = fieldData.values.map(
+              (value: any) => ({
                 key: value.zo_sql_key ? value.zo_sql_key : "null",
                 count: formatLargeNumber(value.zo_sql_num),
-              };
-            });
+              }),
+            );
+          }
         }
-      })
-      .catch(() => {
+      },
+      error: () => {
         $q.notify({
           type: "negative",
-          message: `Error while fetching values for ${name}`,
+          message: `Error while fetching values for ${fieldName}`,
         });
-      })
-      .finally(() => {
-        fieldValues.value[name]["isLoading"] = false;
-      });
-  } catch (e) {
-    fieldValues.value[name]["isLoading"] = false;
-    console.log("Error while fetching field values");
-  }
+      },
+      complete: () => {
+        if (fieldValues.value[fieldName]) {
+          fieldValues.value[fieldName]["isLoading"] = false;
+        }
+      },
+      reset: () => {},
+    },
+  );
 };
+
+defineExpose({ buildSql, openFilterCreator });
 </script>
 
 <style lang="scss">
