@@ -1031,6 +1031,138 @@ pub async fn confirm_action(
     }
 }
 
+/// Answer clarifying questions for AI agent resource creation.
+///
+/// Forwards user answers to the agent's /answer endpoint, which unblocks the
+/// ask_clarifying_questions tool mid-turn so the agent can incorporate the
+/// answers into the resource being created.
+#[utoipa::path(
+    post,
+    path = "/api/{org_id}/ai/answer/{session_id}",
+    params(
+        ("org_id" = String, Path, description = "Organization identifier"),
+        ("session_id" = String, Path, description = "Chat session ID"),
+    ),
+    request_body(
+        content = Object,
+        description = "User answers to clarifying questions",
+        example = json!({"answers": [{"question_id": "focus", "question": "What should this dashboard focus on?", "answer": "Infrastructure"}]}),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Answers forwarded", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn answer_question(
+    Path((_org_id, session_id)): Path<(String, String)>,
+    in_req: axum::extract::Request,
+) -> Response {
+    let (parts, body) = in_req.into_parts();
+
+    // Parse JSON body
+    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Failed to read request body: {e}"));
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::alerts::rca_agent::get_agent_client;
+
+        let config = get_o2_config();
+
+        if !config.ai.enabled {
+            return MetaHttpResponse::internal_error("AI is not enabled");
+        }
+
+        if get_agent_client().is_none() {
+            return MetaHttpResponse::internal_error("Agent service not configured");
+        }
+
+        // Extract user token for identity verification (same as chat_stream)
+        let auth_str = crate::common::utils::auth::extract_auth_str_from_parts(&parts).await;
+        let user_token = if auth_str.starts_with("Session::") {
+            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
+        } else if !auth_str.is_empty() {
+            Some(auth_str)
+        } else {
+            None
+        };
+
+        // Inject user_token into the body for identity verification by the agent
+        let mut forward_body: serde_json::Value =
+            serde_json::from_slice(&body_bytes).unwrap_or(serde_json::json!({}));
+        if let Some(token) = &user_token
+            && let Some(obj) = forward_body.as_object_mut()
+        {
+            obj.insert(
+                "user_token".to_string(),
+                serde_json::Value::String(token.clone()),
+            );
+        }
+        let forward_bytes = serde_json::to_vec(&forward_body).unwrap_or_default();
+
+        // Forward the answers to the agent's /answer endpoint
+        let answer_url = format!(
+            "{}/answer/{}",
+            config.ai.agent_url.trim_end_matches('/'),
+            session_id
+        );
+
+        let http_client = reqwest::Client::new();
+        match http_client
+            .post(&answer_url)
+            .header("Content-Type", "application/json")
+            .body(forward_bytes)
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                let status = resp.status();
+                let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
+
+                if status.is_success() {
+                    (
+                        StatusCode::OK,
+                        axum::Json(
+                            serde_json::from_str::<serde_json::Value>(&response_body)
+                                .unwrap_or(serde_json::json!({"ok": true})),
+                        ),
+                    )
+                        .into_response()
+                } else {
+                    log::error!(
+                        "Agent answer endpoint returned {}: {}",
+                        status,
+                        response_body
+                    );
+                    MetaHttpResponse::internal_error(format!(
+                        "Answer submission failed: {}",
+                        response_body
+                    ))
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to forward answers to agent: {e}");
+                MetaHttpResponse::internal_error(format!("Failed to forward answers: {e}"))
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(session_id);
+        drop(parts);
+        drop(body_bytes);
+        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

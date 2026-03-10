@@ -29,9 +29,17 @@ export interface NavigationAction {
   };
 }
 
+// Clarification question for pre-creation user intent gathering
+export interface ClarificationQuestion {
+  id: string;
+  question: string;
+  options: Array<{ label: string; description?: string }>;
+  allow_custom?: boolean;
+}
+
 // Content block for interleaved display (tool calls and text in order)
 export interface ContentBlock {
-  type: 'tool_call' | 'text' | 'error' | 'navigation';
+  type: 'tool_call' | 'text' | 'error' | 'navigation' | 'question';
   // For tool_call type:
   tool?: string;
   message?: string;
@@ -53,6 +61,12 @@ export interface ContentBlock {
   recoverable?: boolean;       // for stream-level errors
   // Navigation action (from navigation_action events):
   navigationAction?: NavigationAction; // Optional navigation button for tool calls
+  // Clarification questions (from ask_question events):
+  questions?: ClarificationQuestion[];
+  pendingQuestion?: boolean;          // true = waiting for user answers
+  currentQuestionIndex?: number;      // which question is currently displayed
+  questionAnswers?: Record<string, string>; // question_id -> selected answer
+  reviewMode?: boolean;               // true = showing review summary before submit
 }
 
 // Image attachment for multimodal chat

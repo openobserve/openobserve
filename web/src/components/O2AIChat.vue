@@ -582,6 +582,129 @@
                       </div>
                     </div>
                   </div>
+                  <!-- Pending clarification questions -->
+                  <div
+                    v-else-if="block.type === 'question' && block.pendingQuestion"
+                    class="question-block pending-confirmation"
+                    :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+                    @click.stop
+                  >
+                    <!-- Question view (answering one at a time) -->
+                    <template v-if="!block.reviewMode">
+                      <div class="question-header">
+                        <span class="question-counter">
+                          Question {{ (block.currentQuestionIndex ?? 0) + 1 }} of {{ block.questions?.length || 0 }}
+                        </span>
+                        <div class="question-nav">
+                          <q-btn
+                            flat dense round icon="chevron_left" size="sm"
+                            :disable="(block.currentQuestionIndex ?? 0) === 0"
+                            @click="block.currentQuestionIndex = (block.currentQuestionIndex ?? 0) - 1"
+                          />
+                          <q-btn
+                            flat dense round icon="chevron_right" size="sm"
+                            :disable="(block.currentQuestionIndex ?? 0) >= (block.questions?.length || 1) - 1"
+                            @click="block.currentQuestionIndex = (block.currentQuestionIndex ?? 0) + 1"
+                          />
+                        </div>
+                      </div>
+                      <div v-if="block.questions && block.questions[block.currentQuestionIndex ?? 0]" class="question-content">
+                        <p class="question-text">{{ block.questions[block.currentQuestionIndex ?? 0].question }}</p>
+                        <div class="question-options">
+                          <q-btn
+                            v-for="opt in block.questions[block.currentQuestionIndex ?? 0].options"
+                            :key="opt.label"
+                            :label="opt.label"
+                            :outline="!isOptionSelected(block, block.questions[block.currentQuestionIndex ?? 0].id, opt.label)"
+                            :color="isOptionSelected(block, block.questions[block.currentQuestionIndex ?? 0].id, opt.label) ? 'primary' : 'grey'"
+                            dense no-caps size="sm"
+                            class="question-option-btn"
+                            @click="selectQuestionOption(block, block.questions[block.currentQuestionIndex ?? 0].id, opt.label)"
+                          >
+                            <q-tooltip v-if="opt.description">{{ opt.description }}</q-tooltip>
+                          </q-btn>
+                        </div>
+                        <q-input
+                          v-if="block.questions[block.currentQuestionIndex ?? 0].allow_custom !== false"
+                          v-model="customQuestionInput[block.questions[block.currentQuestionIndex ?? 0].id]"
+                          dense outlined
+                          placeholder="Type a custom answer..."
+                          class="question-text-input"
+                          @keyup.enter="applyCustomAnswer(block, block.questions[block.currentQuestionIndex ?? 0].id)"
+                        />
+                      </div>
+                      <div class="question-actions">
+                        <q-btn
+                          dense no-caps size="sm" flat color="grey"
+                          label="Skip"
+                          @click="skipQuestion(block)"
+                        />
+                        <q-btn
+                          v-if="(block.currentQuestionIndex ?? 0) < (block.questions?.length || 1) - 1"
+                          dense no-caps size="sm" color="primary"
+                          label="Next"
+                          icon-right="chevron_right"
+                          @click="nextQuestion(block)"
+                        />
+                        <q-btn
+                          v-else
+                          dense no-caps size="sm" color="primary"
+                          label="Review"
+                          icon-right="checklist"
+                          @click="goToReview(block)"
+                        />
+                      </div>
+                    </template>
+                    <!-- Review view (summary of all answers before submit) -->
+                    <template v-else>
+                      <div class="question-header">
+                        <span class="question-counter">Review Answers</span>
+                      </div>
+                      <div class="review-list">
+                        <div
+                          v-for="(q, idx) in block.questions"
+                          :key="q.id"
+                          class="review-item"
+                          @click="editQuestion(block, idx)"
+                        >
+                          <div class="review-question">{{ q.question }}</div>
+                          <div class="review-answer">
+                            <span v-if="block.questionAnswers?.[q.id]">{{ block.questionAnswers[q.id] }}</span>
+                            <span v-else class="review-skipped">(not answered)</span>
+                            <q-icon name="edit" size="14px" class="review-edit-icon" />
+                          </div>
+                        </div>
+                      </div>
+                      <div class="question-actions">
+                        <q-btn
+                          dense no-caps size="sm" flat color="grey"
+                          label="Back"
+                          icon="chevron_left"
+                          :disable="submittingAnswers"
+                          @click="block.reviewMode = false"
+                        />
+                        <q-btn
+                          dense no-caps size="sm" color="primary"
+                          :label="submittingAnswers ? 'Submitting...' : 'Submit'"
+                          :icon-right="submittingAnswers ? undefined : 'send'"
+                          :loading="submittingAnswers"
+                          :disable="submittingAnswers"
+                          @click="submitQuestionAnswers(block)"
+                        />
+                      </div>
+                    </template>
+                  </div>
+                  <!-- Answered questions (read-only summary) -->
+                  <div
+                    v-else-if="block.type === 'question' && !block.pendingQuestion"
+                    class="question-block answered"
+                    :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+                  >
+                    <div v-for="q in block.questions" :key="q.id" class="answered-item">
+                      <span class="answered-question">{{ q.question }}</span>
+                      <span class="answered-value">{{ block.questionAnswers?.[q.id] || '(skipped)' }}</span>
+                    </div>
+                  </div>
                   <!-- Stream-level error block -->
                   <div
                     v-else-if="block.type === 'error'"
@@ -947,7 +1070,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, nextTick, watch, computed, onUnmounted } from 'vue';
+import { defineComponent, ref, reactive, onMounted, nextTick, watch, computed, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
@@ -1095,6 +1218,9 @@ export default defineComponent({
         }
       }
     });
+
+    // Custom text input for clarification questions (keyed by question id)
+    const customQuestionInput = reactive<Record<string, string>>({});
 
     // AI-generated chat title state
     const aiGeneratedTitle = ref<string | null>(null);
@@ -1673,6 +1799,32 @@ export default defineComponent({
                       args: data.args || {},
                       message: data.message || `Confirm execution of ${data.tool}?`,
                     };
+                    await scrollToBottom();
+                    continue;
+                  }
+
+                  // Handle ask_question events - add inline question block in chat
+                  if (data && data.type === 'ask_question') {
+                    const questionBlock: ContentBlock = {
+                      type: 'question',
+                      questions: data.questions,
+                      pendingQuestion: true,
+                      currentQuestionIndex: 0,
+                      questionAnswers: {},
+                    };
+
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(questionBlock);
+                    } else {
+                      chatMessages.value.push({
+                        role: 'assistant',
+                        content: '',
+                        contentBlocks: [...pendingToolCalls.value, questionBlock],
+                      });
+                      pendingToolCalls.value = [];
+                    }
                     await scrollToBottom();
                     continue;
                   }
@@ -2703,6 +2855,122 @@ export default defineComponent({
         console.error('Error confirming action:', error);
       }
       pendingConfirmation.value = null;
+    };
+
+    // --- Clarification question handlers ---
+
+    // Loading flag for answer submission
+    const submittingAnswers = ref(false);
+
+    // Apply any pending custom text from the input to questionAnswers.
+    // Called on every transition (Next, Skip, Review) so custom text is
+    // never silently lost.
+    const applyPendingCustomInput = (block: ContentBlock) => {
+      if (!block.questions || block.currentQuestionIndex == null) return;
+      const currentQ = block.questions[block.currentQuestionIndex];
+      const text = customQuestionInput[currentQ.id]?.trim();
+      if (text && block.questionAnswers) {
+        block.questionAnswers[currentQ.id] = text;
+      }
+    };
+
+    // Check whether a predefined option should render as selected.
+    // Returns false when the custom input has text (custom overrides).
+    const isOptionSelected = (block: ContentBlock, questionId: string, optionLabel: string): boolean => {
+      if (customQuestionInput[questionId]?.trim()) return false;
+      return block.questionAnswers?.[questionId] === optionLabel;
+    };
+
+    const selectQuestionOption = (block: ContentBlock, questionId: string, optionLabel: string) => {
+      if (block.questionAnswers) {
+        block.questionAnswers[questionId] = optionLabel;
+      }
+      // Clear custom input when an option is selected
+      customQuestionInput[questionId] = '';
+    };
+
+    const applyCustomAnswer = (block: ContentBlock, questionId: string) => {
+      const text = customQuestionInput[questionId]?.trim();
+      if (text && block.questionAnswers) {
+        block.questionAnswers[questionId] = text;
+      }
+    };
+
+    const nextQuestion = (block: ContentBlock) => {
+      if (!block.questions || block.currentQuestionIndex == null) return;
+      applyPendingCustomInput(block);
+      if (block.currentQuestionIndex < block.questions.length - 1) {
+        block.currentQuestionIndex++;
+      }
+    };
+
+    const goToReview = (block: ContentBlock) => {
+      applyPendingCustomInput(block);
+      block.reviewMode = true;
+    };
+
+    const skipQuestion = (block: ContentBlock) => {
+      if (!block.questions || block.currentQuestionIndex == null) return;
+      const currentQ = block.questions[block.currentQuestionIndex];
+      // Clear both the predefined answer and any custom text
+      if (block.questionAnswers) {
+        block.questionAnswers[currentQ.id] = '';
+      }
+      customQuestionInput[currentQ.id] = '';
+      if (block.currentQuestionIndex < block.questions.length - 1) {
+        block.currentQuestionIndex++;
+      } else {
+        block.reviewMode = true;
+      }
+    };
+
+    const editQuestion = (block: ContentBlock, index: number) => {
+      if (block.questions) {
+        const q = block.questions[index];
+        const currentAnswer = block.questionAnswers?.[q.id] || '';
+        const isPredefined = q.options.some((opt) => opt.label === currentAnswer);
+
+        // If the current answer is custom text, pre-fill the input so the
+        // user can edit it. If it's a predefined option, clear the input
+        // so the highlighted button speaks for itself.
+        customQuestionInput[q.id] = isPredefined ? '' : currentAnswer;
+      }
+      block.currentQuestionIndex = index;
+      block.reviewMode = false;
+    };
+
+    const submitQuestionAnswers = async (block: ContentBlock) => {
+      if (!block.questions || submittingAnswers.value) return;
+      const answers = block.questions.map((q) => ({
+        question_id: q.id,
+        question: q.question,
+        answer: block.questionAnswers?.[q.id] || '',
+      }));
+
+      submittingAnswers.value = true;
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        const resp = await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/answer/${currentSessionId.value}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ answers }),
+          }
+        );
+        if (!resp.ok) {
+          throw new Error(`Answer submission failed: ${resp.status}`);
+        }
+        // Only transition to answered state on success
+        block.pendingQuestion = false;
+      } catch (error) {
+        console.error('Error submitting question answers:', error);
+        // Stay in review mode so user can retry
+        block.reviewMode = true;
+      } finally {
+        submittingAnswers.value = false;
+      }
     };
 
     // Generate navigation action from tool result data (generic, pattern-based)
@@ -4350,6 +4618,17 @@ export default defineComponent({
       handleNavigationAction,
       // Auto navigation
       isAutoNavigationEnabled,
+      // Clarification questions
+      customQuestionInput,
+      submittingAnswers,
+      isOptionSelected,
+      selectQuestionOption,
+      applyCustomAnswer,
+      nextQuestion,
+      goToReview,
+      skipQuestion,
+      editQuestion,
+      submitQuestionAnswers,
       processedMessages,
       pendingToolCalls,
       processTextBlock,
@@ -5959,6 +6238,208 @@ export default defineComponent({
   .tool-suggestion {
     font-style: italic;
     opacity: 0.85;
+  }
+}
+
+// Clarification question block - inline in chat flow
+.question-block {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 13px;
+
+  &.pending-confirmation {
+    cursor: default;
+
+    &.light-mode {
+      background: rgba(255, 193, 7, 0.12);
+      border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+    &.dark-mode {
+      background: rgba(255, 193, 7, 0.15);
+      border: 1px solid rgba(255, 193, 7, 0.25);
+    }
+  }
+
+  &.answered {
+    &.light-mode {
+      background: rgba(76, 175, 80, 0.08);
+      border: 1px solid rgba(76, 175, 80, 0.2);
+    }
+    &.dark-mode {
+      background: rgba(76, 175, 80, 0.12);
+      border: 1px solid rgba(76, 175, 80, 0.2);
+    }
+  }
+
+  .question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+
+    .question-counter {
+      font-size: 12px;
+      font-weight: 600;
+
+      .light-mode & {
+        color: #6d5800;
+      }
+      .dark-mode & {
+        color: #ffd54f;
+      }
+    }
+
+    .question-nav {
+      display: flex;
+      gap: 2px;
+    }
+  }
+
+  .question-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .question-text {
+      font-weight: 500;
+      margin: 0;
+
+      .light-mode & {
+        color: #4a5568;
+      }
+      .dark-mode & {
+        color: #e2e8f0;
+      }
+    }
+
+    .question-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+
+      .question-option-btn {
+        font-size: 12px;
+        padding: 2px 10px;
+      }
+    }
+
+    .question-text-input {
+      max-width: 400px;
+      margin-top: 2px;
+    }
+  }
+
+  .question-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 193, 7, 0.2);
+  }
+
+  .review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .review-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+
+    &:hover {
+      .light-mode & {
+        background: rgba(0, 0, 0, 0.04);
+      }
+      .dark-mode & {
+        background: rgba(255, 255, 255, 0.06);
+      }
+    }
+
+    .review-question {
+      font-size: 12px;
+      font-weight: 500;
+
+      .light-mode & {
+        color: #6b7280;
+      }
+      .dark-mode & {
+        color: #9ca3af;
+      }
+    }
+
+    .review-answer {
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+
+      .light-mode & {
+        color: #1f2937;
+      }
+      .dark-mode & {
+        color: #e5e7eb;
+      }
+
+      .review-skipped {
+        font-style: italic;
+        opacity: 0.5;
+      }
+
+      .review-edit-icon {
+        opacity: 0;
+        transition: opacity 0.15s;
+      }
+    }
+
+    &:hover .review-edit-icon {
+      opacity: 0.6;
+    }
+  }
+
+  .answered-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
+
+    &:not(:last-child) {
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      padding-bottom: 6px;
+      margin-bottom: 4px;
+    }
+
+    .answered-question {
+      font-size: 12px;
+      font-weight: 500;
+
+      .light-mode & {
+        color: #6b7280;
+      }
+      .dark-mode & {
+        color: #9ca3af;
+      }
+    }
+
+    .answered-value {
+      font-size: 13px;
+
+      .light-mode & {
+        color: #374151;
+      }
+      .dark-mode & {
+        color: #e5e7eb;
+      }
+    }
   }
 }
 
