@@ -103,7 +103,7 @@ class PageManager {
     this.alertsPage = new AlertsPage(page);
 
     // ===== API CLEANUP =====
-    this.apiCleanup = new APICleanup();
+    this.apiCleanup = new APICleanup(page);
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
