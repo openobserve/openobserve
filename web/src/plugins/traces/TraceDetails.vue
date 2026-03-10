@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tw:flex tw:items-center tw:space-x-2">
             <!-- Unified Search Input Group -->
-            <div class="unified-search-group">
+            <div v-if="activeTab !== 'flame-graph' && activeTab !== 'map'" class="unified-search-group">
               <div class="log-stream-search-input">
                 <q-input
                   v-model="searchQuery"
