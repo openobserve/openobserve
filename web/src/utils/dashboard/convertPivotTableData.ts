@@ -18,9 +18,13 @@ import {
   getUnitValue,
 } from "./convertDataIntoUnitValue";
 import { getDataValue } from "./aliasUtils";
-
-const MAX_PIVOT_COLUMNS = 50;
-const PIVOT_SEPARATOR = " > ";
+import {
+  PIVOT_TABLE_MAX_COLUMNS,
+  PIVOT_TABLE_SEPARATOR,
+  PIVOT_TABLE_ROW_KEY_SEPARATOR,
+  PIVOT_TABLE_TOTAL_LABEL,
+  PIVOT_TABLE_OTHERS_LABEL,
+} from "./constants";
 
 /**
  * Builds N-level header metadata for the TableRenderer.
@@ -46,7 +50,7 @@ function buildPivotHeaderLevels(
 
   // Parse pivot keys into per-level values
   // e.g., "GET > 200" → ["GET", "200"]
-  const parsedKeys = allPivotKeys.map((pk) => pk.split(PIVOT_SEPARATOR));
+  const parsedKeys = allPivotKeys.map((pk) => pk.split(PIVOT_TABLE_SEPARATOR));
 
   // Track top-level (level 0) group boundary positions (leaf column indices)
   // These propagate down so borders align across all header rows.
@@ -107,14 +111,14 @@ function buildPivotHeaderLevels(
     if (lvl === 0 && showRowTotals) {
       topLevelBoundaries.add(leafColPos);
       cells.push({
-        key: `${lvl}_Total`,
-        label: "Total",
+        key: `${lvl}_${PIVOT_TABLE_TOTAL_LABEL}`,
+        label: PIVOT_TABLE_TOTAL_LABEL,
         colspan: yCount > 1 ? yCount : 1,
         rowspan: pivotCount,
         hasBorder: true,
         _isTotalHeader: true,
         // Sort by the first total column
-        _sortColumn: `Total_${yFields[0].alias}`,
+        _sortColumn: `${PIVOT_TABLE_TOTAL_LABEL}_${yFields[0].alias}`,
       });
     }
 
@@ -140,13 +144,13 @@ function buildPivotHeaderLevels(
     if (showRowTotals) {
       for (let tIdx = 0; tIdx < yFields.length; tIdx++) {
         yCells.push({
-          key: `Total_${yFields[tIdx].alias}`,
+          key: `${PIVOT_TABLE_TOTAL_LABEL}_${yFields[tIdx].alias}`,
           label: yFields[tIdx].label,
           colspan: 1,
           hasBorder: topLevelBoundaries.has(leafColPos),
           _isTotalHeader: true,
           _totalColRightIndex: yFields.length - 1 - tIdx,
-          _sortColumn: `Total_${yFields[tIdx].alias}`,
+          _sortColumn: `${PIVOT_TABLE_TOTAL_LABEL}_${yFields[tIdx].alias}`,
         });
         leafColPos++;
       }
@@ -229,7 +233,7 @@ export const convertPivotTableData = (
   const getPivotKey = (row: any): string => {
     return breakdownAliases
       .map((alias: string) => String(getDataValue(row, alias) ?? "(empty)"))
-      .join(PIVOT_SEPARATOR);
+      .join(PIVOT_TABLE_SEPARATOR);
   };
 
   for (const row of tableRows) {
@@ -246,9 +250,9 @@ export const convertPivotTableData = (
     .sort((a, b) => b[1] - a[1])
     .map(([key]) => key);
 
-  const hasOthers = pivotKeys.length > MAX_PIVOT_COLUMNS;
+  const hasOthers = pivotKeys.length > PIVOT_TABLE_MAX_COLUMNS;
   if (hasOthers) {
-    pivotKeys = pivotKeys.slice(0, MAX_PIVOT_COLUMNS);
+    pivotKeys = pivotKeys.slice(0, PIVOT_TABLE_MAX_COLUMNS);
   }
   const pivotKeySet = new Set(pivotKeys);
 
@@ -259,7 +263,7 @@ export const convertPivotTableData = (
   if (breakdownAliases.length > 1) {
     const parsed = pivotKeys.map((pk) => ({
       key: pk,
-      parts: pk.split(PIVOT_SEPARATOR),
+      parts: pk.split(PIVOT_TABLE_SEPARATOR),
     }));
 
     // Stable hierarchical sort: sort by level-0, then level-1, etc.
@@ -289,7 +293,7 @@ export const convertPivotTableData = (
       rowObj[xAlias] = val;
     }
 
-    const rowKey = keyParts.join("|||");
+    const rowKey = keyParts.join(PIVOT_TABLE_ROW_KEY_SEPARATOR);
     const pivotKey = getPivotKey(row);
 
     if (!rowMap.has(rowKey)) {
@@ -305,14 +309,14 @@ export const convertPivotTableData = (
         const colKey = `${pivotKey}_${yAlias}`;
         targetRow[colKey] = numericValue;
       } else if (hasOthers) {
-        const othersKey = `Others_${yAlias}`;
+        const othersKey = `${PIVOT_TABLE_OTHERS_LABEL}_${yAlias}`;
         targetRow[othersKey] = (targetRow[othersKey] || 0) + numericValue;
       }
     }
   }
 
   // --- Step 3: Fill missing values + row totals ---
-  const allPivotKeys = hasOthers ? [...pivotKeys, "Others"] : pivotKeys;
+  const allPivotKeys = hasOthers ? [...pivotKeys, PIVOT_TABLE_OTHERS_LABEL] : pivotKeys;
   const pivotedRows = Array.from(rowMap.values());
 
   for (const row of pivotedRows) {
@@ -326,7 +330,7 @@ export const convertPivotTableData = (
         rowTotal += Number(row[colKey]) || 0;
       }
       if (showRowTotals) {
-        row[`Total_${yAlias}`] = rowTotal;
+        row[`${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`] = rowTotal;
       }
     }
   }
@@ -335,7 +339,7 @@ export const convertPivotTableData = (
   if (showColTotals && pivotedRows.length > 0) {
     const totalRow: any = { __isTotalRow: true };
     for (let i = 0; i < xAliases.length; i++) {
-      totalRow[xAliases[i]] = i === 0 ? "Total" : "";
+      totalRow[xAliases[i]] = i === 0 ? PIVOT_TABLE_TOTAL_LABEL : "";
     }
 
     for (const yAlias of yAliases) {
@@ -350,9 +354,9 @@ export const convertPivotTableData = (
       if (showRowTotals) {
         let grandTotal = 0;
         for (const row of pivotedRows) {
-          grandTotal += Number(row[`Total_${yAlias}`]) || 0;
+          grandTotal += Number(row[`${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`]) || 0;
         }
-        totalRow[`Total_${yAlias}`] = grandTotal;
+        totalRow[`${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`] = grandTotal;
       }
     }
 
@@ -437,12 +441,12 @@ export const convertPivotTableData = (
   if (showRowTotals) {
     for (let tIdx = 0; tIdx < yFields.length; tIdx++) {
       const yField = yFields[tIdx];
-      const colKey = `Total_${yField.alias}`;
+      const colKey = `${PIVOT_TABLE_TOTAL_LABEL}_${yField.alias}`;
       const label = needsMultiRowHeader
         ? yField.label
         : isSingleValueField
-          ? "Total"
-          : `Total - ${yField.label}`;
+          ? PIVOT_TABLE_TOTAL_LABEL
+          : `${PIVOT_TABLE_TOTAL_LABEL} - ${yField.label}`;
 
       const yAliasLower = yField.alias.toLowerCase();
       const unitToUse = unitConfigMap[yAliasLower]?.unit || config.unit;

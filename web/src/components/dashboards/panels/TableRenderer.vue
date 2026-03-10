@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :virtual-scroll="!showPagination"
       v-model:pagination="pagination"
       :rows-per-page-options="paginationOptions"
-      :virtual-scroll-sticky-size-start="pivotHeaderLevels.length > 0 ? 28 * pivotHeaderLevels.length : 48"
-      :virtual-scroll-sticky-size-end="stickyTotalRow ? 28 : 0"
+      :virtual-scroll-sticky-size-start="pivotHeaderLevels.length > 0 ? PIVOT_TABLE_HEADER_ROW_HEIGHT * pivotHeaderLevels.length : PIVOT_TABLE_DEFAULT_HEADER_HEIGHT"
+      :virtual-scroll-sticky-size-end="stickyTotalRow ? PIVOT_TABLE_HEADER_ROW_HEIGHT : 0"
       dense
       :wrap-cells="wrapCells"
       :rows="data.rows || []"
@@ -244,7 +244,12 @@ import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import JsonFieldRenderer from "./JsonFieldRenderer.vue";
-import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
+import {
+  TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
+  PIVOT_TABLE_HEADER_ROW_HEIGHT,
+  PIVOT_TABLE_DEFAULT_HEADER_HEIGHT,
+  PIVOT_TABLE_TOTAL_COLUMN_WIDTH,
+} from "@/utils/dashboard/constants";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 
 export default defineComponent({
@@ -424,19 +429,16 @@ export default defineComponent({
       return props.data?.stickyTotalRow || null;
     });
 
-    // Default width for total columns used to calculate right offsets
-    const TOTAL_COL_WIDTH = 150;
-
     const getStickyTotalColumnStyle = (col: any) => {
       if (!stickyColTotals.value || !col?._isTotalColumn) return {};
-      const rightOffset = (col._totalColRightIndex ?? 0) * TOTAL_COL_WIDTH;
+      const rightOffset = (col._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
       return {
         position: "sticky",
         right: `${rightOffset}px`,
         "z-index": 2,
-        "width": `${TOTAL_COL_WIDTH}px`,
-        "min-width": `${TOTAL_COL_WIDTH}px`,
-        "max-width": `${TOTAL_COL_WIDTH}px`,
+        "width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+        "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+        "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
         "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
         "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
         "white-space": "normal",
@@ -446,14 +448,14 @@ export default defineComponent({
 
     const getStickyTotalHeaderStyle = (col: any) => {
       if (!stickyColTotals.value || !col?._isTotalColumn) return {};
-      const rightOffset = (col._totalColRightIndex ?? 0) * TOTAL_COL_WIDTH;
+      const rightOffset = (col._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
       return {
         position: "sticky",
         right: `${rightOffset}px`,
         "z-index": 3,
-        "width": `${TOTAL_COL_WIDTH}px`,
-        "min-width": `${TOTAL_COL_WIDTH}px`,
-        "max-width": `${TOTAL_COL_WIDTH}px`,
+        "width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+        "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+        "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
         "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
         "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
         "white-space": "normal",
@@ -466,8 +468,8 @@ export default defineComponent({
     // Y-label level cells have individual _totalColRightIndex offsets.
     const getStickyTotalHeaderForPivot = (cell: any) => {
       if (!stickyColTotals.value) return {};
-      const rightOffset = (cell._totalColRightIndex ?? 0) * TOTAL_COL_WIDTH;
-      const width = cell.colspan ? cell.colspan * TOTAL_COL_WIDTH : TOTAL_COL_WIDTH;
+      const rightOffset = (cell._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+      const width = cell.colspan ? cell.colspan * PIVOT_TABLE_TOTAL_COLUMN_WIDTH : PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
       return {
         position: "sticky",
         right: `${rightOffset}px`,
@@ -725,6 +727,8 @@ export default defineComponent({
       pivotRowColumns,
       isPivotMergeHidden,
       isPivotMergeNoBorder,
+      PIVOT_TABLE_HEADER_ROW_HEIGHT,
+      PIVOT_TABLE_DEFAULT_HEADER_HEIGHT,
       getRowClass,
       stickyRowTotals,
       stickyColTotals,

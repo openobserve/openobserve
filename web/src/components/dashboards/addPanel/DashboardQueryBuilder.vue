@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.x[index].isDerived
                               ? 'auto'
-                              : '771px',
+                              : FIELD_FUNCTION_MENU_WIDTH,
                         }"
                       >
                         <div>
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.breakdown[index].isDerived
                               ? 'auto'
-                              : '771px',
+                              : FIELD_FUNCTION_MENU_WIDTH,
                         }"
                       >
                         <div>
@@ -450,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.layout.currentQueryIndex
                         ].fields.y[index].isDerived
                           ? 'auto'
-                          : '771px',
+                          : FIELD_FUNCTION_MENU_WIDTH,
                     }"
                   >
                     <div>
@@ -602,7 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].fields.z[index].isDerived
                             ? 'auto'
-                            : '771px',
+                            : FIELD_FUNCTION_MENU_WIDTH,
                       }"
                     >
                       <div>
@@ -712,7 +712,7 @@ import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOpti
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { useStore } from "vuex";
-import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import { MAX_FIELD_LABEL_CHARS, FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
@@ -1377,6 +1377,7 @@ export default defineComponent({
     return {
       showXAxis,
       t,
+      FIELD_FUNCTION_MENU_WIDTH,
       panelName,
       panelDesc,
       dashboardPanelData,
