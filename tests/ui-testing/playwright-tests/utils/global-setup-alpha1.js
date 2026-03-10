@@ -2,6 +2,7 @@ const { chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 const testLogger = require('./test-logger.js');
+const logsdata = require('../../../test-data/logs_data.json');
 
 /**
  * Global setup for Alpha1 cloud tests
@@ -200,6 +201,15 @@ async function globalSetup() {
       testLogger.warn('[alpha1] Failed to fetch cloud config', { error: e.message });
     }
 
+    // Step 9: Perform global data ingestion (same as self-hosted global-setup.js)
+    // This creates streams that tests expect to find in dropdowns
+    const isCleanupOnly = process.argv.some(arg => /cleanup\.spec\.(js|ts)$/.test(arg));
+    if (isCleanupOnly || process.env.SKIP_INGESTION === 'true') {
+      testLogger.info('[alpha1] Skipping data ingestion (cleanup-only run or SKIP_INGESTION=true)');
+    } else {
+      await performGlobalIngestion(page, baseUrl);
+    }
+
   } catch (error) {
     const debugDir = path.join(__dirname, '..', '..', 'test-results');
     if (!fs.existsSync(debugDir)) {
@@ -221,6 +231,57 @@ async function globalSetup() {
   }
 
   testLogger.info('[alpha1] Global setup completed successfully');
+}
+
+/**
+ * Ingest test data into streams so they appear in UI dropdowns.
+ * Uses cloud auth (email:passcode) from cloud-config.json.
+ */
+async function performGlobalIngestion(page, baseUrl) {
+  const cloudConfigFile = path.join(__dirname, 'auth', 'cloud-config.json');
+  let headers;
+  let orgId;
+
+  try {
+    const cloudConfig = JSON.parse(fs.readFileSync(cloudConfigFile, 'utf-8'));
+    orgId = cloudConfig.orgIdentifier;
+    const basicAuth = Buffer.from(`${cloudConfig.userEmail}:${cloudConfig.passcode}`).toString('base64');
+    headers = {
+      'Authorization': `Basic ${basicAuth}`,
+      'Content-Type': 'application/json',
+    };
+  } catch (e) {
+    testLogger.warn('[alpha1] Cannot read cloud-config.json for ingestion — skipping', { error: e.message });
+    return;
+  }
+
+  // Streams that tests expect to exist in dropdowns
+  const streams = [
+    { name: 'e2e_automate', data: logsdata },
+    { name: 'auto_playwright_stream', data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
+  ];
+
+  for (const stream of streams) {
+    try {
+      const response = await page.evaluate(async ({ url, headers, orgId, streamName, data }) => {
+        const base = url.endsWith('/') ? url.slice(0, -1) : url;
+        const r = await fetch(`${base}/api/${orgId}/${streamName}/_json`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(data),
+        });
+        return { status: r.status, text: await r.text() };
+      }, { url: baseUrl, headers, orgId, streamName: stream.name, data: stream.data });
+
+      if (response.status === 200) {
+        testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: response.status });
+      } else {
+        testLogger.warn(`[alpha1] Ingestion into '${stream.name}' returned ${response.status}`, { body: response.text.substring(0, 200) });
+      }
+    } catch (e) {
+      testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
+    }
+  }
 }
 
 module.exports = globalSetup;
