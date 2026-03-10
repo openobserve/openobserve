@@ -75,7 +75,163 @@ pub async fn handle_triggers(
             handle_query_recommendations_triggers(trace_id, trigger).await
         }
         db::scheduler::TriggerModule::Backfill => handle_backfill_triggers(trace_id, trigger).await,
+        db::scheduler::TriggerModule::AnomalyDetection => {
+            handle_anomaly_detection_triggers(trigger).await
+        }
     }
+}
+
+/// Handle an anomaly detection trigger.
+///
+/// Loads the config, runs detection via the enterprise crate (if trained),
+/// then reschedules the trigger according to `schedule_interval`.
+async fn handle_anomaly_detection_triggers(
+    mut trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use config::utils::time::now_micros;
+    use infra::table::entity::anomaly_detection_config;
+    use sea_orm::EntityTrait;
+
+    let anomaly_id = trigger.module_key.clone();
+
+    log::info!(
+        "[anomaly_detection] trigger fired for {anomaly_id} (org={})",
+        trigger.org
+    );
+
+    let db = infra::db::ORM_CLIENT
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+
+    let config = anomaly_detection_config::Entity::find_by_id(&anomaly_id)
+        .one(db)
+        .await?;
+
+    // If config was deleted, clean up the trigger.
+    let Some(config) = config else {
+        db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::AnomalyDetection,
+            &anomaly_id,
+        )
+        .await?;
+        return Ok(());
+    };
+
+    // If not yet trained or disabled, skip and publish a Skipped trigger record.
+    if !config.is_trained || !config.enabled {
+        trigger.next_run_at = now_micros() + 60 * 1_000_000;
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        db::scheduler::update_trigger(trigger.clone(), false, "").await?;
+
+        crate::service::self_reporting::publish_triggers_usage(TriggerData {
+            _timestamp: now_micros(),
+            org: trigger.org.clone(),
+            module: TriggerDataType::AnomalyDetection,
+            key: format!("{}/{}", config.name, anomaly_id),
+            next_run_at: trigger.next_run_at,
+            is_realtime: false,
+            is_silenced: false,
+            status: TriggerDataStatus::Skipped,
+            start_time: now_micros(),
+            end_time: now_micros(),
+            retries: trigger.retries,
+            error: Some(if !config.is_trained {
+                "skipped: model not yet trained".to_string()
+            } else {
+                "skipped: config disabled".to_string()
+            }),
+            ..Default::default()
+        });
+
+        return Ok(());
+    }
+
+    // Run detection via enterprise and track outcome for the triggers stream.
+    let run_start_us = now_micros();
+    let (trigger_status, trigger_error, trigger_success_response, anomaly_count) = {
+        #[cfg(feature = "enterprise")]
+        {
+            match o2_enterprise::enterprise::anomaly_detection::scheduler::run_detection_for_config(
+                &anomaly_id,
+            )
+            .await
+            {
+                Ok(count) => (
+                    TriggerDataStatus::Completed,
+                    None,
+                    Some(serde_json::json!({ "anomalies_found": count }).to_string()),
+                    count,
+                ),
+                Err(e) => {
+                    log::error!("[anomaly_detection] detection failed for {anomaly_id}: {e}");
+                    (TriggerDataStatus::Failed, Some(e.to_string()), None, 0i32)
+                }
+            }
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            (
+                TriggerDataStatus::Skipped,
+                Some("enterprise feature not enabled".to_string()),
+                None,
+                0i32,
+            )
+        }
+    };
+    let run_end_us = now_micros();
+
+    // Publish trigger run record to the triggers stream (same as alerts).
+    let interval_us = parse_detection_interval_to_micros(&config.schedule_interval);
+    let next_run = now_micros() + interval_us;
+    crate::service::self_reporting::publish_triggers_usage(TriggerData {
+        _timestamp: run_start_us,
+        org: trigger.org.clone(),
+        module: TriggerDataType::AnomalyDetection,
+        key: format!("{}/{}", config.name, anomaly_id),
+        next_run_at: next_run,
+        is_realtime: false,
+        is_silenced: false,
+        status: trigger_status,
+        start_time: run_start_us,
+        end_time: run_end_us,
+        retries: trigger.retries,
+        error: trigger_error,
+        success_response: trigger_success_response,
+        evaluation_took_in_secs: Some((run_end_us - run_start_us) as f64 / 1_000_000.0),
+        ..Default::default()
+    });
+
+    // Persist last_satisfied_at in trigger.data (mirrors alerts pattern).
+    // trigger.start_time (set by the OSS scheduler pull SQL) is already last_triggered_at.
+    // We only need to update last_satisfied_at when anomalies were found.
+    if anomaly_count > 0 {
+        use config::meta::triggers::ScheduledTriggerData;
+        let mut td = ScheduledTriggerData::from_json_string(&trigger.data).unwrap_or_default();
+        td.last_satisfied_at = Some(run_end_us);
+        trigger.data = td.to_json_string();
+    }
+
+    // Reschedule.
+    trigger.next_run_at = next_run;
+    trigger.status = db::scheduler::TriggerStatus::Waiting;
+    db::scheduler::update_trigger(trigger, false, "").await?;
+
+    Ok(())
+}
+
+/// Parse a detection interval string like "5m", "1h" into microseconds.
+/// Defaults to 5 minutes on parse failure.
+fn parse_detection_interval_to_micros(interval: &str) -> i64 {
+    let s = interval.trim();
+    let secs: i64 = if let Some(n) = s.strip_suffix('h') {
+        n.trim().parse::<i64>().unwrap_or(1) * 3600
+    } else if let Some(n) = s.strip_suffix('m') {
+        n.trim().parse::<i64>().unwrap_or(5) * 60
+    } else {
+        s.parse::<i64>().unwrap_or(5) * 60
+    };
+    secs * 1_000_000
 }
 
 /// Returns the skipped timestamps and the final timestamp to evaluate the alert.
