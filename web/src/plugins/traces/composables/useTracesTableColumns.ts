@@ -28,8 +28,61 @@
 import { computed, type Ref } from "vue";
 import { type ColumnDef } from "@tanstack/vue-table";
 
-export function useTracesTableColumns(showLlmColumns: Ref<boolean>) {
+export function useTracesTableColumns(showLlmColumns: Ref<boolean>, searchMode: Ref<"traces" | "spans">) {
   return computed<ColumnDef<Record<string, any>>[]>(() => {
+    if (searchMode.value === "spans") {
+      return [
+        {
+          id: "timestamp",
+          header: "TIMESTAMP",
+          size: 160,
+          meta: { sortable: true },
+        },
+        {
+          id: "trace_id",
+          header: "TRACE ID",
+          size: 160,
+          meta: { cellClass: "tw:text-[var(--o2-text-1)] tw:font-mono tw:text-[0.75rem]" },
+        },
+        {
+          id: "span_id",
+          header: "SPAN ID",
+          size: 140,
+          meta: { cellClass: "tw:text-[var(--o2-text-1)] tw:font-mono tw:text-[0.75rem]" },
+        },
+        {
+          id: "service",
+          header: "SERVICE",
+          meta: {
+            grow: true,
+            width: 160,
+            cellClass: "tw:text-[var(--o2-text-1)]",
+          },
+        },
+        {
+          id: "operation_name",
+          header: "OPERATION NAME",
+          meta: {
+            grow: true,
+            width: 200,
+            cellClass: "tw:text-[var(--o2-text-1)]",
+          },
+        },
+        {
+          id: "duration",
+          header: "DURATION",
+          size: 120,
+          meta: { sortable: true },
+        },
+        {
+          id: "status",
+          header: "STATUS",
+          size: 120,
+          meta: { align: "center" },
+        },
+      ];
+    }
+
     const base: ColumnDef<Record<string, any>>[] = [
       {
         id: "timestamp",

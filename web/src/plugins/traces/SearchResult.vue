@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-pagination="searchObj.meta.resultGrid.showPagination"
         :sort-by="searchObj.meta.resultGrid.sortBy"
         :sort-order="searchObj.meta.resultGrid.sortOrder"
+        :search-mode="searchObj.meta.searchMode"
         @row-click="expandRowDetail"
         @page-change="changePage"
         @rows-per-page-change="changeRowsPerPage"
@@ -141,13 +142,28 @@ export default defineComponent({
     const metricsDashboardRef: any = ref(null);
 
     const expandRowDetail = (props: any) => {
+      let from: number;
+      let to: number;
+
+      if (searchObj.meta.searchMode === "spans") {
+        // start_time / end_time are nanoseconds in raw span rows — convert to µs
+        const spanStart = Math.floor((props.start_time || 0) / 1000);
+        const spanEnd = Math.ceil((props.end_time || props.start_time || 0) / 1000);
+        from = spanStart - 60_000_000;       // -1 min in µs
+        to = spanEnd + 3_600_000_000;        // +1 hr in µs
+      } else {
+        from = props.trace_start_time - 10000000;
+        to = props.trace_end_time + 10000000;
+      }
+
       router.push({
         name: "traceDetails",
         query: {
           stream: router.currentRoute.value.query.stream,
           trace_id: props.trace_id,
-          from: props.trace_start_time - 10000000,
-          to: props.trace_end_time + 10000000,
+          span_id: searchObj.meta.searchMode === "spans" ? props.span_id : undefined,
+          from,
+          to,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
