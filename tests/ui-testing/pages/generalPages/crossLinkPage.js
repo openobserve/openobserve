@@ -123,25 +123,45 @@ export class CrossLinkPage {
     }
 
     // CrossLinkDialog methods
+
+    /**
+     * Wait for the CrossLinkDialog to be fully visible and interactive.
+     * Waits for the name input to appear, indicating the dialog has rendered.
+     */
+    async waitForDialog() {
+        testLogger.debug('Waiting for cross-link dialog to render');
+        await this.page.locator(this.crossLinkNameInput).waitFor({ state: 'visible', timeout: 15000 });
+    }
+
     async fillCrossLinkName(name) {
         testLogger.debug('Filling cross-link name', { name });
-        const input = this.page.locator(this.crossLinkNameInput).locator('input');
+        const input = this.page.locator(this.crossLinkNameInput);
         await input.click();
         await input.fill(name);
     }
 
     async fillCrossLinkUrl(url) {
         testLogger.debug('Filling cross-link URL', { url });
-        const input = this.page.locator(this.crossLinkUrlInput).locator('input');
+        const input = this.page.locator(this.crossLinkUrlInput);
         await input.click();
         await input.fill(url);
     }
 
     async fillFieldInput(fieldName) {
         testLogger.debug('Filling field input', { fieldName });
-        const input = this.page.locator(this.crossLinkFieldInput).locator('input');
-        await input.click();
-        await input.fill(fieldName);
+        const wrapper = this.page.locator(this.crossLinkFieldInput);
+        await wrapper.waitFor({ state: 'visible', timeout: 10000 });
+        // Field input can be q-select (data-test on wrapper) or q-input (data-test on input).
+        // For q-select, we need to target the nested input; for q-input, wrapper IS the input.
+        const tagName = await wrapper.evaluate(el => el.tagName.toLowerCase());
+        if (tagName === 'input') {
+            await wrapper.click();
+            await wrapper.fill(fieldName);
+        } else {
+            const nestedInput = wrapper.locator('input');
+            await nestedInput.click();
+            await nestedInput.fill(fieldName);
+        }
     }
 
     async clickAddFieldBtn() {
@@ -152,7 +172,12 @@ export class CrossLinkPage {
     async addField(fieldName) {
         testLogger.debug('Adding field', { fieldName });
         await this.fillFieldInput(fieldName);
-        await this.clickAddFieldBtn();
+        // Press Enter on the actual input to add field
+        const wrapper = this.page.locator(this.crossLinkFieldInput);
+        const tagName = await wrapper.evaluate(el => el.tagName.toLowerCase());
+        const input = tagName === 'input' ? wrapper : wrapper.locator('input');
+        await input.press('Enter');
+        await this.page.waitForTimeout(300);
     }
 
     async expectFieldChipVisible(idx) {
@@ -191,7 +216,7 @@ export class CrossLinkPage {
 
     async expectDialogVisible() {
         testLogger.debug('Expecting dialog visible');
-        await expect(this.page.locator(this.crossLinkNameInput)).toBeVisible({ timeout: 5000 });
+        await this.waitForDialog();
     }
 
     async expectDialogNotVisible() {
