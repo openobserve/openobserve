@@ -164,6 +164,9 @@ const hasData = computed(() => {
   return props.spans.length > 0 && props.traceDuration > 0;
 });
 
+const GRID_LEFT = 10;
+const GRID_RIGHT = 10;
+
 const timelineTicks = computed(() => {
   const duration = props.traceDuration || 0;
   const totalPad = GRID_LEFT + GRID_RIGHT;
@@ -175,14 +178,11 @@ const timelineTicks = computed(() => {
 });
 
 // Cursor line handler
-const GRID_LEFT = 10;
-const GRID_RIGHT = 10;
 
 const handleChartMouseMove = (event: MouseEvent) => {
-  const container = chartContainerRef.value;
-  if (!container || !hasData.value) return;
+  if (!hasData.value) return;
 
-  const rect = container.getBoundingClientRect();
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
   const offsetX = event.clientX - rect.left;
   const gridWidth = rect.width - GRID_LEFT - GRID_RIGHT;
   const percentage = Math.max(0, Math.min(1, (offsetX - GRID_LEFT) / gridWidth));

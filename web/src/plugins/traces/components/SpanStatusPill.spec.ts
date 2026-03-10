@@ -129,12 +129,12 @@ describe("SpanStatusPill", () => {
       wrapper = mount(SpanStatusPill);
     });
 
-    it("should apply the success class", () => {
+    it("should apply the unset class", () => {
       expect(
         wrapper
           .find('[data-test="span-row-status-pill"]')
           .classes(),
-      ).toContain("o2-status-pill--success");
+      ).toContain("o2-status-pill--unset");
     });
 
     it("should not apply the error class", () => {
