@@ -55,46 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Search Mode Toggle: Traces / Spans -->
-        <template v-if="activeTab === 'search'">
-          <div
-            class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]"
-          >
-            <div class="row">
-              <div>
-                <q-btn
-                  data-test="traces-search-mode-traces-btn"
-                  :class="
-                    searchObj.meta.searchMode === 'traces' ? 'selected' : ''
-                  "
-                  @click="$emit('update:searchMode', 'traces')"
-                  no-caps
-                  size="sm"
-                  class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[2rem]"
-                >
-                  Traces
-                  <q-tooltip>Search by Traces</q-tooltip>
-                </q-btn>
-              </div>
-              <div>
-                <q-btn
-                  data-test="traces-search-mode-spans-btn"
-                  :class="
-                    searchObj.meta.searchMode === 'spans' ? 'selected' : ''
-                  "
-                  @click="$emit('update:searchMode', 'spans')"
-                  no-caps
-                  size="sm"
-                  class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[2rem]"
-                >
-                  Spans
-                  <q-tooltip>Search by Spans</q-tooltip>
-                </q-btn>
-              </div>
-            </div>
-          </div>
-        </template>
-
         <!-- Show search controls only when on Search tab -->
         <template v-if="activeTab === 'search'">
           <div
@@ -181,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="$emit('update:searchMode', 'traces')"
                     no-caps
                     size="sm"
-                    class="button tw:w-[3.85rem]! button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.75rem]! tw:tracking-[0.03rem]!"
+                    class="button tw:w-[3.85rem]! button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
                   >
                     Traces
                     <q-tooltip>Search by Traces</q-tooltip>
@@ -196,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="$emit('update:searchMode', 'spans')"
                     no-caps
                     size="sm"
-                    class="button tw:w-[3.85rem]! button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.75rem]! tw:tracking-[0.03rem]!"
+                    class="button tw:w-[3.85rem]! button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
                   >
                     Spans
                     <q-tooltip>Search by Spans</q-tooltip>
