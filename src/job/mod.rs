@@ -473,7 +473,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_training_reporter(
-            |org_id, anomaly_id, success, error_msg, start_us, end_us| {
+            |org_id, anomaly_id, anomaly_name, success, error_msg, start_us, end_us| {
                 Box::pin(async move {
                     use config::meta::self_reporting::usage::{
                         TriggerData, TriggerDataStatus, TriggerDataType,
@@ -482,7 +482,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         _timestamp: start_us,
                         org: org_id,
                         module: TriggerDataType::AnomalyDetectionTraining,
-                        key: anomaly_id,
+                        key: format!("{anomaly_name}/{anomaly_id}"),
                         next_run_at: 0,
                         is_realtime: false,
                         is_silenced: false,

@@ -1046,48 +1046,68 @@ fn extract_value_from_hit(hit: &serde_json::Value) -> Result<f64> {
     anyhow::bail!("No value field found in search result")
 }
 
-/// Write anomaly events to the _anomalies stream
+/// Write anomaly events to the _anomalies stream.
 ///
-/// This is called by enterprise stream_writer to ingest detected anomalies
+/// Uses HTTP POST to an ingester node so this works from any node role
+/// (including alert_manager which is not an ingester and cannot call
+/// service::logs::ingest::ingest() directly).
 #[cfg(feature = "enterprise")]
 pub async fn write_anomalies_to_stream(
     org_id: &str,
     anomalies: Vec<serde_json::Value>,
 ) -> Result<()> {
-    use crate::common::meta::ingestion::{self, IngestUser, SystemJobType};
-
     if anomalies.is_empty() {
         return Ok(());
     }
 
+    // Pick an online ingester node to forward the write to.
+    let ingester = infra::cluster::get_cached_online_ingester_nodes()
+        .await
+        .and_then(|nodes| nodes.into_iter().next())
+        .ok_or_else(|| anyhow::anyhow!("No online ingester node available to write _anomalies"))?;
+
+    let cfg = config::get_config();
+    let url = format!(
+        "{}{}/api/{org_id}/_anomalies/_json",
+        ingester.http_addr, cfg.common.base_uri,
+    );
+
     tracing::info!(
         org_id = %org_id,
         anomaly_count = anomalies.len(),
-        "Writing anomalies to _anomalies stream"
+        ingester = %ingester.name,
+        "Writing anomalies to _anomalies stream via ingester HTTP"
     );
 
-    // Convert to JSON bytes
-    let json_str = serde_json::to_string(&anomalies)?;
-    let bytes = bytes::Bytes::from(json_str);
+    let json_body = serde_json::to_string(&anomalies)?;
 
-    // Create ingestion request
-    let ingest_req = ingestion::IngestionRequest::JSON(bytes);
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .header(
+            "Authorization",
+            format!(
+                "Basic {}",
+                base64::Engine::encode(
+                    &base64::engine::general_purpose::STANDARD,
+                    format!(
+                        "{}:{}",
+                        cfg.auth.root_user_email, cfg.auth.root_user_password
+                    )
+                )
+            ),
+        )
+        .body(json_body)
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("HTTP request to ingester failed: {e}"))?;
 
-    // Use system job user for ingestion
-    let user = IngestUser::SystemJob(SystemJobType::AnomalyDetection);
-
-    // Ingest to _anomalies stream
-    let _response = crate::service::logs::ingest::ingest(
-        0, // thread_id
-        org_id,
-        "_anomalies", // stream name
-        ingest_req,
-        user,
-        None,  // extend_json
-        false, // is_derived
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("Failed to ingest anomalies: {}", e))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        anyhow::bail!("Ingester returned {status} writing _anomalies: {body}");
+    }
 
     tracing::info!(
         org_id = %org_id,
