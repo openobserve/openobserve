@@ -40,8 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
                 :title="props.row.name"
               >
-                <div class="field_label ellipsis tw:flex tw:items-center">
-                  <FieldTypeBadge :dataType="props.row.type" />
+                <div class="field_label ellipsis tw:flex tw:items-center tw:pl-[calc(1.5rem+3px)]">
                   {{ props.row.name }}
                 </div>
                 <div
@@ -80,9 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="field_label ellipsis tw:flex tw:items-center">
                       <span
                         class="field-type-container"
-                        :title="props.row.type"
                       >
-                        <FieldTypeBadge :dataType="props.row.type" />
                         <q-icon
                           class="field-expand-icon"
                           :name="
@@ -217,13 +214,11 @@ import { useRouter } from "vue-router";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
-import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 
 export default defineComponent({
   name: "IndexList",
   components: {
-    FieldTypeBadge,
     FieldValuesPanel,
   },
   props: {

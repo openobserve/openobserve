@@ -27,14 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`logs-field-list-item-${field.name}`"
     >
       <div
-        class="ellipsis tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]!"
+        class="ellipsis tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]! tw:pl-[calc(1.5rem+3px)]"
         style="display: inline-block"
       >
-        <FieldTypeBadge
-          :dataType="
-            field.name === timestampColumn ? 'timestamp' : field.dataType
-          "
-        />
         {{ field.name }}
       </div>
       <span class="float-right">
@@ -111,7 +106,7 @@ import {
   outlinedVisibility,
   outlinedVisibilityOff,
 } from "@quasar/extras/material-icons-outlined";
-import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
+
 
 interface Props {
   field: any;
