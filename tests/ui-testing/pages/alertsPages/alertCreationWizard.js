@@ -344,14 +344,12 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
-        // Close SQL editor dialog — dismiss any backdrop first, then force-click
-        await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(300);
+        // Close SQL editor dialog — force-click bypasses any backdrop interception
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            await closeButton.click({ force: true, timeout: 5000 });
+            await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, using keyboard escape', { error: error.message });
+            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
             await this.page.waitForTimeout(500);
         }
@@ -692,14 +690,12 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
-        // Close dialog — dismiss any backdrop first, then force-click
-        await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(300);
+        // Close dialog — force-click bypasses any backdrop interception
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            await closeButton.click({ force: true, timeout: 5000 });
+            await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, using keyboard escape', { error: error.message });
+            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
             await this.page.waitForTimeout(500);
         }
@@ -1092,14 +1088,12 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
-        // Close dialog — dismiss any backdrop first, then force-click
-        await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(300);
+        // Close dialog — force-click bypasses any backdrop interception
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            await closeButton.click({ force: true, timeout: 5000 });
+            await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, using keyboard escape', { error: error.message });
+            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
             await this.page.waitForTimeout(500);
         }
@@ -1549,14 +1543,12 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran PromQL query');
 
-        // Close PromQL editor dialog — dismiss any backdrop first, then force-click
-        await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(300);
+        // Close PromQL editor dialog — force-click bypasses any backdrop interception
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            await closeButton.click({ force: true, timeout: 5000 });
+            await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, using keyboard escape', { error: error.message });
+            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
             await this.page.waitForTimeout(500);
         }
