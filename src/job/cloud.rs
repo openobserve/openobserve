@@ -15,6 +15,7 @@
 
 use std::collections::HashMap;
 
+use config::meta::destinations::Email;
 use config::utils::{
     json,
     time::{hour_micros, now_micros},
@@ -30,6 +31,7 @@ const NO_INGESTION_REPORT_INTERVAL: u64 = 3600;
 
 pub fn start() {
     tokio::spawn(async move { run_no_ingestion().await });
+    tokio::spawn(async move { run_ai_quota_check().await });
 }
 
 async fn run_no_ingestion() {
@@ -118,4 +120,76 @@ async fn report_org_no_ingestion(start_hour: i64, duration: &str) {
         }
     }
     log::info!("check for no ingestion for duration {duration} completed");
+}
+
+async fn run_ai_quota_check() {
+    let cfg = o2_enterprise::enterprise::common::config::get_config();
+    let interval_secs = cfg.cloud.ai_quota_check_interval;
+    let mut interval =
+        tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
+    interval.tick().await; // skip first immediate tick
+    loop {
+        interval.tick().await;
+        check_all_orgs_ai_quota().await;
+    }
+}
+
+async fn check_all_orgs_ai_quota() {
+    use crate::service::trial_quota;
+
+    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+    for org_id in orgs {
+        let checkpoint = match trial_quota::get_pending_checkpoint(&org_id).await {
+            Some(cp) => cp,
+            None => continue,
+        };
+
+        // Atomically claim this checkpoint in DB — only one pod wins
+        if !trial_quota::mark_checkpoint_notified(&org_id, checkpoint).await {
+            // Another pod already sent this checkpoint email
+            continue;
+        }
+
+        // Get admin email for this org
+        let admin = match get_admin(&org_id).await {
+            Ok(u) => u,
+            Err(e) => {
+                log::error!(
+                    "[AI_QUOTA] Failed to get admin for org={org_id}: {e}"
+                );
+                continue;
+            }
+        };
+
+        let is_paid = trial_quota::org_has_active_subscription(&org_id).await;
+        let used = trial_quota::get_used(&org_id);
+        let limit = trial_quota::get_limit(&org_id);
+
+        let (subject, body) =
+            trial_quota::build_quota_email_message(checkpoint, is_paid, used, limit);
+
+        let email = Email {
+            recipients: vec![admin.email.clone()],
+        };
+
+        match crate::service::alerts::alert::send_email_notification(
+            &subject, &email, body,
+        )
+        .await
+        {
+            Ok(_) => {
+                log::info!(
+                    "[AI_QUOTA] Sent {}% checkpoint email to {} for org={org_id}",
+                    checkpoint,
+                    admin.email
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "[AI_QUOTA] Failed to send {}% checkpoint email for org={org_id}: {e}",
+                    checkpoint
+                );
+            }
+        }
+    }
 }

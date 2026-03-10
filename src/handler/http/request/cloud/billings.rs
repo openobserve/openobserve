@@ -465,6 +465,30 @@ pub async fn handle_stripe_event(headers: HeaderMap, payload: axum::body::Bytes)
     }
 }
 
+/// GetAiUsage
+#[utoipa::path(
+    get,
+    path = "/{org_id}/ai/usage",
+    context_path = "/api",
+    tag = "Ai",
+    operation_id = "GetAiUsage",
+    summary = "Get AI credit usage for an organization",
+    description = "Returns current AI credit usage, mode, and remaining credits.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    )
+)]
+pub async fn get_ai_usage(Path(org_id): Path<String>) -> Response {
+    let usage = crate::service::trial_quota::get_usage(&org_id).await;
+    MetaHttpResponse::json(usage)
+}
+
 /// StripeWebhookEvent
 #[utoipa::path(
     post,

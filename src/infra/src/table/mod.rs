@@ -23,6 +23,7 @@ use crate::{
 };
 
 pub mod action_scripts;
+pub mod trial_quota_usage;
 pub mod alert_incidents;
 pub mod alerts;
 pub mod backfill_jobs;

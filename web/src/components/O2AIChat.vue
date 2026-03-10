@@ -3139,7 +3139,19 @@ export default defineComponent({
         }
 
         if (!response.ok) {
-          throw response;
+          // Read the actual error body before throwing
+          let errorBody = null;
+          try {
+            errorBody = await response.json();
+          } catch (_) {
+            // body may not be JSON
+          }
+          const err: any = new Error(
+            errorBody?.message || `Server error (${response.status})`
+          );
+          err.status = response.status;
+          err.errorBody = errorBody;
+          throw err;
         }
 
         if (!response.body) {
@@ -3158,20 +3170,18 @@ export default defineComponent({
         if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant' && !chatMessages.value[chatMessages.value.length - 1].content) {
           chatMessages.value.pop();
         }
-        let errorMessage = 'Error: Unable to get response from the server. Please try again later.';
-        //we need to handle the 403 error seperately and show the error message to the user
+        let errorMessage: string;
         if (error.status === 403) {
-          chatMessages.value.push({
-            role: 'assistant',
-            content: 'Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.'
-          });
+          errorMessage = 'Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.';
+        } else if (error.message && error.message !== 'No response body') {
+          errorMessage = error.message;
         } else {
-          // Always create a new assistant message with error since we don't pre-create empty ones
-          chatMessages.value.push({
-            role: 'assistant',
-            content: errorMessage
-          });
+          errorMessage = 'Error: Unable to get response from the server. Please try again later.';
         }
+        chatMessages.value.push({
+          role: 'assistant',
+          content: errorMessage
+        });
         await saveToHistory(); // Save after error
       }
 

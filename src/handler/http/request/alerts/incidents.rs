@@ -427,6 +427,42 @@ pub async fn trigger_incident_rca(
         }
     }
 
+    // AI credit check — deduct from free pool or bill to Stripe
+    #[cfg(feature = "cloud")]
+    {
+        let deduction = crate::service::trial_quota::try_deduct(
+            &org_id,
+            crate::service::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+        )
+        .await;
+
+        let usage_ctx = crate::service::trial_quota::AiUsageContext {
+            user_email: "incident_rca@system.local".to_string(),
+            incident_id: Some(incident_id.clone()),
+            ..Default::default()
+        };
+        match &deduction {
+            Ok(_) => {
+                crate::service::trial_quota::record_free_ai_usage(
+                    &org_id,
+                    &usage_ctx,
+                    crate::service::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+                );
+            }
+            Err(e) => {
+                if crate::service::trial_quota::org_has_active_subscription(&org_id).await {
+                    crate::service::trial_quota::record_billable_ai_usage(
+                        &org_id,
+                        &usage_ctx,
+                        crate::service::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+                    );
+                } else {
+                    return MetaHttpResponse::payment_required(e.to_string());
+                }
+            }
+        }
+    }
+
     // Emit AIAnalysisBegin — all error paths below this point must emit Complete to
     // clear the in-flight guard, otherwise it stays locked until the stale threshold.
     let _ = infra::table::incident_events::append(
@@ -571,24 +607,7 @@ pub async fn trigger_incident_rca(
         )
         .await;
 
-        // Usage: only count as reanalysis if explicitly requested; the initial analysis
-        // on a brand-new incident is already counted as NewIncident.
-        if query.reanalysis {
-            crate::service::self_reporting::report_request_usage_stats(
-                config::meta::self_reporting::usage::RequestStats {
-                    records: 1,
-                    request_body: Some(serde_json::json!({"incident_id": incident_id}).to_string()),
-                    ..Default::default()
-                },
-                &org_id,
-                "",
-                config::meta::stream::StreamType::Metadata,
-                config::meta::self_reporting::usage::UsageType::IncidentReAnalysis,
-                0,
-                chrono::Utc::now().timestamp_micros(),
-            )
-            .await;
-        }
+        // Usage reporting handled by try_deduct quota block above (paid orgs only).
 
         MetaHttpResponse::json(RcaResponse { rca_content })
     }

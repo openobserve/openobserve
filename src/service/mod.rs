@@ -18,6 +18,8 @@ use infra::errors::Result;
 use opentelemetry::trace::TraceContextExt;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+#[cfg(feature = "cloud")]
+pub mod trial_quota;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
