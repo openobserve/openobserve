@@ -24,12 +24,12 @@
 //!
 //! ## Architecture
 //!
-//! - **Hot path** (`try_deduct`): atomic CAS on per-org counter, sends deduction
-//!   record to a bounded channel, broadcasts new total via NATS coordinator events.
-//! - **DB flush** (`flush_to_db`): background job drains the channel periodically,
-//!   coalesces per-org/feature records, and batch-upserts to DB.
-//! - **Cluster sync** (`watch_cluster_events`): listens for coordinator events from
-//!   other nodes and updates local in-memory counters (max of local vs remote).
+//! - **Hot path** (`try_deduct`): atomic CAS on per-org counter, sends deduction record to a
+//!   bounded channel, broadcasts new total via NATS coordinator events.
+//! - **DB flush** (`flush_to_db`): background job drains the channel periodically, coalesces
+//!   per-org/feature records, and batch-upserts to DB.
+//! - **Cluster sync** (`watch_cluster_events`): listens for coordinator events from other nodes and
+//!   updates local in-memory counters (max of local vs remote).
 
 use std::{
     collections::HashMap,
@@ -67,8 +67,9 @@ static FLUSH_TX: Lazy<mpsc::Sender<FlushRecord>> = Lazy::new(|| {
 });
 
 /// The receiver end, set once during FLUSH_TX initialization.
-static FLUSH_RX: once_cell::sync::OnceCell<&'static tokio::sync::Mutex<mpsc::Receiver<FlushRecord>>> =
-    once_cell::sync::OnceCell::new();
+static FLUSH_RX: once_cell::sync::OnceCell<
+    &'static tokio::sync::Mutex<mpsc::Receiver<FlushRecord>>,
+> = once_cell::sync::OnceCell::new();
 
 /// Coordinator event key prefix for trial quota sync across nodes.
 pub const TRIAL_QUOTA_WATCHER_PREFIX: &str = "/trial_quota/";
@@ -301,8 +302,7 @@ pub async fn try_deduct(
             if !config::cluster::LOCAL_NODE.is_single_node() {
                 let key = format!("{}{}", TRIAL_QUOTA_WATCHER_PREFIX, org_id);
                 let value = Bytes::from(new_total.to_string());
-                if let Err(e) =
-                    infra::coordinator::events::put_event(&key, None, Some(value)).await
+                if let Err(e) = infra::coordinator::events::put_event(&key, None, Some(value)).await
                 {
                     log::warn!(
                         "[TRIAL_QUOTA] Failed to broadcast quota update for org={}: {e}",
@@ -395,9 +395,8 @@ pub async fn watch_cluster_events() {
         }
     };
 
-    let events = std::sync::Arc::into_inner(events).unwrap_or_else(|| {
-        panic!("[TRIAL_QUOTA] Failed to unwrap coordinator event receiver")
-    });
+    let events = std::sync::Arc::into_inner(events)
+        .unwrap_or_else(|| panic!("[TRIAL_QUOTA] Failed to unwrap coordinator event receiver"));
     let mut events = events;
 
     while let Some(event) = events.recv().await {
