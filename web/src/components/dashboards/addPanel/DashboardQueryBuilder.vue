@@ -204,9 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   v-if="dashboardPanelData.data.type == 'table'"
                 >
-                  Drag a dimension field here. Its distinct values become column
-                  headers in the pivot table. Up to 3 fields allowed for
-                  multi-level pivoting.
+                  {{ t("panel.pivotFieldTooltip") }}
                 </span>
                 <span
                   v-else-if="
@@ -214,13 +212,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.type == 'h-stacked'
                   "
                 >
-                  Use these fields to split the data into different sections on
-                  the Y axis for a clearer view.
+                  {{ t("panel.breakdownTooltipHBar") }}
                 </span>
 
                 <span v-else>
-                  Use these fields to split the data into different sections on
-                  the X axis for a clearer view.
+                  {{ t("panel.breakdownTooltipDefault") }}
                 </span>
               </q-tooltip>
             </q-icon>
