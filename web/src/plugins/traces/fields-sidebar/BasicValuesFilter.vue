@@ -20,9 +20,7 @@
           <span
             v-if="row.dataType"
             class="field-type-container"
-            :title="row.dataType"
           >
-            <FieldTypeBadge :dataType="row.dataType" />
             <q-icon
               class="field-expand-icon"
               :name="isExpanded ? 'expand_less' : 'expand_more'"
@@ -141,7 +139,6 @@ import {
   formatTimeWithSuffix,
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
