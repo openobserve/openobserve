@@ -1566,7 +1566,10 @@
     "enterCustomSql": "Voer uw aangepaste SQL-query in...",
     "customSql": "SQL op maat",
     "pivotField": "Draaiveld",
-    "addToPivot": "Aan draadveld toevoegen"
+    "addToPivot": "Aan draadveld toevoegen",
+    "pivotFieldTooltip": "Sleep een dimensieveld hierheen. De verschillende waarden worden kolomkoppen in de draaitabel. Er zijn maximaal 3 velden toegestaan voor draaien op meerdere niveaus.",
+    "breakdownTooltipHBar": "Gebruik deze velden om de gegevens op te splitsen in verschillende secties op de Y-as voor een duidelijker beeld.",
+    "breakdownTooltipDefault": "Gebruik deze velden om de gegevens op te splitsen in verschillende secties op de X-as voor een duidelijker beeld."
   },
   "home": {
     "streams": "Streams",

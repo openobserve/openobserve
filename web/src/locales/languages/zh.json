@@ -1566,7 +1566,10 @@
     "enterCustomSql": "输入您的自定义 SQL 查询...",
     "customSql": "自定义 SQL",
     "pivotField": "枢轴字段",
-    "addToPivot": "添加到数据透视字段"
+    "addToPivot": "添加到数据透视字段",
+    "pivotFieldTooltip": "将维度字段拖到此处。它的不同值成为数据透视表中的列标题。最多允许 3 个字段进行多级旋转。",
+    "breakdownTooltipHBar": "使用这些字段在 Y 轴上将数据拆分为不同的部分，以获得更清晰的视图。",
+    "breakdownTooltipDefault": "使用这些字段在 X 轴上将数据拆分为不同的部分，以获得更清晰的视图。"
   },
   "home": {
     "streams": "数据流",

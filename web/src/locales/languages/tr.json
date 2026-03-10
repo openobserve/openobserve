@@ -1566,7 +1566,10 @@
     "enterCustomSql": "Özel SQL sorgunuzu girin...",
     "customSql": "Özel SQL",
     "pivotField": "Pivot Alanı",
-    "addToPivot": "Pivot Alanına Ekle"
+    "addToPivot": "Pivot Alanına Ekle",
+    "pivotFieldTooltip": "Bir boyut alanını buraya sürükleyin. Farklı değerleri pivot tabloda sütun başlıkları haline gelir. Çok seviyeli döndürme için en fazla 3 alana izin verilir.",
+    "breakdownTooltipHBar": "Daha net bir görünüm için verileri Y ekseninde farklı bölümlere bölmek için bu alanları kullanın.",
+    "breakdownTooltipDefault": "Daha net bir görünüm için verileri X ekseninde farklı bölümlere bölmek için bu alanları kullanın."
   },
   "home": {
     "streams": "Akışlar",

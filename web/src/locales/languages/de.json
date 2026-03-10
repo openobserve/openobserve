@@ -1566,7 +1566,10 @@
     "enterCustomSql": "Geben Sie Ihre benutzerdefinierte SQL-Abfrage ein...",
     "customSql": "Benutzerdefiniertes SQL",
     "pivotField": "Pivot-Feld",
-    "addToPivot": "Zum Pivot-Feld hinzufügen"
+    "addToPivot": "Zum Pivot-Feld hinzufügen",
+    "pivotFieldTooltip": "Ziehen Sie ein Dimensionsfeld hierher. Die einzelnen Werte werden zu Spaltenüberschriften in der Pivot-Tabelle. Bis zu 3 Felder sind für mehrstufiges Pivotieren zulässig.",
+    "breakdownTooltipHBar": "Verwenden Sie diese Felder, um die Daten für eine klarere Ansicht in verschiedene Abschnitte auf der Y-Achse zu unterteilen.",
+    "breakdownTooltipDefault": "Verwenden Sie diese Felder, um die Daten für eine klarere Ansicht in verschiedene Abschnitte auf der X-Achse zu unterteilen."
   },
   "home": {
     "streams": "Streams",

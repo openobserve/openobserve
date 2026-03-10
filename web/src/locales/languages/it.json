@@ -1566,7 +1566,10 @@
     "enterCustomSql": "Inserisci la tua query SQL personalizzata...",
     "customSql": "SQL personalizzato",
     "pivotField": "Campo pivot",
-    "addToPivot": "Aggiungi al campo pivot"
+    "addToPivot": "Aggiungi al campo pivot",
+    "pivotFieldTooltip": "Trascina qui un campo di dimensione. I suoi valori distinti diventano le intestazioni delle colonne nella tabella pivot. Sono consentiti fino a 3 campi per la rotazione a più livelli.",
+    "breakdownTooltipHBar": "Usa questi campi per suddividere i dati in diverse sezioni sull'asse Y per una visualizzazione più chiara.",
+    "breakdownTooltipDefault": "Usa questi campi per suddividere i dati in diverse sezioni sull'asse X per una visualizzazione più chiara."
   },
   "home": {
     "streams": "Stream",

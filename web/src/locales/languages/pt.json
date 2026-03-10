@@ -1566,7 +1566,10 @@
     "enterCustomSql": "Insira sua consulta SQL personalizada...",
     "customSql": "SQL personalizado",
     "pivotField": "Campo pivô",
-    "addToPivot": "Adicionar ao campo dinâmico"
+    "addToPivot": "Adicionar ao campo dinâmico",
+    "pivotFieldTooltip": "Arraste um campo de dimensão aqui. Seus valores distintos se tornam cabeçalhos de coluna na tabela dinâmica. Até 3 campos são permitidos para dinamização em vários níveis.",
+    "breakdownTooltipHBar": "Use esses campos para dividir os dados em diferentes seções no eixo Y para uma visão mais clara.",
+    "breakdownTooltipDefault": "Use esses campos para dividir os dados em diferentes seções no eixo X para uma visão mais clara."
   },
   "home": {
     "streams": "Transmissões",

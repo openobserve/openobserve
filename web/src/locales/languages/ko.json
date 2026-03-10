@@ -1566,7 +1566,10 @@
     "enterCustomSql": "사용자 지정 SQL 쿼리를 입력하세요...",
     "customSql": "사용자 지정 SQL",
     "pivotField": "피벗 필드",
-    "addToPivot": "피벗 필드에 추가"
+    "addToPivot": "피벗 필드에 추가",
+    "pivotFieldTooltip": "차원 필드를 여기로 드래그합니다.고유 값은 피벗 테이블의 열 머리글이 됩니다.다단계 피벗에는 최대 3개의 필드가 허용됩니다.",
+    "breakdownTooltipHBar": "이 필드를 사용하여 데이터를 Y축의 여러 섹션으로 분할하여 더 명확하게 볼 수 있습니다.",
+    "breakdownTooltipDefault": "이 필드를 사용하여 데이터를 X축의 여러 섹션으로 분할하여 더 명확하게 볼 수 있습니다."
   },
   "home": {
     "streams": "스트림",

@@ -1566,7 +1566,10 @@
     "enterCustomSql": "Entrez votre requête SQL personnalisée...",
     "customSql": "SQL personnalisé",
     "pivotField": "Champ pivot",
-    "addToPivot": "Ajouter au champ Pivot"
+    "addToPivot": "Ajouter au champ Pivot",
+    "pivotFieldTooltip": "Faites glisser un champ de dimension ici. Ses valeurs distinctes deviennent des en-têtes de colonne dans le tableau croisé dynamique. Jusqu'à 3 champs sont autorisés pour le pivotement à plusieurs niveaux.",
+    "breakdownTooltipHBar": "Utilisez ces champs pour diviser les données en différentes sections sur l'axe Y pour une vue plus claire.",
+    "breakdownTooltipDefault": "Utilisez ces champs pour diviser les données en différentes sections sur l'axe X pour une vue plus claire."
   },
   "home": {
     "streams": "Ruisseaux",

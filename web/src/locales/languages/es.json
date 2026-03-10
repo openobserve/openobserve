@@ -1566,7 +1566,10 @@
     "enterCustomSql": "Introduzca su consulta SQL personalizada...",
     "customSql": "SQL personalizado",
     "pivotField": "Campo de pivote",
-    "addToPivot": "Agregar al campo dinámico"
+    "addToPivot": "Agregar al campo dinámico",
+    "pivotFieldTooltip": "Arrastre un campo de dimensión hasta aquí. Sus distintos valores se convierten en encabezados de columna en la tabla dinámica. Se permiten hasta 3 campos para la rotación en varios niveles.",
+    "breakdownTooltipHBar": "Utilice estos campos para dividir los datos en diferentes secciones del eje Y para obtener una visión más clara.",
+    "breakdownTooltipDefault": "Utilice estos campos para dividir los datos en diferentes secciones del eje X para una visualización más clara."
   },
   "home": {
     "streams": "Transmisiones",
