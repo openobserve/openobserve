@@ -2622,7 +2622,9 @@
     "today": "今日",
     "yesterday": "昨日",
     "spanColorPalettePreview": "Span カラーパレットのプレビュー",
-    "errorsFound": "エラートレース"
+    "errorsFound": "エラートレース",
+    "spansTitle": "スパン",
+    "spansFound": "スパンが見つかりました"
   },
   "actions": {
     "testAction": "アクションをテスト",
