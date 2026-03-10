@@ -79,8 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-container flex content-center ellipsis hover:tw:bg-[var(--o2-hover-accent)]!"
                 :title="props.row.label || props.row.name"
               >
-                <div class="field_label ellipsis tw:flex tw:items-center" style="font-size: 14px">
-                  <FieldTypeBadge :dataType="props.row.dataType" />
+                <div class="field_label ellipsis tw:flex tw:items-center tw:pl-[calc(1.5rem+3px)]" style="font-size: 14px">
                   {{ props.row.label || props.row.name }}
                 </div>
                 <div
@@ -147,14 +146,12 @@ import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
-import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 import { computed } from "vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: {
     BasicValuesFilter,
-    FieldTypeBadge,
   },
   emits: ["update:changeStream"],
   props: {
