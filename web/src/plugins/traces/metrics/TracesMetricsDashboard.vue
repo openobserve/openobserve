@@ -726,6 +726,7 @@ defineExpose({
   },
   loadDashboard,
   getBaseFilters,
+  rangeFiltersVersion,
 });
 </script>
 

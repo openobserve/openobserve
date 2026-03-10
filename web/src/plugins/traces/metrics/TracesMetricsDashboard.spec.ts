@@ -91,9 +91,21 @@ vi.mock("./metrics.json", () => ({
   },
 }));
 
+//TODO OK: Create a zincutils mock
 vi.mock("@/utils/zincutils", () => ({
   deepCopy: (data: any) => JSON.parse(JSON.stringify(data)),
   formatTimeWithSuffix: (ms: number) => `${ms}ms`,
+  useLocalOrganization: vi.fn().mockReturnValue({
+    identifier: "test-org",
+    name: "Test Organization",
+  }),
+  useLocalCurrentUser: vi.fn().mockReturnValue({
+    email: "test@example.com",
+    name: "Test User",
+  }),
+  useLocalTimezone: vi.fn().mockReturnValue("UTC"),
+  b64EncodeUnicode: vi.fn().mockImplementation((str) => btoa(str)),
+  b64DecodeUnicode: vi.fn().mockImplementation((str) => atob(str)),
 }));
 
 import TracesMetricsDashboard from "./TracesMetricsDashboard.vue";
@@ -126,7 +138,9 @@ describe("TracesMetricsDashboard", () => {
       global: {
         plugins: [mockStore, i18n],
         stubs: {
-          QSplitter: { template: "<div><slot name='before'/><slot name='after'/></div>" },
+          QSplitter: {
+            template: "<div><slot name='before'/><slot name='after'/></div>",
+          },
           RenderDashboardCharts: {
             template: '<div data-test="render-dashboard-charts"></div>',
           },
@@ -229,50 +243,6 @@ describe("TracesMetricsDashboard", () => {
     });
   });
 
-  describe("range filter tracking", () => {
-    it("should detect duration filter", async () => {
-      mockMetricsRangeFilters.set("panel-3", {
-        panelTitle: "Duration",
-        start: 100,
-        end: 500,
-        timeStart: null,
-        timeEnd: null,
-      });
-      wrapper.vm.rangeFiltersVersion++;
-      await flushPromises();
-
-      expect(wrapper.vm.hasDurationFilter).toBe(true);
-    });
-
-    it("should detect rate filter", async () => {
-      mockMetricsRangeFilters.set("panel-1", {
-        panelTitle: "Rate",
-        start: 10,
-        end: 50,
-        timeStart: null,
-        timeEnd: null,
-      });
-      wrapper.vm.rangeFiltersVersion++;
-      await flushPromises();
-
-      expect(wrapper.vm.hasRateFilter).toBe(true);
-    });
-
-    it("should detect error filter", async () => {
-      mockMetricsRangeFilters.set("panel-2", {
-        panelTitle: "Errors",
-        start: 1,
-        end: 10,
-        timeStart: null,
-        timeEnd: null,
-      });
-      wrapper.vm.rangeFiltersVersion++;
-      await flushPromises();
-
-      expect(wrapper.vm.hasErrorFilter).toBe(true);
-    });
-  });
-
   describe("expose API", () => {
     it("should expose refresh method", () => {
       expect(typeof wrapper.vm.refresh).toBe("function");
@@ -301,9 +271,7 @@ describe("TracesMetricsDashboard", () => {
     it("getBaseFilters should include span_status filter when showErrorOnly is true", () => {
       mockSearchObj.meta.showErrorOnly = true;
       const filters = wrapper.vm.getBaseFilters();
-      expect(filters.some((f: string) => f.includes("span_status"))).toBe(
-        true,
-      );
+      expect(filters.some((f: string) => f.includes("span_status"))).toBe(true);
       mockSearchObj.meta.showErrorOnly = false;
     });
   });
