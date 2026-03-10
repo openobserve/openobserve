@@ -15,13 +15,23 @@
 
 use std::collections::HashMap;
 
-use config::utils::{
-    json,
-    time::{hour_micros, now_micros},
+use config::{
+    meta::self_reporting::usage::USAGE_STREAM,
+    utils::{
+        json,
+        time::{hour_micros, now_micros},
+    },
 };
+use hashbrown::HashSet;
 use infra::table::org_users::get_admin;
 
-use crate::{common::meta::telemetry, service::stream::get_streams};
+use crate::{
+    common::{infra::config::ORGANIZATIONS, meta::telemetry},
+    service::{
+        organization::is_org_in_free_trial_period, self_reporting::search::get_usage,
+        stream::get_streams,
+    },
+};
 
 /// This file has all odd-jobs that are specific to cloud installation,
 /// and do not fit specifically anywhere else
@@ -29,10 +39,12 @@ use crate::{common::meta::telemetry, service::stream::get_streams};
 const NO_INGESTION_REPORT_INTERVAL: u64 = 3600;
 
 pub fn start() {
-    tokio::spawn(async move { run_no_ingestion().await });
+    tokio::spawn(async move { run_no_ingestion_period().await });
+    tokio::spawn(async move { run_no_ingestion_daily().await });
+    tokio::spawn(async move { run_org_expiry_daily().await });
 }
 
-async fn run_no_ingestion() {
+async fn run_no_ingestion_period() {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
         NO_INGESTION_REPORT_INTERVAL,
     ));
@@ -45,9 +57,9 @@ async fn run_no_ingestion() {
     }
 }
 
-async fn report_no_ingestion_to_segment(org_id: &str, duration: &str) {
+async fn report_to_segment(event: &str, org_id: &str, duration: &str) {
     // Send no ingestion in last 24 hours to ActiveCampaign via segment proxy
-    log::info!("sending track event : no ingestion in duration {duration} for {org_id} to segment");
+    log::info!("sending track event : {event} duration {duration} for {org_id} to segment");
     let org_admin = match get_admin(org_id).await {
         Ok(u) => u,
         Err(e) => {
@@ -71,21 +83,11 @@ async fn report_no_ingestion_to_segment(org_id: &str, duration: &str) {
     ]);
     let mut telemetry_instance = telemetry::Telemetry::new();
     telemetry_instance
-        .send_track_event(
-            "OpenObserve - No ingestion after creation",
-            Some(segment_event_data.clone()),
-            false,
-            false,
-        )
+        .send_track_event(event, Some(segment_event_data.clone()), false, false)
         .await;
 
     telemetry_instance
-        .send_keyevent_track_event(
-            "OpenObserve - No ingestion after creation",
-            Some(segment_event_data),
-            false,
-            false,
-        )
+        .send_keyevent_track_event(event, Some(segment_event_data), false, false)
         .await;
 }
 
@@ -114,8 +116,127 @@ async fn report_org_no_ingestion(start_hour: i64, duration: &str) {
     for org in orgs {
         let streams = get_streams(&org.identifier, None, false, None).await;
         if streams.is_empty() {
-            report_no_ingestion_to_segment(&org.identifier, duration).await;
+            report_to_segment(
+                "OpenObserve - No ingestion after creation",
+                &org.identifier,
+                duration,
+            )
+            .await;
         }
     }
     log::info!("check for no ingestion for duration {duration} completed");
+}
+
+async fn run_no_ingestion_daily() {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_hours(24));
+    loop {
+        interval.tick().await;
+        log::info!("starting daily no ingestion reporting");
+        let orgs = match get_usage(
+            format!(
+                "select org_id from \"{USAGE_STREAM}\" where event = 'Ingestion' group by org_id"
+            ),
+            now_micros() - hour_micros(24), // last 24 hours
+            now_micros(),
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("error in getting orgs for checking no ingestion in last 24 hrs : {e}");
+                continue;
+            }
+        };
+        // get the org_ids which have ingested data in last 24 hours
+        let orgs: HashSet<_> = orgs
+            .into_iter()
+            .flat_map(|v| {
+                v.pointer("/org_id")
+                    .and_then(|v| v.as_str())
+                    .map(|v| v.to_string())
+            })
+            .collect();
+
+        // get list of all orgs in db, which should be already cached
+        let org_cache = { ORGANIZATIONS.read().await.clone() };
+
+        for (org, _) in org_cache {
+            // skip for these two as internal orgs
+            if org == "_meta" || org == "default" {
+                continue;
+            }
+            let trial_period = match is_org_in_free_trial_period(&org).await {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "error in getting trial period info for org {org} for no ingestion daily :{e}"
+                    );
+                    continue;
+                }
+            };
+            // if not ingested data in last 24 hours and org is in free trial/ subscribed
+            // send an event for that org
+            if !orgs.contains(&org) && trial_period {
+                report_to_segment("OpenObserve - No ingestion in last day", &org, "last 1 day")
+                    .await;
+            }
+        }
+        log::info!("daily no ingestion reporting completed");
+    }
+}
+
+async fn run_org_expiry_daily() {
+    use o2_enterprise::enterprise::cloud::billings;
+    let now = chrono::Utc::now().timestamp_micros();
+    let hr_micro = hour_micros(24);
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_hours(24));
+    loop {
+        interval.tick().await;
+        log::info!("starting daily expiry reminder reporting");
+        // get all orgs from db, which should be cached in memory
+        let org_cache = { ORGANIZATIONS.read().await.clone() };
+
+        for (org, _) in org_cache {
+            // skip internal orgs
+            if org == "_meta" || org == "default" {
+                continue;
+            }
+
+            // get the subscription for the org, this would also likely be cached in memory
+            let subscription = match billings::get_billing_by_org_id(&org).await {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "error getting billing info for org {org} for org expiry daily : {e}"
+                    );
+                    continue;
+                }
+            };
+
+            // if org is free, then report how many days for expiry
+            if subscription.is_none() || subscription.unwrap().subscription_type.is_free_sub() {
+                // org record is also cached in memory for most cases
+                let org_record = match infra::table::organizations::get(&org).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!(
+                            "error in getting org record for org {org} for org expiry daily : {e}"
+                        );
+                        continue;
+                    }
+                };
+                // if trial period is still on going, then report the remaining days
+                if now <= org_record.trial_ends_at {
+                    let remaining_days = (org_record.trial_ends_at - now) / hr_micro;
+                    report_to_segment(
+                        "OpenObserve - Org expiry reminder",
+                        &org,
+                        &format!("{remaining_days} days"),
+                    )
+                    .await;
+                }
+            }
+        }
+        log::info!("daily expiry reminder reporting completed");
+    }
 }
