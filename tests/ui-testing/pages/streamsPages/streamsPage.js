@@ -546,7 +546,7 @@ export class StreamsPage {
                     catch { return { status: r.status, data: text }; }
                 }, { orgId, streamName, streamType, payload });
 
-                if (result.status === 200 && result.data?.code === 200) {
+                if (result.status === 200) {
                     testLogger.info('Stream created successfully (cloud)', { streamName });
                 } else {
                     testLogger.warn('Stream creation returned non-200 (cloud)', { streamName, status: result.status });

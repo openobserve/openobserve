@@ -22,7 +22,7 @@ export const getHeaders = () => {
         };
       }
     } catch (e) {
-      // Fall through to password-based auth
+      console.warn('[apiUtils] Failed to read cloud-config.json, falling back to password auth:', e.message);
     }
   }
 
