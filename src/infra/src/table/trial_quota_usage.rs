@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
@@ -61,8 +61,8 @@ pub async fn batch_upsert(records: Vec<(String, String, i64)>) -> Result<(), sea
 
 /// Batch increment quota records by delta. Each tuple is (org_id, feature, delta).
 /// Upserts: if the row exists, adds delta to usage_count; otherwise inserts with
-/// usage_count = delta. Safe for concurrent flushes from multiple nodes because
-/// each node only increments by its own local deltas.
+/// usage_count = delta. Uses INSERT ... ON CONFLICT to be atomic and safe for
+/// concurrent flushes from multiple nodes.
 pub async fn batch_increment(
     records: Vec<(String, String, i64)>,
 ) -> Result<(), sea_orm::DbErr> {
@@ -70,31 +70,20 @@ pub async fn batch_increment(
     let now = config::utils::time::now_micros();
 
     for (org_id, feature, delta) in records {
-        let existing = trial_quota_usage::Entity::find()
-            .filter(trial_quota_usage::Column::OrgId.eq(&org_id))
-            .filter(trial_quota_usage::Column::Feature.eq(&feature))
-            .one(db)
-            .await?;
-
-        match existing {
-            Some(model) => {
-                let new_count = model.usage_count + delta;
-                let mut active: trial_quota_usage::ActiveModel = model.into();
-                active.usage_count = Set(new_count);
-                active.updated_at = Set(now);
-                sea_orm::ActiveModelTrait::update(active, db).await?;
-            }
-            None => {
-                let model = trial_quota_usage::ActiveModel {
-                    org_id: Set(org_id),
-                    feature: Set(feature),
-                    usage_count: Set(delta),
-                    updated_at: Set(now),
-                    notified_checkpoint: Set(0),
-                };
-                sea_orm::ActiveModelTrait::insert(model, db).await?;
-            }
-        }
+        let stmt = sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Postgres,
+            r#"INSERT INTO trial_quota_usage (org_id, feature, usage_count, updated_at, notified_checkpoint)
+               VALUES ($1, $2, $3, $4, 0)
+               ON CONFLICT (org_id, feature)
+               DO UPDATE SET usage_count = trial_quota_usage.usage_count + $3, updated_at = $4"#,
+            [
+                org_id.into(),
+                feature.into(),
+                delta.into(),
+                now.into(),
+            ],
+        );
+        db.execute(stmt).await?;
     }
     Ok(())
 }

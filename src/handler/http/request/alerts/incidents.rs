@@ -389,6 +389,7 @@ pub struct TriggerRcaQuery {
 )]
 pub async fn trigger_incident_rca(
     Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
     Query(query): Query<TriggerRcaQuery>,
 ) -> Response {
     use o2_enterprise::enterprise::{
@@ -427,41 +428,8 @@ pub async fn trigger_incident_rca(
         }
     }
 
-    // AI credit check — deduct from free pool or bill to Stripe
-    #[cfg(feature = "cloud")]
-    {
-        let deduction = crate::service::trial_quota::try_deduct(
-            &org_id,
-            crate::service::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-        )
-        .await;
-
-        let usage_ctx = crate::service::trial_quota::AiUsageContext {
-            user_email: "incident_rca@system.local".to_string(),
-            incident_id: Some(incident_id.clone()),
-            ..Default::default()
-        };
-        match &deduction {
-            Ok(_) => {
-                crate::service::trial_quota::record_free_ai_usage(
-                    &org_id,
-                    &usage_ctx,
-                    crate::service::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                );
-            }
-            Err(e) => {
-                if crate::service::trial_quota::org_has_active_subscription(&org_id).await {
-                    crate::service::trial_quota::record_billable_ai_usage(
-                        &org_id,
-                        &usage_ctx,
-                        crate::service::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                    );
-                } else {
-                    return MetaHttpResponse::payment_required(e.to_string());
-                }
-            }
-        }
-    }
+    // AI credit deduction is handled inside trigger_rca_for_incident at the service layer
+    // (cloud-only). Do NOT deduct here — it would cause double charging.
 
     // Emit AIAnalysisBegin — all error paths below this point must emit Complete to
     // clear the in-flight guard, otherwise it stays locked until the stale threshold.
@@ -546,12 +514,14 @@ pub async fn trigger_incident_rca(
     if query.reanalysis {
         let org_id_bg = org_id.clone();
         let incident_id_bg = incident_id.clone();
+        let user_email_bg = user_email.user_id.clone();
         tokio::spawn(async move {
             if let Err(e) = crate::service::alerts::incidents::trigger_rca_for_incident(
                 org_id_bg.clone(),
                 incident_id_bg.clone(),
                 true,
                 true,
+                user_email_bg,
             )
             .await
             {

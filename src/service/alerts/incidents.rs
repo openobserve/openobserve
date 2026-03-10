@@ -794,6 +794,7 @@ async fn find_or_create_incident(
                             incident_id_rca.clone(),
                             true, // lifecycle-triggered reanalysis — track usage
                             true, // begin already emitted above
+                            "system@openobserve.ai".to_string(),
                         )
                         .await
                         {
@@ -933,6 +934,7 @@ async fn find_or_create_incident(
                             incident_id_rca.clone(),
                             true,
                             true,
+                            "system@openobserve.ai".to_string(),
                         ) // lifecycle reanalysis; begin already emitted above
                         .await
                         {
@@ -1086,6 +1088,7 @@ async fn find_or_create_incident(
                     incident_id_rca.clone(),
                     false,
                     true,
+                    "system@openobserve.ai".to_string(),
                 )
                 .await
                 {
@@ -1483,6 +1486,9 @@ pub async fn trigger_rca_for_incident(
     //  - emitted `AIAnalysisBegin` synchronously (same DB context as `init`)
     // The function skips those steps and goes straight to the agent call.
     begin_already_emitted: bool,
+    // Email of the user who triggered the analysis, used for AI usage tracking.
+    // For automated/system-initiated calls, use "system@openobserve.ai".
+    user_email: String,
 ) -> Result<(), anyhow::Error> {
     use config::{get_config, meta::alerts::incidents::IncidentTopology};
     use o2_enterprise::enterprise::{
@@ -1561,7 +1567,7 @@ pub async fn trigger_rca_for_incident(
         .await;
 
         let usage_ctx = crate::service::trial_quota::AiUsageContext {
-            user_email: "incident_rca@system.local".to_string(),
+            user_email: user_email.clone(),
             incident_id: Some(incident_id.clone()),
             ..Default::default()
         };
@@ -1730,7 +1736,7 @@ pub async fn update_status(
             tokio::spawn(async move {
                 // reanalysis=true: bypass cooldown — incident was closed, context is fresh
                 if let Err(e) =
-                    trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), true, true).await
+                    trigger_rca_for_incident(org_id_rca, incident_id_rca.clone(), true, true, "system@openobserve.ai".to_string()).await
                 // begin already emitted above
                 {
                     log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
