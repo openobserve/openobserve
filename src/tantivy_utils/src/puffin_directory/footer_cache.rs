@@ -36,6 +36,12 @@ pub struct FooterCache {
     data: RwLock<HashMap<PathBuf, HashMap<Range<usize>, OwnedBytes>>>,
 }
 
+impl Default for FooterCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FooterCache {
     pub fn new() -> Self {
         Self {
