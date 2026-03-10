@@ -28,7 +28,7 @@ use tantivy::{
     directory::{Directory, FileHandle, OwnedBytes, error::OpenReadError},
 };
 
-use crate::service::tantivy::{
+use crate::{
     puffin::{BlobMetadata, reader::PuffinBytesReader},
     puffin_directory::{
         EMPTY_PUFFIN_DIRECTORY, EMPTY_PUFFIN_SEG_ID, get_file_from_empty_puffin_dir_with_ext,

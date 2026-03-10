@@ -30,27 +30,27 @@ use super::footer_cache::FooterCache;
 
 /// The caching directory is a simple cache that wraps another directory.
 #[derive(Clone)]
-pub(crate) struct CachingDirectory {
+pub struct CachingDirectory {
     underlying: Arc<dyn Directory>,
     cacher: Arc<FooterCache>,
 }
 
 impl CachingDirectory {
-    pub(crate) fn new(underlying: Arc<dyn Directory>) -> CachingDirectory {
+    pub fn new(underlying: Arc<dyn Directory>) -> CachingDirectory {
         CachingDirectory {
             underlying,
             cacher: Arc::new(FooterCache::new()),
         }
     }
 
-    pub(crate) fn new_with_cacher(
+    pub fn new_with_cacher(
         underlying: Arc<dyn Directory>,
         cacher: Arc<FooterCache>,
     ) -> CachingDirectory {
         CachingDirectory { underlying, cacher }
     }
 
-    pub(crate) fn cacher(&self) -> Arc<FooterCache> {
+    pub fn cacher(&self) -> Arc<FooterCache> {
         self.cacher.clone()
     }
 }

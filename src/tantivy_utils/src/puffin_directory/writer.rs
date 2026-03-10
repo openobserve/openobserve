@@ -27,7 +27,7 @@ use tantivy::{
 };
 
 use super::{FOOTER_CACHE, footer_cache::build_footer_cache};
-use crate::service::tantivy::{
+use crate::{
     puffin::{BlobTypes, writer::PuffinBytesWriter},
     puffin_directory::{ALLOWED_FILE_EXT, META_JSON},
 };

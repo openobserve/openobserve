@@ -7026,6 +7026,7 @@ dependencies = [
  "svix-ksuid",
  "tantivy",
  "tantivy-fst",
+ "tantivy_utils",
  "tempfile",
  "thiserror 2.0.18",
  "tiktoken-rs",
@@ -10716,6 +10717,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23024f6aeb25ceb1a0e27740c84bdb0fae52626737b7e9a9de6ad5aa25c7b038"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "tantivy_utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bitflags 2.11.0",
+ "byteorder",
+ "bytes",
+ "chrono",
+ "config",
+ "futures",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "object_store",
+ "parking_lot 0.12.5",
+ "serde",
+ "serde_json",
+ "tantivy",
+ "tokio",
+ "zstd",
 ]
 
 [[package]]

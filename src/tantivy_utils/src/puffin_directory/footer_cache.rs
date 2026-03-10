@@ -32,18 +32,18 @@ const FOOTER_CACHE_VERSION: u32 = 1;
 const FOOTER_VERSION_LEN: usize = 4;
 const FOOTER_OFFSET_LEN: usize = 8;
 
-pub(crate) struct FooterCache {
+pub struct FooterCache {
     data: RwLock<HashMap<PathBuf, HashMap<Range<usize>, OwnedBytes>>>,
 }
 
 impl FooterCache {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             data: RwLock::new(HashMap::new()),
         }
     }
 
-    pub(crate) fn get_slice(&self, path: &Path, byte_range: Range<usize>) -> Option<OwnedBytes> {
+    pub fn get_slice(&self, path: &Path, byte_range: Range<usize>) -> Option<OwnedBytes> {
         let r = self.data.read();
         let r = r.get(path)?;
         // fast path: check exactly range
@@ -61,7 +61,7 @@ impl FooterCache {
         None
     }
 
-    pub(crate) fn put_slice(&self, path: PathBuf, byte_range: Range<usize>, bytes: OwnedBytes) {
+    pub fn put_slice(&self, path: PathBuf, byte_range: Range<usize>, bytes: OwnedBytes) {
         self.data
             .write()
             .entry(path)
@@ -70,11 +70,11 @@ impl FooterCache {
     }
 
     #[cfg(test)]
-    pub(crate) fn file_num(&self) -> usize {
+    pub fn file_num(&self) -> usize {
         self.data.read().len()
     }
 
-    pub(crate) fn to_bytes(&self) -> tantivy::Result<Bytes> {
+    pub fn to_bytes(&self) -> tantivy::Result<Bytes> {
         let mut buf = Vec::new();
         let r = self.data.read();
         let mut metadata = FooterCacheMeta::new();
@@ -104,7 +104,7 @@ impl FooterCache {
         Ok(buf.into())
     }
 
-    pub(crate) fn from_bytes(bytes: OwnedBytes) -> tantivy::Result<Self> {
+    pub fn from_bytes(bytes: OwnedBytes) -> tantivy::Result<Self> {
         // parse version
         if bytes.len() < FOOTER_VERSION_LEN + FOOTER_OFFSET_LEN {
             return Err(tantivy::TantivyError::InvalidArgument(format!(
@@ -156,7 +156,7 @@ impl FooterCache {
         })
     }
 
-    pub(crate) async fn from_directory(source: Arc<dyn Directory>) -> tantivy::Result<Self> {
+    pub async fn from_directory(source: Arc<dyn Directory>) -> tantivy::Result<Self> {
         let path = std::path::Path::new(FOOTER_CACHE);
         let file = source.get_file_handle(path)?;
         let data = file.read_bytes_async(0..file.len()).await?;
@@ -195,7 +195,7 @@ struct FooterCacheMetaItem {
     len: u64,    // range lenth
 }
 
-pub(crate) fn build_footer_cache<D: Directory>(directory: Arc<D>) -> tantivy::Result<bytes::Bytes> {
+pub fn build_footer_cache<D: Directory>(directory: Arc<D>) -> tantivy::Result<bytes::Bytes> {
     let cache_dir = CachingDirectory::new(directory);
     let index = tantivy::Index::open(cache_dir.clone())?;
     let schema = index.schema();
