@@ -25,8 +25,8 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicU64, Ordering},
         RwLock,
+        atomic::{AtomicU64, Ordering},
     },
 };
 
@@ -154,7 +154,6 @@ pub async fn org_has_active_subscription(org_id: &str) -> bool {
     }
 }
 
-
 /// Try to deduct credits from the org's shared pool for a feature.
 ///
 /// Returns `Ok(remaining)` on success, or `Err(QuotaExhaustedError)` when
@@ -259,7 +258,12 @@ pub struct AiUsageContext {
 ///
 /// `AiFreeCredits` is informational (not billed). `AiCredits` is picked up by the
 /// metering pipeline and reported to Stripe/AWS/Azure.
-fn record_usage_internal(org_id: &str, ctx: &AiUsageContext, feature: TrialQuotaFeature, billable: bool) {
+fn record_usage_internal(
+    org_id: &str,
+    ctx: &AiUsageContext,
+    feature: TrialQuotaFeature,
+    billable: bool,
+) {
     let now = Utc::now();
     let timestamp = now.timestamp_micros();
     let event_time_hour = format!(
@@ -287,7 +291,8 @@ fn record_usage_internal(org_id: &str, ctx: &AiUsageContext, feature: TrialQuota
             "feature": feature.feature_key(),
             "session_id": ctx.session_id,
             "incident_id": ctx.incident_id,
-        }).to_string(),
+        })
+        .to_string(),
         size: feature.cost() as f64,
         unit: "credits".to_string(),
         user_email: ctx.user_email.clone(),
@@ -406,17 +411,12 @@ pub async fn get_pending_checkpoint(org_id: &str) -> Option<u8> {
 /// Atomically mark a checkpoint as notified for an org in the DB.
 /// Returns true if this pod won the update (no other pod set it first).
 pub async fn mark_checkpoint_notified(org_id: &str, checkpoint: u8) -> bool {
-    match infra::table::trial_quota_usage::update_notified_checkpoint(
-        org_id,
-        checkpoint as i16,
-    )
-    .await
+    match infra::table::trial_quota_usage::update_notified_checkpoint(org_id, checkpoint as i16)
+        .await
     {
         Ok(updated) => updated,
         Err(e) => {
-            log::error!(
-                "[AI_QUOTA] Failed to persist checkpoint for org={org_id}: {e}"
-            );
+            log::error!("[AI_QUOTA] Failed to persist checkpoint for org={org_id}: {e}");
             false
         }
     }
@@ -424,9 +424,7 @@ pub async fn mark_checkpoint_notified(org_id: &str, checkpoint: u8) -> bool {
 
 /// Reset checkpoint tracking for an org (e.g., when credits are refilled).
 pub async fn reset_checkpoint(org_id: &str) {
-    if let Err(e) =
-        infra::table::trial_quota_usage::update_notified_checkpoint(org_id, 0).await
-    {
+    if let Err(e) = infra::table::trial_quota_usage::update_notified_checkpoint(org_id, 0).await {
         log::error!("[AI_QUOTA] Failed to reset checkpoint for org={org_id}: {e}");
     }
 }
@@ -438,10 +436,7 @@ pub fn build_quota_email_message(
     used: u64,
     limit: u64,
 ) -> (String, String) {
-    let subject = format!(
-        "[OpenObserve] AI Credits: {}% used",
-        checkpoint
-    );
+    let subject = format!("[OpenObserve] AI Credits: {}% used", checkpoint);
 
     let message = match (checkpoint, is_paid) {
         (80, false) => format!(
@@ -468,9 +463,7 @@ pub fn build_quota_email_message(
         (100, true) => format!(
             "Your free AI credits are exhausted ({used}/{limit}). AI usage is now billed to your subscription via pay-as-you-go."
         ),
-        _ => format!(
-            "You've used {checkpoint}% of your free AI credits ({used}/{limit})."
-        ),
+        _ => format!("You've used {checkpoint}% of your free AI credits ({used}/{limit})."),
     };
 
     let body = format!(
@@ -493,8 +486,7 @@ pub async fn init_from_db() {
             // Sum per-feature counts into per-org totals
             let mut org_totals: HashMap<String, u64> = HashMap::new();
             for record in &records {
-                *org_totals.entry(record.org_id.clone()).or_default() +=
-                    record.usage_count as u64;
+                *org_totals.entry(record.org_id.clone()).or_default() += record.usage_count as u64;
             }
 
             // Populate ORG_USAGE with totals

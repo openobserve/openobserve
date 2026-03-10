@@ -3,7 +3,6 @@
 pub mod prelude;
 
 pub mod action_scripts;
-pub mod trial_quota_usage;
 pub mod alert_dedup_state;
 pub mod alert_incident_alerts;
 pub mod alert_incidents;
@@ -39,4 +38,5 @@ pub mod system_settings;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
+pub mod trial_quota_usage;
 pub mod users;

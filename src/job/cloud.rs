@@ -15,10 +15,12 @@
 
 use std::collections::HashMap;
 
-use config::meta::destinations::Email;
-use config::utils::{
-    json,
-    time::{hour_micros, now_micros},
+use config::{
+    meta::destinations::Email,
+    utils::{
+        json,
+        time::{hour_micros, now_micros},
+    },
 };
 use infra::table::org_users::get_admin;
 
@@ -125,8 +127,7 @@ async fn report_org_no_ingestion(start_hour: i64, duration: &str) {
 async fn run_ai_quota_check() {
     let cfg = o2_enterprise::enterprise::common::config::get_config();
     let interval_secs = cfg.cloud.ai_quota_check_interval;
-    let mut interval =
-        tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
     interval.tick().await; // skip first immediate tick
     loop {
         interval.tick().await;
@@ -154,9 +155,7 @@ async fn check_all_orgs_ai_quota() {
         let admin = match get_admin(&org_id).await {
             Ok(u) => u,
             Err(e) => {
-                log::error!(
-                    "[AI_QUOTA] Failed to get admin for org={org_id}: {e}"
-                );
+                log::error!("[AI_QUOTA] Failed to get admin for org={org_id}: {e}");
                 continue;
             }
         };
@@ -172,11 +171,7 @@ async fn check_all_orgs_ai_quota() {
             recipients: vec![admin.email.clone()],
         };
 
-        match crate::service::alerts::alert::send_email_notification(
-            &subject, &email, body,
-        )
-        .await
-        {
+        match crate::service::alerts::alert::send_email_notification(&subject, &email, body).await {
             Ok(_) => {
                 log::info!(
                     "[AI_QUOTA] Sent {}% checkpoint email to {} for org={org_id}",

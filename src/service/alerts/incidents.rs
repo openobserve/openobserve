@@ -1012,8 +1012,6 @@ async fn find_or_create_incident(
         );
     }
 
-
-
     log::info!(
         "[incidents] Created new incident {} for alert '{}' (correlation_key: {}, severity: {})",
         incident.id,

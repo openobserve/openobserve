@@ -23,9 +23,7 @@ use crate::{
 /// Batch upsert quota records. Uses INSERT ON CONFLICT to safely merge
 /// concurrent writes — takes the GREATEST usage_count to avoid losing
 /// deductions from other nodes.
-pub async fn batch_upsert(
-    records: Vec<(String, String, i64, i64)>,
-) -> Result<(), sea_orm::DbErr> {
+pub async fn batch_upsert(records: Vec<(String, String, i64, i64)>) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = config::utils::time::now_micros();
 
