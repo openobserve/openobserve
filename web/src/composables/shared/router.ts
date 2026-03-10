@@ -390,7 +390,9 @@ const useRoutes = () => {
         title: "Add Anomaly Detection",
       },
       beforeEnter(to: any, from: any, next: any) {
-        if (config.isEnterprise !== "true" && config.isCloud !== "true") {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
           next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
           return;
         }
@@ -406,7 +408,9 @@ const useRoutes = () => {
         title: "Edit Anomaly Detection",
       },
       beforeEnter(to: any, from: any, next: any) {
-        if (config.isEnterprise !== "true" && config.isCloud !== "true") {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
           next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
           return;
         }

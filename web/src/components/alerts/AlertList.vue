@@ -965,9 +965,13 @@ export default defineComponent({
 
     const activeFolderToMove = ref("default");
 
-    // Show anomaly detection for enterprise/cloud builds.
+    // Show anomaly detection only when the backend is an enterprise or cloud build.
+    // The frontend build flag alone is not sufficient — an enterprise UI can be
+    // pointed at an OSS backend which does not have the feature.
     const isAnomalyDetectionEnabled = computed(
-      () => config.isEnterprise === "true" || config.isCloud === "true",
+      () =>
+        store.state.zoConfig.build_type !== "opensource" &&
+        (config.isEnterprise === "true" || config.isCloud === "true"),
     );
 
     // Initialize activeTab from URL query parameter, default to "all".
