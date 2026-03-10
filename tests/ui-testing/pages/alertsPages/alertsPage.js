@@ -2079,8 +2079,9 @@ export class AlertsPage {
             }
         }
         if (!streamSelected) {
-            // Final attempt with force click
-            await this.page.getByText(streamName, { exact: true }).click({ force: true });
+            // Final attempt with force click — will throw if element doesn't exist in DOM
+            testLogger.warn(`Stream '${streamName}' not found after 3 attempts, trying force-click`);
+            await this.page.getByText(streamName, { exact: true }).click({ force: true, timeout: 10000 });
         }
 
         await this.selectScheduledAlertType();

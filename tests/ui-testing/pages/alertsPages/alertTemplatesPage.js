@@ -87,9 +87,7 @@ export class AlertTemplatesPage {
         await this.page.locator(this.addTemplateButton).click();
         await this.page.waitForTimeout(1000);
 
-        // Dismiss any lingering dialog backdrop before interacting with inputs
-        await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(300);
+        // Use force-click to bypass any backdrop interception (don't press Escape — it closes the dialog)
         await this.page.locator(this.templateNameInput).click({ force: true });
         await this.page.locator(this.templateNameInput).fill(templateName);
         await this.page.waitForTimeout(1000);
