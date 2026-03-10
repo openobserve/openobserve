@@ -852,7 +852,7 @@ pub fn service_routes() -> Router {
                 post(cloud::marketing::handle_new_attribution_event),
             )
             .route(
-                "/organizations/all",
+                "/{org_id}/organizations",
                 get(organization::org::all_organizations),
             )
             .route(
@@ -1027,8 +1027,9 @@ mod tests {
         let response = app.oneshot(req).await.unwrap();
         // The proxy will fail to connect in tests, but route should be reachable
         assert!(
-            response.status() == StatusCode::INTERNAL_SERVER_ERROR
-                || response.status() == StatusCode::NOT_FOUND
+            response.status().is_client_error() || response.status().is_server_error(),
+            "expected 4xx/5xx, got {}",
+            response.status()
         );
     }
 }

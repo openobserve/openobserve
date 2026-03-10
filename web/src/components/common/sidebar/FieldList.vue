@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column index-menu default-index-menu">
-    <div class="index-table logs-index-menu">
+  <div class="column index-menu default-index-menu tw:h-full!">
+    <div class="index-table logs-index-menu tw:h-full!">
       <q-table
         data-test="log-search-index-list-fields-table"
         :visible-columns="['name']"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="{ rowsPerPage: 10000 }"
         hide-header
         hide-bottom
-        class="traces-field-table tw:h-full"
+        class="traces-field-table tw:h-full!"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
@@ -36,25 +36,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
-                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
+                class="field-container flex content-center ellipsis q-pr-sm"
                 :title="props.row.name"
               >
-                <div class="field_label ellipsis">
+                <div
+                  class="field_label ellipsis tw:flex tw:items-center tw:pl-[1.2rem]"
+                >
                   {{ props.row.name }}
                 </div>
                 <div
-                  class="field_overlay"
-                  :style="{
-                    background:
-                      store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
-                  }"
+                  class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
                 >
                   <q-btn
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                    style="margin-right: 0.375rem"
                     size="0.4rem"
-                    class="q-mr-sm"
                     @click.stop="addSearchTerm(`${props.row.name}=''`)"
                     round
                   />
@@ -82,27 +78,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="field_label ellipsis">
                       {{ props.row.name }}
                     </div>
-                    <div v-if="!hideAddSearchTerm" class="field_overlay">
+                    <div
+                      v-if="!hideAddSearchTerm"
+                      class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
+                    >
                       <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
-                        style="margin-right: 0.375rem"
                         size="0.4rem"
-                        class="q-mr-sm"
                         @click.stop="addSearchTerm(`${props.row.name}=''`)"
                         round
                       />
                     </div>
                     <div
                       v-if="!hideCopyValue"
-                      style="background-color: #e8e8e8"
-                      class="field_overlay"
+                      class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
                     >
                       <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-copy-btn`"
                         icon="content_copy"
-                        size="10px"
-                        class="q-mr-sm"
+                        size="0.4rem"
                         @click.stop="copyContentValue(props.row.name)"
                         round
                         flat
@@ -242,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
-            class="o2-search-input tw:min-w-full "
+            class="o2-search-input tw:min-w-full"
           >
             <template #prepend>
               <q-icon name="search" class="o2-search-input-icon" />
@@ -411,9 +406,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.traces-field-table {
-  height: calc(100vh - 212px) !important;
-}
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);

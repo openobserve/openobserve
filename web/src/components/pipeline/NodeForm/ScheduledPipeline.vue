@@ -131,8 +131,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:mt-1"
                   />
                 </span>
-                <div class="q-pt-sm" v-show="expandState.buildQuery">
-                  <div>
+                <!-- 1.875 is the height of above container -->
+                <div
+                  class="q-mt-sm tw:h-[calc(100%-1.875rem)] tw:flex tw:flex-col"
+                  v-show="expandState.buildQuery"
+                >
+                  <div
+                    data-test="scheduled-pipeline-stream-select"
+                    class="tw:shrink-0"
+                  >
                     <q-select
                       v-model="selectedStreamType"
                       :options="streamTypes"
@@ -178,19 +185,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
 
-                  <FieldList
-                    :fields="streamFields"
-                    :stream-name="selectedStreamName"
-                    :stream-type="selectedStreamType"
-                    @event-emitted="handleSidebarEvent"
-                    :time-stamp="{
-                      startTime: dateTime.startTime,
-                      endTime: dateTime.endTime,
-                    }"
-                    :hideIncludeExlcude="true"
-                    :hideCopyValue="false"
-                    :hideAddSearchTerm="true"
-                  />
+                  <div class="tw:flex-1 tw:min-h-0">
+                    <FieldList
+                      :fields="streamFields"
+                      :stream-name="selectedStreamName"
+                      :stream-type="selectedStreamType"
+                      @event-emitted="handleSidebarEvent"
+                      :time-stamp="{
+                        startTime: dateTime.startTime,
+                        endTime: dateTime.endTime,
+                      }"
+                      :hideIncludeExlcude="true"
+                      :hideCopyValue="false"
+                      :hideAddSearchTerm="true"
+                    />
+                  </div>
                 </div>
               </template>
               <template #after>
@@ -2134,10 +2143,13 @@ const getStreamFields = () => {
       .then((stream: any) => {
         streamFields.value = [];
         userDefinedFields.value = [];
+        const ftsKeys: string[] = stream.settings?.full_text_search_keys || [];
+        const timestampColumn: string = store.state.zoConfig.timestamp_column;
         stream.schema?.forEach((field: any) => {
           streamFields.value.push({
             ...field,
-            showValues: true,
+            showValues: field.name !== timestampColumn,
+            ftsKey: ftsKeys.includes(field.name),
           });
         });
         stream.uds_schema?.forEach((field: any) => {
