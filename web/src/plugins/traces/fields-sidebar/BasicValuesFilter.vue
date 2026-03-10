@@ -69,7 +69,7 @@
               <div class="tw:flex tw:gap-[0.15rem]">
                 <q-btn
                   :data-test="`log-search-subfield-list-equal-${row.name}-field-btn`"
-                  size="0.25rem"
+                  size="0.3rem"
                   round
                   :title="`duration >= ${formatDuration(percentiles[p.key])}`"
                   @click.stop="
@@ -86,7 +86,7 @@
                 </q-btn>
                 <q-btn
                   :data-test="`log-search-subfield-list-not-equal-${row.name}-field-btn`"
-                  size="0.25rem"
+                  size="0.3rem"
                   round
                   :title="`duration <= ${formatDuration(percentiles[p.key])}`"
                   @click.stop="

@@ -941,6 +941,7 @@ import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import {
   isLLMTrace,
@@ -1293,15 +1294,8 @@ export default defineComponent({
       else expandedEvents.value[index.toString()] = true;
     };
 
-    const getSpanKind = (id: number) => {
-      const spanKindMapping: { [key: number]: string } = {
-        1: "Server",
-        2: "Client",
-        3: "Producer",
-        4: "Consumer",
-        5: "Internal",
-      };
-      return spanKindMapping[id] || id;
+    const getSpanKind = (id: number | string): string => {
+      return SPAN_KIND_MAP[String(id)] || "Unknown";
     };
 
     const getFormattedSpanDetails = () => {
