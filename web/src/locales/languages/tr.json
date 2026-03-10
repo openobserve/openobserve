@@ -2629,7 +2629,9 @@
     "today": "Bugün",
     "yesterday": "Dün",
     "spanColorPalettePreview": "Span Renk Paleti Önizlemesi",
-    "errorsFound": "Hata İzleri"
+    "errorsFound": "Hata İzleri",
+    "spansTitle": "YAYILIMLAR",
+    "spansFound": "Bulunan Açıklıklar"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
