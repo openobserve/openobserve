@@ -44,6 +44,7 @@ const DURATION_UNIT_MULTIPLIERS: Record<string, number> = {
  *   `duration >= '1.50ms'`    →  `duration >= 1500`
  *   `duration >= '2.50s'`     →  `duration >= 2500000`
  *   `duration >= '1.50m'`     →  `duration >= 90000000`
+ */
 /** Maps every accepted unit spelling to a canonical key in DURATION_UNIT_MULTIPLIERS. */
 const UNIT_ALIASES: Record<string, string> = {
   // Microseconds

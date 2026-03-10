@@ -300,7 +300,7 @@ export default defineComponent({
     ),
     SyntaxGuide,
   },
-  emits: ["searchdata", "update:activeTab", "cancel-query"],
+  emits: ["searchdata", "update:activeTab", "cancel-query", "filters-reset", "error-only-toggled", "onChangeTimezone"],
   props: {
     fieldValues: {
       type: Object,
