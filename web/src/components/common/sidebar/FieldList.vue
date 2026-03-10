@@ -36,10 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
-                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
+                class="field-container flex content-center ellipsis q-pr-sm"
                 :title="props.row.name"
               >
-                <div class="field_label ellipsis">
+                <div
+                  class="field_label ellipsis tw:flex tw:items-center tw:pl-[1.2rem]"
+                >
                   {{ props.row.name }}
                 </div>
                 <div
