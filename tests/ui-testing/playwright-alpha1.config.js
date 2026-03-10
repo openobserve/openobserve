@@ -24,6 +24,15 @@ if (!process.env.ALPHA1_USER_EMAIL || !process.env.ALPHA1_USER_PASSWORD) {
   testLogger.warn('ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set for Dex email login');
 }
 
+// Set ZO_ROOT_USER_* as fallbacks from ALPHA1_* env vars so that spec files
+// and utility modules that reference ZO_ROOT_USER_EMAIL/PASSWORD work on cloud
+if (!process.env.ZO_ROOT_USER_EMAIL && process.env.ALPHA1_USER_EMAIL) {
+  process.env.ZO_ROOT_USER_EMAIL = process.env.ALPHA1_USER_EMAIL;
+}
+if (!process.env.ZO_ROOT_USER_PASSWORD && process.env.ALPHA1_USER_PASSWORD) {
+  process.env.ZO_ROOT_USER_PASSWORD = process.env.ALPHA1_USER_PASSWORD;
+}
+
 // Ensure INGESTION_URL is set — on cloud, it's the same as the base URL
 if (!process.env.INGESTION_URL) {
   process.env.INGESTION_URL = process.env.ZO_BASE_URL;
