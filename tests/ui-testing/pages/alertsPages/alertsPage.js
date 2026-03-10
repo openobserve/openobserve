@@ -2054,14 +2054,20 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.streamNameDropdown).click();
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.type(streamName, { delay: 30 });
+        await this.page.waitForTimeout(1000);
         try {
             await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-            await this.page.getByText(streamName, { exact: true }).click();
         } catch (e) {
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
             await this.page.locator(this.locators.streamNameDropdown).click();
+            await this.page.waitForTimeout(500);
+            await this.page.keyboard.type(streamName, { delay: 30 });
             await this.page.waitForTimeout(1000);
-            await this.page.getByText(streamName, { exact: true }).click();
         }
+        await this.page.getByText(streamName, { exact: true }).click();
 
         await this.selectScheduledAlertType();
         await this.clickContinueButton();

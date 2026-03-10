@@ -20,6 +20,31 @@ export class AlertCreationWizard {
     }
 
     /**
+     * Select a stream from the stream name dropdown using keyboard filtering.
+     * The dropdown uses Quasar virtual scroll which only renders visible items.
+     * Typing the stream name triggers QSelect's built-in filter to narrow results.
+     */
+    async selectStreamByName(streamName) {
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.locators.streamNameDropdown).click();
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.type(streamName, { delay: 30 });
+        await this.page.waitForTimeout(1000);
+        try {
+            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        } catch (e) {
+            testLogger.warn('Stream not visible after typing, retrying dropdown', { streamName });
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
+            await this.page.locator(this.locators.streamNameDropdown).click();
+            await this.page.waitForTimeout(500);
+            await this.page.keyboard.type(streamName, { delay: 30 });
+            await this.page.waitForTimeout(1000);
+        }
+        await this.page.getByText(streamName, { exact: true }).click();
+    }
+
+    /**
      * Create a real-time alert using Alerts 2.0 wizard UI
      * Wizard steps for real-time: Step 1 (Setup) -> Step 2 (Conditions) -> Step 4 (Settings) -> Step 6 (Advanced) -> Submit
      * @param {string} streamName - Name of the stream
@@ -46,18 +71,7 @@ export class AlertCreationWizard {
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
         await this.page.waitForTimeout(1000);
 
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-
-        try {
-            await expect(this.page.getByText(`${streamName}`, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            testLogger.warn('Stream dropdown options not visible after first click, retrying');
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-            await expect(this.page.getByText(`${streamName}`, { exact: true })).toBeVisible({ timeout: 5000 });
-        }
-        await this.page.getByText(`${streamName}`, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         await expect(this.page.locator(this.locators.realtimeAlertRadio)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.locators.realtimeAlertRadio).click();
@@ -181,15 +195,7 @@ export class AlertCreationWizard {
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
         await this.page.waitForTimeout(1000);
 
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         await expect(this.page.locator(this.locators.realtimeAlertRadio)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.locators.realtimeAlertRadio).click();
@@ -306,18 +312,7 @@ export class AlertCreationWizard {
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
         await this.page.waitForTimeout(1000);
 
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            testLogger.warn('Stream dropdown options not visible after first click, retrying');
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.locators.scheduledAlertRadio).click();
@@ -469,14 +464,7 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
 
         // Select stream name
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         // Select Real-time alert type
         await this.page.locator(this.locators.realtimeAlertRadio).click();
@@ -665,15 +653,7 @@ export class AlertCreationWizard {
         testLogger.info('Selected stream type: logs');
 
         // Select stream name
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
         testLogger.info('Selected stream name', { streamName });
 
         // Select Scheduled alert type
@@ -871,10 +851,7 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
 
         // Select stream
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        await this.page.waitForTimeout(500);
-        await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         // Select real-time alert type
         await this.page.locator(this.locators.realtimeAlertRadio).click();
@@ -1074,15 +1051,7 @@ export class AlertCreationWizard {
         testLogger.info('Selected stream type: logs');
 
         // Select stream name
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
         testLogger.info('Selected stream name', { streamName });
 
         // Select Scheduled alert type
@@ -1316,16 +1285,7 @@ export class AlertCreationWizard {
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
         await this.page.waitForTimeout(1000);
 
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         // Select Scheduled alert type
         await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
@@ -1546,18 +1506,7 @@ export class AlertCreationWizard {
         testLogger.info('Selected stream type: metrics');
 
         // Select metrics stream name
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-
-        try {
-            await expect(this.page.getByText(metricsStreamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            testLogger.warn('Stream dropdown options not visible after first click, retrying');
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-            await expect(this.page.getByText(metricsStreamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        }
-        await this.page.getByText(metricsStreamName, { exact: true }).click();
+        await this.selectStreamByName(metricsStreamName);
         testLogger.info('Selected metrics stream name', { metricsStreamName });
 
         // Select Scheduled alert type
