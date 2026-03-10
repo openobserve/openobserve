@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @error-only-toggled="onErrorOnlyToggled"
           @filters-reset="onFiltersReset"
           @cancel-query="cancelSearch"
+          @update:searchMode="onSearchModeChange"
         />
       </div>
 
@@ -131,6 +132,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ t("search.histogramErrorBtnLabel") }}</q-btn
                     >
                   </div>
+                  <!-- Collapsible error detail — shown below results when toggled -->
+                  <div class="text-center">
+                    <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
+                      <span v-if="disableMoreErrorDetails">
+                        <SanitizedHtmlRenderer
+                          data-test="traces-search-detail-error-message"
+                          :htmlContent="searchObj?.data?.errorMsg"
+                          class="tw:pt-[1rem]"
+                        />
+                        <div
+                          v-if="searchObj?.data?.errorDetail"
+                          class="error-display__message tw:pt-[1rem]! tw:text-[var(--o2-text-2)]!"
+                        >
+                          {{ searchObj.data.errorDetail }}
+                        </div>
+                      </span>
+                    </div>
+                  </div>
                   <!-- FTS not configured -->
                   <div
                     data-test="traces-search-error-20003"
@@ -204,23 +223,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @shareLink="copyTracesUrl"
                   @metrics:filters-updated="onMetricsFiltersUpdated"
                 />
-              </div>
-              <!-- Collapsible error detail — shown below results when toggled -->
-              <div class="text-center">
-                <h5 class="tw:my-none">
-                  <span v-if="disableMoreErrorDetails">
-                    <SanitizedHtmlRenderer
-                      data-test="traces-search-detail-error-message"
-                      :htmlContent="searchObj?.data?.errorMsg"
-                    />
-                    <div
-                      v-if="searchObj?.data?.errorDetail"
-                      class="error-display__message"
-                    >
-                      {{ searchObj.data.errorDetail }}
-                    </div>
-                  </span>
-                </h5>
               </div>
             </div>
           </template>
@@ -654,7 +656,13 @@ function fetchTracesCount() {
   if (!queryReq || !selectedStreamName.value) return;
 
   const streamName = selectedStreamName.value;
-  const countSql = `select approx_distinct(trace_id) as trace_count, (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR')) as error_count FROM "${streamName}"${builtWhereClause ? " WHERE " + builtWhereClause : ""}`;
+  const whereClause = builtWhereClause ? ` WHERE ${builtWhereClause}` : "";
+  const isSpansMode = searchObj.meta.searchMode === "spans";
+
+  const countSql = isSpansMode
+    ? `select count(*) as span_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count FROM "${streamName}"${whereClause}`
+    : `select approx_distinct(trace_id) as trace_count, (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR')) as error_count FROM "${streamName}"${whereClause}`;
+
   const countTraceId = getUUID().replace(/-/g, "");
 
   fetchQueryDataWithHttpStream(
@@ -679,7 +687,9 @@ function fetchTracesCount() {
       data: (_payload: any, response: any) => {
         const hits: any[] = response.content?.results?.hits || [];
         if (hits.length > 0) {
-          const count = hits[0]?.trace_count ?? 0;
+          const count = isSpansMode
+            ? (hits[0]?.span_count ?? 0)
+            : (hits[0]?.trace_count ?? 0);
           searchObj.data.queryResults.total = count;
           searchObj.data.queryResults.errorCount = hits[0]?.error_count ?? 0;
           searchObj.meta.resultGrid.showPagination = count > 0;
@@ -784,7 +794,9 @@ async function getQueryData(
     // Mirror buildSearch: split on | so only the WHERE-clause portion (after the pipe)
     // is passed to parseDurationWhereClause, not the query-functions prefix.
     const editorParts = searchObj.data.editorValue.trim().split("|");
-    let filter = (editorParts.length > 1 ? editorParts[1] : editorParts[0]).trim();
+    let filter = (
+      editorParts.length > 1 ? editorParts[1] : editorParts[0]
+    ).trim();
     const filterParseResult = parseDurationWhereClause(
       filter,
       parser,
@@ -815,19 +827,46 @@ async function getQueryData(
     currentSearchTraceId = searchTraceId;
     tracesPartitionMap[searchTraceId] = { partition: 0, chunks: {} };
 
-    fetchQueryDataWithHttpStream(
-      {
-        queryReq: {
-          stream_name: selectedStreamName.value,
-          filter: combinedFilter || "",
-          start_time: queryReq.query.start_time,
-          end_time: queryReq.query.end_time,
+    const isSpansMode = searchObj.meta.searchMode === "spans";
+    const spansQueryReq = (() => {
+      if (!isSpansMode) return null;
+      const sortCol =
+        searchObj.meta.resultGrid.sortBy === "duration"
+          ? "duration"
+          : "start_time";
+      const sortOrd = (
+        searchObj.meta.resultGrid.sortOrder || "desc"
+      ).toUpperCase();
+      const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${sortCol} ${sortOrd}`;
+      return {
+        query: {
+          sql: b64EncodeUnicode(spansSql),
           from: queryReq.query.from,
           size: queryReq.query.size,
-          sort_by: searchObj.meta.resultGrid.sortBy || "start_time",
-          sort_order: searchObj.meta.resultGrid.sortOrder || "desc",
+          start_time: queryReq.query.start_time,
+          end_time: queryReq.query.end_time,
         },
-        type: "traces",
+        encoding: "base64",
+      };
+    })();
+
+    fetchQueryDataWithHttpStream(
+      {
+        queryReq: isSpansMode
+          ? spansQueryReq
+          : {
+              stream_name: selectedStreamName.value,
+              filter: combinedFilter || "",
+              start_time: queryReq.query.start_time,
+              end_time: queryReq.query.end_time,
+              from: queryReq.query.from,
+              size: queryReq.query.size,
+              sort_by: searchObj.meta.resultGrid.sortBy || "start_time",
+              sort_order: searchObj.meta.resultGrid.sortOrder || "desc",
+            },
+        type: isSpansMode ? "search" : "traces",
+        ...(isSpansMode ? { pageType: "traces", searchType: "ui" } : {}),
         traceId: searchTraceId,
         org_id: searchObj.organizationIdentifier,
       },
@@ -880,7 +919,10 @@ async function getQueryData(
             // the current partition (mirrors useSearchResponseHandler logic)
             const appendResult = partition > 1 || isChunkedHits;
 
-            const formattedHits = formatTracesMetaData(rawHits);
+            const formattedHits =
+              searchObj.meta.searchMode === "traces"
+                ? formatTracesMetaData(rawHits)
+                : rawHits;
             // Replace hits on the first partition of a pagination fetch (clears the
             // previous page) or on the very first data chunk of a fresh search
             if ((isPagination && partition === 1) || !appendResult) {
@@ -1285,6 +1327,13 @@ function restoreUrlQueryParams() {
   }
 
   if (
+    queryParams.search_mode === "spans" ||
+    queryParams.search_mode === "traces"
+  ) {
+    searchObj.meta.searchMode = queryParams.search_mode as "traces" | "spans";
+  }
+
+  if (
     queryParams.stream &&
     searchObj.data.stream.selectedStream.value !== queryParams.stream
   ) {
@@ -1406,13 +1455,27 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
+// Handler for Search Mode toggle (Traces / Spans)
+const onSearchModeChange = (mode: "traces" | "spans") => {
+  searchObj.meta.searchMode = mode;
+  searchObj.data.resultGrid.currentPage = 0;
+  searchObj.data.queryResults = {
+    hits: [],
+    total: 0,
+    from: 0,
+    size: searchObj.meta.resultGrid.rowsPerPage,
+    took: 0,
+    errorCount: 0,
+  };
+  getQueryData();
+};
+
 // Handler for Reset Filters button
 // Clears all filters including brush selections
 const onFiltersReset = () => {
   // Brush selections already cleared in SearchBar.vue
   // metricsRangeFilters.clear() was called
   // No additional action needed here
-  console.log("Filters reset - brush selections cleared");
 };
 
 const isStreamSelected = computed(() => {

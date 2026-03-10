@@ -22,12 +22,75 @@
       </div>
     </div>
 
-    <!-- ECharts Container -->
+    <!-- Timeline Ruler + Chart wrapper — unified mousemove zone -->
     <div
-      ref="chartContainerRef"
-      class="tw:flex-1 tw:w-full tw:pt-[0.625rem]"
-      style="min-height: 300px; position: relative"
-    ></div>
+      class="tw:flex tw:flex-col tw:flex-1"
+      style="min-height: 0; position: relative"
+      @mousemove="handleChartMouseMove"
+      @mouseleave="cursorVisible = false"
+    >
+      <!-- Timeline Ruler -->
+      <div
+        class="tw:relative tw:bg-[var(--o2-card-bg)] tw:select-none tw:flex-shrink-0"
+        style="height: 1.5rem"
+      >
+        <!-- Static tick labels -->
+        <span
+          v-for="(tick, index) in timelineTicks"
+          :key="'lbl-' + index"
+          class="tw:absolute tw:text-[10px] tw:text-[var(--o2-text-secondary)] tw:leading-none tw:whitespace-nowrap"
+          style="top: 50%; padding-left: 3px"
+          :style="{ left: tick.left, transform: tick.transform }"
+        >{{ tick.label }}</span>
+
+        <!-- Static tick marks — skip first and last -->
+        <template v-for="(tick, index) in timelineTicks" :key="'tic-' + index">
+          <div
+            v-if="index > 0 && index < timelineTicks.length - 1"
+            class="tw:absolute tw:w-px"
+            style="bottom: 0; height: 100%; background: #aaa"
+            :style="{ left: tick.left, transform: 'translateX(-50%)' }"
+          ></div>
+        </template>
+
+        <!-- Cursor time badge with downward arrow -->
+        <div
+          v-if="cursorVisible"
+          class="tw:absolute tw:pointer-events-none tw:flex tw:flex-col tw:items-center"
+          style="top: 2px; z-index: 20; transform: translateX(-50%)"
+          :style="{ left: cursorX + 'px' }"
+        >
+          <!-- Time label pill -->
+          <div
+            class="tw:text-[10px] tw:text-white tw:px-[6px] tw:py-[2px] tw:rounded tw:whitespace-nowrap tw:font-medium"
+            style="background: rgba(30,30,30,0.9); line-height: 1.4"
+          >
+            {{ cursorTimeLabel }}
+          </div>
+          <!-- Downward caret -->
+          <div style="width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid rgba(30,30,30,0.9); margin-top: 0"></div>
+        </div>
+      </div>
+
+      <!-- ECharts container -->
+      <div
+        class="tw:flex-1 tw:w-full"
+        style="min-height: 300px; position: relative"
+      >
+        <div
+          ref="chartContainerRef"
+          class="tw:absolute tw:inset-0 tw:pt-[0.625rem]"
+        ></div>
+
+        <!-- Vertical cursor line (no label — label is on ruler) -->
+        <div
+          v-if="cursorVisible"
+          class="tw:absolute tw:top-0 tw:bottom-0 tw:pointer-events-none"
+          style="width: 1px; background: rgba(80,80,80,0.6); z-index: 10"
+          :style="{ left: cursorX + 'px' }"
+        ></div>
+      </div>
+    </div>
 
     <!-- Empty State -->
     <div
@@ -81,6 +144,9 @@ let chartInstance: echarts.ECharts | null = null;
 
 // State
 const viewMode = ref<"time" | "percentage">("time");
+const cursorVisible = ref(false);
+const cursorX = ref(0);
+const cursorTimeLabel = ref("");
 
 // Constants
 const BLOCK_PADDING = 2;
@@ -97,6 +163,34 @@ const maxDepth = computed(() => {
 const hasData = computed(() => {
   return props.spans.length > 0 && props.traceDuration > 0;
 });
+
+const GRID_LEFT = 10;
+const GRID_RIGHT = 10;
+
+const timelineTicks = computed(() => {
+  const duration = props.traceDuration || 0;
+  const totalPad = GRID_LEFT + GRID_RIGHT;
+  return [0, 0.25, 0.5, 0.75, 1].map((fraction) => ({
+    label: formatDuration(duration * fraction),
+    left: `calc(${GRID_LEFT}px + ${fraction} * (100% - ${totalPad}px))`,
+    transform: fraction === 1 ? "translateX(-100%) translateY(-50%)" : "translateY(-50%)",
+  }));
+});
+
+// Cursor line handler
+
+const handleChartMouseMove = (event: MouseEvent) => {
+  if (!hasData.value) return;
+
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  const offsetX = event.clientX - rect.left;
+  const gridWidth = rect.width - GRID_LEFT - GRID_RIGHT;
+  const percentage = Math.max(0, Math.min(1, (offsetX - GRID_LEFT) / gridWidth));
+
+  cursorX.value = offsetX;
+  cursorTimeLabel.value = formatDuration(percentage * props.traceDuration);
+  cursorVisible.value = true;
+};
 
 // Build flame graph data for ECharts
 const buildFlameGraphData = () => {

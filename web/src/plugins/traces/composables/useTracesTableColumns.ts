@@ -28,8 +28,64 @@
 import { computed, type Ref } from "vue";
 import { type ColumnDef } from "@tanstack/vue-table";
 
-export function useTracesTableColumns(showLlmColumns: Ref<boolean>) {
+export function useTracesTableColumns(
+  showLlmColumns: Ref<boolean>,
+  searchMode: Ref<"traces" | "spans">,
+) {
   return computed<ColumnDef<Record<string, any>>[]>(() => {
+    if (searchMode.value === "spans") {
+      return [
+        {
+          id: "timestamp",
+          header: "TIMESTAMP",
+          size: 160,
+          meta: { sortable: true },
+        },
+        {
+          id: "service",
+          header: "SERVICE",
+          meta: {
+            grow: true,
+            width: 160,
+            cellClass: "tw:text-[var(--o2-text-1)]",
+          },
+        },
+        {
+          id: "operation_name",
+          header: "OPERATION NAME",
+          meta: {
+            grow: true,
+            width: 200,
+            cellClass: "tw:text-[var(--o2-text-1)]",
+          },
+        },
+        {
+          id: "duration",
+          header: "DURATION",
+          size: 120,
+          meta: { sortable: true },
+        },
+        {
+          id: "status",
+          header: "STATUS",
+          size: 120,
+          meta: { align: "center" },
+        },
+        {
+          id: "status_code",
+          header: "STATUS CODE",
+          size: 140,
+          meta: { align: "center" },
+        },
+        {
+          id: "method",
+          header: "METHOD",
+          size: 140,
+          meta: { align: "center" },
+        },
+      ];
+    }
+
     const base: ColumnDef<Record<string, any>>[] = [
       {
         id: "timestamp",
