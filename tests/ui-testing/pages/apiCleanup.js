@@ -31,12 +31,14 @@ class APICleanup {
                 }
             }
             try {
+                // Strip empty Authorization header so browser relies on session cookies (OIDC cloud auth)
+                const browserOpts = { ...options, headers: Object.fromEntries(Object.entries(options.headers || {}).filter(([k, v]) => !(k.toLowerCase() === 'authorization' && !v))) };
                 const result = await this._page.evaluate(async ({ url, options }) => {
                     const r = await fetch(url, options);
                     const text = await r.text();
                     const contentType = r.headers.get('content-type') || '';
                     return { ok: r.ok, status: r.status, text, contentType };
-                }, { url, options });
+                }, { url, options: browserOpts });
 
                 return {
                     ok: result.ok,
