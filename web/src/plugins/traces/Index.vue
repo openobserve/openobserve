@@ -841,12 +841,13 @@ async function getQueryData(
       const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${sortCol} ${sortOrd}`;
       return {
         query: {
-          sql: spansSql,
+          sql: b64EncodeUnicode(spansSql),
           from: queryReq.query.from,
           size: queryReq.query.size,
           start_time: queryReq.query.start_time,
           end_time: queryReq.query.end_time,
         },
+        encoding: "base64",
       };
     })();
 

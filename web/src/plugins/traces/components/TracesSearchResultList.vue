@@ -157,26 +157,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <TraceTimestampCell :item="item" :search-mode="props.searchMode" />
           </template>
 
-          <template #cell-trace_id="{ item }">
-            <span
-              class="text-caption tw:font-mono tw:text-[0.75rem] tw:text-[var(--o2-text-1)] ellipsis"
-              data-test="span-row-trace-id"
-            >
-              {{ item.trace_id }}
-              <q-tooltip>{{ item.trace_id }}</q-tooltip>
-            </span>
-          </template>
-
-          <template #cell-span_id="{ item }">
-            <span
-              class="text-caption tw:font-mono tw:text-[0.75rem] tw:text-[var(--o2-text-1)] ellipsis"
-              data-test="span-row-span-id"
-            >
-              {{ item.span_id }}
-              <q-tooltip>{{ item.span_id }}</q-tooltip>
-            </span>
-          </template>
-
           <template #cell-service="{ item }">
             <TraceServiceCell :item="item" />
           </template>
