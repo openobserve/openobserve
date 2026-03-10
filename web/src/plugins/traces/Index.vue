@@ -132,6 +132,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ t("search.histogramErrorBtnLabel") }}</q-btn
                     >
                   </div>
+                  <!-- Collapsible error detail — shown below results when toggled -->
+                  <div class="text-center">
+                    <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
+                      <span v-if="disableMoreErrorDetails">
+                        <SanitizedHtmlRenderer
+                          data-test="traces-search-detail-error-message"
+                          :htmlContent="searchObj?.data?.errorMsg"
+                          class="tw:pt-[1rem]"
+                        />
+                        <div
+                          v-if="searchObj?.data?.errorDetail"
+                          class="error-display__message tw:pt-[1rem]! tw:text-[var(--o2-text-2)]!"
+                        >
+                          {{ searchObj.data.errorDetail }}
+                        </div>
+                      </span>
+                    </div>
+                  </div>
                   <!-- FTS not configured -->
                   <div
                     data-test="traces-search-error-20003"
@@ -205,23 +223,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @shareLink="copyTracesUrl"
                   @metrics:filters-updated="onMetricsFiltersUpdated"
                 />
-              </div>
-              <!-- Collapsible error detail — shown below results when toggled -->
-              <div class="text-center">
-                <h5 class="tw:my-none">
-                  <span v-if="disableMoreErrorDetails">
-                    <SanitizedHtmlRenderer
-                      data-test="traces-search-detail-error-message"
-                      :htmlContent="searchObj?.data?.errorMsg"
-                    />
-                    <div
-                      v-if="searchObj?.data?.errorDetail"
-                      class="error-display__message"
-                    >
-                      {{ searchObj.data.errorDetail }}
-                    </div>
-                  </span>
-                </h5>
               </div>
             </div>
           </template>
