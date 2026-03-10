@@ -566,6 +566,17 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-trace-selected: #{$o2-blue-100};
 
   --o2-cancel-query-bg: #f67a7a;
+  // Status semantic colors (light mode)
+  --o2-status-success-text: #{$o2-green-800};
+  --o2-status-success-bg: #{$o2-green-100};
+  --o2-status-info-text: #{$o2-blue-700};
+  --o2-status-info-bg: #{$o2-blue-200};
+  --o2-status-warning-text: #{$o2-orange-600};
+  --o2-status-warning-bg: #{$o2-orange-100};
+  --o2-status-error-text: #{$o2-red-900};
+  --o2-status-error-bg: #{$o2-red-100};
+  --o2-status-neutral-text: #{$o2-gray-900};
+  --o2-status-neutral-bg: #{$o2-gray-200};
 }
 
 // Semantic Colors - Dark Mode
@@ -722,6 +733,18 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-trace-text-secondary: #{$o2-dark-gray-1000};
   --o2-trace-hover: #{$o2-dark-gray-300};
   --o2-trace-selected: #{$o2-dark-blue-300};
+
+  // Status semantic colors (dark mode)
+  --o2-status-success-text: #{$o2-dark-green-900};
+  --o2-status-success-bg: #{$o2-dark-green-100};
+  --o2-status-info-text: #{$o2-dark-iris-1100};
+  --o2-status-info-bg: #{$o2-dark-iris-200};
+  --o2-status-warning-text: #{$o2-dark-orange-700};
+  --o2-status-warning-bg: #{$o2-dark-orange-100};
+  --o2-status-error-text: #{$o2-dark-red-800};
+  --o2-status-error-bg: #{$o2-dark-red-100};
+  --o2-status-neutral-text: #{$o2-dark-gray-900};
+  --o2-status-neutral-bg: #{$o2-dark-gray-200};
 
 
   --o2-section-header-bg: #28292a;

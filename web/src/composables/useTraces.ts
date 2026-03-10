@@ -88,6 +88,7 @@ const defaultObject = {
     >(),
     showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
+    searchMode: "traces" as "traces" | "spans",
   },
   data: {
     query: "",
@@ -221,6 +222,10 @@ const useTraces = () => {
     query["org_identifier"] = store.state.selectedOrganization.identifier;
 
     query["trace_id"] = router.currentRoute.value.query.trace_id;
+
+    if (searchObj.meta.searchMode === "spans") {
+      query["search_mode"] = "spans";
+    }
 
     if (router.currentRoute.value.query.span_id)
       query["span_id"] = router.currentRoute.value.query.span_id;

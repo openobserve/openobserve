@@ -11,14 +11,13 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
--->
+along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
   <div
-    data-test="trace-row-status-pill"
+    data-test="span-row-status-pill"
     class="tw:rounded-xl tw:py-[0.125rem] tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit"
-    :class="hasErrors ? 'o2-status-pill--error' : 'o2-status-pill--success'"
+    :class="isError ? 'o2-status-pill--error' : isOk ? 'o2-status-pill--success' : 'o2-status-pill--unset'"
   >
     <span
       class="q-mr-xs tw:inline-block tw:w-[0.4375rem] tw:h-[0.4375rem] tw:rounded-full tw:shrink-0 o2-status-pill__dot"
@@ -33,21 +32,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
-
-const { t } = useI18n();
 
 const props = defineProps<{
-  item: Record<string, any>;
+  status?: string;
 }>();
 
-const hasErrors = computed(() => (props.item.errors ?? 0) > 0);
-
-const label = computed(() =>
-  hasErrors.value
-    ? `${props.item.errors} ${props.item.errors !== 1 ? t("traces.errors") : t("traces.error")}`
-    : t("traces.success"),
+const isError = computed(() =>
+  (props.status ?? "").toUpperCase() === "ERROR",
 );
+
+const isOk = computed(() => (props.status ?? "").toUpperCase() === "OK");
+
+const label = computed(() => props.status || "UNSET");
 </script>
 
 <style scoped>
@@ -65,5 +61,13 @@ const label = computed(() =>
 }
 .o2-status-pill--error .o2-status-pill__dot {
   background-color: var(--o2-status-error-text);
+}
+
+.o2-status-pill--unset {
+  color: var(--o2-status-unset-text, #888888);
+  background: var(--o2-status-unset-bg, #f0f0f0);
+}
+.o2-status-pill--unset .o2-status-pill__dot {
+  background-color: var(--o2-status-unset-text, #888888);
 }
 </style>

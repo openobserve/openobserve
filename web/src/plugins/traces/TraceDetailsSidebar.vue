@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="preview"
         class="llm-preview-panel q-pa-md"
       >
-        <div class="llm-preview-container">
+        <div class="llm-preview-container tw:overflow-x-auto">
           <!-- Input and Output Side by Side -->
           <div
             class="flex q-col-gutter-md io-container"

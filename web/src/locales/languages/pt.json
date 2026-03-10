@@ -2559,7 +2559,9 @@
     "today": "Hoje",
     "yesterday": "Ontem",
     "spanColorPalettePreview": "Pré-visualização da paleta de cores Span",
-    "errorsFound": "Traços de erro"
+    "errorsFound": "Traços de erro",
+    "spansTitle": "VÃOS",
+    "spansFound": "Vãos encontrados"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
