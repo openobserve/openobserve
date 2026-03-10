@@ -516,9 +516,7 @@ export class StreamsPage {
      * @returns {Promise<object>} API response
      */
     async createStream(streamName, streamType = 'logs') {
-        const fetch = (await import('node-fetch')).default;
         const orgId = process.env["ORGNAME"];
-        const headers = getHeaders();
 
         const payload = {
             fields: [],
@@ -535,6 +533,30 @@ export class StreamsPage {
         testLogger.info('Creating stream via API', { streamName, streamType });
 
         try {
+            if (process.env.IS_CLOUD === 'true') {
+                // On cloud, management APIs require OIDC session cookies — use browser context
+                const result = await this.page.evaluate(async ({ orgId, streamName, streamType, payload }) => {
+                    const r = await fetch(`/api/${orgId}/streams/${streamName}?type=${streamType}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                    const text = await r.text();
+                    try { return { status: r.status, data: JSON.parse(text) }; }
+                    catch { return { status: r.status, data: text }; }
+                }, { orgId, streamName, streamType, payload });
+
+                if (result.status === 200 && result.data?.code === 200) {
+                    testLogger.info('Stream created successfully (cloud)', { streamName });
+                } else {
+                    testLogger.warn('Stream creation returned non-200 (cloud)', { streamName, status: result.status });
+                }
+                return result;
+            }
+
+            // Self-hosted: use node-fetch with Basic Auth
+            const fetch = (await import('node-fetch')).default;
+            const headers = getHeaders();
             const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
                 method: 'POST',
                 headers: headers,
@@ -562,11 +584,30 @@ export class StreamsPage {
      * @returns {Promise<boolean>} True if stream exists
      */
     async verifyStreamExists(streamName) {
-        const fetch = (await import('node-fetch')).default;
         const orgId = process.env["ORGNAME"];
-        const headers = getHeaders();
 
         try {
+            if (process.env.IS_CLOUD === 'true') {
+                // On cloud, management APIs require OIDC session cookies — use browser context
+                const result = await this.page.evaluate(async ({ orgId }) => {
+                    const r = await fetch(`/api/${orgId}/streams`);
+                    if (!r.ok) return { ok: false, status: r.status };
+                    const data = await r.json();
+                    return { ok: true, list: (data.list || []).map(s => s.name) };
+                }, { orgId });
+
+                if (result.ok) {
+                    const exists = result.list.includes(streamName);
+                    testLogger.info('Stream existence check (cloud)', { streamName, exists });
+                    return exists;
+                }
+                testLogger.warn('Failed to check stream existence (cloud)', { streamName, status: result.status });
+                return false;
+            }
+
+            // Self-hosted: use node-fetch with Basic Auth
+            const fetch = (await import('node-fetch')).default;
+            const headers = getHeaders();
             const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/streams`, {
                 method: 'GET',
                 headers: headers
@@ -820,13 +861,29 @@ export class StreamsPage {
      * @param {string} streamType - Type of stream
      */
     async deleteStreamViaAPI(streamName, streamType = 'logs') {
-        const fetch = (await import('node-fetch')).default;
         const orgId = process.env["ORGNAME"];
-        const headers = getHeaders();
 
         testLogger.info('Deleting stream via API', { streamName, streamType });
 
         try {
+            if (process.env.IS_CLOUD === 'true') {
+                // On cloud, management APIs require OIDC session cookies — use browser context
+                const status = await this.page.evaluate(async ({ orgId, streamName, streamType }) => {
+                    const r = await fetch(`/api/${orgId}/streams/${streamName}?type=${streamType}`, { method: 'DELETE' });
+                    return r.status;
+                }, { orgId, streamName, streamType });
+
+                if (status === 200) {
+                    testLogger.info('Stream deleted successfully (cloud)', { streamName });
+                } else {
+                    testLogger.warn('Stream deletion returned non-200 (cloud)', { streamName, status });
+                }
+                return status;
+            }
+
+            // Self-hosted: use node-fetch with Basic Auth
+            const fetch = (await import('node-fetch')).default;
+            const headers = getHeaders();
             const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
                 method: 'DELETE',
                 headers: headers
