@@ -344,17 +344,16 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
-        // Close SQL editor dialog
+        // Close SQL editor dialog — dismiss any backdrop first, then force-click
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            if (await closeButton.isVisible({ timeout: 3000 })) {
-                await closeButton.click();
-            } else {
-                await this.page.locator(this.locators.qDialogLocator).getByText('arrow_back_ios_new').click();
-            }
+            await closeButton.click({ force: true, timeout: 5000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
+            testLogger.warn('Close button click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
         }
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
@@ -693,17 +692,16 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
-        // Close dialog
+        // Close dialog — dismiss any backdrop first, then force-click
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            if (await closeButton.isVisible({ timeout: 3000 })) {
-                await closeButton.click();
-            } else {
-                await this.page.locator(this.locators.qDialogLocator).getByText('arrow_back_ios_new').click();
-            }
+            await closeButton.click({ force: true, timeout: 5000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
+            testLogger.warn('Close button click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
         }
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
@@ -1094,18 +1092,16 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
-        // Close dialog - use same approach as working createScheduledAlertWithSQL method
-        // The close button may be intercepted by backdrop, so use Escape as fallback
+        // Close dialog — dismiss any backdrop first, then force-click
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            if (await closeButton.isVisible({ timeout: 3000 })) {
-                await closeButton.click();
-            } else {
-                await this.page.locator(this.locators.qDialogLocator).getByText('arrow_back_ios_new').click();
-            }
+            await closeButton.click({ force: true, timeout: 5000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
+            testLogger.warn('Close button click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
         }
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
@@ -1553,17 +1549,16 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran PromQL query');
 
-        // Close PromQL editor dialog
+        // Close PromQL editor dialog — dismiss any backdrop first, then force-click
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            if (await closeButton.isVisible({ timeout: 3000 })) {
-                await closeButton.click();
-            } else {
-                await this.page.locator(this.locators.qDialogLocator).getByText('arrow_back_ios_new').click();
-            }
+            await closeButton.click({ force: true, timeout: 5000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
+            testLogger.warn('Close button click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
         }
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);

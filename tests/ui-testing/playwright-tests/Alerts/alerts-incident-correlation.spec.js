@@ -468,6 +468,8 @@ test.describe("Incident Correlation Tests", { tag: '@enterprise' }, () => {
     // afterAll: Clean up alerts, folder, destination, template. Stream persists.
     // ========================================================================
     test.beforeAll(async ({ browser }) => {
+        // Cloud environments need extra time: setup (~90s) + waitForIncidents (up to 300s) + re-trigger (120s)
+        test.setTimeout(10 * 60 * 1000); // 10 minutes
         testLogger.info('=== INCIDENT CORRELATION TEST SETUP ===');
 
         const context = await browser.newContext({

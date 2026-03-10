@@ -86,8 +86,11 @@ export class AlertTemplatesPage {
         
         await this.page.locator(this.addTemplateButton).click();
         await this.page.waitForTimeout(1000);
-        
-        await this.page.locator(this.templateNameInput).click();
+
+        // Dismiss any lingering dialog backdrop before interacting with inputs
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
+        await this.page.locator(this.templateNameInput).click({ force: true });
         await this.page.locator(this.templateNameInput).fill(templateName);
         await this.page.waitForTimeout(1000);
         

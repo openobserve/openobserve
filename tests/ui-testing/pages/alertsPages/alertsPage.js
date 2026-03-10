@@ -2053,21 +2053,30 @@ export class AlertsPage {
         await this.selectStreamType('logs');
         await this.page.waitForTimeout(1000);
 
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        await this.page.waitForTimeout(500);
-        await this.page.keyboard.type(streamName, { delay: 30 });
-        await this.page.waitForTimeout(1000);
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            await this.page.keyboard.press('Escape');
-            await this.page.waitForTimeout(500);
+        // Select stream from dropdown with retries (cloud may load streams slowly)
+        let streamSelected = false;
+        for (let attempt = 0; attempt < 3 && !streamSelected; attempt++) {
+            if (attempt > 0) {
+                await this.page.keyboard.press('Escape');
+                await this.page.waitForTimeout(500);
+            }
             await this.page.locator(this.locators.streamNameDropdown).click();
             await this.page.waitForTimeout(500);
             await this.page.keyboard.type(streamName, { delay: 30 });
             await this.page.waitForTimeout(1000);
+            try {
+                const streamOption = this.page.getByText(streamName, { exact: true });
+                await streamOption.waitFor({ state: 'visible', timeout: 10000 });
+                await streamOption.click({ timeout: 5000 });
+                streamSelected = true;
+            } catch (e) {
+                testLogger.debug(`Stream '${streamName}' not found in dropdown (attempt ${attempt + 1})`, { error: e.message });
+            }
         }
-        await this.page.getByText(streamName, { exact: true }).click();
+        if (!streamSelected) {
+            // Final attempt with force click
+            await this.page.getByText(streamName, { exact: true }).click({ force: true });
+        }
 
         await this.selectScheduledAlertType();
         await this.clickContinueButton();
@@ -2221,8 +2230,9 @@ export class AlertsPage {
      */
     async navigateToVrlEditor() {
         // First, click on Step 2 (Conditions) if Continue button is visible
+        // Cloud environments may take longer to load the wizard after edit
         const continueBtn = this.page.locator('[data-test="add-alert-continue-btn"], button:has-text("Continue")').first();
-        if (await continueBtn.isVisible({ timeout: 3000 })) {
+        if (await continueBtn.isVisible({ timeout: 10000 })) {
             await continueBtn.click();
             await this.page.waitForTimeout(1000);
             testLogger.info('Clicked Continue to go to Step 2');
