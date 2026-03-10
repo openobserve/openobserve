@@ -42,7 +42,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-section-title"
           class="tw:text-[0.75rem] tw:font-bold tw:tracking-[0.0625rem]! tw:text-[var(--o2-text-1)]! tw:mr-[0.85rem]"
         >
-          {{ props.searchMode === "spans" ? t("traces.spansTitle") : t("traces.tracesTitle") }}
+          {{
+            props.searchMode === "spans"
+              ? t("traces.spansTitle")
+              : t("traces.tracesTitle")
+          }}
         </span>
         <q-badge
           data-test="traces-count-badge"
@@ -203,6 +207,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
+          <template #cell-method="{ item }">
+            {{ item.http_method || item.rpc_method || "—" }}
+          </template>
+
+          <template #cell-status_code="{ item }">
+            <SpanStatusCodeBadge
+              :code="item.http_status_code"
+              :grpc-code="item.rpc_grpc_status_code"
+            />
+          </template>
+
           <template #cell-status="{ item }">
             <TraceStatusCell v-if="props.searchMode !== 'spans'" :item="item" />
             <SpanStatusPill v-else :status="item.span_status" />
@@ -259,6 +274,7 @@ import TraceServiceCell from "./TraceServiceCell.vue";
 import TraceLatencyCell from "./TraceLatencyCell.vue";
 import TraceStatusCell from "./TraceStatusCell.vue";
 import SpanStatusPill from "./SpanStatusPill.vue";
+import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import {
   isLLMTrace,
   extractLLMData,

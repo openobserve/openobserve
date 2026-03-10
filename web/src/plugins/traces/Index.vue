@@ -846,7 +846,6 @@ async function getQueryData(
           start_time: queryReq.query.start_time,
           end_time: queryReq.query.end_time,
         },
-        encoding: "Empty",
       };
     })();
 

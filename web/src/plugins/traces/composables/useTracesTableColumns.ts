@@ -28,7 +28,10 @@
 import { computed, type Ref } from "vue";
 import { type ColumnDef } from "@tanstack/vue-table";
 
-export function useTracesTableColumns(showLlmColumns: Ref<boolean>, searchMode: Ref<"traces" | "spans">) {
+export function useTracesTableColumns(
+  showLlmColumns: Ref<boolean>,
+  searchMode: Ref<"traces" | "spans">,
+) {
   return computed<ColumnDef<Record<string, any>>[]>(() => {
     if (searchMode.value === "spans") {
       return [
@@ -37,18 +40,6 @@ export function useTracesTableColumns(showLlmColumns: Ref<boolean>, searchMode: 
           header: "TIMESTAMP",
           size: 160,
           meta: { sortable: true },
-        },
-        {
-          id: "trace_id",
-          header: "TRACE ID",
-          size: 160,
-          meta: { cellClass: "tw:text-[var(--o2-text-1)] tw:font-mono tw:text-[0.75rem]" },
-        },
-        {
-          id: "span_id",
-          header: "SPAN ID",
-          size: 140,
-          meta: { cellClass: "tw:text-[var(--o2-text-1)] tw:font-mono tw:text-[0.75rem]" },
         },
         {
           id: "service",
@@ -78,6 +69,18 @@ export function useTracesTableColumns(showLlmColumns: Ref<boolean>, searchMode: 
           id: "status",
           header: "STATUS",
           size: 120,
+          meta: { align: "center" },
+        },
+        {
+          id: "status_code",
+          header: "STATUS CODE",
+          size: 140,
+          meta: { align: "center" },
+        },
+        {
+          id: "method",
+          header: "METHOD",
+          size: 140,
           meta: { align: "center" },
         },
       ];
