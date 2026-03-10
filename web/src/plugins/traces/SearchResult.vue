@@ -161,7 +161,9 @@ export default defineComponent({
         query: {
           stream: router.currentRoute.value.query.stream,
           trace_id: props.trace_id,
-          span_id: searchObj.meta.searchMode === "spans" ? props.span_id : undefined,
+          ...(searchObj.meta.searchMode === "spans"
+            ? { span_id: props.span_id }
+            : {}),
           from,
           to,
           org_identifier: store.state.selectedOrganization.identifier,

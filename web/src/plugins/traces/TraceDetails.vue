@@ -1713,6 +1713,17 @@ export default defineComponent({
       flatSpans.value = useTraceProcessing(
         treeForFlameGraph as any,
       ).flatSpans.value;
+
+      // After the tree is built, scroll the pre-selected span into view (e.g.
+      // when arriving from spans search mode with a span_id in the URL).
+      if (selectedSpanId.value) {
+        nextTick(() => {
+          const el = document.querySelector(
+            `[data-test="trace-tree-span-container-${selectedSpanId.value}"]`,
+          );
+          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      }
     }
 
     let index = 0;
