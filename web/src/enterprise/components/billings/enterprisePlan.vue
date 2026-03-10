@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator spaced />
 
-    <div class="q-px-md q-pt-sm" style="margin-bottom: 239px;">
+    <div class="q-px-md q-pt-sm">
       <div class="o2-page-subtitle1">{{ t("billing.features") }}</div>
       <div class="o2-page-subtitle2 q-mb-md q-mt-xs">{{ t("billing.included") }}</div>
 
@@ -77,12 +77,18 @@ export default defineComponent({
     const planName = "enterprise";
 
     const features = [
-      { name: 'Everything in Pay as you go plan, plus:', price: '' , is_parent: true},
-      { name: 'Extended Data Retention', price: '' , is_parent: true},
-      { name: 'Priority Support', price: '' , is_parent: true},
-      { name: 'SSO (Single Sign On) with Custom Auth Providers', price: '' , is_parent: true},
-      { name: '(Okta, Microsoft Entra, etc)', price: '' , is_parent: false},
-      { name: 'SLA Guarantees', price: '' , is_parent: true},
+      { name: "Everything in Pay as you go plan, plus:", price: "", is_parent: true },
+      { name: "Premium support", price: "", is_parent: true },
+      { name: "Deployment flexibility (Public Cloud, or Bring Your Own Cloud)", price: "", is_parent: true },
+      { name: "Architecture reviews", price: "", is_parent: true },
+      { name: "Volume discounts", price: "", is_parent: true },
+      { name: '', price: '' , is_parent: false},
+      { name: '', price: '' , is_parent: false},
+      { name: '', price: '' , is_parent: false},
+      { name: '', price: '' , is_parent: false},
+      { name: '', price: '' , is_parent: false},
+      { name: '', price: '' , is_parent: false},
+      { name: '', price: '' , is_parent: false},
       { name: '', price: '' , is_parent: false},
       { name: '', price: '' , is_parent: false},
       { name: '', price: '' , is_parent: false},
