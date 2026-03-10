@@ -139,18 +139,39 @@ async function globalSetup() {
       );
     }
 
-    // If stuck on callback URL (/web/cb#id_token=...), the auth cookies are set
-    // but the client-side router may not complete the redirect.
-    // Navigate directly to /web/ — the auth state is already persisted.
+    // If on callback URL (/web/cb#id_token=...), the SPA needs time to process
+    // the token from the hash before the session is valid. Wait for the SPA to
+    // complete token processing and auto-redirect, rather than navigating away
+    // prematurely (which would lose the session).
     if (page.url().includes('/cb#') || page.url().includes('/cb?')) {
-      testLogger.info('[alpha1] On callback URL — auth cookies set, navigating to /web/...');
-      await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
+      testLogger.info('[alpha1] On callback URL — waiting for SPA token processing...');
+      try {
+        // Wait for the SPA to process the token and redirect away from /cb
+        await page.waitForURL(
+          url => !url.toString().includes('/cb'),
+          { timeout: 30000 }
+        );
+        testLogger.info(`[alpha1] Callback processed, now at: ${page.url()}`);
+      } catch (e) {
+        // If the SPA didn't auto-redirect, wait for network to settle then navigate
+        testLogger.warn('[alpha1] Callback did not auto-redirect, waiting for network idle...');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        if (page.url().includes('/cb')) {
+          testLogger.info('[alpha1] Still on callback, navigating to /web/...');
+          await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
+        }
+      }
     }
 
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch((e) => testLogger.warn('[alpha1] networkidle timeout:', { error: e.message }));
 
     // Step 7: Verify login success
     testLogger.info(`[alpha1] Verifying login at: ${page.url()}`);
+
+    // If we ended up back on Dex, the token exchange failed
+    if (page.url().includes('dex')) {
+      throw new Error(`Login failed — redirected back to Dex after token exchange: ${page.url()}`);
+    }
 
     const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
     await menuItem.waitFor({ state: 'visible', timeout: 15000 });
