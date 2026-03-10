@@ -429,7 +429,7 @@ export const convertPivotTableData = (
         sort: (a: any, b: any) => (Number(a) || 0) - (Number(b) || 0),
         format: (val: any) => {
           if (val === null || val === undefined) return String(missingValue);
-          return !Number.isNaN(val)
+          return typeof val === 'number' && !Number.isNaN(val)
             ? `${formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, decimals)) ?? 0}`
             : val;
         },
@@ -466,7 +466,7 @@ export const convertPivotTableData = (
         sort: (a: any, b: any) => (Number(a) || 0) - (Number(b) || 0),
         format: (val: any) => {
           if (val === null || val === undefined) return String(missingValue);
-          return !Number.isNaN(val)
+          return typeof val === 'number' && !Number.isNaN(val)
             ? `${formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, decimals)) ?? 0}`
             : val;
         },

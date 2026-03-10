@@ -446,23 +446,6 @@ export default defineComponent({
       };
     };
 
-    const getStickyTotalHeaderStyle = (col: any) => {
-      if (!stickyColTotals.value || !col?._isTotalColumn) return {};
-      const rightOffset = (col._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
-      return {
-        position: "sticky",
-        right: `${rightOffset}px`,
-        "z-index": 3,
-        "width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-        "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-        "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-        "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
-        "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
-        "white-space": "normal",
-        "word-break": "break-word",
-      };
-    };
-
     // Style for Total header cells in multi-row pivot headers.
     // Level-0 "Total" cell spans all sub-columns → right: 0.
     // Y-label level cells have individual _totalColRightIndex offsets.
@@ -630,6 +613,7 @@ export default defineComponent({
 
     const isDarkColor = (hex: any) => {
       const result: any = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      if (!result) return false;
       const r = parseInt(result[1], 16);
       const g = parseInt(result[2], 16);
       const b = parseInt(result[3], 16);
@@ -717,7 +701,6 @@ export default defineComponent({
       getStyle,
       getStickyColumnStyle,
       getStickyTotalColumnStyle,
-      getStickyTotalHeaderStyle,
       getStickyTotalHeaderForPivot,
       store,
       copyCellContent,
