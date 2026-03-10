@@ -1,16 +1,57 @@
 const fetch = require('node-fetch');
 const testLogger = require('../playwright-tests/utils/test-logger.js');
-const { getAuthHeaders, getOrgIdentifier } = require('../playwright-tests/utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../playwright-tests/utils/cloud-auth.js');
 
 class APICleanup {
-    constructor() {
+    constructor(page = null) {
+        this._page = page;
         this.baseUrl = process.env.ZO_BASE_URL;
         this.org = getOrgIdentifier();
-        this.email = process.env.ZO_ROOT_USER_EMAIL;
-        this.password = process.env.ZO_ROOT_USER_PASSWORD;
-        // Use centralized auth headers (cloud: no auth header, self-hosted: Basic auth)
+        this.email = process.env.ZO_ROOT_USER_EMAIL || process.env.ALPHA1_USER_EMAIL;
+        this.password = process.env.ZO_ROOT_USER_PASSWORD || process.env.ALPHA1_USER_PASSWORD;
+        // Use centralized auth headers (cloud: email:passcode, self-hosted: email:password)
         const headers = getAuthHeaders();
         this.authHeader = headers['Authorization'] || '';
+    }
+
+    /**
+     * Fetch wrapper: on cloud uses page.evaluate (browser cookies for OIDC auth),
+     * on self-hosted uses node-fetch with Basic Auth.
+     * Falls back to node-fetch if page is unavailable.
+     */
+    async _fetch(url, options = {}) {
+        if (this._page && isCloudEnvironment()) {
+            // Ensure page is on the same origin so session cookies are sent with fetch
+            if (!this._pageNavigated) {
+                try {
+                    await this._page.goto(`${this.baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
+                    this._pageNavigated = true;
+                } catch (e) {
+                    testLogger.warn('Failed to navigate page to baseUrl for cookie auth', { error: e.message });
+                }
+            }
+            try {
+                const result = await this._page.evaluate(async ({ url, options }) => {
+                    const r = await fetch(url, options);
+                    const text = await r.text();
+                    const contentType = r.headers.get('content-type') || '';
+                    return { ok: r.ok, status: r.status, text, contentType };
+                }, { url, options });
+
+                return {
+                    ok: result.ok,
+                    status: result.status,
+                    headers: {
+                        get: (name) => name.toLowerCase() === 'content-type' ? result.contentType : null
+                    },
+                    json: async () => JSON.parse(result.text),
+                    text: async () => result.text,
+                };
+            } catch (e) {
+                testLogger.warn('page.evaluate fetch failed, falling back to node-fetch', { url: url.substring(0, 80), error: e.message });
+            }
+        }
+        return fetch(url, options);
     }
 
     /**
@@ -19,7 +60,7 @@ class APICleanup {
      */
     async fetchDestinationsWithTemplateMapping() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations?page_num=1&page_size=100000&sort_by=name&desc=false&module=alert`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations?page_num=1&page_size=100000&sort_by=name&desc=false&module=alert`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -58,7 +99,7 @@ class APICleanup {
      */
     async fetchAlertFolders() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/v2/${this.org}/folders/alerts`, {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/folders/alerts`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -86,7 +127,7 @@ class APICleanup {
      */
     async fetchAlertsInFolder(folderId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/v2/${this.org}/alerts?sort_by=name&desc=false&name=&folder=${folderId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/alerts?sort_by=name&desc=false&name=&folder=${folderId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -115,7 +156,7 @@ class APICleanup {
      */
     async deleteAlert(alertId, folderId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/v2/${this.org}/alerts/${alertId}?folder=${folderId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/alerts/${alertId}?folder=${folderId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -138,7 +179,7 @@ class APICleanup {
      */
     async deleteFolder(folderId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/v2/${this.org}/folders/alerts/${folderId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/folders/alerts/${folderId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -173,7 +214,7 @@ class APICleanup {
      */
     async fetchDashboardFolders() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/folders`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/folders`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -201,7 +242,7 @@ class APICleanup {
      */
     async fetchDashboardsInFolder(folderName = 'default') {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/dashboards?page_num=0&page_size=1000&sort_by=name&desc=false&name=&folder=${folderName}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/dashboards?page_num=0&page_size=1000&sort_by=name&desc=false&name=&folder=${folderName}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -230,7 +271,7 @@ class APICleanup {
      */
     async deleteDashboard(dashboardId, folderId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/dashboards/${dashboardId}?folder=${folderId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/dashboards/${dashboardId}?folder=${folderId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -257,7 +298,7 @@ class APICleanup {
      */
     async fetchReports() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/reports`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/reports`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -285,7 +326,7 @@ class APICleanup {
      */
     async deleteReport(reportName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/reports/${reportName}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/reports/${reportName}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -312,7 +353,7 @@ class APICleanup {
      */
     async fetchPipelines() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -340,7 +381,7 @@ class APICleanup {
      */
     async deletePipeline(pipelineId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/pipelines/${pipelineId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/pipelines/${pipelineId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -368,7 +409,7 @@ class APICleanup {
      */
     async fetchFunctionsInOrg(org = 'default') {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -397,7 +438,7 @@ class APICleanup {
      */
     async deleteFunctionInOrg(org, functionName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${org}/functions/${functionName}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${org}/functions/${functionName}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -470,7 +511,7 @@ class APICleanup {
      */
     async fetchEnrichmentTables() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams?type=enrichment_tables`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams?type=enrichment_tables`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -498,7 +539,7 @@ class APICleanup {
      */
     async deleteEnrichmentTable(tableName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${tableName}?type=enrichment_tables&delete_all=true`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${tableName}?type=enrichment_tables&delete_all=true`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -576,7 +617,7 @@ class APICleanup {
      */
     async fetchUrlEnrichmentTables() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/enrichment_tables/status`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/enrichment_tables/status`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -850,7 +891,7 @@ class APICleanup {
      */
     async fetchStreams() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams?type=logs`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams?type=logs`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -878,7 +919,7 @@ class APICleanup {
      */
     async deleteStream(streamName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=logs&delete_all=true`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=logs&delete_all=true`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -910,7 +951,7 @@ class APICleanup {
     async isStreamStillDeleting(streamName) {
         try {
             // Phase 1: Check if stream schema exists via GET
-            const getResponse = await fetch(
+            const getResponse = await this._fetch(
                 `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
                 {
                     method: 'GET',
@@ -936,7 +977,7 @@ class APICleanup {
 
             // Phase 2: Schema is gone (404), but deletion marker might still be active
             // Try PUT settings - this triggers is_deleting_stream check without creating data
-            const putResponse = await fetch(
+            const putResponse = await this._fetch(
                 `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
                 {
                     method: 'PUT',
@@ -1064,7 +1105,7 @@ class APICleanup {
      */
     async fetchMetricsStreams() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams?type=metrics`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams?type=metrics`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1092,7 +1133,7 @@ class APICleanup {
      */
     async deleteMetricsStream(streamName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=metrics&delete_all=true`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=metrics&delete_all=true`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1290,7 +1331,7 @@ class APICleanup {
      */
     async fetchPipelineDestinations() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations?page_num=1&page_size=100000&sort_by=name&desc=false&module=pipeline`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations?page_num=1&page_size=100000&sort_by=name&desc=false&module=pipeline`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1318,7 +1359,7 @@ class APICleanup {
      */
     async deletePipelineDestination(name) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${name}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${name}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1390,7 +1431,7 @@ class APICleanup {
      */
     async fetchServiceAccounts() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/service_accounts`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/service_accounts`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1418,7 +1459,7 @@ class APICleanup {
      */
     async deleteServiceAccount(email) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/service_accounts/${email}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/service_accounts/${email}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1494,7 +1535,7 @@ class APICleanup {
      */
     async fetchUsers() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/users`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/users`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1522,7 +1563,7 @@ class APICleanup {
      */
     async deleteUser(email) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/users/${email}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/users/${email}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1606,7 +1647,7 @@ class APICleanup {
 
         try {
             // Fetch all regex patterns
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1686,7 +1727,7 @@ class APICleanup {
 
             for (const pattern of matchingPatterns) {
                 try {
-                    const deleteResponse = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${pattern.id}`, {
+                    const deleteResponse = await this._fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${pattern.id}`, {
                         method: 'DELETE',
                         headers: {
                             'Authorization': this.authHeader,
@@ -1734,7 +1775,7 @@ class APICleanup {
         testLogger.info('Starting logo cleanup');
 
         try {
-            const response = await fetch(`${this.baseUrl}/api/_meta/settings/logo`, {
+            const response = await this._fetch(`${this.baseUrl}/api/_meta/settings/logo`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1768,7 +1809,7 @@ class APICleanup {
      */
     async fetchSearchJobs() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/search_jobs?type=logs`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/search_jobs?type=logs`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1796,7 +1837,7 @@ class APICleanup {
      */
     async deleteSearchJob(jobId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/search_jobs/${jobId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/search_jobs/${jobId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1867,7 +1908,7 @@ class APICleanup {
      */
     async fetchSavedViews() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/savedviews`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/savedviews`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1895,7 +1936,7 @@ class APICleanup {
      */
     async deleteSavedView(viewId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/savedviews/${viewId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/savedviews/${viewId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2107,7 +2148,7 @@ class APICleanup {
                 testLogger.info('Found destinations matching prefixes/patterns', { total: matchingDestinations.length });
 
                 for (const destination of matchingDestinations) {
-                    const deleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${destination.name}`, {
+                    const deleteResult = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${destination.name}`, {
                         method: 'DELETE',
                         headers: {
                             'Authorization': this.authHeader,
@@ -2146,7 +2187,7 @@ class APICleanup {
             if (templatePrefixes.length > 0) {
                 testLogger.info('Step 4: Deleting templates matching prefixes', { prefixes: templatePrefixes });
 
-                const allTemplatesResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates?page_num=1&page_size=100000&sort_by=name&desc=false`, {
+                const allTemplatesResponse = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/templates?page_num=1&page_size=100000&sort_by=name&desc=false`, {
                     method: 'GET',
                     headers: {
                         'Authorization': this.authHeader,
@@ -2162,7 +2203,7 @@ class APICleanup {
                     testLogger.info('Found templates matching prefixes', { total: matchingTemplates.length });
 
                     for (const template of matchingTemplates) {
-                        const templateDeleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates/${template.name}`, {
+                        const templateDeleteResult = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/templates/${template.name}`, {
                             method: 'DELETE',
                             headers: {
                                 'Authorization': this.authHeader,
@@ -2253,7 +2294,7 @@ class APICleanup {
         testLogger.info('Creating stream via API', { streamName, streamType });
 
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=${streamType}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=${streamType}`, {
                 method: 'POST',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2383,7 +2424,7 @@ class APICleanup {
         testLogger.info('Pipeline payload', { payload: JSON.stringify(pipelinePayload, null, 2) });
 
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
                 method: 'POST',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2433,7 +2474,7 @@ class APICleanup {
             const record = data[i];
 
             try {
-                const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/${streamName}/_json`, {
+                const response = await this._fetch(`${process.env.INGESTION_URL}/api/${this.org}/${streamName}/_json`, {
                     method: 'POST',
                     headers: {
                         'Authorization': this.authHeader,
@@ -2494,7 +2535,7 @@ class APICleanup {
         };
 
         try {
-            const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/_search?type=logs`, {
+            const response = await this._fetch(`${process.env.INGESTION_URL}/api/${this.org}/_search?type=logs`, {
                 method: 'POST',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2533,7 +2574,7 @@ class APICleanup {
      */
     async fetchRegexPatterns() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2566,7 +2607,7 @@ class APICleanup {
      */
     async deleteRegexPatternById(patternId, patternName = '') {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${patternId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${patternId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2719,7 +2760,7 @@ class APICleanup {
 
         try {
             // First, fetch the current deduplication config
-            const getResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
+            const getResponse = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2769,7 +2810,7 @@ class APICleanup {
                     .filter(id => !groupIds.includes(id))
             };
 
-            const updateResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
+            const updateResponse = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
                 method: 'POST',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2796,7 +2837,7 @@ class APICleanup {
      */
     async verifyStreamExists(streamName) {
         try {
-            const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/streams`, {
+            const response = await this._fetch(`${process.env.INGESTION_URL}/api/${this.org}/streams`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
