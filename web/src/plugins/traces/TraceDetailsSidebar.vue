@@ -1294,8 +1294,9 @@ export default defineComponent({
       else expandedEvents.value[index.toString()] = true;
     };
 
-    const getSpanKind = (id: number | string): string => {
-      return SPAN_KIND_MAP[String(id)] || "Unknown";
+    const getSpanKind = (id: number | string | null | undefined): string => {
+      if (id === null || id === undefined || id === "") return "Unspecified";
+      return SPAN_KIND_MAP[String(id)] || String(id);
     };
 
     const getFormattedSpanDetails = () => {

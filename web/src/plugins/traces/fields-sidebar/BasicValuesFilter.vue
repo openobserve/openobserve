@@ -232,7 +232,10 @@ const mappedFieldValues = computed(() => {
     ...entry,
     values: entry.values.map((v: { key: string; count: number }) => ({
       ...v,
-      label: SPAN_KIND_MAP[v.key] ?? v.key,
+      label:
+        v.key === null || v.key === undefined || v.key === ""
+          ? "Unspecified"
+          : (SPAN_KIND_MAP[v.key] ?? v.key),
     })),
   };
 });

@@ -1930,7 +1930,7 @@ export default defineComponent({
       if (spanKind === null || spanKind === undefined || spanKind === "") {
         return "Unspecified";
       }
-      return SPAN_KIND_MAP[String(spanKind)] || "Unknown";
+      return SPAN_KIND_MAP[String(spanKind)] || String(spanKind);
     };
 
     const closeSidebar = () => {
