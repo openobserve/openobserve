@@ -37,6 +37,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="o2-page-subtitle1">{{ t("billing.features") }}</div>
       <div class="o2-page-subtitle2 q-mb-md q-mt-xs">{{ t("billing.included") }}</div>
 
+      <div
+        v-if="pricingError && !features?.length"
+        class="row items-center q-mb-sm text-negative"
+      >
+        <q-icon name="warning" size="16px" class="q-mr-sm" />
+        <span class="o2-page-subtitle3"
+          >Failed to load pricing details. Please refresh the page.</span
+        >
+      </div>
       <div v-for="(feature, index) in features" :key="index" class="row items-center justify-between q-mb-sm">
         <div class="row items-center">
           <q-icon v-if="feature.is_parent" name="check_circle" color="green" size="16px" class="q-mr-sm" />
@@ -72,7 +81,7 @@ import { siteURL } from "@/constants/config";
 
 export default defineComponent({
   name: "enterprisePlan",
-  props: ["features"],
+  props: ["features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();
 

@@ -46,10 +46,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :planType="planType"
         :billingProvider="billingProvider"
         :features="proPlanFeatures"
+        :pricingError="pricingError"
         @update:proSubscription="onLoadSubscription(config.paidPlan)"
         @update:cancelSubscription="onUnsubscribe"
       ></pro-plan>
-      <enterprise-plan :features="enterprisePlanFeatures"></enterprise-plan>
+      <enterprise-plan
+        :features="enterprisePlanFeatures"
+        :pricingError="pricingError"
+      ></enterprise-plan>
     </div>
   </q-page>
 </template>
@@ -117,7 +121,7 @@ export default defineComponent({
         this.proPlanFeatures = proFeatures;
         this.enterprisePlanFeatures = paddedEntFeatures;
       } catch {
-        // silently fall back to hardcoded defaults in child components
+        this.pricingError = true;
       }
     },
     onLoadSubscription(planType: string) {
@@ -250,6 +254,7 @@ export default defineComponent({
     const billingProvider = ref("");
     const proPlanFeatures: any = ref([]);
     const enterprisePlanFeatures: any = ref([]);
+    const pricingError = ref(false);
 
     const retrieveHostedPage = () => {
       BillingService.retrieve_hosted_page(
@@ -281,6 +286,7 @@ export default defineComponent({
       billingProvider,
       proPlanFeatures,
       enterprisePlanFeatures,
+      pricingError,
     };
   },
 });
