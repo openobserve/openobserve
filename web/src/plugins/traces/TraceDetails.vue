@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tw:flex tw:items-center tw:space-x-2">
             <!-- Unified Search Input Group -->
-            <div class="unified-search-group">
+            <div v-if="activeTab !== 'flame-graph' && activeTab !== 'map'" class="unified-search-group">
               <div class="log-stream-search-input">
                 <q-input
                   v-model="searchQuery"
@@ -834,7 +834,7 @@ export default defineComponent({
 
     const ChartData: any = ref({});
 
-    const leftWidth: Ref<number> = ref(250);
+    const leftWidth: Ref<number> = ref(460);
     const initialX: Ref<number> = ref(0);
     const initialWidth: Ref<number> = ref(0);
 
@@ -1713,6 +1713,17 @@ export default defineComponent({
       flatSpans.value = useTraceProcessing(
         treeForFlameGraph as any,
       ).flatSpans.value;
+
+      // After the tree is built, scroll the pre-selected span into view (e.g.
+      // when arriving from spans search mode with a span_id in the URL).
+      if (selectedSpanId.value) {
+        nextTick(() => {
+          const el = document.querySelector(
+            `[data-test="trace-tree-span-container-${selectedSpanId.value}"]`,
+          );
+          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      }
     }
 
     let index = 0;

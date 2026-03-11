@@ -41,12 +41,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-if="field.dataType"
               class="field-type-container"
-              :title="field.dataType"
             >
-              <FieldTypeBadge :dataType="field.dataType" />
               <q-icon
                 class="field-expand-icon"
-                :name="isExpanded ? 'expand_less' : 'expand_more'"
+                :name="isExpanded ? 'expand_more' : 'chevron_right'"
                 size="1rem"
               />
             </span>
@@ -143,7 +141,6 @@ import {
   outlinedVisibility,
   outlinedVisibilityOff,
 } from "@quasar/extras/material-icons-outlined";
-import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 
 interface Props {
@@ -210,16 +207,6 @@ const handleBeforeHide = () => {
   align-items: center;
   padding: 0 0.25rem;
   background: var(--q-dark);
-}
-
-// field-type-container base styles come from the global _field-type-badge.scss partial;
-// override only what differs in the logs expansion context.
-.field-type-container {
-  margin-left: 0.1rem;
-}
-
-.field-expansion-header:hover .field-expand-icon {
-  left: -2px;
 }
 
 :deep(.q-expansion-item):hover .field_overlay {

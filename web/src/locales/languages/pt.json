@@ -731,9 +731,9 @@
     "usage_information": "Informações de uso",
     "license_allows_ingestion": "Sua licença permite <strong>{limit} GB</strong> de ingestão de dados por dia.",
     "limit_exceeded_days": "Limite excedido em <strong class=\"{colorClass}\">{dias} dias</strong> deste mês",
-    "limit_exceeded_warning": " (máximo de 3 dias permitidos). O recurso do aplicativo será restrito",
-    "limit_exceeded_info": " ({remaining} subsídio{plural} à esquerda de 3 no máximo)",
-    "no_limit_exceedances": "Nenhum limite excede este mês (máximo de 3 permitidos por mês).",
+    "limit_exceeded_warning": " (máximo de {max} dias permitidos). O recurso do aplicativo será restrito",
+    "limit_exceeded_info": " ({remaining} subsídio{plural} à esquerda de {max} no máximo)",
+    "no_limit_exceedances": "Nenhum limite excede este mês (máximo de {max} permitidos por mês).",
     "usage_shows_zero_unlimited": "* O uso mostra 0% para planos ilimitados",
     "license_updated_success": "Licença atualizada com sucesso",
     "failed_to_update_license": "Falha ao atualizar a licença",
@@ -744,7 +744,8 @@
     "yes_update_license": "Sim, atualize a licença",
     "no_keep_current": "Não, mantenha-se atualizado",
     "feature_correlation_management": "Gerenciamento de correlações",
-    "feature_log_patterns": "Padrões de registro"
+    "feature_log_patterns": "Padrões de registro",
+    "environment_type": "Tipo de ambiente"
   },
   "login": {
     "userid": "ID do usuário",
@@ -2068,7 +2069,35 @@
     "noStreamSelected": "Nenhum stream selecionado",
     "resultsIncludeAllWindows": "Os resultados incluem todas as adições de várias janelas",
     "runQueryForOutput": "Clique em Executar consulta para ver a saída",
-    "applyVRLForOutput": "Clique em Aplicar VRL para ver a saída combinada"
+    "applyVRLForOutput": "Clique em Aplicar VRL para ver a saída combinada",
+    "anomalyDetection": "Detecção de anomalias",
+    "newAnomalyDetection": "Nova detecção de anomalias",
+    "editAnomalyDetection": "Editar detecção de anomalias",
+    "anomalyDetectionSubtitle": "Detecte anomalias em seus dados de observabilidade usando aprendizado de máquina",
+    "anomalyDetectionConfig": "Configuração de detecção",
+    "alerting": "Alertando",
+    "saveAndTrain": "Economize e treine",
+    "detectionInterval": "Intervalo de detecção",
+    "trainingWindow": "Janela de treinamento",
+    "sensitivity": "Sensibilidade",
+    "sensitivityHint": "Percentil mais alto = menos alertas. Somente as anomalias mais extremas são sinalizadas.",
+    "queryMode": "Modo de consulta",
+    "detectionFunction": "Função de detecção",
+    "trained": "Treinado",
+    "notTrained": "Não treinado",
+    "lastDetection": "Última detecção",
+    "nextRun": "Próxima corrida",
+    "triggerTraining": "Trigger o treinamento",
+    "retraining": "Reciclagem...",
+    "sqlPreview": "Pré-visualização do SQL",
+    "configSummary": "Resumo",
+    "anomalyStatus": {
+      "waiting": "Esperando",
+      "training": "Treinamento",
+      "active": "Ativo",
+      "failed": "Falhou",
+      "disabled": "Desativado"
+    }
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2599,7 +2628,10 @@
     "success": "SUCESSO",
     "today": "Hoje",
     "yesterday": "Ontem",
-    "spanColorPalettePreview": "Pré-visualização da paleta de cores Span"
+    "spanColorPalettePreview": "Pré-visualização da paleta de cores Span",
+    "errorsFound": "Traços de erro",
+    "spansTitle": "VÃOS",
+    "spansFound": "Vãos encontrados"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -3062,8 +3094,8 @@
     "namePlaceholder": "por exemplo, Exibir detalhes do rastreamento",
     "urlTemplate": "Modelo de URL",
     "urlRequired": "O URL é obrigatório",
-    "urlPlaceholder": "por exemplo, https://example.com/trace/${field. __valor}? de=$ {start_time} &a=$ {end_time}",
-    "urlHint": "Use $ {field. __name}, $ {field. __value}, $ {start_time}, $ {end_time}, $ {query}, $ {query_encoded}",
+    "urlPlaceholder": "ex., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "Use {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Campos",
     "fieldsHint": "Mostrar link somente quando pelo menos um campo estiver presente no registro",
     "fieldSearchPlaceholder": "Digite para pesquisar ou inserir um campo personalizado",

@@ -731,9 +731,9 @@
     "usage_information": "Información de uso",
     "license_allows_ingestion": "Su licencia permite <strong>{limit} GB</strong> de ingesta de datos por día.",
     "limit_exceeded_days": "Límite superado el <strong class=\"{colorClass}\">día {days} {plural}</strong> de este mes",
-    "limit_exceeded_warning": " (se permite un máximo de 3 días). La función de la aplicación estará restringida",
-    "limit_exceeded_info": " (asignación {remaining} {plural} restante de 3 como máximo)",
-    "no_limit_exceedances": "No se superará el límite este mes (se permite un máximo de 3 por mes).",
+    "limit_exceeded_warning": " (se permite un máximo de {max} días). La función de la aplicación estará restringida",
+    "limit_exceeded_info": " (asignación {remaining} {plural} restante de {max} como máximo)",
+    "no_limit_exceedances": "No se superará el límite este mes (se permite un máximo de {max} por mes).",
     "usage_shows_zero_unlimited": "* El uso muestra un 0% para planes ilimitados",
     "license_updated_success": "La licencia se actualizó correctamente",
     "failed_to_update_license": "No se pudo actualizar la licencia",
@@ -744,7 +744,8 @@
     "yes_update_license": "Sí, actualizar la licencia",
     "no_keep_current": "No, mantente al día",
     "feature_correlation_management": "Gestión de correlaciones",
-    "feature_log_patterns": "Patrones de registro"
+    "feature_log_patterns": "Patrones de registro",
+    "environment_type": "Tipo de entorno"
   },
   "login": {
     "userid": "ID de usuario",
@@ -2068,7 +2069,35 @@
     "noStreamSelected": "No se ha seleccionado ninguna transmisión",
     "resultsIncludeAllWindows": "Los resultados incluyen todas las adiciones de ventanas múltiples",
     "runQueryForOutput": "Haga clic en Ejecutar consulta para ver el resultado",
-    "applyVRLForOutput": "Haga clic en Aplicar VRL para ver la salida combinada"
+    "applyVRLForOutput": "Haga clic en Aplicar VRL para ver la salida combinada",
+    "anomalyDetection": "Detección de anomalías",
+    "newAnomalyDetection": "Detección de nuevas anomalías",
+    "editAnomalyDetection": "Editar detección de anomalías",
+    "anomalyDetectionSubtitle": "Detecte anomalías en sus datos de observabilidad mediante el aprendizaje automático",
+    "anomalyDetectionConfig": "Configuración de detección",
+    "alerting": "Alertar",
+    "saveAndTrain": "Ahorra y entrena",
+    "detectionInterval": "Intervalo de detección",
+    "trainingWindow": "Ventana de entrenamiento",
+    "sensitivity": "Sensibilidad",
+    "sensitivityHint": "Un percentil más alto = menos alertas. Solo se marcan las anomalías más extremas.",
+    "queryMode": "Modo de consulta",
+    "detectionFunction": "Función de detección",
+    "trained": "Entrenado",
+    "notTrained": "No está entrenado",
+    "lastDetection": "Última detección",
+    "nextRun": "Próxima ejecución",
+    "triggerTraining": "Entrenamiento de desencadenantes",
+    "retraining": "Readiestramiento...",
+    "sqlPreview": "Vista previa de SQL",
+    "configSummary": "Resumen",
+    "anomalyStatus": {
+      "waiting": "Esperando",
+      "training": "Entrenamiento",
+      "active": "Activo",
+      "failed": "Falló",
+      "disabled": "Discapacitado"
+    }
   },
   "alert_templates": {
     "header": "Plantillas",
@@ -2597,7 +2626,10 @@
     "success": "ÉXITO",
     "today": "Hoy",
     "yesterday": "Ayer",
-    "spanColorPalettePreview": "Vista previa de la paleta de colores Span"
+    "spanColorPalettePreview": "Vista previa de la paleta de colores Span",
+    "errorsFound": "Rastreos de errores",
+    "spansTitle": "SE EXTIENDE",
+    "spansFound": "Vanos encontrados"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -3060,8 +3092,8 @@
     "namePlaceholder": "p. ej., Ver detalles de rastreo",
     "urlTemplate": "Plantilla de URL",
     "urlRequired": "La URL es obligatoria",
-    "urlPlaceholder": "por ejemplo, https://example.com/trace/${field. __valor}? desde=$ {start_time} &a=$ {end_time}",
-    "urlHint": "Usa $ {field. __name}, $ {field. __value}, $ {start_time}, $ {end_time}, $ {query}, $ {query_coded}",
+    "urlPlaceholder": "p. ej., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "Usa {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Campos",
     "fieldsHint": "Mostrar enlace solo cuando hay al menos un campo en el registro",
     "fieldSearchPlaceholder": "Escriba para buscar o introduzca un campo personalizado",

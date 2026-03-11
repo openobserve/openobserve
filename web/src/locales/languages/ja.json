@@ -731,9 +731,9 @@
     "usage_information": "使用情報",
     "license_allows_ingestion": "このライセンスでは、1 日あたり <strong>{limit} GB</strong> のデータを取り込むことができます。",
     "limit_exceeded_days": "今月の <strong class=\"{colorClass}\">{days} 日{plural} 日に制限を超えました</strong>",
-    "limit_exceeded_warning": " （最大3日まで可能）。アプリケーション機能は制限されます",
-    "limit_exceeded_info": " (最大3個のうち {remaining} 個残り {plural})",
-    "no_limit_exceedances": "今月は上限超過なし (1 か月あたり 3 回まで)。",
+    "limit_exceeded_warning": " （最大{max}日まで可能）。アプリケーション機能は制限されます",
+    "limit_exceeded_info": " (最大{max}個のうち {remaining} 個残り {plural})",
+    "no_limit_exceedances": "今月は上限超過なし (1 か月あたり {max} 回まで)。",
     "usage_shows_zero_unlimited": "* 無制限プランでは使用量が 0% と表示される",
     "license_updated_success": "ライセンスは正常に更新されました",
     "failed_to_update_license": "ライセンスを更新できませんでした",
@@ -744,7 +744,8 @@
     "yes_update_license": "はい、ライセンスを更新してください",
     "no_keep_current": "いいえ、最新の状態に保つ",
     "feature_correlation_management": "相関管理",
-    "feature_log_patterns": "ログパターン"
+    "feature_log_patterns": "ログパターン",
+    "environment_type": "環境タイプ"
   },
   "login": {
     "userid": "ユーザーID",
@@ -2085,7 +2086,35 @@
     "noStreamSelected": "ストリームが選択されていません",
     "resultsIncludeAllWindows": "結果にはマルチウィンドウの追加がすべて含まれます",
     "runQueryForOutput": "[クエリの実行] をクリックして出力を確認してください",
-    "applyVRLForOutput": "結合された出力を確認するには、[VRL を適用] をクリックしてください"
+    "applyVRLForOutput": "結合された出力を確認するには、[VRL を適用] をクリックしてください",
+    "anomalyDetection": "異常検知",
+    "newAnomalyDetection": "新しい異常検出",
+    "editAnomalyDetection": "異常検出の編集",
+    "anomalyDetectionSubtitle": "機械学習を使用してオブザーバビリティデータの異常を検出",
+    "anomalyDetectionConfig": "検出設定",
+    "alerting": "アラート",
+    "saveAndTrain": "保存してトレーニング",
+    "detectionInterval": "検出間隔",
+    "trainingWindow": "トレーニングウィンドウ",
+    "sensitivity": "感度",
+    "sensitivityHint": "パーセンタイルが高いほど、アラートが少なくなります。最も極端な異常のみにフラグが立てられます。",
+    "queryMode": "クエリーモード",
+    "detectionFunction": "検出機能",
+    "trained": "訓練を受けた",
+    "notTrained": "訓練を受けていない",
+    "lastDetection": "最終検出",
+    "nextRun": "次回の実行",
+    "triggerTraining": "トリガートレーニング",
+    "retraining": "再訓練...",
+    "sqlPreview": "SQL プレビュー",
+    "configSummary": "サマリー",
+    "anomalyStatus": {
+      "waiting": "待っています",
+      "training": "トレーニング",
+      "active": "アクティブ",
+      "failed": "失敗",
+      "disabled": "無効"
+    }
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -2620,7 +2649,10 @@
     "success": "成功",
     "today": "今日",
     "yesterday": "昨日",
-    "spanColorPalettePreview": "Span カラーパレットのプレビュー"
+    "spanColorPalettePreview": "Span カラーパレットのプレビュー",
+    "errorsFound": "エラートレース",
+    "spansTitle": "スパン",
+    "spansFound": "スパンが見つかりました"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -3062,8 +3094,8 @@
     "namePlaceholder": "例:トレースの詳細を表示",
     "urlTemplate": "URL テンプレート",
     "urlRequired": "URL が必要です",
-    "urlPlaceholder": "例:https://example.com/trace/${field。__value}?始点=$ {開始時刻} &to=$ {終了時刻}",
-    "urlHint": "$ {フィールドを使用してください。__名前}、$ {フィールド。__value}, $ {start_time}, $ {end_time}, $ {query}, $ {query_encoded}",
+    "urlPlaceholder": "例: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "{'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'} を使用",
     "fields": "フィールド",
     "fieldsHint": "レコードに少なくとも 1 つのフィールドが存在する場合にのみリンクを表示",
     "fieldSearchPlaceholder": "入力して検索するか、カスタムフィールドを入力します",

@@ -731,9 +731,9 @@
     "usage_information": "사용 정보",
     "license_allows_ingestion": "라이선스는 하루에 <strong>{limit} GB의</strong> 데이터 수집을 허용합니다.",
     "limit_exceeded_days": "이번 달 <strong class=\"{colorClass}\">{days} 일{plural} 일에</strong> 한도를 초과했습니다.",
-    "limit_exceeded_warning": " (최대 3일 허용).애플리케이션 기능이 제한됩니다.",
-    "limit_exceeded_info": " (최대 3개 중 {remaining} 개의 허용량 {plural} 개)",
-    "no_limit_exceedances": "이번 달에는 한도 초과가 없습니다 (월 최대 3회 허용).",
+    "limit_exceeded_warning": " (최대 {max}일 허용).애플리케이션 기능이 제한됩니다.",
+    "limit_exceeded_info": " (최대 {max}개 중 {remaining} 개의 허용량 {plural} 개)",
+    "no_limit_exceedances": "이번 달에는 한도 초과가 없습니다 (월 최대 {max}회 허용).",
     "usage_shows_zero_unlimited": "* 무제한 요금제의 사용량은 0% 로 표시됩니다.",
     "license_updated_success": "라이선스가 성공적으로 업데이트되었습니다",
     "failed_to_update_license": "라이선스 업데이트 실패",
@@ -744,7 +744,8 @@
     "yes_update_license": "예, 라이선스 업데이트",
     "no_keep_current": "아니요, 최신 상태로 유지",
     "feature_correlation_management": "상관관계 관리",
-    "feature_log_patterns": "로그 패턴"
+    "feature_log_patterns": "로그 패턴",
+    "environment_type": "환경 유형"
   },
   "login": {
     "userid": "사용자 ID",
@@ -2068,7 +2069,35 @@
     "noStreamSelected": "선택한 스트림 없음",
     "resultsIncludeAllWindows": "결과에는 모든 다중 창 추가 사항이 포함됩니다.",
     "runQueryForOutput": "결과를 보려면 [쿼리 실행] 을 클릭하십시오.",
-    "applyVRLForOutput": "VRL 적용을 클릭하여 결합된 출력을 확인하십시오."
+    "applyVRLForOutput": "VRL 적용을 클릭하여 결합된 출력을 확인하십시오.",
+    "anomalyDetection": "이상 징후 탐지",
+    "newAnomalyDetection": "새로운 이상 탐지",
+    "editAnomalyDetection": "이상 탐지 편집",
+    "anomalyDetectionSubtitle": "머신러닝을 사용하여 옵저버빌리티 데이터에서 이상 징후를 감지합니다.",
+    "anomalyDetectionConfig": "탐지 구성",
+    "alerting": "알림",
+    "saveAndTrain": "저장 및 교육",
+    "detectionInterval": "감지 간격",
+    "trainingWindow": "교육 창",
+    "sensitivity": "민감도",
+    "sensitivityHint": "백분위수가 높을수록 경고가 적어집니다.가장 극단적인 예외 항목만 플래그됩니다.",
+    "queryMode": "쿼리 모드",
+    "detectionFunction": "감지 기능",
+    "trained": "트레이닝",
+    "notTrained": "교육을 받지 않음",
+    "lastDetection": "마지막 탐지",
+    "nextRun": "다음 실행",
+    "triggerTraining": "트리거 트레이닝",
+    "retraining": "재교육...",
+    "sqlPreview": "SQL 미리 보기",
+    "configSummary": "요약",
+    "anomalyStatus": {
+      "waiting": "대기 중",
+      "training": "트레이닝",
+      "active": "액티브",
+      "failed": "실패",
+      "disabled": "장애인"
+    }
   },
   "alert_templates": {
     "header": "템플릿",
@@ -2599,7 +2628,10 @@
     "success": "성공",
     "today": "오늘",
     "yesterday": "어제",
-    "spanColorPalettePreview": "스팬 컬러 팔레트 미리보기"
+    "spanColorPalettePreview": "스팬 컬러 팔레트 미리보기",
+    "errorsFound": "오류 추적",
+    "spansTitle": "기간",
+    "spansFound": "스팬 발견"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -3062,8 +3094,8 @@
     "namePlaceholder": "예: 트레이스 세부 정보 보기",
     "urlTemplate": "URL 템플릿",
     "urlRequired": "URL이 필요합니다",
-    "urlPlaceholder": "예: https://example.com/trace/${field.__값}?시작=$ {시작_시간} &to=$ {종료_시간}",
-    "urlHint": "$ {필드를 사용하십시오.__이름}, $ {필드.__값}, $ {시작_시간}, $ {종료_시간}, $ {쿼리}, $ {쿼리_인코딩}",
+    "urlPlaceholder": "예: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "{'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'} 사용",
     "fields": "필드",
     "fieldsHint": "레코드에 하나 이상의 필드가 있는 경우에만 링크 표시",
     "fieldSearchPlaceholder": "입력하여 검색하거나 사용자 지정 필드 입력",
