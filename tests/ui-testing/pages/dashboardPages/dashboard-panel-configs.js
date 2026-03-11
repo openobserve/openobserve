@@ -94,6 +94,28 @@ export default class DashboardPanelConfigs {
     this.connectNullValuesToggle = page.locator(
       '[data-test="dashboard-config-connect-null-values"]'
     );
+
+    // Time Shift (Compare Against / Multi-Window) locators
+    this.timeShiftAddBtn = page.locator(
+      '[data-test="dashboard-addpanel-config-time-shift-add-btn"]'
+    );
+
+    // Color By Series locators
+    this.colorBySeriesBtn = page.locator(
+      '[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]'
+    );
+    this.colorBySeriesPopup = page.locator(
+      '[data-test="dashboard-color-by-series-popup"]'
+    );
+    this.colorBySeriesAddColorBtn = page.locator(
+      '[data-test="dashboard-addpanel-config-color-by-series-add-btn"]'
+    );
+    this.colorBySeriesSaveBtn = page.locator(
+      '[data-test="dashboard-addpanel-config-color-by-series-apply-btn"]'
+    );
+    this.colorBySeriesCancelBtn = page.locator(
+      '[data-test="dashboard-color-by-series-cancel"]'
+    );
   }
   /// Open the config panel
   async openConfigPanel() {
@@ -415,6 +437,219 @@ export default class DashboardPanelConfigs {
     }
 
     return isChecked;
+  }
+
+  // ========== Time Shift (Compare Against / Multi-Window) ==========
+
+  /**
+   * Scroll sidebar until target element is visible
+   * @param {import('@playwright/test').Locator} targetLocator - Element to scroll to
+   */
+  async scrollSidebarToElement(targetLocator) {
+    const sidebar = this.page.locator('.sidebar-content');
+    await sidebar.waitFor({ state: "visible" });
+    await sidebar.hover();
+
+    for (let i = 0; i < 15; i++) {
+      if (await targetLocator.isVisible().catch(() => false)) break;
+      await this.page.mouse.wheel(0, 300);
+      await this.page.waitForTimeout(200);
+    }
+
+    if (!(await targetLocator.isVisible().catch(() => false))) {
+      await this.page.evaluate((selector) => {
+        const el = document.querySelector(selector);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, await targetLocator.evaluate(el => {
+        return el.getAttribute('data-test')
+          ? `[data-test="${el.getAttribute('data-test')}"]`
+          : null;
+      }).catch(() => null) || '.sidebar-content');
+
+      // Fallback: scroll sidebar to bottom
+      await this.page.evaluate(() => {
+        const el = document.querySelector('.sidebar-content');
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+      await this.page.waitForTimeout(500);
+    }
+
+    await targetLocator.waitFor({ state: "visible", timeout: 15000 });
+  }
+
+  /**
+   * Add a time shift entry (Compare Against) with default 15m offset
+   * Opens config sidebar first if needed
+   */
+  async addTimeShift() {
+    await this.scrollSidebarToElement(this.timeShiftAddBtn);
+    await this.timeShiftAddBtn.click();
+  }
+
+  /**
+   * Remove a time shift entry at the given index
+   * @param {number} index - Index of the time shift to remove (0-based)
+   */
+  async removeTimeShift(index = 0) {
+    const removeBtn = this.page.locator(
+      `[data-test="dashboard-addpanel-config-time-shift-remove-${index}"]`
+    );
+    await removeBtn.waitFor({ state: "visible" });
+    await removeBtn.click();
+  }
+
+  // ========== Color By Series ==========
+
+  /**
+   * Open the Color By Series popup dialog
+   */
+  async openColorBySeries() {
+    await this.scrollSidebarToElement(this.colorBySeriesBtn);
+    await this.colorBySeriesBtn.click();
+    await this.colorBySeriesPopup.waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  /**
+   * Select a series from the autocomplete dropdown at the given row index.
+   * Can select by index or by matching text (e.g., "ago" to find comparison series).
+   * @param {number} rowIndex - Row index in the color-by-series popup (0-based)
+   * @param {Object} options - Selection options
+   * @param {number} [options.optionIndex] - Which option to select by index (0-based)
+   * @param {string} [options.matchText] - Text to match in the option (e.g., "ago", "Minutes")
+   * @returns {string} The selected series name
+   */
+  async selectColorBySeriesOption(rowIndex = 0, { optionIndex, matchText } = {}) {
+    const autoComplete = this.colorBySeriesPopup
+      .locator('[data-test="common-auto-complete"]')
+      .nth(rowIndex);
+    await autoComplete.waitFor({ state: "visible" });
+    await autoComplete.click();
+
+    const optionLocators = this.colorBySeriesPopup.locator(
+      '[data-test="common-auto-complete-option"]'
+    );
+    await optionLocators.first().waitFor({ state: "visible", timeout: 10000 });
+
+    let targetOption;
+
+    if (matchText) {
+      // Find option containing the match text (e.g., "ago" for comparison series)
+      const count = await optionLocators.count();
+      for (let i = 0; i < count; i++) {
+        const text = await optionLocators.nth(i).textContent();
+        if (text && text.includes(matchText)) {
+          targetOption = optionLocators.nth(i);
+          break;
+        }
+      }
+      // Fallback to last option if no match (comparison series is usually last)
+      if (!targetOption && count > 1) {
+        targetOption = optionLocators.nth(count - 1);
+      } else if (!targetOption) {
+        targetOption = optionLocators.first();
+      }
+    } else {
+      targetOption = optionLocators.nth(optionIndex ?? 0);
+    }
+
+    const seriesName = await targetOption.textContent();
+    await targetOption.click();
+
+    return seriesName?.trim() || "";
+  }
+
+  /**
+   * Set a color for a series row in the Color By Series popup
+   * @param {number} rowIndex - Row index (0-based)
+   * @param {string} color - Hex color value (e.g., "#FF0000")
+   */
+  async setColorForSeriesRow(rowIndex = 0, color = "#5960b2") {
+    // Click "Set color" button if the color picker is not yet initialized
+    const setColorBtn = this.colorBySeriesPopup.getByText("Set color");
+    if (await setColorBtn.first().isVisible().catch(() => false)) {
+      await setColorBtn.first().click();
+      await this.page.waitForTimeout(500);
+    }
+
+    // Set color via Vue's reactive data (setupState).
+    // Quasar's q-input v-model doesn't respond to Playwright's fill()/type()/
+    // pressSequentially() — none trigger Vue's reactivity system.
+    // Access the Vue component instance via __vueParentComponent and
+    // directly set editColorBySeries[rowIndex].color.
+    const result = await this.page.evaluate(
+      ({ color, rowIndex }) => {
+        const popup = document.querySelector(
+          '[data-test="dashboard-color-by-series-popup"]'
+        );
+        if (!popup || !popup.__vueParentComponent) return { success: false };
+
+        const vpc = popup.__vueParentComponent;
+        const series = vpc.setupState?.editColorBySeries;
+        if (Array.isArray(series) && series.length > rowIndex) {
+          series[rowIndex].color = color;
+          return { success: true, color: series[rowIndex].color };
+        }
+        return { success: false };
+      },
+      { color, rowIndex }
+    );
+
+    if (!result.success) {
+      throw new Error("Failed to set color via Vue setupState");
+    }
+
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Add a new color row in the Color By Series popup
+   */
+  async addColorBySeriesRow() {
+    await this.colorBySeriesAddColorBtn.click();
+  }
+
+  /**
+   * Save the Color By Series configuration
+   */
+  async saveColorBySeries() {
+    await this.colorBySeriesSaveBtn.click();
+    await this.colorBySeriesPopup.waitFor({ state: "hidden", timeout: 10000 });
+  }
+
+  /**
+   * Close the Color By Series popup without saving
+   */
+  async cancelColorBySeries() {
+    await this.colorBySeriesCancelBtn.click();
+    await this.colorBySeriesPopup.waitFor({ state: "hidden", timeout: 10000 });
+  }
+
+  /**
+   * Delete a color-by-series row at the given index
+   * @param {number} index - Row index (0-based)
+   */
+  async deleteColorBySeriesRow(index = 0) {
+    const deleteBtn = this.page.locator(
+      `[data-test="dashboard-addpanel-config-color-by-series-delete-btn-${index}"]`
+    );
+    await deleteBtn.waitFor({ state: "visible" });
+    await deleteBtn.click();
+  }
+
+  /**
+   * Configure a complete color-by-series entry: select series and set color.
+   * Can select by index or by matching text.
+   * @param {Object} options - Configuration options
+   * @param {number} [options.rowIndex=0] - Row index (0-based)
+   * @param {number} [options.optionIndex] - Which series option to select by index (0-based)
+   * @param {string} [options.matchText] - Text to match in the series option (e.g., "ago")
+   * @param {string} [options.color="#FF0000"] - Hex color value
+   * @returns {string} The selected series name
+   */
+  async configureColorBySeries({ rowIndex = 0, optionIndex, matchText, color = "#FF0000" } = {}) {
+    const seriesName = await this.selectColorBySeriesOption(rowIndex, { optionIndex, matchText });
+    await this.setColorForSeriesRow(rowIndex, color);
+    return seriesName;
   }
 
 }
