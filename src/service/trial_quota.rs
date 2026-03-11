@@ -462,6 +462,17 @@ pub fn get_limit(_org_id: &str) -> u64 {
     get_pool_limit()
 }
 
+/// Serializable request body for AI usage events.
+/// Fields that are None are omitted from the JSON output.
+#[derive(Serialize)]
+struct AiUsageRequestBody<'a> {
+    feature: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    session_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    incident_id: Option<&'a str>,
+}
+
 /// Context for AI usage events — carries traceability info.
 #[derive(Default, Clone)]
 pub struct AiUsageContext {
@@ -508,12 +519,12 @@ fn record_usage_internal(
         hour: now.hour(),
         event_time_hour: event_time_hour.clone(),
         org_id: org_id.to_string(),
-        request_body: serde_json::json!({
-            "feature": feature.feature_key(),
-            "session_id": ctx.session_id,
-            "incident_id": ctx.incident_id,
+        request_body: serde_json::to_string(&AiUsageRequestBody {
+            feature: feature.feature_key(),
+            session_id: ctx.session_id.as_deref(),
+            incident_id: ctx.incident_id.as_deref(),
         })
-        .to_string(),
+        .unwrap_or_default(),
         size: feature.cost() as f64,
         unit: "credits".to_string(),
         user_email: ctx.user_email.clone(),
