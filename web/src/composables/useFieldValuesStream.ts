@@ -148,7 +148,7 @@ const useFieldValuesStream = () => {
           item.values?.forEach((subItem: any) => {
             chunkValues.push({
               key: subItem.zo_sql_key ? subItem.zo_sql_key : "null",
-              count: parseInt(subItem.zo_sql_num),
+              count: parseInt(subItem.zo_sql_num, 10) || 0,
             });
           });
         });
@@ -180,7 +180,7 @@ const useFieldValuesStream = () => {
         fieldValues.value[fieldName].values = isAppend
           ? aggregatedArray
           : aggregatedArray.slice(0, pageSize);
-        fieldValues.value[fieldName].hasMore = chunkValues.length >= pageSize;
+        fieldValues.value[fieldName].hasMore = aggregatedArray.length >= pageSize;
       }
 
       fieldValues.value[fieldName].isLoading = false;
@@ -212,8 +212,8 @@ const useFieldValuesStream = () => {
   const handleReset = (data: any) => {
     const fieldName = data?.queryReq?.fields[0];
     if (fieldName) {
+      cancelFieldStream(fieldName);
       resetFieldValues(fieldName, true);
-      traceIdMapper.value[fieldName] = [];
       fetchFieldValues(data.queryReq);
     }
   };

@@ -311,6 +311,8 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
 // Track the current search stream so we can cancel it when a new search starts
 let currentSearchTraceId: string | null = null;
+// Track the current count stream so we can cancel it when a new search starts
+let currentCountTraceId: string | null = null;
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
 /**
@@ -666,6 +668,7 @@ function fetchTracesCount() {
     : `select approx_distinct(trace_id) as trace_count, (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR')) as error_count FROM "${streamName}"${whereClause}`;
 
   const countTraceId = getUUID().replace(/-/g, "");
+  currentCountTraceId = countTraceId;
 
   fetchQueryDataWithHttpStream(
     {
@@ -983,6 +986,13 @@ async function getQueryData(
 const cancelSearch = () => {
   // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
   window.dispatchEvent(new Event("cancelQuery"));
+  if (currentCountTraceId) {
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentCountTraceId,
+      org_id: searchObj.organizationIdentifier,
+    });
+    currentCountTraceId = null;
+  }
   if (!currentSearchTraceId) return;
   cancelStreamQueryBasedOnRequestId({
     trace_id: currentSearchTraceId,
