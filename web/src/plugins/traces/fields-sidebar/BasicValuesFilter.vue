@@ -253,10 +253,14 @@ const removeFieldFromWhere = (
   fieldName: string,
 ): string => {
   const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Single condition: field='val', field!='val', field>=val, etc.
   const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
-  const remaining = whereClause
-    .split(/\s+AND\s+/i)
-    .filter((cond) => !fieldPattern.test(cond.trim()));
+  // Parenthesized multi-value group: (field='x' or field='y')
+  const multiPattern = new RegExp(`^\\(\\s*"?${escaped}"?\\s*[=!<>]`, "i");
+  const remaining = whereClause.split(/\s+AND\s+/i).filter((cond) => {
+    const trimmed = cond.trim();
+    return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
+  });
   return remaining.join(" AND ");
 };
 
