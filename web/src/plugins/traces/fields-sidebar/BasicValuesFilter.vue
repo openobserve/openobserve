@@ -249,15 +249,35 @@ const addSearchTerm = (term: string) => {
   searchObj.data.stream.addToFilter = term;
 };
 
-const buildSql = () => {
-  let query = searchObj.data.editorValue;
-  let parseQuery = query.split("|");
-  let whereClause = "";
-  if (parseQuery.length > 1) {
-    whereClause = parseQuery[1].trim();
-  } else {
-    whereClause = parseQuery[0].trim();
-  }
+/**
+ * Remove conditions referencing `fieldName` from a flat AND-chained WHERE
+ * string.  Returns an empty string when all conditions are removed.
+ */
+const removeFieldFromWhere = (
+  whereClause: string,
+  fieldName: string,
+): string => {
+  const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Single condition: field='val', field!='val', field>=val, etc.
+  const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
+  // Parenthesized multi-value group: (field='x' or field='y')
+  const multiPattern = new RegExp(`^\\(\\s*"?${escaped}"?\\s*[=!<>]`, "i");
+  const remaining = whereClause.split(/\s+AND\s+/i).filter((cond) => {
+    const trimmed = cond.trim();
+    return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
+  });
+  return remaining.join(" AND ");
+};
+
+/**
+ * Build base64-encoded SQL for field-value queries with the expanded field's
+ * own filter excluded from the WHERE clause so value counts are unbiased.
+ */
+const buildSql = (): string => {
+  const fieldName = props.row.name;
+  const query = searchObj.data.editorValue;
+  const parts = query.split("|");
+  let whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
 
   const durationParseResult = parseDurationWhereClause(
     whereClause,
@@ -268,64 +288,17 @@ const buildSql = () => {
     whereClause = durationParseResult;
   }
 
-  let query_context =
-    `SELECT * FROM "` +
-    searchObj.data.stream.selectedStream.value +
-    `" [WHERE_CLAUSE]`;
+  const streamName = searchObj.data.stream.selectedStream.value;
+  let sql = `SELECT * FROM "${streamName}"`;
 
-  if (whereClause.trim() !== "") {
-    whereClause = whereClause
-      .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-      .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-      .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-    whereClause = whereClause
-      .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-      .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-      .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-      .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
-
-    const parsedSQL = whereClause.split(" ");
-    searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-      parsedSQL.forEach((node: any, index: any) => {
-        if (node == field.name) {
-          node = node.replaceAll('"', "");
-          parsedSQL[index] = '"' + node + '"';
-        }
-      });
-    });
-
-    whereClause = parsedSQL.join(" ");
-    query_context = query_context
-      .split("[WHERE_CLAUSE]")
-      .join(" WHERE " + whereClause);
-  } else {
-    query_context = query_context.replace("[WHERE_CLAUSE]", "");
-  }
-
-  // Remove the expanded field's own filter so value counts are not constrained
-  // by the condition the user is exploring.
-  let sqlForValues = query_context;
-  try {
-    const parsedForValues = fnParsedSQL(query_context);
-    if (parsedForValues?.from?.length > 0) {
-      const modifiedWhere = removeFieldFromWhereAST(
-        parsedForValues.where,
-        props.row.name,
-      );
-      const modifiedSQL = fnUnparsedSQL({
-        ...parsedForValues,
-        where: modifiedWhere,
-      }).replace(/`/g, '"');
-      if (modifiedSQL) {
-        sqlForValues = modifiedSQL;
-      }
+  if (whereClause !== "") {
+    const filteredWhere = removeFieldFromWhere(whereClause, fieldName);
+    if (filteredWhere.trim() !== "") {
+      sql += ` WHERE ${filteredWhere}`;
     }
-  } catch {
-    // Fall back to original SQL if AST manipulation fails
   }
 
-  return b64EncodeUnicode(sqlForValues) || "";
+  return b64EncodeUnicode(sql) || "";
 };
 
 const fetchValues = (from: number = 0, keyword: string = "") => {

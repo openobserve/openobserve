@@ -262,6 +262,7 @@ import {
   timestampToTimezoneDate,
   escapeSingleQuotes,
   getUUID,
+  generateTraceContext,
 } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import segment from "@/services/segment_analytics";
@@ -311,6 +312,8 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
 // Track the current search stream so we can cancel it when a new search starts
 let currentSearchTraceId: string | null = null;
+// Track the count query stream so it can be cancelled independently
+let currentCountTraceId: string | null = null;
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
 /**
@@ -665,7 +668,13 @@ function fetchTracesCount() {
     ? `select count(*) as span_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count FROM "${streamName}"${whereClause}`
     : `select approx_distinct(trace_id) as trace_count, (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR')) as error_count FROM "${streamName}"${whereClause}`;
 
-  const countTraceId = getUUID().replace(/-/g, "");
+  if (currentCountTraceId) {
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentCountTraceId,
+      org_id: searchObj.organizationIdentifier,
+    });
+  }
+  currentCountTraceId = generateTraceContext().traceId;
 
   fetchQueryDataWithHttpStream(
     {
@@ -682,7 +691,7 @@ function fetchTracesCount() {
       type: "search",
       pageType: "traces",
       searchType: "ui",
-      traceId: countTraceId,
+      traceId: currentCountTraceId,
       org_id: searchObj.organizationIdentifier,
     },
     {
@@ -699,8 +708,11 @@ function fetchTracesCount() {
       },
       error: (_payload: any, _err: any) => {
         console.error("Failed to fetch traces count");
+        currentCountTraceId = null;
       },
-      complete: (_payload: any) => {},
+      complete: (_payload: any) => {
+        currentCountTraceId = null;
+      },
       reset: (_payload: any) => {},
     },
   );
