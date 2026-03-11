@@ -2069,7 +2069,35 @@
     "noStreamSelected": "Geen stream geselecteerd",
     "resultsIncludeAllWindows": "De resultaten omvatten alle toevoegingen met meerdere vensters",
     "runQueryForOutput": "Klik op Query uitvoeren om de uitvoer te zien",
-    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien"
+    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien",
+    "anomalyDetection": "Detectie van afwijkingen",
+    "newAnomalyDetection": "Nieuwe detectie van afwijkingen",
+    "editAnomalyDetection": "Anomaliedetectie bewerken",
+    "anomalyDetectionSubtitle": "Detecteer afwijkingen in uw waarneembaarheidsgegevens met behulp van machine learning",
+    "anomalyDetectionConfig": "Opsporingsconfiguratie",
+    "alerting": "Alarmering",
+    "saveAndTrain": "Opslaan en trainen",
+    "detectionInterval": "Detectie-interval",
+    "trainingWindow": "Trainingsvenster",
+    "sensitivity": "Gevoeligheid",
+    "sensitivityHint": "Hoger percentiel = minder meldingen. Alleen de meest extreme afwijkingen worden gemarkeerd.",
+    "queryMode": "Query-modus",
+    "detectionFunction": "Detectiefunctie",
+    "trained": "Getraind",
+    "notTrained": "Niet opgeleid",
+    "lastDetection": "Laatste detectie",
+    "nextRun": "Volgende run",
+    "triggerTraining": "Triggertraining",
+    "retraining": "Omscholing...",
+    "sqlPreview": "SQL-voorbeeld",
+    "configSummary": "Samenvatting",
+    "anomalyStatus": {
+      "waiting": "Wachtend",
+      "training": "Opleiding",
+      "active": "Actief",
+      "failed": "Mislukt",
+      "disabled": "Uitgeschakeld"
+    }
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2601,7 +2629,9 @@
     "today": "Vandaag",
     "yesterday": "Gisteren",
     "spanColorPalettePreview": "Voorbeeld van het kleurenpalet van Span",
-    "errorsFound": "Foutsporen"
+    "errorsFound": "Foutsporen",
+    "spansTitle": "OVERSPANT",
+    "spansFound": "Overspanningen gevonden"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

@@ -1994,6 +1994,20 @@ export default defineComponent({
         return; // Stop navigation if validation fails
       }
 
+      // Anomaly Detection selected: leave the alert wizard and go to the dedicated wizard,
+      // carrying stream_type and stream_name forward as query params.
+      if (formData.value.is_real_time === 'anomaly' && wizardStep.value === 1) {
+        router.push({
+          name: "addAnomalyDetection",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            stream_type: formData.value.stream_type || undefined,
+            stream_name: formData.value.stream_name || undefined,
+          },
+        });
+        return;
+      }
+
       if (formData.value.is_real_time === 'true') {
         // For real-time alerts: 1 -> 2 -> 4 -> 6 (skip 3 and 5)
         if (wizardStep.value === 2) {
