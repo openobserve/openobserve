@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card style="min-width: 600px; max-width: 800px">
         <q-card-section>
           <div class="text-h6">
-            {{ editingModel?.id ? "Edit Model Pricing" : "New Model Pricing" }}
+            {{ editingModel?.id ? "Edit Model Pricing" : (editingModel?.name ? "Override Inherited Pricing" : "New Model Pricing") }}
           </div>
         </q-card-section>
 
@@ -324,11 +324,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:body="props">
-        <q-tr :props="props">
+        <!-- Section separator when inherited entries begin -->
+        <q-tr
+          v-if="props.row.__inheritedSectionStart"
+          class="inherited-section-header"
+        >
+          <q-td :colspan="columns.length" style="padding: 10px 16px; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <q-icon name="corporate_fare" size="18px" color="grey-7" />
+              <span class="text-caption" style="font-weight: 600; color: #555;">
+                Inherited from Meta Org
+              </span>
+              <span class="text-caption" style="color: #888;">
+                &mdash; These apply to all orgs. Override by creating your own definition for the same model.
+              </span>
+            </div>
+          </q-td>
+        </q-tr>
+
+        <q-tr
+          :props="props"
+          :class="{ 'inherited-row': props.row.inherited }"
+        >
           <q-td v-for="col in columns" :key="col.name" :props="props" :style="col.style">
             <template v-if="col.name === 'name'">
-              <div class="o2-table-cell-content tw:font-semibold">
+              <div class="o2-table-cell-content tw:font-semibold tw:flex tw:items-center tw:gap-2">
                 {{ props.row.name }}
+                <q-badge
+                  v-if="props.row.inherited"
+                  color="blue-grey-3"
+                  text-color="blue-grey-8"
+                  label="Inherited"
+                  style="font-size: 10px; padding: 2px 6px;"
+                />
               </div>
             </template>
             <template v-else-if="col.name === 'match_pattern'">
@@ -346,35 +374,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else-if="col.name === 'enabled'">
               <q-toggle
+                v-if="!props.row.inherited"
                 :model-value="props.row.enabled"
                 @update:model-value="(val: boolean) => toggleEnabled(props.row, val)"
                 dense
               />
+              <q-icon
+                v-else
+                :name="props.row.enabled ? 'check_circle' : 'cancel'"
+                :color="props.row.enabled ? 'positive' : 'grey-5'"
+                size="20px"
+              />
             </template>
             <template v-else-if="col.name === 'actions'">
               <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
-                <q-btn
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  icon="edit"
-                  title="Edit"
-                  @click.stop="openEditor(props.row)"
-                  data-test="model-pricing-edit-btn"
-                />
-                <q-btn
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :icon="outlinedDelete"
-                  title="Delete"
-                  @click.stop="confirmDelete(props.row)"
-                  data-test="model-pricing-delete-btn"
-                />
+                <template v-if="!props.row.inherited">
+                  <q-btn
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    icon="edit"
+                    title="Edit"
+                    @click.stop="openEditor(props.row)"
+                    data-test="model-pricing-edit-btn"
+                  />
+                  <q-btn
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    :icon="outlinedDelete"
+                    title="Delete"
+                    @click.stop="confirmDelete(props.row)"
+                    data-test="model-pricing-delete-btn"
+                  />
+                </template>
+                <template v-else>
+                  <q-btn
+                    flat
+                    no-caps
+                    dense
+                    size="sm"
+                    label="Override"
+                    color="primary"
+                    icon="content_copy"
+                    title="Create an org-specific override for this model"
+                    @click.stop="overrideInherited(props.row)"
+                    data-test="model-pricing-override-btn"
+                  />
+                </template>
               </div>
             </template>
             <template v-else>
@@ -474,12 +525,28 @@ const pagination = ref({ rowsPerPage: 20 });
 const resultTotal = computed(() => filteredModels.value.length);
 
 const filteredModels = computed(() => {
-  if (!filterQuery.value) return models.value;
-  const search = filterQuery.value.toLowerCase();
-  return models.value.filter(
-    (m: any) =>
-      m.name.toLowerCase().includes(search) || m.match_pattern.toLowerCase().includes(search)
-  );
+  let items = models.value;
+  if (filterQuery.value) {
+    const search = filterQuery.value.toLowerCase();
+    items = items.filter(
+      (m: any) =>
+        m.name.toLowerCase().includes(search) || m.match_pattern.toLowerCase().includes(search)
+    );
+  }
+  // Sort: org-specific first, then inherited. Mark where inherited section starts.
+  const orgItems = items.filter((m: any) => !m.inherited);
+  const inheritedItems = items.filter((m: any) => m.inherited);
+  const sorted = [...orgItems, ...inheritedItems];
+  // Mark the first inherited row so the template can render a section header
+  let inheritedStartMarked = false;
+  for (const item of sorted) {
+    item.__inheritedSectionStart = false;
+    if (item.inherited && !inheritedStartMarked) {
+      item.__inheritedSectionStart = true;
+      inheritedStartMarked = true;
+    }
+  }
+  return sorted;
 });
 
 function newTier(name: string, condition: any = null) {
@@ -663,6 +730,15 @@ async function toggleEnabled(model: any, enabled: boolean) {
   }
 }
 
+function overrideInherited(model: any) {
+  // Pre-fill the editor with the inherited model's data but as a new org-specific entry
+  const copy = JSON.parse(JSON.stringify(model));
+  copy.id = null; // Force new entry (not an update of the inherited one)
+  copy.inherited = false;
+  delete copy.__inheritedSectionStart;
+  openEditor(copy);
+}
+
 async function confirmDelete(model: any) {
   q.dialog({
     title: "Delete Model Pricing",
@@ -692,5 +768,14 @@ onBeforeMount(() => {
   white-space: nowrap;
   width: 100%;
   display: block;
+}
+
+.inherited-row {
+  opacity: 0.7;
+  background: #fafafa;
+
+  &:hover {
+    opacity: 0.85;
+  }
 }
 </style>

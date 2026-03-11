@@ -28,7 +28,10 @@ use config::meta::model_pricing::ModelPricingDefinition;
 use dashmap::DashMap;
 use infra::table;
 use once_cell::sync::Lazy;
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
+
+/// The meta org whose model pricing definitions are inherited by all other orgs.
+const META_ORG: &str = "_meta";
 
 const WATCHER_PREFIX: &str = "/model_pricing/";
 
@@ -40,8 +43,10 @@ pub struct CachedModelPricing {
 }
 
 /// In-memory cache: org_id -> sorted Vec of enabled entries (pre-compiled regex).
+/// Wrapped in Arc so `get_org_pricing_entries` returns a cheap refcount bump
+/// instead of cloning every entry on every trace request.
 /// Populated at startup via `cache()` and kept current via `watch()`.
-static CACHE: Lazy<Arc<DashMap<String, Vec<CachedModelPricing>>>> =
+static CACHE: Lazy<Arc<DashMap<String, Arc<Vec<CachedModelPricing>>>>> =
     Lazy::new(|| Arc::new(DashMap::new()));
 
 // ── Cache helpers ─────────────────────────────────────────────────────────────
@@ -51,18 +56,23 @@ fn build_entries(definitions: Vec<ModelPricingDefinition>) -> Vec<CachedModelPri
     let mut entries: Vec<CachedModelPricing> = definitions
         .into_iter()
         .filter(|d| d.enabled)
-        .filter_map(|def| match Regex::new(&def.match_pattern) {
-            Ok(re) => Some(CachedModelPricing {
-                definition: def,
-                compiled_regex: re,
-            }),
-            Err(e) => {
-                log::warn!(
-                    "[model_pricing] invalid regex '{}' for model '{}': {e}",
-                    def.match_pattern,
-                    def.name,
-                );
-                None
+        .filter_map(|def| {
+            match RegexBuilder::new(&def.match_pattern)
+                .size_limit(1 << 16)
+                .build()
+            {
+                Ok(re) => Some(CachedModelPricing {
+                    definition: def,
+                    compiled_regex: re,
+                }),
+                Err(e) => {
+                    log::warn!(
+                        "[model_pricing] invalid regex '{}' for model '{}': {e}",
+                        def.match_pattern,
+                        def.name,
+                    );
+                    None
+                }
             }
         })
         .collect();
@@ -81,7 +91,7 @@ fn build_entries(definitions: Vec<ModelPricingDefinition>) -> Vec<CachedModelPri
 async fn reload_org(org_id: &str) {
     match table::model_pricing::list(org_id).await {
         Ok(defs) => {
-            CACHE.insert(org_id.to_string(), build_entries(defs));
+            CACHE.insert(org_id.to_string(), Arc::new(build_entries(defs)));
         }
         Err(e) => {
             log::error!("[model_pricing] failed to reload cache for org '{org_id}': {e}");
@@ -91,12 +101,36 @@ async fn reload_org(org_id: &str) {
 
 // ── Public cache API ──────────────────────────────────────────────────────────
 
-/// Return the pre-loaded pricing entries for an org. O(1), no I/O.
-pub fn get_org_pricing_entries(org_id: &str) -> Vec<CachedModelPricing> {
-    CACHE
-        .get(org_id)
-        .map(|e| e.value().clone())
-        .unwrap_or_default()
+/// Return the pre-loaded pricing entries for an org with `META_ORG` fallback.
+///
+/// Resolution: org-specific entries first, then `META_ORG` entries appended as fallback.
+/// Since `find_pricing_sync_at` picks the first regex match, org-specific entries naturally
+/// take priority over inherited meta org entries.
+///
+/// Returns an `Arc` so the caller gets a cheap refcount bump instead of cloning.
+pub fn get_org_pricing_entries(org_id: &str) -> Arc<Vec<CachedModelPricing>> {
+    let org_entries = CACHE.get(org_id).map(|e| Arc::clone(e.value()));
+    let default_entries = if org_id != META_ORG {
+        CACHE.get(META_ORG).map(|e| Arc::clone(e.value()))
+    } else {
+        None
+    };
+
+    match (org_entries, default_entries) {
+        // Org has entries, no defaults — return org entries directly (zero-copy).
+        (Some(org), None) => org,
+        // No org entries, has defaults — return defaults directly (zero-copy).
+        (None, Some(def)) => def,
+        // Both present — merge: org first, then defaults.
+        (Some(org), Some(def)) => {
+            let mut merged = Vec::with_capacity(org.len() + def.len());
+            merged.extend_from_slice(&org);
+            merged.extend_from_slice(&def);
+            Arc::new(merged)
+        }
+        // Neither — empty.
+        (None, None) => Arc::default(),
+    }
 }
 
 /// Sync lookup: find the best matching pricing definition from pre-loaded entries.
@@ -139,17 +173,24 @@ pub fn find_pricing_sync_at(
     best.map(|e| e.definition.clone())
 }
 
+/// Result of a cost calculation, including the selected tier name for logging.
+pub struct CostResult {
+    pub cost: HashMap<String, f64>,
+    pub tier_name: String,
+}
+
 /// Calculate cost using a model pricing definition.
-/// Returns a map of usage_key -> cost (e.g., {"input": 0.003, "output": 0.015, "total": 0.018}).
+/// Returns a `CostResult` with a map of usage_key -> cost and the name of the selected tier.
 /// The "total" key in the usage map is always skipped — cost total is always computed as the sum
 /// of individual component costs to avoid double-counting.
 pub fn calculate_cost_from_definition(
     definition: &ModelPricingDefinition,
     usage: &HashMap<String, i64>,
-) -> HashMap<String, f64> {
+) -> CostResult {
     let mut cost = HashMap::new();
 
     let tier = select_tier(definition, usage);
+    let tier_name = tier.name.clone();
 
     let mut total = 0.0;
     for (usage_key, &token_count) in usage {
@@ -179,7 +220,7 @@ pub fn calculate_cost_from_definition(
         cost.insert("total".to_string(), total);
     }
 
-    cost
+    CostResult { cost, tier_name }
 }
 
 fn select_tier<'a>(
@@ -212,7 +253,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let orgs = table::model_pricing::list_orgs().await?;
     for org_id in &orgs {
         let defs = table::model_pricing::list(org_id).await?;
-        CACHE.insert(org_id.clone(), build_entries(defs));
+        CACHE.insert(org_id.clone(), Arc::new(build_entries(defs)));
     }
     log::info!("[model_pricing] cache loaded for {} orgs", orgs.len());
     Ok(())
@@ -282,6 +323,9 @@ pub async fn set(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
     Ok(saved)
 }
 
+/// Delete a model pricing definition by ID.
+/// `org_id` is required for the coordinator event key (cache invalidation), not for the DB query.
+/// The caller (HTTP handler) must verify ownership before calling this.
 pub async fn delete_by_id(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
     table::model_pricing::delete_by_id(id).await?;
     let event_key = format!("{WATCHER_PREFIX}{org_id}/{id}");
@@ -320,10 +364,11 @@ mod tests {
         }]);
 
         let usage = HashMap::from([("input".to_string(), 1000i64), ("output".to_string(), 500)]);
-        let cost = calculate_cost_from_definition(&def, &usage);
-        assert!((cost["input"] - 0.003).abs() < 1e-10);
-        assert!((cost["output"] - 0.0075).abs() < 1e-10);
-        assert!((cost["total"] - 0.0105).abs() < 1e-10);
+        let result = calculate_cost_from_definition(&def, &usage);
+        assert_eq!(result.tier_name, "Default");
+        assert!((result.cost["input"] - 0.003).abs() < 1e-10);
+        assert!((result.cost["output"] - 0.0075).abs() < 1e-10);
+        assert!((result.cost["total"] - 0.0105).abs() < 1e-10);
     }
 
     #[test]
@@ -356,17 +401,19 @@ mod tests {
             ("input".to_string(), 50_000i64),
             ("output".to_string(), 10_000),
         ]);
-        let cost = calculate_cost_from_definition(&def, &usage);
-        assert!((cost["input"] - 0.15).abs() < 1e-10);
+        let result = calculate_cost_from_definition(&def, &usage);
+        assert_eq!(result.tier_name, "Default");
+        assert!((result.cost["input"] - 0.15).abs() < 1e-10);
 
         // Above threshold: extended tier
         let usage = HashMap::from([
             ("input".to_string(), 250_000i64),
             ("output".to_string(), 10_000),
         ]);
-        let cost = calculate_cost_from_definition(&def, &usage);
-        assert!((cost["input"] - 1.5).abs() < 1e-10);
-        assert!((cost["output"] - 0.225).abs() < 1e-10);
+        let result = calculate_cost_from_definition(&def, &usage);
+        assert_eq!(result.tier_name, "Extended Context");
+        assert!((result.cost["input"] - 1.5).abs() < 1e-10);
+        assert!((result.cost["output"] - 0.225).abs() < 1e-10);
     }
 
     #[test]
@@ -423,8 +470,8 @@ mod tests {
         }]);
 
         let usage = HashMap::from([("input".to_string(), 0i64), ("output".to_string(), 0)]);
-        let cost = calculate_cost_from_definition(&def, &usage);
-        assert!(cost.is_empty());
+        let result = calculate_cost_from_definition(&def, &usage);
+        assert!(result.cost.is_empty());
     }
 
     #[test]
@@ -435,5 +482,326 @@ mod tests {
         );
         assert_eq!(parse_org_from_key("/model_pricing/"), None);
         assert_eq!(parse_org_from_key("/other/myorg/id"), None);
+    }
+
+    #[test]
+    fn test_valid_from_selects_most_recent() {
+        // Two entries match "gpt-4o" but with different valid_from timestamps.
+        // The one with the greatest valid_from <= span_ts should win.
+        let entries = vec![
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-old".to_string(),
+                    valid_from: Some(1_000_000), // old
+                    tiers: vec![PricingTierDefinition {
+                        name: "Old".to_string(),
+                        condition: None,
+                        prices: HashMap::from([("input".to_string(), 0.000001)]),
+                    }],
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-new".to_string(),
+                    valid_from: Some(5_000_000), // newer
+                    tiers: vec![PricingTierDefinition {
+                        name: "New".to_string(),
+                        condition: None,
+                        prices: HashMap::from([("input".to_string(), 0.000005)]),
+                    }],
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+        ];
+
+        // Span at ts=6M → both valid, picks newer (valid_from=5M)
+        let result = find_pricing_sync_at(&entries, "gpt-4o", Some(6_000_000));
+        assert_eq!(result.unwrap().name, "gpt-4o-new");
+
+        // Span at ts=3M → only old is valid (valid_from=1M <= 3M, 5M > 3M)
+        let result = find_pricing_sync_at(&entries, "gpt-4o", Some(3_000_000));
+        assert_eq!(result.unwrap().name, "gpt-4o-old");
+
+        // Span at ts=500k → neither valid
+        let result = find_pricing_sync_at(&entries, "gpt-4o", Some(500_000));
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_total_key_in_usage_is_skipped() {
+        // "total" in usage map should not be double-counted
+        let def = make_definition(vec![PricingTierDefinition {
+            name: "Default".to_string(),
+            condition: None,
+            prices: HashMap::from([
+                ("input".to_string(), 0.000003),
+                ("output".to_string(), 0.000015),
+                ("total".to_string(), 0.0001), // should be ignored
+            ]),
+        }]);
+
+        let usage = HashMap::from([
+            ("input".to_string(), 1000i64),
+            ("output".to_string(), 500),
+            ("total".to_string(), 1500), // should be skipped
+        ]);
+        let result = calculate_cost_from_definition(&def, &usage);
+        // total should be computed as sum of input+output costs, not from the "total" usage key
+        assert!((result.cost["input"] - 0.003).abs() < 1e-10);
+        assert!((result.cost["output"] - 0.0075).abs() < 1e-10);
+        assert!((result.cost["total"] - 0.0105).abs() < 1e-10);
+        assert_eq!(result.cost.len(), 3); // input, output, total
+    }
+
+    #[test]
+    fn test_usage_key_without_price_is_zero_cost() {
+        let def = make_definition(vec![PricingTierDefinition {
+            name: "Default".to_string(),
+            condition: None,
+            prices: HashMap::from([("input".to_string(), 0.000003)]),
+        }]);
+
+        // "output" has tokens but no price configured → should not appear in cost
+        let usage = HashMap::from([("input".to_string(), 1000i64), ("output".to_string(), 500)]);
+        let result = calculate_cost_from_definition(&def, &usage);
+        assert!((result.cost["input"] - 0.003).abs() < 1e-10);
+        assert!(!result.cost.contains_key("output"));
+        assert!((result.cost["total"] - 0.003).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_all_tier_operators() {
+        let make_tiered = |op: TierOperator| {
+            make_definition(vec![
+                PricingTierDefinition {
+                    name: "Conditional".to_string(),
+                    condition: Some(TierCondition {
+                        usage_key: "input".to_string(),
+                        operator: op,
+                        value: 100.0,
+                    }),
+                    prices: HashMap::from([("input".to_string(), 0.00001)]),
+                },
+                PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: HashMap::from([("input".to_string(), 0.000001)]),
+                },
+            ])
+        };
+
+        let usage_50 = HashMap::from([("input".to_string(), 50i64)]);
+        let usage_100 = HashMap::from([("input".to_string(), 100i64)]);
+        let usage_150 = HashMap::from([("input".to_string(), 150i64)]);
+
+        // Gt: 150 > 100 → conditional, 100 !> 100 → default
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Gt), &usage_150).tier_name,
+            "Conditional"
+        );
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Gt), &usage_100).tier_name,
+            "Default"
+        );
+
+        // Gte: 100 >= 100 → conditional, 50 !>= 100 → default
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Gte), &usage_100).tier_name,
+            "Conditional"
+        );
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Gte), &usage_50).tier_name,
+            "Default"
+        );
+
+        // Lt: 50 < 100 → conditional, 100 !< 100 → default
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Lt), &usage_50).tier_name,
+            "Conditional"
+        );
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Lt), &usage_100).tier_name,
+            "Default"
+        );
+
+        // Lte: 100 <= 100 → conditional, 150 !<= 100 → default
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Lte), &usage_100).tier_name,
+            "Conditional"
+        );
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Lte), &usage_150).tier_name,
+            "Default"
+        );
+
+        // Eq: 100 == 100 → conditional, 50 != 100 → default
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Eq), &usage_100).tier_name,
+            "Conditional"
+        );
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Eq), &usage_50).tier_name,
+            "Default"
+        );
+
+        // Neq: 50 != 100 → conditional, 100 == 100 → default
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Neq), &usage_50).tier_name,
+            "Conditional"
+        );
+        assert_eq!(
+            calculate_cost_from_definition(&make_tiered(TierOperator::Neq), &usage_100).tier_name,
+            "Default"
+        );
+    }
+
+    #[test]
+    fn test_build_entries_skips_disabled() {
+        let entries = build_entries(vec![
+            ModelPricingDefinition {
+                name: "enabled".to_string(),
+                match_pattern: "(?i)^test".to_string(),
+                enabled: true,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: HashMap::from([("input".to_string(), 0.000001)]),
+                }],
+                ..Default::default()
+            },
+            ModelPricingDefinition {
+                name: "disabled".to_string(),
+                match_pattern: "(?i)^test".to_string(),
+                enabled: false,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: HashMap::from([("input".to_string(), 0.000001)]),
+                }],
+                ..Default::default()
+            },
+        ]);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].definition.name, "enabled");
+    }
+
+    #[test]
+    fn test_build_entries_skips_invalid_regex() {
+        let entries = build_entries(vec![
+            ModelPricingDefinition {
+                name: "valid".to_string(),
+                match_pattern: "(?i)^test".to_string(),
+                enabled: true,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: HashMap::from([("input".to_string(), 0.000001)]),
+                }],
+                ..Default::default()
+            },
+            ModelPricingDefinition {
+                name: "bad-regex".to_string(),
+                match_pattern: "[invalid(".to_string(),
+                enabled: true,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: HashMap::from([("input".to_string(), 0.000001)]),
+                }],
+                ..Default::default()
+            },
+        ]);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].definition.name, "valid");
+    }
+
+    #[test]
+    fn test_build_entries_sorted_by_sort_order() {
+        let entries = build_entries(vec![
+            ModelPricingDefinition {
+                name: "low-priority".to_string(),
+                match_pattern: "(?i)^test".to_string(),
+                enabled: true,
+                sort_order: 10,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: HashMap::new(),
+                }],
+                ..Default::default()
+            },
+            ModelPricingDefinition {
+                name: "high-priority".to_string(),
+                match_pattern: "(?i)^test".to_string(),
+                enabled: true,
+                sort_order: -1,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: HashMap::new(),
+                }],
+                ..Default::default()
+            },
+        ]);
+        assert_eq!(entries[0].definition.name, "high-priority");
+        assert_eq!(entries[1].definition.name, "low-priority");
+    }
+
+    // These tests share the static CACHE so they use a single test to avoid
+    // parallel-test interference on the META_ORG key.
+    #[test]
+    fn test_default_org_fallback() {
+        // Setup: insert META_ORG entries
+        let default_entries = Arc::new(build_entries(vec![ModelPricingDefinition {
+            name: "gpt-4o-default".to_string(),
+            match_pattern: "(?i)^gpt-4o".to_string(),
+            enabled: true,
+            tiers: vec![PricingTierDefinition {
+                name: "Default".to_string(),
+                condition: None,
+                prices: HashMap::from([("input".to_string(), 0.000003)]),
+            }],
+            ..Default::default()
+        }]));
+        CACHE.insert(META_ORG.to_string(), default_entries);
+
+        // --- Case 1: Org with no entries inherits META_ORG ---
+        let entries = get_org_pricing_entries("test_fallback_org_empty");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].definition.name, "gpt-4o-default");
+
+        // --- Case 2: META_ORG itself does NOT duplicate ---
+        let entries = get_org_pricing_entries(META_ORG);
+        assert_eq!(entries.len(), 1);
+
+        // --- Case 3: Org-specific entries take priority, defaults appended ---
+        let org_entries = Arc::new(build_entries(vec![ModelPricingDefinition {
+            name: "gpt-4o-acme".to_string(),
+            match_pattern: "(?i)^gpt-4o".to_string(),
+            enabled: true,
+            tiers: vec![PricingTierDefinition {
+                name: "Acme Custom".to_string(),
+                condition: None,
+                prices: HashMap::from([("input".to_string(), 0.000005)]),
+            }],
+            ..Default::default()
+        }]));
+        CACHE.insert("test_fallback_org_acme".to_string(), org_entries);
+
+        let entries = get_org_pricing_entries("test_fallback_org_acme");
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].definition.name, "gpt-4o-acme");
+        assert_eq!(entries[1].definition.name, "gpt-4o-default");
+
+        // find_pricing_sync_at should pick the org-specific one (first match)
+        let matched = find_pricing_sync_at(&entries, "gpt-4o-2024-05-13", None);
+        assert_eq!(matched.unwrap().name, "gpt-4o-acme");
+
+        // Cleanup
+        CACHE.remove(META_ORG);
+        CACHE.remove("test_fallback_org_acme");
     }
 }

@@ -200,12 +200,11 @@ impl OtelIngestionProcessor {
                 usage.insert("output".to_string(), 0);
             }
             if !usage.contains_key("total") {
-                let total: i64 = usage
-                    .iter()
-                    .filter(|(k, _)| k.as_str() != "total")
-                    .map(|(_, &v)| v)
-                    .sum();
-                usage.insert("total".to_string(), total);
+                // Total = input + output only. Cache tokens (cache_read_input_tokens,
+                // cache_creation_input_tokens) are subsets of input, not additive.
+                let input = usage.get("input").copied().unwrap_or(0);
+                let output = usage.get("output").copied().unwrap_or(0);
+                usage.insert("total".to_string(), input + output);
             }
 
             // Calculate cost from tokens if cost is missing but we have model and usage.
@@ -218,24 +217,19 @@ impl OtelIngestionProcessor {
             {
                 if let Some(pricing_def) = matched_pricing {
                     // Use user-defined per-token pricing (already matched above)
-                    let user_cost =
-                        crate::service::db::model_pricing::calculate_cost_from_definition(
-                            &pricing_def,
-                            &usage,
-                        );
-                    if !user_cost.is_empty() {
+                    let result = crate::service::db::model_pricing::calculate_cost_from_definition(
+                        &pricing_def,
+                        &usage,
+                    );
+                    if !result.cost.is_empty() {
                         log::debug!(
                             "[model_pricing] model='{}' pattern='{}' tier='{}' total_cost={:.8}",
                             model_name.as_deref().unwrap_or(""),
                             pricing_def.match_pattern,
-                            pricing_def
-                                .tiers
-                                .first()
-                                .map(|t| t.name.as_str())
-                                .unwrap_or("Default"),
-                            user_cost.get("total").copied().unwrap_or(0.0),
+                            result.tier_name,
+                            result.cost.get("total").copied().unwrap_or(0.0),
                         );
-                        cost = user_cost;
+                        cost = result.cost;
                     }
                 } else if let Some(ref model_name) = model_name {
                     // Fall back to built-in pricing (per-1M token rates)

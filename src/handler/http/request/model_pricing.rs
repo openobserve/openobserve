@@ -14,9 +14,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{Json, extract::Path, response::Response};
-use config::meta::model_pricing::{ModelPricingDefinition, PricingTierDefinition};
+use config::meta::model_pricing::ModelPricingDefinition;
+use serde::Serialize;
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::model_pricing};
+
+/// The meta org whose model pricing definitions are inherited by all other orgs.
+const META_ORG: &str = "_meta";
+
+/// A model pricing definition enriched with an `inherited` flag for the API response.
+/// When `inherited` is true, this definition comes from the `_meta` org and applies
+/// as a fallback. The org can override it by creating their own definition for the same model.
+#[derive(Serialize)]
+struct ModelPricingResponse {
+    #[serde(flatten)]
+    definition: ModelPricingDefinition,
+    /// True if this definition is inherited from the `_meta` org (not org-specific).
+    inherited: bool,
+}
 
 /// ListModelPricing
 ///
@@ -28,7 +43,7 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::m
     tag = "LLM",
     operation_id = "ListModelPricing",
     summary = "List all model pricing definitions",
-    description = "Returns all model pricing definitions (user-defined and built-in) for the organization.",
+    description = "Returns all model pricing definitions for the organization, including inherited definitions from the meta org.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -39,10 +54,43 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::m
     ),
 )]
 pub async fn list(Path(org_id): Path<String>) -> Response {
-    match model_pricing::list(&org_id).await {
-        Ok(items) => MetaHttpResponse::json(items),
-        Err(e) => MetaHttpResponse::internal_error(e),
+    // Fetch org-specific entries
+    let org_items = match model_pricing::list(&org_id).await {
+        Ok(items) => items,
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+
+    // For the default org itself, no inheritance — just return its own entries.
+    if org_id == META_ORG {
+        let response: Vec<ModelPricingResponse> = org_items
+            .into_iter()
+            .map(|d| ModelPricingResponse {
+                definition: d,
+                inherited: false,
+            })
+            .collect();
+        return MetaHttpResponse::json(response);
     }
+
+    // Fetch default org entries as inherited fallbacks.
+    let default_items = match model_pricing::list(META_ORG).await {
+        Ok(items) => items,
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+
+    let mut response: Vec<ModelPricingResponse> = org_items
+        .into_iter()
+        .map(|d| ModelPricingResponse {
+            definition: d,
+            inherited: false,
+        })
+        .collect();
+    response.extend(default_items.into_iter().map(|d| ModelPricingResponse {
+        definition: d,
+        inherited: true,
+    }));
+
+    MetaHttpResponse::json(response)
 }
 
 /// GetModelPricing
@@ -101,19 +149,7 @@ pub async fn create(
     item.org_id = org_id;
     item.id = None; // Force new ID generation
 
-    if item.name.trim().is_empty() {
-        return MetaHttpResponse::bad_request("Model name is required");
-    }
-    if item.match_pattern.len() > 512 {
-        return MetaHttpResponse::bad_request("Match pattern must be 512 characters or fewer");
-    }
-    if let Err(e) = regex::Regex::new(&item.match_pattern) {
-        return MetaHttpResponse::bad_request(format!("Invalid regex pattern: {e}"));
-    }
-    if item.tiers.is_empty() {
-        return MetaHttpResponse::bad_request("At least one pricing tier is required");
-    }
-    if let Err(e) = validate_tier_prices(&item.tiers) {
+    if let Err(e) = validate_definition(&item) {
         return MetaHttpResponse::bad_request(e);
     }
 
@@ -164,19 +200,7 @@ pub async fn update(
         }
     }
 
-    if item.name.trim().is_empty() {
-        return MetaHttpResponse::bad_request("Model name is required");
-    }
-    if item.match_pattern.len() > 512 {
-        return MetaHttpResponse::bad_request("Match pattern must be 512 characters or fewer");
-    }
-    if let Err(e) = regex::Regex::new(&item.match_pattern) {
-        return MetaHttpResponse::bad_request(format!("Invalid regex pattern: {e}"));
-    }
-    if item.tiers.is_empty() {
-        return MetaHttpResponse::bad_request("At least one pricing tier is required");
-    }
-    if let Err(e) = validate_tier_prices(&item.tiers) {
+    if let Err(e) = validate_definition(&item) {
         return MetaHttpResponse::bad_request(e);
     }
 
@@ -221,8 +245,30 @@ pub async fn delete(Path((org_id, model_id)): Path<(String, String)>) -> Respons
     }
 }
 
-fn validate_tier_prices(tiers: &[PricingTierDefinition]) -> Result<(), String> {
-    for tier in tiers {
+/// Max compiled NFA size for user-supplied regex patterns (64 KB).
+/// Prevents excessive memory/CPU usage from complex patterns.
+const REGEX_SIZE_LIMIT: usize = 1 << 16;
+
+fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
+    if item.name.trim().is_empty() {
+        return Err("Model name is required".to_string());
+    }
+    if item.match_pattern.trim().is_empty() {
+        return Err("Match pattern is required".to_string());
+    }
+    if item.match_pattern.len() > 512 {
+        return Err("Match pattern must be 512 characters or fewer".to_string());
+    }
+    if let Err(e) = regex::RegexBuilder::new(&item.match_pattern)
+        .size_limit(REGEX_SIZE_LIMIT)
+        .build()
+    {
+        return Err(format!("Invalid regex pattern: {e}"));
+    }
+    if item.tiers.is_empty() {
+        return Err("At least one pricing tier is required".to_string());
+    }
+    for tier in &item.tiers {
         for (key, &price) in &tier.prices {
             if price < 0.0 {
                 return Err(format!(

@@ -115,14 +115,19 @@ pub enum TierOperator {
 }
 
 impl TierOperator {
+    /// Tolerance for Eq/Neq comparisons. Token counts are integers cast to f64,
+    /// so 0.5 is more than sufficient and avoids false negatives from f64::EPSILON
+    /// being too tight for large values.
+    const EQ_TOLERANCE: f64 = 0.5;
+
     pub fn evaluate(&self, actual: f64, threshold: f64) -> bool {
         match self {
             TierOperator::Gt => actual > threshold,
             TierOperator::Gte => actual >= threshold,
             TierOperator::Lt => actual < threshold,
             TierOperator::Lte => actual <= threshold,
-            TierOperator::Eq => (actual - threshold).abs() < f64::EPSILON,
-            TierOperator::Neq => (actual - threshold).abs() >= f64::EPSILON,
+            TierOperator::Eq => (actual - threshold).abs() < Self::EQ_TOLERANCE,
+            TierOperator::Neq => (actual - threshold).abs() >= Self::EQ_TOLERANCE,
         }
     }
 }
