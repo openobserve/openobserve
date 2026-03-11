@@ -108,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import {
   ref,
+  watch,
   onMounted,
   onBeforeUnmount,
   computed,
@@ -295,6 +296,7 @@ const loadDashboard = async () => {
     // Convert the dashboard schema and update stream names
     const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
 
+    const isSpansMode = searchObj.meta.searchMode === "spans";
     const baseFilters: string[] = getBaseFilters();
     convertedDashboard.tabs[0].panels.forEach((panel, index) => {
       // Build WHERE clause based on filters
@@ -324,8 +326,17 @@ const loadDashboard = async () => {
         whereClause = errorFilters.length
           ? "WHERE " + errorFilters.join(" AND ")
           : "";
+      } else if (panel.title === "Duration" && !isSpansMode) {
+        // Traces mode: restrict Duration percentiles to root spans only so that
+        // each trace contributes exactly one duration value. Root spans are
+        // identified by an absent reference_parent_span_id (NULL or empty string).
+        const durationFilters = [
+          ...baseFilters,
+          "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')",
+        ];
+        whereClause = "WHERE " + durationFilters.join(" AND ");
       } else {
-        // For Rate and Duration panels, apply the combined filters
+        // Spans mode Duration, and Rate panel for both modes: apply combined filters
         whereClause = baseFilters.length
           ? "WHERE " + baseFilters.join(" AND ")
           : "";
@@ -333,13 +344,23 @@ const loadDashboard = async () => {
 
       const streamName = searchObj.data.stream.selectedStream.value;
 
-      convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
-        "queries"
-      ][0].query.replace("[STREAM_NAME]", `"${streamName}"`);
+      // Build the final query: substitute placeholders then apply mode transforms
+      let query = panel["queries"][0].query
+        .replace("[STREAM_NAME]", `"${streamName}"`)
+        .replace("[WHERE_CLAUSE]", whereClause);
 
-      convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
-        "queries"
-      ][0].query.replace("[WHERE_CLAUSE]", whereClause);
+      // Spans mode: replace trace-level distinct counts with span-level counts
+      // in the Rate and Errors panels.
+      if (isSpansMode && (panel.title === "Rate" || panel.title === "Errors")) {
+        query = query
+          .replace(
+            /approx_distinct\(trace_id\)\s+filter\s*\(where\s+span_status\s*=\s*'ERROR'\)/gi,
+            "count(*) FILTER (WHERE span_status = 'ERROR')",
+          )
+          .replace(/approx_distinct\(trace_id\)/gi, "count(*)");
+      }
+
+      convertedDashboard.tabs[0].panels[index]["queries"][0].query = query;
     });
 
     dashboardData.value = convertedDashboard;
