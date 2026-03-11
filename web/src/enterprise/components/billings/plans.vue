@@ -45,10 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <pro-plan
         :planType="planType"
         :billingProvider="billingProvider"
+        :features="proPlanFeatures"
         @update:proSubscription="onLoadSubscription(config.paidPlan)"
         @update:cancelSubscription="onUnsubscribe"
       ></pro-plan>
-      <enterprise-plan></enterprise-plan>
+      <enterprise-plan :features="enterprisePlanFeatures"></enterprise-plan>
     </div>
   </q-page>
 </template>
@@ -64,6 +65,7 @@ import { useQuasar, date } from "quasar";
 import { useLocalOrganization, convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
+import { siteURL } from "@/constants/config";
 
 export default defineComponent({
   name: "plans",
@@ -75,9 +77,49 @@ export default defineComponent({
   emits: ["update:proSubscription"],
   async mounted() {
     this.loading = true;
-    await this.loadSubscription();
+    await Promise.all([this.loadSubscription(), this.fetchPricingData()]);
   },
   methods: {
+    async fetchPricingData() {
+      try {
+        const response = await fetch(siteURL.pricingJsonUrl);
+        const json = await response.json();
+        const cloudPlans = json?.data?.[0]?.cloud ?? [];
+        const mapFeatures = (jsonFeatures: any[]) =>
+          jsonFeatures.map((f: any) => ({
+            name: f.title,
+            price: f.price ?? "",
+            is_parent: !f.isSubItem,
+          }));
+        const payAsYouGo = cloudPlans.find((p: any) => p.id === 1);
+        const enterprise = cloudPlans.find((p: any) => p.id === 3);
+
+        const proFeatures = payAsYouGo?.features
+          ? mapFeatures(payAsYouGo.features)
+          : [];
+        const entFeatures = enterprise?.features
+          ? mapFeatures(enterprise.features)
+          : [];
+
+        const diff = proFeatures.length - entFeatures.length + 3;
+        const paddedEntFeatures =
+          diff > 0
+            ? [
+                ...entFeatures,
+                ...Array.from({ length: diff }, () => ({
+                  name: "",
+                  price: "",
+                  is_parent: false,
+                })),
+              ]
+            : entFeatures;
+
+        this.proPlanFeatures = proFeatures;
+        this.enterprisePlanFeatures = paddedEntFeatures;
+      } catch {
+        // silently fall back to hardcoded defaults in child components
+      }
+    },
     onLoadSubscription(planType: string) {
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
@@ -206,6 +248,8 @@ export default defineComponent({
     const proLoading: any = ref(false);
     const currentPlanDetail = ref();
     const billingProvider = ref("");
+    const proPlanFeatures: any = ref([]);
+    const enterprisePlanFeatures: any = ref([]);
 
     const retrieveHostedPage = () => {
       BillingService.retrieve_hosted_page(
@@ -235,6 +279,8 @@ export default defineComponent({
       proLoading,
       currentPlanDetail,
       billingProvider,
+      proPlanFeatures,
+      enterprisePlanFeatures,
     };
   },
 });
