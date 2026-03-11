@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Search config..."
           class="col"
           clearable
+          autofocus
         >
           <template #prepend>
             <q-icon name="search" size="xs" class="q-ml-xs text-grey-6" />
@@ -74,7 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-expansion-item
       v-show="sectionVisible(generalKeywords)"
       :model-value="isExpanded('general', generalKeywords)"
-      @update:model-value="(v) => { expandedSections.general = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.general = v;
+        }
+      "
       label="General"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -83,7 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body">
-        <div v-show="itemVisible(['description'])" class="tw:max-w-[300px]">
+        <div
+          v-show="itemVisible(['description'], 'general')"
+          class="tw:max-w-[300px]"
+        >
           <div class="q-mb-sm tw:font-semibold">
             {{ t("dashboard.description") }}
           </div>
@@ -99,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="promqlMode"
-          v-show="itemVisible(['step', 'step value', 'promql step'])"
+          v-show="itemVisible(['step', 'step value', 'promql step'], 'general')"
           v-model="dashboardPanelData.data.config.step_value"
           type="text"
           color="input-border"
@@ -142,14 +150,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Panel Default Time Configuration -->
         <div
           v-show="
-            itemVisible([
-              'panel time',
-              'default time',
-              'use default time',
-              'duration',
-              'set panel time',
-              'panel default time',
-            ])
+            itemVisible(
+              [
+                'panel time',
+                'default time',
+                'use default time',
+                'duration',
+                'set panel time',
+                'panel default time',
+              ],
+              'general',
+            )
           "
           class="q-mb-sm"
         >
@@ -244,7 +255,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <PromQLChartConfig
           v-if="promqlMode"
           v-show="
-            itemVisible(['promql', 'step', 'chart config', 'promql chart'])
+            itemVisible(
+              ['promql', 'step', 'chart config', 'promql chart'],
+              'general',
+            )
           "
           :chart-type="dashboardPanelData.data.type"
         />
@@ -255,7 +269,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-expansion-item
       v-show="sectionVisible(legendKeywords) && legendSectionHasContent"
       :model-value="isExpanded('legend', legendKeywords)"
-      @update:model-value="(v) => { expandedSections.legend = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.legend = v;
+        }
+      "
       label="Legend"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -266,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="config-section-body o2-input">
         <q-toggle
           v-if="shouldShowLegendsToggle(dashboardPanelData)"
-          v-show="itemVisible(['legend', 'show legend', 'legends'])"
+          v-show="itemVisible(['legend', 'show legend', 'legends'], 'legend')"
           v-model="dashboardPanelData.data.config.show_legends"
           :label="t('dashboard.showLegendsLabel')"
           data-test="dashboard-config-show-legend"
@@ -557,7 +575,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-select
           v-if="shouldShowLegendType(dashboardPanelData)"
           v-show="
-            itemVisible(['legend type', 'type', 'scroll', 'plain', 'legend'])
+            itemVisible(
+              ['legend type', 'type', 'scroll', 'plain', 'legend'],
+              'legend',
+            )
           "
           borderless
           v-model="dashboardPanelData.data.config.legends_type"
@@ -577,13 +598,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           v-show="
-            itemVisible([
-              'legend width',
-              'legend height',
-              'width',
-              'height',
+            itemVisible(
+              ['legend width', 'legend height', 'width', 'height', 'legend'],
               'legend',
-            ])
+            )
           "
           style="display: flex; gap: 8px; flex-wrap: wrap"
         >
@@ -712,7 +730,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-select
           v-if="shouldApplyChartAlign(dashboardPanelData)"
-          v-show="itemVisible(['align', 'chart align', 'chart alignment'])"
+          v-show="
+            itemVisible(['align', 'chart align', 'chart alignment'], 'legend')
+          "
           borderless
           v-model="dashboardPanelData.data.config.chart_align"
           :options="chartAlignOptions"
@@ -735,7 +755,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type != 'geomap' &&
             dashboardPanelData.data.type != 'maps'
           "
-          v-show="itemVisible(['promql legend', 'legend', 'query'])"
+          v-show="itemVisible(['promql legend', 'legend', 'query'], 'legend')"
           class="showLabelOnTop"
           style="font-weight: 600"
         >
@@ -767,7 +787,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type != 'geomap' &&
             dashboardPanelData.data.type != 'maps'
           "
-          v-show="itemVisible(['promql legend', 'legend', 'legend label'])"
+          v-show="
+            itemVisible(['promql legend', 'legend', 'legend label'], 'legend')
+          "
           :label="t('common.legend')"
           v-model="
             dashboardPanelData.data.queries[
@@ -818,7 +840,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-expansion-item
       v-show="sectionVisible(dataKeywords) && dataSectionHasVisibleContent"
       :model-value="isExpanded('data', dataKeywords)"
-      @update:model-value="(v) => { expandedSections.data = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.data = v;
+        }
+      "
       label="Data"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -828,7 +854,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="config-section-body o2-input">
         <q-select
-          v-show="itemVisible(['unit'])"
+          v-show="itemVisible(['unit'], 'data')"
           borderless
           v-model="dashboardPanelData.data.config.unit"
           :options="unitOptions"
@@ -850,7 +876,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="dashboardPanelData.data.config.unit == 'custom'"
-          v-show="itemVisible(['custom unit', 'unit'])"
+          v-show="itemVisible(['custom unit', 'unit'], 'data')"
           v-model="dashboardPanelData.data.config.unit_custom"
           :label="t('dashboard.customunitLabel')"
           color="input-border"
@@ -865,7 +891,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <q-input
-          v-show="itemVisible(['decimals'])"
+          v-show="itemVisible(['decimals'], 'data')"
           type="number"
           v-model.number="dashboardPanelData.data.config.decimals"
           value="2"
@@ -899,7 +925,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].customQuery
           "
-          v-show="itemVisible(['limit', 'query limit'])"
+          v-show="itemVisible(['limit', 'query limit'], 'data')"
           v-model.number="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -950,7 +976,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
           v-show="
-            itemVisible(['top results', 'top n', 'show top n', 'top n values'])
+            itemVisible(
+              ['top results', 'top n', 'show top n', 'top n values'],
+              'data',
+            )
           "
           v-model.number="dashboardPanelData.data.config.top_results"
           :min="0"
@@ -1007,12 +1036,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="row items-center"
           v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
           v-show="
-            itemVisible([
-              'others',
-              'others series',
-              'top results others',
-              'add others',
-            ])
+            itemVisible(
+              ['others', 'others series', 'top results others', 'add others'],
+              'data',
+            )
           "
         >
           <q-toggle
@@ -1052,7 +1079,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toggle
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
-          v-show="itemVisible(['connect null', 'connect null values', 'null'])"
+          v-show="
+            itemVisible(['connect null', 'connect null values', 'null'], 'data')
+          "
           v-model="dashboardPanelData.data.config.connect_nulls"
           :label="t('dashboard.connectNullValues')"
           data-test="dashboard-config-connect-null-values"
@@ -1083,7 +1112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
-          v-show="itemVisible(['no value', 'no value replacement'])"
+          v-show="itemVisible(['no value', 'no value replacement'], 'data')"
           v-model="dashboardPanelData.data.config.no_value_replacement"
           :label="t('dashboard.noValueReplacement')"
           color="input-border"
@@ -1125,7 +1154,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-expansion-item
       v-show="sectionVisible(axisKeywords) && axisSectionHasContent"
       :model-value="isExpanded('axis', axisKeywords)"
-      @update:model-value="(v) => { expandedSections.axis = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.axis = v;
+        }
+      "
       label="Axis"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -1136,7 +1169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="config-section-body">
         <q-input
           v-if="shouldShowAxisConfig(dashboardPanelData)"
-          v-show="itemVisible(['axis width'])"
+          v-show="itemVisible(['axis width'], 'axis')"
           v-model.number="dashboardPanelData.data.config.axis_width"
           :label="t('common.axisWidth')"
           color="input-border"
@@ -1159,7 +1192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toggle
           v-if="shouldShowAxisConfig(dashboardPanelData)"
-          v-show="itemVisible(['border', 'axis border', 'show border'])"
+          v-show="itemVisible(['border', 'axis border', 'show border'], 'axis')"
           v-model="dashboardPanelData.data.config.axis_border_show"
           :label="t('dashboard.showBorder')"
           data-test="dashboard-config-axis-border"
@@ -1176,15 +1209,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; display: flex; gap: 16px"
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="
-            itemVisible([
-              'y axis',
-              'y min',
-              'y max',
-              'y-axis min',
-              'y-axis max',
-              'y axis min',
-              'y axis max',
-            ])
+            itemVisible(
+              [
+                'y axis',
+                'y min',
+                'y max',
+                'y-axis min',
+                'y-axis max',
+                'y axis min',
+                'y axis max',
+              ],
+              'axis',
+            )
           "
         >
           <q-input
@@ -1275,7 +1311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toggle
           v-if="shouldShowGridlines(dashboardPanelData)"
-          v-show="itemVisible(['gridlines', 'grid', 'show gridlines'])"
+          v-show="itemVisible(['gridlines', 'grid', 'show gridlines'], 'axis')"
           v-model="dashboardPanelData.data.config.show_gridlines"
           :label="t('dashboard.showGridlines')"
           data-test="dashboard-config-show-gridlines"
@@ -1294,7 +1330,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-expansion-item
       v-show="sectionVisible(labelsKeywords) && labelsSectionHasContent"
       :model-value="isExpanded('labels', labelsKeywords)"
-      @update:model-value="(v) => { expandedSections.labels = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.labels = v;
+        }
+      "
       label="Labels"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -1305,7 +1345,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="config-section-body">
         <q-select
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
-          v-show="itemVisible(['label position', 'position', 'label'])"
+          v-show="
+            itemVisible(['label position', 'position', 'label'], 'labels')
+          "
           borderless
           v-model="dashboardPanelData.data.config.label_option.position"
           :options="labelPositionOptions"
@@ -1329,7 +1371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
-          v-show="itemVisible(['label rotate', 'rotate', 'label'])"
+          v-show="itemVisible(['label rotate', 'rotate', 'label'], 'labels')"
           v-model.number="dashboardPanelData.data.config.label_option.rotate"
           :label="t('dashboard.labelRotate')"
           color="input-border"
@@ -1354,13 +1396,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; display: flex; gap: 16px"
           v-if="shouldShowAxisLabelConfig(dashboardPanelData)"
           v-show="
-            itemVisible([
-              'axis label',
-              'axis label rotate',
-              'axis label truncate',
-              'rotate',
-              'truncate',
-            ])
+            itemVisible(
+              [
+                'axis label',
+                'axis label rotate',
+                'axis label truncate',
+                'rotate',
+                'truncate',
+              ],
+              'labels',
+            )
           "
         >
           <q-input
@@ -1465,7 +1510,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-expansion-item
       v-show="sectionVisible(lineStyleKeywords) && lineStyleSectionHasContent"
       :model-value="isExpanded('lineStyle', lineStyleKeywords)"
-      @update:model-value="(v) => { expandedSections.lineStyle = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.lineStyle = v;
+        }
+      "
       label="Line Style"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -1476,7 +1525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="config-section-body o2-input">
         <q-select
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
-          v-show="itemVisible(['symbol', 'show symbol'])"
+          v-show="itemVisible(['symbol', 'show symbol'], 'line style')"
           borderless
           v-model="dashboardPanelData.data.config.show_symbol"
           :options="showSymbol"
@@ -1512,15 +1561,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-select
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="
-            itemVisible([
-              'interpolation',
-              'line interpolation',
-              'smooth',
-              'step',
-              'linear',
-              'step before',
-              'step after',
-            ])
+            itemVisible(
+              [
+                'interpolation',
+                'line interpolation',
+                'smooth',
+                'step',
+                'linear',
+                'step before',
+                'step after',
+              ],
+              'line style',
+            )
           "
           borderless
           v-model="dashboardPanelData.data.config.line_interpolation"
@@ -1557,7 +1609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="shouldShowLineThickness(dashboardPanelData, promqlMode)"
-          v-show="itemVisible(['line thickness', 'thickness'])"
+          v-show="itemVisible(['line thickness', 'thickness'], 'line style')"
           v-model.number="dashboardPanelData.data.config.line_thickness"
           :value="1.5"
           :min="0"
@@ -1587,7 +1639,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="sectionVisible(tableKeywords)"
       :model-value="isExpanded('table', tableKeywords)"
-      @update:model-value="(v) => { expandedSections.table = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.table = v;
+        }
+      "
       label="Table"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -1597,7 +1653,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="config-section-body">
         <q-toggle
-          v-show="itemVisible(['wrap', 'wrap text', 'wrap table'])"
+          v-show="itemVisible(['wrap', 'wrap text', 'wrap table'], 'table')"
           v-model="dashboardPanelData.data.config.wrap_table_cells"
           :label="t('dashboard.wraptext')"
           data-test="dashboard-config-wrap-table-cells"
@@ -1612,7 +1668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toggle
           v-if="!promqlMode"
-          v-show="itemVisible(['transpose', 'table transpose'])"
+          v-show="itemVisible(['transpose', 'table transpose'], 'table')"
           v-model="dashboardPanelData.data.config.table_transpose"
           :label="t('dashboard.tableTranspose')"
           data-test="dashboard-config-table_transpose"
@@ -1627,7 +1683,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toggle
           v-if="!promqlMode"
-          v-show="itemVisible(['dynamic', 'dynamic columns', 'table dynamic'])"
+          v-show="
+            itemVisible(
+              ['dynamic', 'dynamic columns', 'table dynamic'],
+              'table',
+            )
+          "
           v-model="dashboardPanelData.data.config.table_dynamic_columns"
           :label="t('dashboard.tableDynamicColumns')"
           data-test="dashboard-config-table_dynamic_columns"
@@ -1641,7 +1702,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <q-toggle
-          v-show="itemVisible(['pagination'])"
+          v-show="itemVisible(['pagination'], 'table')"
           v-model="dashboardPanelData.data.config.table_pagination"
           :label="t('dashboard.pagination')"
           data-test="dashboard-config-show-pagination"
@@ -1656,7 +1717,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="dashboardPanelData.data.config.table_pagination"
-          v-show="itemVisible(['rows per page', 'pagination'])"
+          v-show="itemVisible(['rows per page', 'pagination'], 'table')"
           v-model.number="
             dashboardPanelData.data.config.table_pagination_rows_per_page
           "
@@ -1696,9 +1757,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
 
-        <ValueMapping v-show="itemVisible(['value mapping'])" />
+        <ValueMapping v-show="itemVisible(['value mapping'], 'table')" />
         <OverrideConfig
-          v-show="itemVisible(['override', 'column'])"
+          v-show="itemVisible(['override', 'column'], 'table')"
           :dashboardPanelData="dashboardPanelData"
           :panelData="panelData"
         />
@@ -1713,7 +1774,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       v-show="sectionVisible(mapKeywords)"
       :model-value="isExpanded('map', mapKeywords)"
-      @update:model-value="(v) => { expandedSections.map = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.map = v;
+        }
+      "
       label="Map"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -1987,7 +2052,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="dashboardPanelData.data.type === 'gauge'"
       v-show="sectionVisible(gaugeKeywords)"
       :model-value="isExpanded('gauge', gaugeKeywords)"
-      @update:model-value="(v) => { expandedSections.gauge = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.gauge = v;
+        }
+      "
       label="Gauge"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -1997,7 +2066,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="config-section-body">
         <q-input
-          v-show="itemVisible(['gauge min', 'min', 'minimum'])"
+          v-show="itemVisible(['gauge min', 'min', 'minimum'], 'gauge')"
           v-model.number="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -2028,7 +2097,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
         <q-input
-          v-show="itemVisible(['gauge max', 'max', 'maximum'])"
+          v-show="itemVisible(['gauge max', 'max', 'maximum'], 'gauge')"
           v-model.number="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -2067,7 +2136,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showTrellisConfig"
       v-show="sectionVisible(layoutKeywords) && layoutSectionHasVisibleContent"
       :model-value="isExpanded('layout', layoutKeywords)"
-      @update:model-value="(v) => { expandedSections.layout = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.layout = v;
+        }
+      "
       label="Layout"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -2077,7 +2150,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="config-section-body">
         <q-select
-          v-show="itemVisible(['trellis', 'layout', 'trellis layout'])"
+          v-show="
+            itemVisible(['trellis', 'layout', 'trellis layout'], 'layout')
+          "
           :label="t('dashboard.trellisLayout')"
           data-test="dashboard-trellis-chart"
           borderless
@@ -2122,57 +2197,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           v-if="dashboardPanelData.data.config.trellis?.layout === 'custom'"
-          v-show="itemVisible(['columns', 'num of columns', 'trellis columns'])"
+          v-show="
+            itemVisible(
+              ['columns', 'num of columns', 'trellis columns'],
+              'layout',
+            )
+          "
         >
           <q-input
-              borderless
-              v-model.number="
-                dashboardPanelData.data.config.trellis.num_of_columns
-              "
-              :label="t('dashboard.numOfColumns')"
-              class="q-mr-sm showLabelOnTop"
-              stack-label
-              dense
-              :type="'number'"
-              placeholder="Auto"
-              data-test="trellis-chart-num-of-columns"
-              :disable="isBreakdownFieldEmpty || hasTimeShifts"
-              :min="1"
-              :max="16"
-              hide-bottom-space
-              @update:model-value="
-                (value: any) =>
-                  dashboardPanelData.data.config.trellis.num_of_columns > 16
-                    ? (dashboardPanelData.data.config.trellis.num_of_columns = 16)
-                    : value
-              "
-            >
-              <template v-slot:label>
-                <div class="row items-center all-pointer-events">
-                  {{ t("dashboard.numOfColumns") }}
-                  <div>
-                    <q-icon
-                      class="q-ml-xs"
-                      size="20px"
-                      name="info"
-                      data-test="dashboard-config-top_results-info"
-                    />
-                    <q-tooltip
-                      class="bg-grey-8"
-                      anchor="top middle"
-                      self="bottom middle"
-                      max-width="250px"
-                    >
-                      <b>{{
-                        hasTimeShifts
-                          ? t("dashboard.trellisTimeShiftTooltip")
-                          : t("dashboard.trellisTooltip")
-                      }}</b>
-                    </q-tooltip>
-                  </div>
+            borderless
+            v-model.number="
+              dashboardPanelData.data.config.trellis.num_of_columns
+            "
+            :label="t('dashboard.numOfColumns')"
+            class="q-mr-sm showLabelOnTop"
+            stack-label
+            dense
+            :type="'number'"
+            placeholder="Auto"
+            data-test="trellis-chart-num-of-columns"
+            :disable="isBreakdownFieldEmpty || hasTimeShifts"
+            :min="1"
+            :max="16"
+            hide-bottom-space
+            @update:model-value="
+              (value: any) =>
+                dashboardPanelData.data.config.trellis.num_of_columns > 16
+                  ? (dashboardPanelData.data.config.trellis.num_of_columns = 16)
+                  : value
+            "
+          >
+            <template v-slot:label>
+              <div class="row items-center all-pointer-events">
+                {{ t("dashboard.numOfColumns") }}
+                <div>
+                  <q-icon
+                    class="q-ml-xs"
+                    size="20px"
+                    name="info"
+                    data-test="dashboard-config-top_results-info"
+                  />
+                  <q-tooltip
+                    class="bg-grey-8"
+                    anchor="top middle"
+                    self="bottom middle"
+                    max-width="250px"
+                  >
+                    <b>{{
+                      hasTimeShifts
+                        ? t("dashboard.trellisTimeShiftTooltip")
+                        : t("dashboard.trellisTooltip")
+                    }}</b>
+                  </q-tooltip>
                 </div>
-              </template>
-            </q-input>
+              </div>
+            </template>
+          </q-input>
         </div>
 
         <div
@@ -2181,7 +2261,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             !(isBreakdownFieldEmpty || hasTimeShifts)
           "
           v-show="
-            itemVisible(['group', 'group by y axis', 'y axis', 'trellis'])
+            itemVisible(
+              ['group', 'group by y axis', 'y axis', 'trellis'],
+              'layout',
+            )
           "
           class="row items-center"
         >
@@ -2237,7 +2320,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showColorPalette"
       v-show="sectionVisible(colorsKeywords)"
       :model-value="isExpanded('colors', colorsKeywords)"
-      @update:model-value="(v) => { expandedSections.colors = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.colors = v;
+        }
+      "
       label="Colors"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -2256,7 +2343,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="shouldShowDrilldown(dashboardPanelData, dashboardPanelDataPageKey)"
       v-show="sectionVisible(drilldownKeywords)"
       :model-value="isExpanded('drilldown', drilldownKeywords)"
-      @update:model-value="(v) => { expandedSections.drilldown = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.drilldown = v;
+        }
+      "
       label="Drilldown"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -2280,7 +2371,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       v-show="sectionVisible(comparisonKeywords)"
       :model-value="isExpanded('comparison', comparisonKeywords)"
-      @update:model-value="(v) => { expandedSections.comparison = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.comparison = v;
+        }
+      "
       label="Comparison"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -2360,7 +2455,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
       v-show="sectionVisible(markLinesKeywords)"
       :model-value="isExpanded('markLines', markLinesKeywords)"
-      @update:model-value="(v) => { expandedSections.markLines = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.markLines = v;
+        }
+      "
       label="Mark Lines"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -2378,7 +2477,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="dashboardPanelData.data.type == 'metric'"
       v-show="sectionVisible(backgroundKeywords)"
       :model-value="isExpanded('background', backgroundKeywords)"
-      @update:model-value="(v) => { expandedSections.background = v; }"
+      @update:model-value="
+        (v) => {
+          expandedSections.background = v;
+        }
+      "
       label="Background"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
@@ -3446,10 +3549,12 @@ export default defineComponent({
       return keywords.some((k) => matchesSearch(k, q));
     };
 
-    // Item-level filter: same logic but applied to individual config rows
-    const itemVisible = (keywords: string[]) => {
+    // Item-level filter. When the section's own label matches the query all
+    // items in that section are visible regardless of their own keywords.
+    const itemVisible = (keywords: string[], sectionLabel?: string) => {
       const q = (searchQuery.value ?? "").trim().toLowerCase();
       if (!q) return true;
+      if (sectionLabel && matchesSearch(sectionLabel, q)) return true;
       return keywords.some((k) => matchesSearch(k, q));
     };
 
@@ -3481,7 +3586,7 @@ export default defineComponent({
     // items matching the query are actually renderable (their v-if is true).
     const legendSectionHasContent = computed(() => {
       const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q)
+      if (!q || matchesSearch("legend", q))
         return (
           shouldShowLegendsToggle(dashboardPanelData) ||
           shouldShowLegendPosition(dashboardPanelData) ||
@@ -3494,32 +3599,39 @@ export default defineComponent({
             dashboardPanelData.data.type !== "maps")
         );
       if (
-        ["legend", "show legend", "legends"].some((k) =>
-          matchesSearch(k, q),
-        ) && shouldShowLegendsToggle(dashboardPanelData)
-      ) return true;
+        ["legend", "show legend", "legends"].some((k) => matchesSearch(k, q)) &&
+        shouldShowLegendsToggle(dashboardPanelData)
+      )
+        return true;
       if (
         ["legend position", "position", "legend"].some((k) =>
           matchesSearch(k, q),
-        ) && shouldShowLegendPosition(dashboardPanelData)
-      ) return true;
+        ) &&
+        shouldShowLegendPosition(dashboardPanelData)
+      )
+        return true;
       if (
         ["legend type", "type", "scroll", "plain", "legend"].some((k) =>
           matchesSearch(k, q),
-        ) && shouldShowLegendType(dashboardPanelData)
-      ) return true;
+        ) &&
+        shouldShowLegendType(dashboardPanelData)
+      )
+        return true;
       if (
         ["legend width", "legend height", "width", "height", "legend"].some(
           (k) => matchesSearch(k, q),
         ) &&
         (shouldShowLegendWidth(dashboardPanelData) ||
           shouldShowLegendHeight(dashboardPanelData))
-      ) return true;
+      )
+        return true;
       if (
         ["align", "chart align", "chart alignment"].some((k) =>
           matchesSearch(k, q),
-        ) && shouldApplyChartAlign(dashboardPanelData)
-      ) return true;
+        ) &&
+        shouldApplyChartAlign(dashboardPanelData)
+      )
+        return true;
       if (
         ["promql legend", "legend", "query", "legend label"].some((k) =>
           matchesSearch(k, q),
@@ -3527,13 +3639,14 @@ export default defineComponent({
         promqlMode.value &&
         dashboardPanelData.data.type !== "geomap" &&
         dashboardPanelData.data.type !== "maps"
-      ) return true;
+      )
+        return true;
       return false;
     });
 
     const axisSectionHasContent = computed(() => {
       const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q)
+      if (!q || matchesSearch("axis", q))
         return (
           shouldShowAxisConfig(dashboardPanelData) ||
           shouldShowCartesianAxisConfig(dashboardPanelData) ||
@@ -3542,28 +3655,41 @@ export default defineComponent({
       if (
         ["axis width"].some((k) => matchesSearch(k, q)) &&
         shouldShowAxisConfig(dashboardPanelData)
-      ) return true;
+      )
+        return true;
       if (
         ["border", "axis border", "show border"].some((k) =>
           matchesSearch(k, q),
-        ) && shouldShowAxisConfig(dashboardPanelData)
-      ) return true;
+        ) &&
+        shouldShowAxisConfig(dashboardPanelData)
+      )
+        return true;
       if (
-        ["y axis", "y min", "y max", "y-axis min", "y-axis max", "y axis min", "y axis max"].some(
-          (k) => matchesSearch(k, q),
-        ) && shouldShowCartesianAxisConfig(dashboardPanelData)
-      ) return true;
+        [
+          "y axis",
+          "y min",
+          "y max",
+          "y-axis min",
+          "y-axis max",
+          "y axis min",
+          "y axis max",
+        ].some((k) => matchesSearch(k, q)) &&
+        shouldShowCartesianAxisConfig(dashboardPanelData)
+      )
+        return true;
       if (
         ["gridlines", "grid", "show gridlines"].some((k) =>
           matchesSearch(k, q),
-        ) && shouldShowGridlines(dashboardPanelData)
-      ) return true;
+        ) &&
+        shouldShowGridlines(dashboardPanelData)
+      )
+        return true;
       return false;
     });
 
     const labelsSectionHasContent = computed(() => {
       const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q)
+      if (!q || matchesSearch("labels", q))
         return (
           shouldShowCartesianAxisConfig(dashboardPanelData) ||
           shouldShowAxisLabelConfig(dashboardPanelData)
@@ -3571,24 +3697,32 @@ export default defineComponent({
       if (
         ["label position", "position", "label"].some((k) =>
           matchesSearch(k, q),
-        ) && shouldShowCartesianAxisConfig(dashboardPanelData)
-      ) return true;
+        ) &&
+        shouldShowCartesianAxisConfig(dashboardPanelData)
+      )
+        return true;
       if (
-        ["label rotate", "rotate", "label"].some((k) =>
-          matchesSearch(k, q),
-        ) && shouldShowCartesianAxisConfig(dashboardPanelData)
-      ) return true;
+        ["label rotate", "rotate", "label"].some((k) => matchesSearch(k, q)) &&
+        shouldShowCartesianAxisConfig(dashboardPanelData)
+      )
+        return true;
       if (
-        ["axis label", "axis label rotate", "axis label truncate", "rotate", "truncate"].some(
-          (k) => matchesSearch(k, q),
-        ) && shouldShowAxisLabelConfig(dashboardPanelData)
-      ) return true;
+        [
+          "axis label",
+          "axis label rotate",
+          "axis label truncate",
+          "rotate",
+          "truncate",
+        ].some((k) => matchesSearch(k, q)) &&
+        shouldShowAxisLabelConfig(dashboardPanelData)
+      )
+        return true;
       return false;
     });
 
     const lineStyleSectionHasContent = computed(() => {
       const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q)
+      if (!q || matchesSearch("line style", q))
         return (
           shouldShowAreaLineStyleConfig(dashboardPanelData) ||
           shouldShowLineThickness(dashboardPanelData, promqlMode.value)
@@ -3596,22 +3730,32 @@ export default defineComponent({
       if (
         ["symbol", "show symbol"].some((k) => matchesSearch(k, q)) &&
         shouldShowAreaLineStyleConfig(dashboardPanelData)
-      ) return true;
+      )
+        return true;
       if (
-        ["interpolation", "line interpolation", "smooth", "step", "linear", "step before", "step after"].some(
-          (k) => matchesSearch(k, q),
-        ) && shouldShowAreaLineStyleConfig(dashboardPanelData)
-      ) return true;
+        [
+          "interpolation",
+          "line interpolation",
+          "smooth",
+          "step",
+          "linear",
+          "step before",
+          "step after",
+        ].some((k) => matchesSearch(k, q)) &&
+        shouldShowAreaLineStyleConfig(dashboardPanelData)
+      )
+        return true;
       if (
         ["line thickness", "thickness"].some((k) => matchesSearch(k, q)) &&
         shouldShowLineThickness(dashboardPanelData, promqlMode.value)
-      ) return true;
+      )
+        return true;
       return false;
     });
 
     const dataSectionHasVisibleContent = computed(() => {
       const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q) return true;
+      if (!q || matchesSearch("data", q)) return true;
       // unit + decimals have no v-if — always renderable
       if (["unit", "decimals"].some((k) => matchesSearch(k, q))) return true;
       // custom unit — only renderable when unit is 'custom'
@@ -3663,19 +3807,18 @@ export default defineComponent({
 
     const layoutSectionHasVisibleContent = computed(() => {
       const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q) return true;
+      if (!q || matchesSearch("layout", q)) return true;
       // Trellis select — always renderable when section is visible
       if (
-        ["trellis", "layout", "trellis layout"].some((k) =>
-          matchesSearch(k, q),
-        )
+        ["trellis", "layout", "trellis layout"].some((k) => matchesSearch(k, q))
       )
         return true;
       // Columns input — only renders when trellis layout is 'custom'
       if (
         ["columns", "num of columns", "trellis columns"].some((k) =>
           matchesSearch(k, q),
-        ) && dashboardPanelData.data.config.trellis?.layout === "custom"
+        ) &&
+        dashboardPanelData.data.config.trellis?.layout === "custom"
       )
         return true;
       // Group toggle — only renders when trellis layout is set
@@ -3719,7 +3862,9 @@ export default defineComponent({
           sectionVisible(mapKeywords)) ||
         (dashboardPanelData.data.type === "gauge" &&
           sectionVisible(gaugeKeywords)) ||
-        (showTrellisConfig.value && sectionVisible(layoutKeywords) && layoutSectionHasVisibleContent.value) ||
+        (showTrellisConfig.value &&
+          sectionVisible(layoutKeywords) &&
+          layoutSectionHasVisibleContent.value) ||
         (showColorPalette.value && sectionVisible(colorsKeywords)) ||
         (shouldShowDrilldown(dashboardPanelData, dashboardPanelDataPageKey) &&
           sectionVisible(drilldownKeywords)) ||
