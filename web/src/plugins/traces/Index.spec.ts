@@ -955,14 +955,26 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Metrics Filters Integration", () => {
-    it("should update query editor when metrics filters are updated", async () => {
-      wrapper = mount(Index, {
+    // Spies for SearchBar ref methods exposed via stub
+    const mockApplyFilters = vi.fn();
+    const mockRemoveFilterByField = vi.fn();
+
+    function mountWithSearchBarStub() {
+      return mount(Index, {
         attachTo: node,
         global: {
           plugins: [i18n, router],
           provide: { store: store },
           stubs: {
-            "search-bar": true,
+            "search-bar": {
+              template: "<div />",
+              setup() {
+                return {
+                  applyFilters: mockApplyFilters,
+                  removeFilterByField: mockRemoveFilterByField,
+                };
+              },
+            },
             "index-list": true,
             "search-result": true,
             "service-graph": true,
@@ -970,73 +982,82 @@ describe("Index.vue (Main Traces Page)", () => {
           },
         },
       });
+    }
 
-      await flushPromises();
-
-      const filters = ["duration >= 100", "service_name = 'test'"];
-      wrapper.vm.onMetricsFiltersUpdated(filters);
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toBe(
-        "duration >= 100 AND service_name = 'test'",
-      );
+    beforeEach(() => {
+      mockApplyFilters.mockReset();
+      mockRemoveFilterByField.mockReset();
+      mockSearchObj.meta.showErrorOnly = false;
+      mockSearchObj.meta.metricsRangeFilters.clear();
     });
 
-    it("should add error filter when error only toggle is enabled", async () => {
+    it("should call applyFilters with all filter terms when metrics filters are updated", async () => {
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+
+      wrapper.vm.onMetricsFiltersUpdated([
+        "duration >= 100",
+        "service_name = 'test'",
+      ]);
+      await flushPromises();
+
+      expect(mockApplyFilters).toHaveBeenCalledWith([
+        "duration >= 100",
+        "service_name = 'test'",
+      ]);
+    });
+
+    it("should append error filter to applyFilters call when showErrorOnly is enabled", async () => {
       mockSearchObj.meta.showErrorOnly = true;
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
+      wrapper = mountWithSearchBarStub();
       await flushPromises();
 
-      const filters = ["duration >= 100"];
-      wrapper.vm.onMetricsFiltersUpdated(filters);
+      wrapper.vm.onMetricsFiltersUpdated(["duration >= 100"]);
       await flushPromises();
 
-      expect(mockSearchObj.data.editorValue).toContain("span_status = 'ERROR'");
+      expect(mockApplyFilters).toHaveBeenCalledWith([
+        "duration >= 100",
+        "span_status = 'ERROR'",
+      ]);
     });
 
-    it("should handle error only toggle correctly", async () => {
-      mockSearchObj.meta.metricsRangeFilters.set("duration", {
-        panelTitle: "Duration",
-        start: 100,
-        end: 500,
-      });
+    it("should not duplicate error filter when it is already present in incoming filters", async () => {
+      mockSearchObj.meta.showErrorOnly = true;
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
 
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
+      // Error panel brush already emitted span_status filter
+      wrapper.vm.onMetricsFiltersUpdated([
+        "duration >= 100",
+        "span_status = 'ERROR'",
+      ]);
+      await flushPromises();
 
+      // span_status = 'ERROR' must appear exactly once
+      const calledWith = mockApplyFilters.mock.calls[0][0] as string[];
+      expect(
+        calledWith.filter((f) => f === "span_status = 'ERROR'"),
+      ).toHaveLength(1);
+    });
+
+    it("should call applyFilters with error condition when error only toggle is turned on", async () => {
+      wrapper = mountWithSearchBarStub();
       await flushPromises();
 
       wrapper.vm.onErrorOnlyToggled(true);
       await flushPromises();
 
-      expect(mockSearchObj.data.editorValue).toContain("span_status = 'ERROR'");
+      expect(mockApplyFilters).toHaveBeenCalledWith(["span_status = 'ERROR'"]);
+    });
+
+    it("should call removeFilterByField when error only toggle is turned off", async () => {
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+
+      wrapper.vm.onErrorOnlyToggled(false);
+      await flushPromises();
+
+      expect(mockRemoveFilterByField).toHaveBeenCalledWith("span_status");
     });
   });
 
