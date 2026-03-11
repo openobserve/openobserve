@@ -1,0 +1,37 @@
+# .test-ignore
+# ─────────────────────────────────────────────────────────────────────────────
+# Glob patterns for UI files that should NOT require unit test coverage.
+# The pre-commit hook (scripts/hooks/pre-commit) reads this file.
+#
+# Syntax:
+#   - One pattern per line
+#   - Patterns are matched against the repo-relative file path using bash globs
+#   - Lines starting with # are comments
+#   - Blank lines are ignored
+#
+# Examples:
+#   web/src/components/icons/*          skip an entire directory
+#   web/src/views/LegacyView.vue        skip a single file
+#   web/src/**/SkipMe.ts                skip by filename anywhere under web/src
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Icon components ───────────────────────────────────────────────────────────
+# SVG-wrapper icon components have no logic to test
+web/src/components/icons/*
+
+# ── Cloud / enterprise feature guards ────────────────────────────────────────
+# Top-level cloud/enterprise wrappers are tested via integration tests
+web/src/cloud/index.ts
+web/src/enterprise/index.ts
+
+# ── Build / environment config ────────────────────────────────────────────────
+web/src/aws-exports.ts
+web/src/main.ts
+
+# ── Re-export barrel files ────────────────────────────────────────────────────
+# Pure index.ts re-exports are caught by the heuristic but list explicit ones here
+# web/src/stores/index.ts
+
+# ── Known large files with integration-test coverage only ────────────────────
+# Uncomment and add files your team has agreed to skip:
+# web/src/views/HomeView.vue
