@@ -189,7 +189,7 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_concurrent_operations() {
         let (_temp_dir, _wal_path) = setup_test_environment().await;
         let path = Path::from("test/concurrent.txt");
@@ -257,7 +257,7 @@ mod tests {
         // If we get here, the DEFAULT was successfully initialized
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_error_consistency() {
         let (_temp_dir, _wal_path) = setup_test_environment().await;
         let path = Path::from("test/consistency.txt");

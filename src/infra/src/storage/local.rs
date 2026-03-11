@@ -252,9 +252,16 @@ impl ObjectStore for Local {
         })
         .map_err(|e| {
             log::error!("[STORAGE] get_range local file: {file}, range: {range:?}, error: {e:?}");
-            Error::Generic {
-                store: "LocalFileSystem",
-                source: Box::new(e),
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Error::NotFound {
+                    path: file.clone(),
+                    source: Box::new(e),
+                }
+            } else {
+                Error::Generic {
+                    store: "LocalFileSystem",
+                    source: Box::new(e),
+                }
             }
         })?;
 
@@ -303,9 +310,16 @@ impl ObjectStore for Local {
         })
         .map_err(|e| {
             log::error!("[STORAGE] get_ranges local file: {file}, error: {e:?}");
-            Error::Generic {
-                store: "LocalFileSystem",
-                source: Box::new(e),
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Error::NotFound {
+                    path: file.clone(),
+                    source: Box::new(e),
+                }
+            } else {
+                Error::Generic {
+                    store: "LocalFileSystem",
+                    source: Box::new(e),
+                }
             }
         })?;
 
