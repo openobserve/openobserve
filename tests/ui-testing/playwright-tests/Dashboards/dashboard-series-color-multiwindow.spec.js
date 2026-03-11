@@ -112,11 +112,11 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
   let pm;
   let dashboardName;
 
-  test.beforeEach(async ({ page }, testInfo) => {
+  test.beforeEach(async ({ page }) => {
     pm = new PageManager(page);
     // Generate unique dashboard name per test to avoid cleanup collisions
-    const suffix = Math.random().toString(36).substr(2, 6);
-    dashboardName = `SeriesColorMW_${testInfo.title.includes("persist") ? "area" : "line"}_${suffix}`;
+    const suffix = Math.random().toString(36).slice(2, 8);
+    dashboardName = `SeriesColorMW_${suffix}`;
     await navigateToBase(page);
     await ingestion(page);
   });
@@ -206,7 +206,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
       "Re-editing panel to verify color configuration persists after save"
     );
     // Wait for dashboard view to settle before re-editing
-    await page.waitForTimeout(2000);
+    await page.waitForSelector('[data-test="dashboard-panel"]', { timeout: 15000 }).catch(() => {});
 
     await pm.dashboardPanelActions.selectPanelAction(panelName, "Edit");
 
@@ -323,7 +323,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     // Clean up: navigate back and delete dashboard
     try {
       await pm.dashboardCreate.backToDashboardList();
-      await page.waitForTimeout(1000);
+      await page.waitForURL(/\/dashboards/, { timeout: 10000 }).catch(() => {});
 
       try {
         await deleteDashboard(page, dashboardName);
