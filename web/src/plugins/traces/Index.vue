@@ -1402,12 +1402,7 @@ const onMetricsFiltersUpdated = (filters: string[]) => {
   // Join filters with AND
   const newFilters = allFilters.join(" AND ");
 
-  searchObj.data.editorValue = newFilters;
-
-  // Update the query editor UI via ref
-  if (searchBarRef.value?.setEditorValue) {
-    searchBarRef.value.setEditorValue(newFilters);
-  }
+  searchObj.data.stream.addToFilter = newFilters;
 };
 
 // Handler for Error Only toggle

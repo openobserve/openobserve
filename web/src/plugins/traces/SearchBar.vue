@@ -321,6 +321,15 @@ const replaceExistingFieldCondition = (
     return queryStr.replace(multiRegex, newExpression);
   }
 
+  // Try range condition: field >= val AND field <= val (e.g. duration filters)
+  const rangeRegex = new RegExp(
+    `${condPat}\\s+(?:and|AND)\\s+${condPat}`,
+    "gi",
+  );
+  if (rangeRegex.test(queryStr)) {
+    return queryStr.replace(rangeRegex, newExpression);
+  }
+
   // Try single condition
   const singleRegex = new RegExp(condPat, "gi");
   if (singleRegex.test(queryStr)) {
@@ -691,7 +700,6 @@ export default defineComponent({
             })
             .replace(/'null'/, "null");
         }
-
         if (currentQuery.length > 1) {
           if (currentQuery[1].trim() != "") {
             const fieldName = getFieldFromExpression(filter);

@@ -140,7 +140,9 @@ import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
-import useDurationPercentiles from "@/composables/useDurationPercentiles";
+import useDurationPercentiles, {
+  parseDurationWhereClause,
+} from "@/composables/useDurationPercentiles";
 import useParser from "@/composables/useParser";
 import {
   outlinedArrowBackIos,
@@ -239,7 +241,16 @@ const buildSql = (): string => {
   const fieldName = props.row.name;
   const query = searchObj.data.editorValue;
   const parts = query.split("|");
-  const whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  let whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+
+  const durationParseResult = parseDurationWhereClause(
+    whereClause,
+    sqlParser.value,
+    searchObj.data.stream.selectedStream.value,
+  );
+  if (typeof durationParseResult === "string") {
+    whereClause = durationParseResult;
+  }
 
   const streamName = searchObj.data.stream.selectedStream.value;
   let sql = `SELECT * FROM "${streamName}"`;
