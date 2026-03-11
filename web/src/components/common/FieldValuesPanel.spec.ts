@@ -488,8 +488,13 @@ describe("FieldValuesPanel", () => {
         count: i,
       }));
       wrapper = mountFactory({
-        fieldValues: makeFieldValues({ values: tenValues }),
+        fieldValues: makeFieldValues({ values: [] }),
         defaultValuesCount: 10,
+      });
+      // The watch has no `immediate` option, so trigger it by updating the prop.
+      // There is no public API to seed the cache — vm mutation is intentional.
+      await wrapper.setProps({
+        fieldValues: makeFieldValues({ values: tenValues }),
       });
       await flushPromises();
 
@@ -498,21 +503,26 @@ describe("FieldValuesPanel", () => {
     });
 
     it("should emit search-field-values when valueSearchTerm changes (via debounce)", async () => {
+      // useFakeTimers must be called before mount so watchDebounced picks it up
       vi.useFakeTimers();
       const tenValues = Array.from({ length: 10 }, (_, i) => ({
         key: `v${i}`,
         count: i,
       }));
       wrapper = mountFactory({
-        fieldValues: makeFieldValues({ values: tenValues }),
+        fieldValues: makeFieldValues({ values: [] }),
         defaultValuesCount: 10,
+      });
+      // Trigger the watcher to seed cachedValues so the search input appears
+      await wrapper.setProps({
+        fieldValues: makeFieldValues({ values: tenValues }),
       });
       await flushPromises();
 
       const input = wrapper.find("input");
       expect(input.exists()).toBe(true);
       await input.setValue("err");
-      // advance debounce timer (300ms)
+      // advance past the 300ms debounce
       vi.advanceTimersByTime(350);
       await flushPromises();
 
@@ -569,8 +579,12 @@ describe("FieldValuesPanel", () => {
         count: i,
       }));
       wrapper = mountFactory({
-        fieldValues: makeFieldValues({ values: tenValues }),
+        fieldValues: makeFieldValues({ values: [] }),
         defaultValuesCount: 10,
+      });
+      // Seed cache via prop update — watch has no `immediate`, so a change is needed
+      await wrapper.setProps({
+        fieldValues: makeFieldValues({ values: tenValues }),
       });
       await flushPromises();
 
@@ -595,33 +609,39 @@ describe("FieldValuesPanel", () => {
     });
 
     it("should show interim locally-filtered results while isLoading and search term is active", async () => {
-      // Seed cache with values by providing them with no search term first
       const tenValues = Array.from({ length: 10 }, (_, i) => ({
         key: `item-${i}`,
         count: i,
       }));
+      // Mount with empty values first so the watcher can detect a real change
       wrapper = mountFactory({
-        fieldValues: makeFieldValues({ values: tenValues }),
+        fieldValues: makeFieldValues({ values: [] }),
         defaultValuesCount: 10,
+      });
+
+      // Trigger the watch by changing the prop — this seeds cachedValues
+      // (the watch only caches when valueSearchTerm is empty, which it is here)
+      await wrapper.setProps({
+        fieldValues: makeFieldValues({ values: tenValues }),
       });
       await flushPromises();
 
-      // Now simulate loading state with a search term active
+      // Activate a search term then simulate the API loading (returns nothing yet)
       (wrapper.vm as any).valueSearchTerm = "item-1";
       await wrapper.setProps({
         fieldValues: {
           isLoading: true,
-          values: [], // API hasn't responded yet
+          values: [], // API response pending
           hasMore: false,
         },
       });
       await flushPromises();
 
-      // displayValues should be the locally-filtered cached result
+      // displayValues falls back to the locally-filtered cachedValues
       const items = wrapper.findAll(
         '[data-test^="logs-search-subfield-add-level-"]',
       );
-      // "item-1" matches "item-1" exactly (1 item from the original 10)
+      // "item-1" matches only "item-1" in the cache (1 result)
       expect(items.length).toBeGreaterThanOrEqual(1);
     });
   });
