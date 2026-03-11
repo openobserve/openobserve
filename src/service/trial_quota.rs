@@ -703,7 +703,14 @@ pub async fn get_pending_checkpoint(org_id: &str) -> Option<u8> {
     let already_notified = infra::table::trial_quota_usage::get_notified_checkpoint(org_id)
         .await
         .unwrap_or(0) as u8;
+    pending_checkpoint_from(pct, already_notified)
+}
 
+/// Compute the pending checkpoint given a pre-fetched usage percentage and
+/// already-notified level. This is the DB-free, sync part of
+/// `get_pending_checkpoint` — used by `check_all_orgs_ai_quota` which
+/// pre-fetches all checkpoints in a single query to avoid N+1 DB round-trips.
+pub fn pending_checkpoint_from(pct: u8, already_notified: u8) -> Option<u8> {
     // Find the highest checkpoint that the org has reached
     let mut highest_reached: Option<u8> = None;
     for &cp in QUOTA_CHECKPOINTS {

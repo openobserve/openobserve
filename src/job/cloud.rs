@@ -161,8 +161,22 @@ async fn check_all_orgs_ai_quota() {
     use crate::service::trial_quota;
 
     let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+
+    // Pre-fetch all notified checkpoints in a single GROUP-BY query to avoid
+    // one DB round-trip per org (N+1).
+    let all_checkpoints: HashMap<String, i16> =
+        match infra::table::trial_quota_usage::load_all_checkpoints().await {
+            Ok(rows) => rows.into_iter().collect(),
+            Err(e) => {
+                log::error!("[AI_QUOTA] Failed to load checkpoints: {e}");
+                return;
+            }
+        };
+
     for org_id in orgs {
-        let checkpoint = match trial_quota::get_pending_checkpoint(&org_id).await {
+        let already_notified = all_checkpoints.get(&org_id).copied().unwrap_or(0) as u8;
+        let pct = trial_quota::get_quota_percentage(&org_id);
+        let checkpoint = match trial_quota::pending_checkpoint_from(pct, already_notified) {
             Some(cp) => cp,
             None => continue,
         };
