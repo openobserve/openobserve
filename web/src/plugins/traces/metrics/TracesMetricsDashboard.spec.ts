@@ -595,10 +595,18 @@ describe("TracesMetricsDashboard", () => {
       expect(filters[0]).toBe("duration >= 100 and duration <= 500");
     });
 
-    it("should include span_status = 'ERROR' when showErrorOnly is true", () => {
+    it("should include span_status = 'ERROR' when showErrorOnly is true and filter prop contains it", () => {
+      wrapper.unmount();
       mockSearchObj.meta.showErrorOnly = true;
+      wrapper = mountComponent({ filter: "span_status = 'ERROR'" });
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("span_status = 'ERROR'");
+    });
+
+    it("should NOT include span_status = 'ERROR' from toggle alone when filter prop does not contain it", () => {
+      mockSearchObj.meta.showErrorOnly = true;
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).not.toContain("span_status = 'ERROR'");
     });
 
     it("should include the filter prop string when filter is a non-empty string", () => {
