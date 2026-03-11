@@ -1733,7 +1733,7 @@ export default defineComponent({
             `[data-test="trace-tree-span-container-${selectedSpanId.value}"]`,
           );
           el?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 500);
+        }, 300);
       }
     }
 
