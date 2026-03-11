@@ -1120,77 +1120,6 @@ export const convertServiceGraphToNetwork = (
     console.log('[convertServiceGraphToNetwork] Using cached positions for', cachedPositions.size, 'nodes');
   }
 
-  // ── Dynamic label positioning ──────────────────────────────────────────────
-  // For each node with a known position: place the label away from the neighbor
-  // centroid (into open space). Prefers 'right' and 'bottom' — only falls back
-  // to 'left' or 'top' when the node is significantly closer to the opposite edge.
-  {
-    const adjMap = new Map<string, string[]>();
-    nodes.forEach((n: any) => adjMap.set(n.id, []));
-    graphData.edges.forEach((e: any) => {
-      adjMap.get(e.from)?.push(e.to);
-      adjMap.get(e.to)?.push(e.from);
-    });
-
-    nodes.forEach((node: any) => {
-      if (node.x == null || node.y == null) return;
-
-      const neighbors = adjMap.get(node.id) || [];
-      let sumDx = 0, sumDy = 0, validNeighbors = 0;
-
-      neighbors.forEach((nbrId: string) => {
-        const nbr = nodes.find((n: any) => n.id === nbrId);
-        if (nbr && nbr.x != null && nbr.y != null) {
-          sumDx += nbr.x - node.x;
-          sumDy += nbr.y - node.y;
-          validNeighbors++;
-        }
-      });
-
-      const rightSpace  = canvasWidth  - node.x;
-      const bottomSpace = canvasHeight - node.y;
-
-      let labelPos: string;
-
-      if (validNeighbors === 0) {
-        // Isolated node: pick side with most canvas room, prefer right > bottom
-        labelPos = rightSpace >= bottomSpace ? 'right' : 'bottom';
-      } else {
-        const awayX = -sumDx; // direction away from neighbour centroid
-        const awayY = -sumDy;
-        const absX  = Math.abs(awayX);
-        const absY  = Math.abs(awayY);
-
-        if (absX >= absY) {
-          // Horizontal dominant
-          if (awayX > 0) {
-            // Push right — only fall back to 'bottom' if nearly no room on right
-            labelPos = rightSpace > 80 ? 'right' : 'bottom';
-          } else {
-            // Push left — prefer 'left' only when clearly more room; otherwise 'bottom'
-            labelPos = node.x > rightSpace * 1.6 ? 'left' : 'bottom';
-          }
-        } else {
-          // Vertical dominant
-          if (awayY > 0) {
-            // Push down — only fall back to 'right' if nearly no room below
-            labelPos = bottomSpace > 60 ? 'bottom' : 'right';
-          } else {
-            // Push up — prefer 'top' only when clearly more room; otherwise 'right'
-            labelPos = node.y > bottomSpace * 1.6 ? 'top' : 'right';
-          }
-        }
-      }
-
-      node.label = {
-        show: true,
-        position: labelPos,
-        // Shift horizontal labels slightly upward so text clears the node boundary
-        offset: (labelPos === 'right' || labelPos === 'left') ? [0, -14] : [0, 4],
-      };
-    });
-  }
-
   // Use "none" layout when we have fixed positions (D3-force computed or cached)
   const layoutMode = "none";
 
@@ -1235,10 +1164,7 @@ export const convertServiceGraphToNetwork = (
           formatter: (params: any) => params.data.name,
           fontSize: 12,
           fontWeight: 500,
-          color: isDarkMode ? '#e4e7eb' : '#1f2937',
-          // White outline so labels remain readable over any background color
-          textBorderColor: isDarkMode ? 'rgba(15, 20, 35, 0.85)' : 'rgba(255, 255, 255, 0.92)',
-          textBorderWidth: 3,
+          color: isDarkMode ? '#e4e7eb' : '#374151',
         },
         emphasis: {
           focus: "adjacency",
