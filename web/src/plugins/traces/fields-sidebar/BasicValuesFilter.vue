@@ -1,20 +1,29 @@
 <template>
   <q-expansion-item
-    class="field-expansion-item"
+    class="field-expansion-item hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
     dense
-    switch-toggle-side
-    :label="row.name"
-    expand-icon-class="field-expansion-icon"
-    expand-icon="expand_more"
+    hide-expand-icon
+    v-model="isExpanded"
     @before-show="(event: any) => openFilterCreator(event, row)"
+    @before-hide="handleBeforeHide"
   >
     <template v-slot:header>
-      <div class="flex content-center ellipsis full-width" :title="row.name">
+      <div
+        class="flex content-center ellipsis full-width field-expansion-header"
+        :title="row.name"
+      >
         <div
-          class="field_label ellipsis"
+          class="field_label ellipsis tw:flex tw:items-center"
           style="width: calc(100% - 28px); font-size: 14px"
           :title="row.label || row.name"
         >
+          <span v-if="row.dataType" class="field-type-container">
+            <q-icon
+              class="field-expand-icon"
+              :name="isExpanded ? 'expand_less' : 'expand_more'"
+              size="1rem"
+            />
+          </span>
           {{ row.label || row.name }}
         </div>
         <div class="field_overlay">
@@ -32,127 +41,108 @@
     </template>
     <q-card>
       <q-card-section class="q-pl-md q-pr-xs q-py-xs">
-        <div class="filter-values-container">
+        <template v-if="row.name === 'duration'">
+          <!-- Percentile stats -->
           <div
-            v-show="fieldValues[row.name]?.isLoading"
-            class="q-pl-md q-py-xs"
-            style="height: 60px"
+            v-if="durationPercentilesLoading"
+            class="tw:flex tw:justify-center tw:py-[0.5rem]"
           >
-            <q-inner-loading
-              size="xs"
-              :showing="fieldValues[row.name]?.isLoading"
-              label="Fetching values..."
-              label-style="font-size: 1.1em"
-            />
+            <q-spinner size="1rem" color="primary" />
           </div>
-          <div
-            v-show="
-              !fieldValues[row.name]?.values?.length &&
-              !fieldValues[row.name]?.isLoading
-            "
-            class="q-pl-md q-py-xs text-subtitle2"
-          >
-            No values found
-          </div>
-          <div
-            v-for="value in fieldValues[row.name]?.values || []"
-            :key="value.key"
-          >
-            <q-list dense>
-              <q-item tag="label" class="q-pr-none">
-                <div
-                  class="flex row wrap justify-between"
-                  style="width: calc(100% - 2.625rem)"
-                >
-                  <div
-                    :title="value.key"
-                    class="ellipsis q-pr-xs"
-                    style="width: calc(100% - 3.125rem)"
-                  >
-                    {{ value.key }}
-                  </div>
-                  <div
-                    :title="value.count"
-                    class="ellipsis text-right q-pr-sm"
-                    style="width: 3.125rem"
-                  >
-                    {{ value.count }}
-                  </div>
-                </div>
-                <div
-                  class="flex row"
-                  :class="
-                    store.state.theme === 'dark' ? 'text-white' : 'text-black'
+          <template v-else-if="hasPercentiles">
+            <div
+              v-for="p in PERCENTILE_LABELS"
+              :key="p.key"
+              class="tw:flex tw:items-center tw:justify-between tw:py-[0.15rem] tw:pl-[0.5rem]"
+            >
+              <span class="tw:text-[0.75rem] tw:w-[2rem] tw:shrink-0">{{
+                p.label
+              }}</span>
+              <span
+                class="tw:text-[0.75rem] tw:flex-1 tw:text-right tw:pr-[0.25rem]"
+              >
+                {{ formatDuration(percentiles[p.key]) }}
+              </span>
+              <div class="tw:flex tw:gap-[0.15rem]">
+                <q-btn
+                  :data-test="`log-search-subfield-list-equal-${row.name}-field-btn`"
+                  size="0.25rem"
+                  round
+                  :title="`duration >= ${formatDuration(percentiles[p.key])}`"
+                  @click.stop="
+                    addSearchTerm(
+                      `duration>='${formatTimeWithSuffix(percentiles[p.key])}'`,
+                    )
                   "
+                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
                 >
-                  <q-btn
-                    class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                    size="5px"
-                    title="Include Term"
-                    round
-                    @click="
-                      addSearchTerm(
-                        row.name === 'duration'
-                          ? `${row.name}>=${value.key}`
-                          : `${row.name}='${value.key}'`,
-                      )
-                    "
-                  >
-                    <q-icon
-                      v-if="row.name === 'duration'"
-                      :name="outlinedArrowForwardIos"
-                      class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
-                    />
-                    <q-icon v-else class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
-                      <EqualIcon></EqualIcon>
-                    </q-icon>
-                  </q-btn>
-                  <q-btn
-                    class="o2-custom-button-hover tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                    size="5px"
-                    title="Exclude Term"
-                    round
-                    @click="
-                      addSearchTerm(
-                        row.name === 'duration'
-                          ? `${row.name}<=${value.key}`
-                          : `${row.name}!='${value.key}'`,
-                      )
-                    "
-                  >
-                    <q-icon
-                      v-if="row.name === 'duration'"
-                      :name="outlinedArrowBackIos"
-                      class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
-                    />
-                    <q-icon v-else class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
-                      <NotEqualIcon></NotEqualIcon>
-                    </q-icon>
-                  </q-btn>
-                </div>
-              </q-item>
-            </q-list>
-          </div>
-        </div>
+                  <q-icon
+                    :name="outlinedArrowForwardIos"
+                    class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                  />
+                </q-btn>
+                <q-btn
+                  :data-test="`log-search-subfield-list-not-equal-${row.name}-field-btn`"
+                  size="0.25rem"
+                  round
+                  :title="`duration <= ${formatDuration(percentiles[p.key])}`"
+                  @click.stop="
+                    addSearchTerm(
+                      `duration<='${formatTimeWithSuffix(percentiles[p.key])}'`,
+                    )
+                  "
+                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                >
+                  <q-icon
+                    :name="outlinedArrowBackIos"
+                    class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                  />
+                </q-btn>
+              </div>
+            </div>
+          </template>
+        </template>
+        <FieldValuesPanel
+          v-else
+          ref="fieldValuesPanelRef"
+          :field-name="row.name"
+          :field-values="
+            fieldValues[row.name] || {
+              isLoading: false,
+              values: [],
+              hasMore: false,
+              errMsg: '',
+            }
+          "
+          :show-multi-select="true"
+          :default-values-count="defaultValuesCount"
+          :theme="store.state.theme"
+          @add-search-term="handleAddSearchTerm"
+          @add-multiple-search-terms="handleAddMultipleSearchTerms"
+          @load-more-values="handleLoadMoreValues"
+          @search-field-values="handleSearchFieldValues"
+        />
       </q-card-section>
     </q-card>
   </q-expansion-item>
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import useTraces from "@/composables/useTraces";
 import {
   b64EncodeUnicode,
-  formatLargeNumber,
-  generateTraceContext,
+  b64DecodeUnicode,
+  formatTimeWithSuffix,
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
-import EqualIcon from "@/components/icons/EqualIcon.vue";
-import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
+import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
+import useFieldValuesStream from "@/composables/useFieldValuesStream";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
+import useDurationPercentiles from "@/composables/useDurationPercentiles";
+import useParser from "@/composables/useParser";
 import {
-  outlinedAdd,
   outlinedArrowBackIos,
   outlinedArrowForwardIos,
 } from "@quasar/extras/material-icons-outlined";
@@ -165,14 +155,61 @@ const props = defineProps({
   },
 });
 
-const fieldValues = ref<any>({});
+const isExpanded = ref(false);
+const fieldValuesPanelRef = ref();
+const currentFrom = ref(0);
+const currentKeyword = ref("");
+const sqlParser = ref<any>(null);
+
+onMounted(async () => {
+  const { sqlParser: loadSqlParser } = useParser();
+  sqlParser.value = await loadSqlParser();
+});
+
+const PERCENTILE_LABELS = [
+  { key: "p25", label: "P25" },
+  { key: "p50", label: "P50" },
+  { key: "p75", label: "P75" },
+  { key: "p95", label: "P95" },
+  { key: "p99", label: "P99" },
+] as const;
+
+const {
+  percentiles,
+  isLoading: durationPercentilesLoading,
+  fetchPercentiles,
+  cancelFetch: cancelPercentileFetch,
+} = useDurationPercentiles();
+
+const hasPercentiles = computed(() =>
+  PERCENTILE_LABELS.some((p) => percentiles.value[p.key] !== null),
+);
+
+/**
+ * Formats a raw microsecond value into a human-readable string with a dynamic
+ * unit: µs for sub-millisecond, ms up to 1 s, s above that.
+ */
+const formatDuration = (us: number | null): string => {
+  if (us === null) return "—";
+  if (us < 1_000) return `${Math.round(us)} µs`;
+  if (us < 1_000_000) {
+    const ms = us / 1_000;
+    return `${Number.isInteger(ms) ? ms : ms.toFixed(2)} ms`;
+  }
+  const s = us / 1_000_000;
+  return `${Number.isInteger(s) ? s : s.toFixed(2)} s`;
+};
 
 const store = useStore();
-
-const $q = useQuasar();
-
 const { searchObj } = useTraces();
 const { fetchQueryDataWithHttpStream } = useStreamingSearch();
+const { fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues } =
+  useFieldValuesStream();
+const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
+
+const defaultValuesCount = computed(
+  () => store.state.zoConfig?.query_values_default_num || 10,
+);
 
 const addSearchTerm = (term: string) => {
   searchObj.data.stream.addToFilter = term;
@@ -217,6 +254,28 @@ const buildSql = (): string => {
   return b64EncodeUnicode(sql) || "";
 };
 
+const fetchValues = (from: number = 0, keyword: string = "") => {
+  const fetchPayload: any = {
+    fields: [props.row.name],
+    size: from + defaultValuesCount.value,
+    from,
+    no_count: false,
+    start_time: searchObj.data.datetime.startTime,
+    end_time: searchObj.data.datetime.endTime,
+    stream_name: searchObj.data.stream.selectedStream.value,
+    stream_type: "traces",
+    sql: buildSql(),
+    timeout: 30000,
+    use_cache: (globalThis as any).use_cache ?? true,
+  };
+
+  if (keyword) {
+    fetchPayload.keyword = keyword;
+  }
+
+  fetchFieldValues(fetchPayload);
+};
+
 const openFilterCreator = (event: any, { ftsKey }: any) => {
   if (ftsKey) {
     event.stopPropagation();
@@ -224,60 +283,82 @@ const openFilterCreator = (event: any, { ftsKey }: any) => {
     return;
   }
 
-  const fieldName = props.row.name;
+  if (props.row.name === "duration") {
+    const decodedSql = b64DecodeUnicode(buildSql());
+    const whereMatch = decodedSql.match(/\bWHERE\b\s+([\s\S]+)$/i);
+    fetchPercentiles({
+      streamName: searchObj.data.stream.selectedStream.value,
+      startTime: searchObj.data.datetime.startTime,
+      endTime: searchObj.data.datetime.endTime,
+      whereClause: whereMatch ? whereMatch[1].trim() : "",
+    });
+    return;
+  }
 
-  fieldValues.value[fieldName] = { isLoading: true, values: [] };
+  currentFrom.value = 0;
+  currentKeyword.value = "";
+  cancelFieldStream(props.row.name);
+  resetFieldValues(props.row.name, true);
+  fetchValues(0, "");
+};
 
-  const sql = buildSql();
-  const { traceId } = generateTraceContext();
+const handleSearchFieldValues = (_fieldName: string, term: string) => {
+  currentKeyword.value = term;
+  currentFrom.value = 0;
+  cancelFieldStream(props.row.name);
+  resetFieldValues(props.row.name, true);
+  fetchValues(0, term);
+};
 
-  const queryReq = {
-    sql,
-    fields: [fieldName],
-    size: store.state.zoConfig?.query_values_default_num || 10,
-    start_time: searchObj.data.datetime.startTime,
-    end_time: searchObj.data.datetime.endTime,
-    stream_name: searchObj.data.stream.selectedStream.value,
-    type: "traces",
-  };
+const handleLoadMoreValues = (_fieldName: string) => {
+  currentFrom.value += defaultValuesCount.value;
+  fetchValues(currentFrom.value, currentKeyword.value);
+};
 
-  fetchQueryDataWithHttpStream(
-    {
-      queryReq,
-      type: "values",
-      traceId,
-      org_id: store.state.selectedOrganization?.identifier,
-    },
-    {
-      data: (_payload: any, response: any) => {
-        if (response?.hits?.length) {
-          const fieldData = response.hits.find(
-            (f: any) => f.field === fieldName,
-          );
-          if (fieldData?.values) {
-            fieldValues.value[fieldName]["values"] = fieldData.values.map(
-              (value: any) => ({
-                key: value.zo_sql_key ? value.zo_sql_key : "null",
-                count: formatLargeNumber(value.zo_sql_num),
-              }),
-            );
-          }
-        }
-      },
-      error: () => {
-        $q.notify({
-          type: "negative",
-          message: `Error while fetching values for ${fieldName}`,
-        });
-      },
-      complete: () => {
-        if (fieldValues.value[fieldName]) {
-          fieldValues.value[fieldName]["isLoading"] = false;
-        }
-      },
-      reset: () => {},
-    },
+const handleAddSearchTerm = (
+  fieldName: string,
+  value: string,
+  action: string,
+) => {
+  if (action === "include") {
+    addSearchTerm(
+      fieldName === "duration"
+        ? `${fieldName}>=${value}`
+        : `${fieldName}='${value}'`,
+    );
+  } else {
+    addSearchTerm(
+      fieldName === "duration"
+        ? `${fieldName}<=${value}`
+        : `${fieldName}!='${value}'`,
+    );
+  }
+};
+
+const handleAddMultipleSearchTerms = (
+  fieldName: string,
+  values: string[],
+  action: string,
+) => {
+  const joinOp = action === "include" ? " or " : " and ";
+  const expressions = values.map((v) =>
+    action === "include" ? `${fieldName}='${v}'` : `${fieldName}!='${v}'`,
   );
+  const combined =
+    expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0];
+  addSearchTerm(combined);
+};
+
+const handleBeforeHide = () => {
+  if (props.row.name === "duration") {
+    cancelPercentileFetch();
+    return;
+  }
+  cancelFieldStream(props.row.name);
+  fieldValuesPanelRef.value?.reset();
+  currentFrom.value = 0;
+  currentKeyword.value = "";
+  resetFieldValues(props.row.name);
 };
 
 defineExpose({ buildSql, openFilterCreator });
