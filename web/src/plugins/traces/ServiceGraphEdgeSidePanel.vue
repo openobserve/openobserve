@@ -155,10 +155,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Latency Trend Section -->
+        <!-- RED Chart Section -->
         <div class="panel-section trend-section" data-test="service-graph-edge-side-panel-trend">
           <div class="section-header">
-            <div class="section-title">Latency Trend</div>
+            <!-- R·E·D Tab switcher -->
+            <div class="chart-tabs" data-test="service-graph-edge-chart-tabs">
+              <button
+                v-for="tab in chartTabs"
+                :key="tab.key"
+                class="chart-tab"
+                :class="{ active: activeTab === tab.key }"
+                @click="switchTab(tab.key)"
+                :data-test="`service-graph-edge-chart-tab-${tab.key}`"
+              >
+                {{ tab.label }}
+              </button>
+            </div>
             <q-btn
               flat
               dense
@@ -175,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading -->
           <div v-if="trendLoading" class="trend-state">
             <q-spinner color="primary" size="sm" />
-            <span>Loading trend data…</span>
+            <span>Loading data…</span>
           </div>
 
           <!-- Error -->
@@ -187,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Empty -->
           <div v-else-if="!trendData || !trendDataPoints.length" class="trend-state trend-empty">
             <q-icon name="show_chart" size="24px" class="trend-empty-icon" />
-            <span>No trend data available</span>
+            <span>No data available</span>
           </div>
 
           <!-- Chart — always in DOM when data exists so ref is stable -->
@@ -218,6 +230,8 @@ import { useStore } from 'vuex';
 import { useQuasar } from 'quasar';
 import * as echarts from 'echarts';
 import serviceGraphService from '@/services/service_graph';
+
+type ChartTab = 'rate' | 'errors' | 'duration';
 
 export default defineComponent({
   name: 'ServiceGraphEdgeSidePanel',
@@ -254,6 +268,15 @@ export default defineComponent({
     const trendData = ref<any>(null);
     let chartInstance: echarts.ECharts | null = null;
     let chartResizeObserver: ResizeObserver | null = null;
+
+    // ── RED tab state ────────────────────────────────────────────────────────
+
+    const chartTabs: { key: ChartTab; label: string }[] = [
+      { key: 'rate',     label: 'Rate'     },
+      { key: 'errors',   label: 'Errors'   },
+      { key: 'duration', label: 'Duration' },
+    ];
+    const activeTab = ref<ChartTab>('rate');
 
     // ── Formatters ──────────────────────────────────────────────────────────
 
@@ -299,7 +322,6 @@ export default defineComponent({
       formatLatencyNs(props.selectedEdge?.baseline_p99_latency_ns ?? 0)
     );
 
-    // Delta %: positive = regression (latency went up), negative = improvement
     const calcDeltaPct = (current: number, baseline: number): number => {
       if (!baseline || baseline === 0) return 0;
       return ((current - baseline) / baseline) * 100;
@@ -335,7 +357,6 @@ export default defineComponent({
     const p95DeltaFormatted = computed(() => formatDelta(p95DeltaPct.value));
     const p99DeltaFormatted = computed(() => formatDelta(p99DeltaPct.value));
 
-    // delta-improved: latency went down (good), delta-critical: went up a lot (bad)
     const getDeltaClass = (pct: number): string => {
       if (Math.abs(pct) < 2) return 'delta-neutral';
       if (pct <= -5) return 'delta-improved';
@@ -379,7 +400,7 @@ export default defineComponent({
       return 'status-critical';
     };
 
-    // ── ECharts trend chart ─────────────────────────────────────────────────
+    // ── ECharts chart builders ──────────────────────────────────────────────
 
     const disposeChart = () => {
       chartResizeObserver?.disconnect();
@@ -390,57 +411,48 @@ export default defineComponent({
       }
     };
 
-    const buildChartOptions = (points: any[]) => {
+    /** Shared base: timestamps, colors, grid, tooltip base, legend, xAxis */
+    const getSharedBase = (points: any[]) => {
       const isDark = $q.dark.isActive;
-      const toMs = (ns: number) => ns / 1_000_000;
-      const fmtMs = (ms: number) =>
-        ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${Math.round(ms)}ms`;
-
-      const timestamps = points.map((p) => {
-        const ts = p.timestamp;
-        const ms = ts > 1e12 ? ts / 1_000_000 : ts * 1_000;
-        return new Date(ms).toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-      });
-
-      const p50 = points.map((p) => toMs(p.p50_latency_ns ?? 0));
-      const p95 = points.map((p) => toMs(p.p95_latency_ns ?? 0));
-      const p99 = points.map((p) => toMs(p.p99_latency_ns ?? 0));
-
       const textColor = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)';
       const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+      const tooltipBg = isDark ? 'rgba(22,22,26,0.92)' : 'rgba(255,255,255,0.96)';
+      const tooltipBorder = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.12)';
+      const tooltipText = isDark ? '#e4e7eb' : '#202124';
+
+      // Timestamps are in microseconds (1.77e15). Current time:
+      //   nanoseconds  ~1.77e18  → threshold > 1e16 → divide by 1_000_000
+      //   microseconds ~1.77e15  → threshold > 1e13 → divide by 1_000
+      //   milliseconds ~1.77e12  → threshold > 1e10 → use as-is
+      //   seconds      ~1.77e9   → multiply by 1_000
+      const toMs = (ts: number) =>
+        ts > 1e16 ? ts / 1_000_000   // nanoseconds
+        : ts > 1e13 ? ts / 1_000     // microseconds (actual format)
+        : ts > 1e10 ? ts             // milliseconds
+        : ts * 1_000;                // seconds
+
+      const xAxisLabels = points.map((p) => {
+        const d = new Date(toMs(p.timestamp));
+        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+      });
+      const tooltipLabels = points.map((p) => {
+        const d = new Date(toMs(p.timestamp));
+        const date = d.toLocaleDateString('en-CA');
+        const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        return `${date} ${time}`;
+      });
+      const xInterval = Math.max(0, Math.floor(xAxisLabels.length / 3) - 1);
 
       return {
-        backgroundColor: 'transparent',
-        animation: true,
-        grid: { left: 52, right: 16, top: 12, bottom: 36 },
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: {
-            type: 'cross',
-            lineStyle: { color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)' },
-          },
-          backgroundColor: isDark ? 'rgba(22,22,26,0.92)' : 'rgba(255,255,255,0.96)',
-          borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.12)',
-          textStyle: { color: isDark ? '#e4e7eb' : '#202124', fontSize: 11 },
-          formatter: (params: any[]) => {
-            const label = params[0]?.axisValue ?? '';
-            const rows = params
-              .map(
-                (p: any) =>
-                  `<div style="display:flex;justify-content:space-between;gap:16px;">
-                    <span style="color:${p.color}">${p.seriesName}</span>
-                    <span style="font-weight:600">${fmtMs(p.value)}</span>
-                  </div>`
-              )
-              .join('');
-            return `<div style="font-size:11px;min-width:120px">
-              <div style="margin-bottom:4px;opacity:0.6">${label}</div>
-              ${rows}
-            </div>`;
-          },
+        isDark, textColor, gridColor, tooltipBg, tooltipBorder, tooltipText,
+        xAxisLabels, tooltipLabels, xInterval,
+        xAxis: {
+          type: 'category',
+          data: xAxisLabels,
+          axisLine: { lineStyle: { color: gridColor } },
+          axisTick: { show: false },
+          axisLabel: { color: textColor, fontSize: 10, interval: xInterval },
+          splitLine: { show: false },
         },
         legend: {
           bottom: 0,
@@ -450,62 +462,186 @@ export default defineComponent({
           itemHeight: 4,
           icon: 'roundRect',
         },
-        xAxis: {
-          type: 'category',
-          data: timestamps,
-          axisLine: { lineStyle: { color: gridColor } },
-          axisTick: { show: false },
-          axisLabel: {
-            color: textColor,
-            fontSize: 10,
-            interval: Math.max(0, Math.floor(timestamps.length / 4) - 1),
+        baseTooltip: {
+          trigger: 'axis',
+          axisPointer: {
+            type: 'cross',
+            lineStyle: { color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)' },
           },
-          splitLine: { show: false },
+          backgroundColor: tooltipBg,
+          borderColor: tooltipBorder,
+          textStyle: { color: tooltipText, fontSize: 11 },
         },
+      };
+    };
+
+    /** Rate tab: total_requests over time — line chart matching traces page */
+    const buildRateOptions = (points: any[]) => {
+      const b = getSharedBase(points);
+      const data = points.map((p) => p.total_requests ?? 0);
+      const lineColor = '#5470c6';
+
+      return {
+        backgroundColor: 'transparent',
+        animation: true,
+        grid: { left: 44, right: 16, top: 12, bottom: 36 },
+        tooltip: {
+          ...b.baseTooltip,
+          formatter: (params: any[]) => {
+            const idx = params[0]?.dataIndex ?? 0;
+            const label = b.tooltipLabels[idx] ?? params[0]?.axisValue ?? '';
+            const val = params[0]?.value ?? 0;
+            return `<div style="font-size:11px;min-width:160px">
+              <div style="margin-bottom:4px;opacity:0.6">${label}</div>
+              <span style="color:${lineColor}">● </span><span style="font-weight:600">: ${formatNumber(val)}</span>
+            </div>`;
+          },
+        },
+        xAxis: b.xAxis,
         yAxis: {
           type: 'value',
           axisLine: { show: false },
           axisTick: { show: false },
           axisLabel: {
-            color: textColor,
+            color: b.textColor,
             fontSize: 10,
-            formatter: fmtMs,
+            formatter: (v: number) => formatNumber(v),
           },
-          splitLine: { lineStyle: { color: gridColor } },
+          splitLine: { lineStyle: { color: b.gridColor } },
         },
         series: [
           {
-            name: 'P50',
+            name: 'Rate',
             type: 'line',
-            data: p50,
+            data,
             smooth: true,
             symbol: 'none',
-            lineStyle: { color: '#10b981', width: 2 },
-            itemStyle: { color: '#10b981' },
-            areaStyle: { color: 'rgba(16,185,129,0.08)' },
-          },
-          {
-            name: 'P95',
-            type: 'line',
-            data: p95,
-            smooth: true,
-            symbol: 'none',
-            lineStyle: { color: '#f59e0b', width: 2 },
-            itemStyle: { color: '#f59e0b' },
-            areaStyle: { color: 'rgba(245,158,11,0.08)' },
-          },
-          {
-            name: 'P99',
-            type: 'line',
-            data: p99,
-            smooth: true,
-            symbol: 'none',
-            lineStyle: { color: '#ef4444', width: 2 },
-            itemStyle: { color: '#ef4444' },
-            areaStyle: { color: 'rgba(239,68,68,0.08)' },
+            lineStyle: { color: lineColor, width: 1.5 },
+            itemStyle: { color: lineColor },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(84,112,198,0.3)' },
+                { offset: 1, color: 'rgba(84,112,198,0.02)' },
+              ]),
+            },
           },
         ],
       };
+    };
+
+    /** Errors tab: failed_requests bar chart matching traces page style */
+    const buildErrorsOptions = (points: any[]) => {
+      const b = getSharedBase(points);
+      const failed = points.map((p) => p.failed_requests ?? 0);
+      const barColor = '#f44336';
+
+      return {
+        backgroundColor: 'transparent',
+        animation: true,
+        grid: { left: 44, right: 16, top: 12, bottom: 36 },
+        tooltip: {
+          ...b.baseTooltip,
+          formatter: (params: any[]) => {
+            const idx = params[0]?.dataIndex ?? 0;
+            const label = b.tooltipLabels[idx] ?? params[0]?.axisValue ?? '';
+            const val = params[0]?.value ?? 0;
+            return `<div style="font-size:11px;min-width:160px">
+              <div style="margin-bottom:4px;opacity:0.6">${label}</div>
+              <span style="color:${barColor}">● </span><span style="font-weight:600">: ${formatNumber(val)}</span>
+            </div>`;
+          },
+        },
+        xAxis: b.xAxis,
+        yAxis: {
+          type: 'value',
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: b.textColor,
+            fontSize: 10,
+            formatter: (v: number) => formatNumber(v),
+          },
+          splitLine: { lineStyle: { color: b.gridColor } },
+        },
+        series: [
+          {
+            name: 'Errors',
+            type: 'bar',
+            data: failed,
+            barMaxWidth: 8,
+            itemStyle: { color: barColor },
+          },
+        ],
+      };
+    };
+
+    /** Duration tab: P50/P95/P99 lines matching traces page colors & series names */
+    const buildDurationOptions = (points: any[]) => {
+      const b = getSharedBase(points);
+      const toMs = (ns: number) => ns / 1_000_000;
+      const fmtMs = (ms: number) => {
+        if (ms >= 60_000) return `${(ms / 60_000).toFixed(2)}m`;
+        if (ms >= 1_000) return `${(ms / 1_000).toFixed(2)}s`;
+        return `${ms.toFixed(2)}ms`;
+      };
+
+      const p50 = points.map((p) => toMs(p.p50_latency_ns ?? 0));
+      const p95 = points.map((p) => toMs(p.p95_latency_ns ?? 0));
+      const p99 = points.map((p) => toMs(p.p99_latency_ns ?? 0));
+
+      const makeSeries = (name: string, data: number[], color: string) => ({
+        name,
+        type: 'line',
+        data,
+        smooth: true,
+        symbol: 'none',
+        lineStyle: { color, width: 1.5 },
+        itemStyle: { color },
+      });
+
+      return {
+        backgroundColor: 'transparent',
+        animation: true,
+        grid: { left: 52, right: 16, top: 12, bottom: 36 },
+        tooltip: {
+          ...b.baseTooltip,
+          formatter: (params: any[]) => {
+            const idx = params[0]?.dataIndex ?? 0;
+            const label = b.tooltipLabels[idx] ?? params[0]?.axisValue ?? '';
+            const rows = params.map((p: any) =>
+              `<div style="display:flex;justify-content:space-between;gap:16px;">
+                <span style="color:${p.color}">● ${p.seriesName}</span>
+                <span style="font-weight:600">: ${fmtMs(p.value)}</span>
+              </div>`
+            ).join('');
+            return `<div style="font-size:11px;min-width:160px">
+              <div style="margin-bottom:4px;opacity:0.6">${label}</div>
+              ${rows}
+            </div>`;
+          },
+        },
+        legend: b.legend,
+        xAxis: b.xAxis,
+        yAxis: {
+          type: 'value',
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: b.textColor, fontSize: 10, formatter: fmtMs },
+          splitLine: { lineStyle: { color: b.gridColor } },
+        },
+        series: [
+          makeSeries('p99',         p99, '#f44336'),
+          makeSeries('p95',         p95, '#ff9800'),
+          makeSeries('p50 (Median)', p50, '#4caf50'),
+        ],
+      };
+    };
+
+    /** Dispatch to the correct builder based on active tab */
+    const buildChartOptions = (points: any[]) => {
+      if (activeTab.value === 'rate') return buildRateOptions(points);
+      if (activeTab.value === 'errors') return buildErrorsOptions(points);
+      return buildDurationOptions(points);
     };
 
     const renderChart = () => {
@@ -518,7 +654,6 @@ export default defineComponent({
           renderer: 'canvas',
           devicePixelRatio: window.devicePixelRatio || 1,
         });
-        // Keep chart sized to its flex container as the panel height changes
         chartResizeObserver = new ResizeObserver(() => {
           chartInstance?.resize();
         });
@@ -549,14 +684,21 @@ export default defineComponent({
       } catch {
         trendError.value = 'Failed to load trend data.';
       } finally {
-        // Set loading false first — Vue will re-render and make the chart div visible
         trendLoading.value = false;
+      }
+    };
+
+    // Switch tab and re-render immediately if data is already loaded
+    const switchTab = async (tab: ChartTab) => {
+      activeTab.value = tab;
+      if (!trendLoading.value && trendDataPoints.value.length && chartInstance) {
+        await nextTick();
+        chartInstance.setOption(buildChartOptions(trendDataPoints.value), { notMerge: true });
       }
     };
 
     // ── Watchers ────────────────────────────────────────────────────────────
 
-    // Trigger load when edge or visibility changes
     watch(
       () => [props.selectedEdge?.from, props.selectedEdge?.to, props.visible] as const,
       ([, , visible]) => {
@@ -571,9 +713,7 @@ export default defineComponent({
       { immediate: true }
     );
 
-    // After trendLoading goes false and trendData is set, render the chart.
-    // The chart div becomes visible only after loading=false, so we must wait
-    // for the next DOM tick before initializing ECharts.
+    // Render once data arrives (chart div becomes visible after loading=false)
     watch(trendLoading, async (isLoading) => {
       if (!isLoading && trendData.value && trendDataPoints.value.length) {
         await nextTick();
@@ -608,6 +748,9 @@ export default defineComponent({
       trendError,
       trendData,
       trendDataPoints,
+      chartTabs,
+      activeTab,
+      switchTab,
       edgeHealth,
       errorRateFormatted,
       p50Latency,
@@ -768,7 +911,7 @@ export default defineComponent({
 // ── Scrollable content ────────────────────────────────────────────────────
 .panel-content {
   flex: 1;
-  min-height: 0;                 // essential: allows flex child to shrink below content
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
@@ -806,19 +949,58 @@ export default defineComponent({
   margin-bottom: 8px;
 }
 
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #e4e7eb;
-  margin-bottom: 8px;
-}
-
-.body--light .section-title { color: #202124; }
-
 .refresh-trend-btn {
   font-size: 11px;
   color: #9ca3af;
-  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+// ── RED tab switcher ───────────────────────────────────────────────────────
+.chart-tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 3px;
+
+  .chart-tab {
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1.4;
+
+    &:hover {
+      color: rgba(255, 255, 255, 0.75);
+    }
+
+    &.active {
+      background: #374151;
+      color: #e4e7eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    }
+  }
+}
+
+.body--light .chart-tabs {
+  background: rgba(0, 0, 0, 0.05);
+
+  .chart-tab {
+    color: rgba(0, 0, 0, 0.4);
+
+    &:hover { color: rgba(0, 0, 0, 0.7); }
+
+    &.active {
+      background: #ffffff;
+      color: #202124;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+  }
 }
 
 // ── Metric card ───────────────────────────────────────────────────────────
@@ -895,7 +1077,6 @@ export default defineComponent({
           .traffic-value { color: #d1d5db; }
         }
 
-        // error-rate pill inherits status-* class
         &.error-rate {
           &.status-healthy {
             background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.02));
@@ -1011,26 +1192,11 @@ export default defineComponent({
           font-weight: 700;
           letter-spacing: -0.01em;
 
-          &.delta-improved {
-            background: rgba(16, 185, 129, 0.14);
-            color: #10b981;
-          }
-          &.delta-improved-slight {
-            background: rgba(16, 185, 129, 0.08);
-            color: #34d399;
-          }
-          &.delta-neutral {
-            background: rgba(107, 114, 128, 0.12);
-            color: #6b7280;
-          }
-          &.delta-warning {
-            background: rgba(251, 191, 36, 0.14);
-            color: #fbbf24;
-          }
-          &.delta-critical {
-            background: rgba(239, 68, 68, 0.14);
-            color: #ef4444;
-          }
+          &.delta-improved       { background: rgba(16, 185, 129, 0.14); color: #10b981; }
+          &.delta-improved-slight { background: rgba(16, 185, 129, 0.08); color: #34d399; }
+          &.delta-neutral        { background: rgba(107, 114, 128, 0.12); color: #6b7280; }
+          &.delta-warning        { background: rgba(251, 191, 36, 0.14);  color: #fbbf24; }
+          &.delta-critical       { background: rgba(239, 68, 68, 0.14);   color: #ef4444; }
         }
       }
     }
@@ -1107,19 +1273,15 @@ export default defineComponent({
           .latency-current { color: #dc2626; }
         }
 
-        .percentile-badge {
-          background: rgba(107, 114, 128, 0.1);
-          color: #6b7280;
-        }
-
+        .percentile-badge { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
         .latency-baseline { color: #9ca3af; }
 
         .delta-badge {
-          &.delta-improved { background: rgba(16, 185, 129, 0.1); color: #059669; }
+          &.delta-improved       { background: rgba(16, 185, 129, 0.1);  color: #059669; }
           &.delta-improved-slight { background: rgba(16, 185, 129, 0.06); color: #10b981; }
-          &.delta-neutral { background: rgba(107, 114, 128, 0.08); color: #6b7280; }
-          &.delta-warning { background: rgba(217, 119, 6, 0.1); color: #d97706; }
-          &.delta-critical { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+          &.delta-neutral        { background: rgba(107, 114, 128, 0.08); color: #6b7280; }
+          &.delta-warning        { background: rgba(217, 119, 6, 0.1);    color: #d97706; }
+          &.delta-critical       { background: rgba(220, 38, 38, 0.1);    color: #dc2626; }
         }
       }
     }
@@ -1128,7 +1290,7 @@ export default defineComponent({
 
 // ── Trend chart ───────────────────────────────────────────────────────────
 .trend-section {
-  flex: 1;                       // fill all remaining vertical space
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -1153,8 +1315,6 @@ export default defineComponent({
 
   .trend-error { color: #f87171; border-color: rgba(239,68,68,0.2); }
 
-  // The chart div is always in the DOM so the ref is stable.
-  // flex: 1 makes it fill remaining height inside .trend-section.
   .trend-chart {
     flex: 1;
     min-height: 180px;
@@ -1164,9 +1324,7 @@ export default defineComponent({
     border: 1px solid rgba(255,255,255,0.06);
     background: rgba(255,255,255,0.02);
 
-    &.trend-chart--hidden {
-      display: none;
-    }
+    &.trend-chart--hidden { display: none; }
   }
 }
 
