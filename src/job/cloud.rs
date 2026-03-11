@@ -44,7 +44,7 @@ pub fn start() {
 pub fn start_trial_quota_jobs() {
     tokio::spawn(async move { run_trial_quota_flush().await });
     tokio::spawn(async move {
-        crate::service::trial_quota::watch_cluster_events().await;
+        crate::service::trial_quota::subscribe_ha_queue().await;
     });
 }
 

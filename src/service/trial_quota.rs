@@ -25,25 +25,31 @@
 //! ## Architecture
 //!
 //! - **Hot path** (`try_deduct`): atomic CAS on per-org counter, sends deduction record to a
-//!   bounded channel, broadcasts new total via NATS coordinator events.
+//!   bounded channel, broadcasts delta via dedicated NATS queue.
 //! - **DB flush** (`flush_to_db`): background job drains the channel periodically, coalesces
 //!   per-org/feature records, and batch-upserts to DB.
-//! - **Cluster sync** (`watch_cluster_events`): listens for coordinator events from other nodes and
-//!   updates local in-memory counters (max of local vs remote).
+//! - **Cluster sync** (`subscribe_ha_queue`): listens for delta messages from other nodes on a
+//!   dedicated NATS queue and atomically adds the delta to the local counter. Skips messages from
+//!   self (source_node check). Deltas are commutative so message ordering doesn't matter.
 
 use std::{
     collections::HashMap,
     sync::{
-        RwLock,
+        Arc, RwLock,
         atomic::{AtomicU64, Ordering},
     },
 };
 
 use bytes::Bytes;
 use chrono::{Datelike, Timelike, Utc};
-use config::meta::{
-    self_reporting::usage::{UsageData, UsageEvent},
-    stream::StreamType,
+use config::{
+    cluster::LOCAL_NODE,
+    meta::{
+        cluster::Node,
+        self_reporting::usage::{UsageData, UsageEvent},
+        stream::StreamType,
+    },
+    utils::json,
 };
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -71,8 +77,8 @@ static FLUSH_RX: once_cell::sync::OnceCell<
     &'static tokio::sync::Mutex<mpsc::Receiver<FlushRecord>>,
 > = once_cell::sync::OnceCell::new();
 
-/// Coordinator event key prefix for trial quota sync across nodes.
-pub const TRIAL_QUOTA_WATCHER_PREFIX: &str = "/trial_quota/";
+/// Dedicated NATS queue for HA sync of quota deductions across nodes.
+pub const TRIAL_QUOTA_HA_QUEUE: &str = "trial_quota_ha_queue";
 
 /// The checkpoints at which quota notification emails are sent.
 const QUOTA_CHECKPOINTS: &[u8] = &[80, 90, 95, 100];
@@ -176,25 +182,23 @@ fn ensure_org_counter(org_id: &str) {
         .or_insert_with(|| AtomicU64::new(0));
 }
 
-/// Update the local in-memory counter for an org to at least `new_total`.
-/// Used by cluster sync to apply remote updates without going backwards.
-fn update_org_counter_max(org_id: &str, new_total: u64) {
+/// Atomically add a delta to the org's in-memory counter.
+/// Used by the HA consumer to apply remote deductions.
+fn add_to_org_counter(org_id: &str, delta: u64) {
     ensure_org_counter(org_id);
     let map = ORG_USAGE.read().unwrap();
     if let Some(counter) = map.get(org_id) {
-        loop {
-            let current = counter.load(Ordering::Relaxed);
-            if new_total <= current {
-                break; // remote is behind or equal, nothing to do
-            }
-            if counter
-                .compare_exchange(current, new_total, Ordering::AcqRel, Ordering::Relaxed)
-                .is_ok()
-            {
-                break;
-            }
-        }
+        counter.fetch_add(delta, Ordering::Relaxed);
     }
+}
+
+/// HA message broadcast to other nodes after a deduction.
+/// Contains the delta (cost) so receivers can add it to their local counter.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrialQuotaHaMsg {
+    pub org_id: String,
+    pub cost: u64,
+    pub source_node: Node,
 }
 
 /// Check if the org has an active Stripe subscription (valid subscription_id + customer_id).
@@ -300,15 +304,17 @@ pub async fn try_deduct(
                 );
             }
 
-            // Broadcast new total to other nodes via coordinator events
+            // Broadcast delta to other nodes via NATS queue
             // Skip if single node — no other nodes to sync with
-            if !config::cluster::LOCAL_NODE.is_single_node() {
-                let key = format!("{}{}", TRIAL_QUOTA_WATCHER_PREFIX, org_id);
-                let value = Bytes::from(new_total.to_string());
-                if let Err(e) = infra::coordinator::events::put_event(&key, None, Some(value)).await
-                {
+            if !LOCAL_NODE.is_single_node() {
+                let msg = TrialQuotaHaMsg {
+                    org_id: org_id.to_string(),
+                    cost,
+                    source_node: LOCAL_NODE.clone(),
+                };
+                if let Err(e) = publish_ha_msg(&msg).await {
                     log::warn!(
-                        "[TRIAL_QUOTA] Failed to broadcast quota update for org={}: {e}",
+                        "[TRIAL_QUOTA] Failed to broadcast delta for org={}: {e}",
                         org_id
                     );
                 }
@@ -378,70 +384,92 @@ pub async fn flush_to_db() {
 }
 
 // ---------------------------------------------------------------------------
-// Cluster sync via coordinator events
+// Cluster sync via dedicated NATS queue (delta-based)
 // ---------------------------------------------------------------------------
 
-/// Watch for trial quota coordinator events from other nodes.
-/// When a remote node deducts credits, it broadcasts the new org total.
-/// We update our local counter to the max of (local, remote) to stay in sync.
-pub async fn watch_cluster_events() {
-    if config::cluster::LOCAL_NODE.is_single_node() {
-        log::info!("[TRIAL_QUOTA] Single node mode, skipping cluster event watcher");
+/// Publish a delta message to the HA queue.
+async fn publish_ha_msg(msg: &TrialQuotaHaMsg) -> Result<(), anyhow::Error> {
+    let payload = Bytes::from(json::to_vec(msg).map_err(|e| anyhow::anyhow!("{e}"))?);
+    let q = infra::queue::get_queue().await;
+    q.publish(TRIAL_QUOTA_HA_QUEUE, payload)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))
+}
+
+/// Subscribe to the HA queue and apply remote deltas to local counters.
+/// Each message carries `(org_id, cost, source_node)`. Messages from self
+/// are skipped. The delta is atomically added to the local counter.
+///
+/// Must run on ALL cloud nodes. Skipped in single-node mode.
+pub async fn subscribe_ha_queue() {
+    if LOCAL_NODE.is_single_node() {
+        log::info!("[TRIAL_QUOTA] Single node mode, skipping HA queue subscriber");
         return;
     }
 
-    let events = match infra::coordinator::events::watch(TRIAL_QUOTA_WATCHER_PREFIX).await {
-        Ok(ev) => ev,
+    let q = infra::queue::get_queue().await;
+    if let Err(e) = q.create(TRIAL_QUOTA_HA_QUEUE).await {
+        log::error!("[TRIAL_QUOTA] Failed to create HA queue: {e}");
+        return;
+    }
+
+    let mut receiver = match q.consume(TRIAL_QUOTA_HA_QUEUE, None).await {
+        Ok(rx) => rx,
         Err(e) => {
-            log::error!("[TRIAL_QUOTA] Failed to watch coordinator events: {e}");
+            log::error!("[TRIAL_QUOTA] Failed to consume from HA queue: {e}");
             return;
         }
     };
 
-    let events = std::sync::Arc::into_inner(events)
-        .unwrap_or_else(|| panic!("[TRIAL_QUOTA] Failed to unwrap coordinator event receiver"));
-    let mut events = events;
+    let rx = match Arc::get_mut(&mut receiver) {
+        Some(rx) => rx,
+        None => {
+            log::error!("[TRIAL_QUOTA] Failed to get mutable receiver for HA queue");
+            return;
+        }
+    };
 
-    while let Some(event) = events.recv().await {
-        match event {
-            infra::db::Event::Put(data) => {
-                let org_id = match data.key.strip_prefix(TRIAL_QUOTA_WATCHER_PREFIX) {
-                    Some(id) => id,
-                    None => continue,
-                };
-                let new_total = match data
-                    .value
-                    .as_ref()
-                    .and_then(|v| std::str::from_utf8(v).ok())
-                    .and_then(|s| s.parse::<u64>().ok())
-                {
-                    Some(t) => t,
-                    None => {
-                        log::warn!(
-                            "[TRIAL_QUOTA] Invalid cluster sync value for org={}",
-                            org_id
-                        );
-                        continue;
-                    }
-                };
+    log::info!("[TRIAL_QUOTA] HA queue subscriber started");
 
-                let old = get_org_total_used(org_id);
-                update_org_counter_max(org_id, new_total);
-                if new_total > old {
-                    log::info!(
-                        "[TRIAL_QUOTA] cluster sync: org={} updated {}->{}",
-                        org_id,
-                        old,
-                        new_total,
-                    );
+    while let Some(msg) = rx.recv().await {
+        let payload = msg.message();
+        let ha_msg: TrialQuotaHaMsg = match json::from_slice(payload) {
+            Ok(m) => m,
+            Err(e) => {
+                log::error!("[TRIAL_QUOTA] Failed to deserialize HA message: {e}");
+                if let Err(e) = msg.ack().await {
+                    log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
                 }
+                continue;
             }
-            infra::db::Event::Delete(_) | infra::db::Event::Empty => {
-                // Ignore deletes and empty events
+        };
+
+        // Skip messages from self — we already applied the deduction locally
+        if ha_msg.source_node.eq(&LOCAL_NODE) {
+            if let Err(e) = msg.ack().await {
+                log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
             }
+            continue;
+        }
+
+        let old = get_org_total_used(&ha_msg.org_id);
+        add_to_org_counter(&ha_msg.org_id, ha_msg.cost);
+        let new_total = get_org_total_used(&ha_msg.org_id);
+
+        log::info!(
+            "[TRIAL_QUOTA] HA sync: org={} delta={} total {}->{}",
+            ha_msg.org_id,
+            ha_msg.cost,
+            old,
+            new_total,
+        );
+
+        if let Err(e) = msg.ack().await {
+            log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
         }
     }
-    log::warn!("[TRIAL_QUOTA] Coordinator event watcher ended");
+
+    log::warn!("[TRIAL_QUOTA] HA queue subscriber ended");
 }
 
 // ---------------------------------------------------------------------------
