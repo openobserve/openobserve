@@ -238,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-else-if="
+                        searchObj.meta.logsVisualizeToggle === 'logs' &&
                         searchObj.data.queryResults.hasOwnProperty('hits') &&
                         searchObj.data.queryResults.hits.length == 0 &&
                         searchObj.loading == false &&
