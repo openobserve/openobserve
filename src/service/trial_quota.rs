@@ -526,7 +526,7 @@ fn record_usage_internal(
         })
         .unwrap_or_default(),
         size: feature.cost() as f64,
-        unit: "credits".to_string(),
+        unit: "count".to_string(),
         user_email: ctx.user_email.clone(),
         response_time: 0.0,
         stream_type: StreamType::Logs,
@@ -681,10 +681,7 @@ pub fn build_quota_email_message(
     used: u64,
     limit: u64,
 ) -> (String, String) {
-    let subject = format!(
-        "[OpenObserve] AI Credits: {}% used — {org_id}",
-        checkpoint
-    );
+    let subject = format!("[OpenObserve] AI Credits: {}% used — {org_id}", checkpoint);
 
     let message = match (checkpoint, is_paid) {
         (80, false) => format!(
