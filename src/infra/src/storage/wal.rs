@@ -99,7 +99,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_get_range_function() {
         let (_temp_dir, _wal_path) = setup_test_environment().await;
         let path = Path::from("test/file.txt");
@@ -151,7 +151,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_get_range_with_different_ranges() {
         let (_temp_dir, _wal_path) = setup_test_environment().await;
         let path = Path::from("test/file.txt");
