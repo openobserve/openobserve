@@ -1350,7 +1350,10 @@ export default defineComponent({
         processes.value = {};
         Object.keys(props.span).forEach((key: string) => {
           if (!span_details.has(key)) {
-            tags.value[key] = props.span[key];
+            tags.value[key] =
+              key === "span_kind"
+                ? getSpanKind(props.span[key])
+                : props.span[key];
           }
         });
 

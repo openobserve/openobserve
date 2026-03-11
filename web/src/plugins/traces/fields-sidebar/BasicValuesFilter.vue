@@ -17,10 +17,7 @@
           style="width: calc(100% - 28px); font-size: 14px"
           :title="row.label || row.name"
         >
-          <span
-            v-if="row.dataType"
-            class="field-type-container"
-          >
+          <span v-if="row.dataType" class="field-type-container">
             <q-icon
               class="field-expand-icon"
               :name="isExpanded ? 'expand_less' : 'expand_more'"
@@ -66,7 +63,7 @@
               >
                 {{ formatDuration(percentiles[p.key]) }}
               </span>
-              <div class="tw:flex tw:gap-[0.15rem]">
+              <div class="tw:flex">
                 <q-btn
                   :data-test="`log-search-subfield-list-equal-${row.name}-field-btn`"
                   size="0.3rem"
@@ -77,7 +74,7 @@
                       `duration>='${formatTimeWithSuffix(percentiles[p.key])}'`,
                     )
                   "
-                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
                 >
                   <q-icon
                     :name="outlinedArrowForwardIos"
@@ -94,7 +91,7 @@
                       `duration<='${formatTimeWithSuffix(percentiles[p.key])}'`,
                     )
                   "
-                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.625rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
                 >
                   <q-icon
                     :name="outlinedArrowBackIos"
@@ -117,7 +114,7 @@
           ref="fieldValuesPanelRef"
           :field-name="row.name"
           :field-values="
-            fieldValues[row.name] || {
+            mappedFieldValues || {
               isLoading: false,
               values: [],
               hasMore: false,
@@ -138,7 +135,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, unref } from "vue";
 import useTraces from "@/composables/useTraces";
 import {
   b64EncodeUnicode,
@@ -161,6 +158,7 @@ import {
   outlinedArrowBackIos,
   outlinedArrowForwardIos,
 } from "@quasar/extras/material-icons-outlined";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 
 const props = defineProps({
   row: {
@@ -219,6 +217,25 @@ const store = useStore();
 const { searchObj } = useTraces();
 const { fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues } =
   useFieldValuesStream();
+
+const EMPTY_FIELD_VALUES = {
+  isLoading: false,
+  values: [],
+  hasMore: false,
+  errMsg: "",
+};
+
+const mappedFieldValues = computed(() => {
+  const entry = unref(fieldValues)[props.row?.name] ?? EMPTY_FIELD_VALUES;
+  if (props.row?.name !== "span_kind") return entry;
+  return {
+    ...entry,
+    values: entry.values.map((v: { key: string; count: number }) => ({
+      ...v,
+      label: SPAN_KIND_MAP[v.key] ?? v.key,
+    })),
+  };
+});
 const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
 
 const defaultValuesCount = computed(
