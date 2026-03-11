@@ -571,31 +571,47 @@ export default class DashboardPanelConfigs {
       await this.page.waitForTimeout(500);
     }
 
-    // Set color via Vue's reactive data (setupState).
-    // Quasar's q-input v-model doesn't respond to Playwright's fill()/type()/
-    // pressSequentially() — none trigger Vue's reactivity system.
-    // Access the Vue component instance via __vueParentComponent and
-    // directly set editColorBySeries[rowIndex].color.
+    // Strategy 1: Set color via Vue's reactive data (setupState).
+    // __vueParentComponent is only available in Vue dev builds; in production builds
+    // this property is stripped. We try this first and fall back to native input events.
     const result = await this.page.evaluate(
       ({ color, rowIndex }) => {
         const popup = document.querySelector(
           '[data-test="dashboard-color-by-series-popup"]'
         );
-        if (!popup || !popup.__vueParentComponent) return { success: false };
+        if (!popup) return { success: false, reason: "popup not found" };
 
-        const vpc = popup.__vueParentComponent;
-        const series = vpc.setupState?.editColorBySeries;
-        if (Array.isArray(series) && series.length > rowIndex) {
-          series[rowIndex].color = color;
-          return { success: true, color: series[rowIndex].color };
+        // Strategy 1: Vue setupState (dev builds only)
+        if (popup.__vueParentComponent) {
+          const vpc = popup.__vueParentComponent;
+          const series = vpc.setupState?.editColorBySeries;
+          if (Array.isArray(series) && series.length > rowIndex) {
+            series[rowIndex].color = color;
+            return { success: true, method: "vue-setupState", color: series[rowIndex].color };
+          }
         }
-        return { success: false };
+
+        // Strategy 2: Native input events fallback (works in prod builds)
+        // Find the color input for the given row and set value via native setter + events
+        const colorInputs = popup.querySelectorAll(".color-section input");
+        const input = colorInputs[rowIndex];
+        if (input) {
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype, "value"
+          ).set;
+          nativeInputValueSetter.call(input, color);
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          return { success: true, method: "native-input", color };
+        }
+
+        return { success: false, reason: "no vue component or input found" };
       },
       { color, rowIndex }
     );
 
     if (!result.success) {
-      throw new Error("Failed to set color via Vue setupState");
+      throw new Error(`Failed to set color: ${result.reason}`);
     }
 
     await this.page.waitForTimeout(500);

@@ -9,10 +9,8 @@
 
 import { test, expect, navigateToBase } from "../utils/enhanced-baseFixtures.js";
 import {
-  waitForDashboardPage,
   deleteDashboard,
   setupTestDashboard,
-  cleanupTestDashboard,
 } from "./utils/dashCreation.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
@@ -60,33 +58,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
 
     // Step 5: Scroll down to find the time shift section and add a time shift
     testLogger.info("Adding time shift (Compare Against) with default 15m");
-    const timeShiftAddBtn = page.locator(
-      '[data-test="dashboard-addpanel-config-time-shift-add-btn"]'
-    );
-
-    // Scroll the sidebar until the time shift button is visible
-    const sidebar = page.locator(".sidebar-content");
-    await sidebar.waitFor({ state: "visible" });
-    await sidebar.hover();
-
-    // Scroll down to find the time shift button
-    for (let i = 0; i < 15; i++) {
-      if (await timeShiftAddBtn.isVisible().catch(() => false)) break;
-      await page.mouse.wheel(0, 300);
-      await page.waitForTimeout(200);
-    }
-
-    // Fallback: try programmatic scroll if still not visible
-    if (!(await timeShiftAddBtn.isVisible().catch(() => false))) {
-      await page.evaluate(() => {
-        const el = document.querySelector(".sidebar-content");
-        if (el) el.scrollTop = el.scrollHeight;
-      });
-      await page.waitForTimeout(500);
-    }
-
-    await timeShiftAddBtn.waitFor({ state: "visible", timeout: 15000 });
-    await timeShiftAddBtn.click();
+    await pm.dashboardPanelConfigs.addTimeShift();
     testLogger.info("Time shift added (default 15m)");
 
     // Step 6: Apply the query again to render with multi-window data
@@ -106,134 +78,29 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
       testLogger.warn("waitForChartToRender timed out after time shift apply, continuing");
     });
 
-    // Step 8: Scroll sidebar to find the Color By Series button and click it
+    // Step 7: Open Color By Series popup and configure comparison series color
     testLogger.info("Opening Color By Series configuration");
-    const colorBySeriesBtn = page.locator(
-      '[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]'
-    );
-
-    // Scroll to find the button
-    await sidebar.hover();
-    for (let i = 0; i < 15; i++) {
-      if (await colorBySeriesBtn.isVisible().catch(() => false)) break;
-      await page.mouse.wheel(0, 300);
-      await page.waitForTimeout(200);
-    }
-
-    if (!(await colorBySeriesBtn.isVisible().catch(() => false))) {
-      await page.evaluate(() => {
-        const btn = document.querySelector(
-          '[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]'
-        );
-        if (btn) btn.scrollIntoView({ behavior: "smooth", block: "center" });
-      });
-      await page.waitForTimeout(500);
-    }
-
-    await colorBySeriesBtn.waitFor({ state: "visible", timeout: 15000 });
-    await colorBySeriesBtn.click();
-
-    // Step 9: Wait for the Color By Series popup to appear
-    const colorBySeriesPopup = page.locator(
-      '[data-test="dashboard-color-by-series-popup"]'
-    );
-    await colorBySeriesPopup.waitFor({ state: "visible", timeout: 10000 });
+    await pm.dashboardPanelConfigs.openColorBySeries();
     testLogger.info("Color By Series popup opened");
 
-    // Step 10: Select the multi-window comparison series from the autocomplete dropdown
-    // We specifically want the series with the time-shift suffix (e.g., "(15 Minutes ago)")
-    // to verify the fix applies colors correctly to comparison/offset series
-    const seriesAutoComplete = colorBySeriesPopup
-      .locator('[data-test="common-auto-complete"]')
-      .first();
-    await seriesAutoComplete.waitFor({ state: "visible" });
-    await seriesAutoComplete.click();
-
-    // Wait for autocomplete options to appear
-    const autoCompleteOptions = colorBySeriesPopup.locator(
-      '[data-test="common-auto-complete-option"]'
-    );
-    await autoCompleteOptions.first().waitFor({ state: "visible", timeout: 10000 });
-
-    // Get all available series names for logging
-    const optionCount = await autoCompleteOptions.count();
-    const allSeriesNames = [];
-    for (let i = 0; i < optionCount; i++) {
-      const name = await autoCompleteOptions.nth(i).textContent();
-      allSeriesNames.push(name?.trim());
-    }
-    testLogger.info("Available series options", { count: optionCount, series: allSeriesNames });
-
-    // Find and select ONLY the comparison series — "Kubernetes Container Name (15 Minutes ago)"
-    // This is the critical series to test: the bug was that colors were lost on these suffixed series
-    const targetSeriesText = "15 Minutes ago";
-    let selectedSeriesName = "";
-    let targetOption = null;
-
-    for (let i = 0; i < optionCount; i++) {
-      const name = await autoCompleteOptions.nth(i).textContent();
-      if (name && name.includes(targetSeriesText)) {
-        targetOption = autoCompleteOptions.nth(i);
-        selectedSeriesName = name.trim();
-        break;
-      }
-    }
-
-    // The comparison series must exist after adding a time shift
-    expect(targetOption).not.toBeNull();
-
-    testLogger.info("Selecting multi-window comparison series", {
-      seriesName: selectedSeriesName,
-    });
-    await targetOption.click();
-
-    // Step 11: Set color #1a2cf0 for the comparison series
+    // Step 8: Select the comparison series and set custom color #1a2cf0
     const customColor = "#1a2cf0";
-    testLogger.info("Setting custom color", { color: customColor });
+    const selectedSeriesName = await pm.dashboardPanelConfigs.configureColorBySeries({
+      rowIndex: 0,
+      matchText: "15 Minutes ago",
+      color: customColor,
+    });
+    testLogger.info("Configured comparison series color", {
+      seriesName: selectedSeriesName,
+      color: customColor,
+    });
 
-    // Click "Set color" button to initialize the color field with default #5960b2
-    const setColorBtn = colorBySeriesPopup.getByText("Set color").first();
-    await setColorBtn.waitFor({ state: "visible", timeout: 5000 });
-    await setColorBtn.click();
-    await page.waitForTimeout(500);
-
-    // Set color via Vue's reactive data (setupState).
-    // Quasar's q-input v-model doesn't respond to Playwright's fill()/type()/
-    // pressSequentially() — none of them trigger Vue's reactivity system.
-    // Instead, we access the Vue component instance via __vueParentComponent
-    // on the popup's root DOM element and directly set editColorBySeries[0].color.
-    const colorSet = await page.evaluate((color) => {
-      const popup = document.querySelector(
-        '[data-test="dashboard-color-by-series-popup"]'
-      );
-      if (!popup || !popup.__vueParentComponent) return { success: false };
-
-      const vpc = popup.__vueParentComponent;
-      const series = vpc.setupState?.editColorBySeries;
-      if (Array.isArray(series) && series.length > 0) {
-        series[0].color = color;
-        return { success: true, color: series[0].color };
-      }
-      return { success: false };
-    }, customColor);
-
-    testLogger.info("Color set via Vue setupState", colorSet);
-    expect(colorSet.success).toBe(true);
-    await page.waitForTimeout(500);
-
-    // Step 12: Save the color configuration
+    // Step 9: Save the color configuration
     testLogger.info("Saving color by series configuration");
-    const saveColorBtn = page.locator(
-      '[data-test="dashboard-addpanel-config-color-by-series-apply-btn"]'
-    );
-    await saveColorBtn.waitFor({ state: "visible" });
-    await saveColorBtn.click();
-
-    // Wait for popup to close
-    await colorBySeriesPopup.waitFor({ state: "hidden", timeout: 10000 });
+    await pm.dashboardPanelConfigs.saveColorBySeries();
     testLogger.info("Color By Series configuration saved");
 
-    // Step 13: Apply and verify the chart renders with the custom color
+    // Step 10: Apply and verify the chart renders with the custom color
     testLogger.info("Applying final query to verify color");
     const finalApiPromise = page.waitForResponse(
       (response) =>
@@ -247,7 +114,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
       testLogger.warn("waitForChartToRender timed out after final apply, continuing");
     });
 
-    // Step 14: Verify #1a2cf0 is applied on the chart canvas.
+    // Step 11: Verify #1a2cf0 is applied on the chart canvas.
     // ECharts is imported as ES module (not on window.echarts), so we can't use
     // getInstanceByDom(). Instead, we use canvas pixel analysis to verify that
     // the custom color #1a2cf0 (RGB: 26, 44, 240) appears on the rendered chart.
@@ -312,12 +179,12 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     // This verifies the fix: colorBySeries mappings are re-applied after multi-window merge
     expect(colorVerification.colorFound).toBe(true);
 
-    // Step 15: Save the panel
+    // Step 12: Save the panel
     testLogger.info("Saving panel", { panelName });
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
 
-    // Step 16: Verify color persists after save by re-editing the panel
+    // Step 13: Verify color persists after save by re-editing the panel
     testLogger.info(
       "Re-editing panel to verify color configuration persists after save"
     );
@@ -332,40 +199,13 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
       testLogger.warn("waitForChartToRender timed out on re-edit, continuing");
     });
 
-    // Open config sidebar
+    // Open config sidebar and Color By Series popup (should say "Edit Color by Series")
     await pm.dashboardPanelConfigs.openConfigPanel();
-
-    // Scroll to find and click the Color By Series button
-    // It should now say "Edit Color by Series" since config already exists
-    const editColorBtn = page.locator(
-      '[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]'
-    );
-
-    await sidebar.hover();
-    for (let i = 0; i < 15; i++) {
-      if (await editColorBtn.isVisible().catch(() => false)) break;
-      await page.mouse.wheel(0, 300);
-      await page.waitForTimeout(200);
-    }
-
-    if (!(await editColorBtn.isVisible().catch(() => false))) {
-      await page.evaluate(() => {
-        const btn = document.querySelector(
-          '[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]'
-        );
-        if (btn) btn.scrollIntoView({ behavior: "smooth", block: "center" });
-      });
-      await page.waitForTimeout(500);
-    }
-
-    await editColorBtn.waitFor({ state: "visible", timeout: 15000 });
-    await editColorBtn.click();
-
-    // Verify the popup shows #1a2cf0 for the comparison series after save
-    await colorBySeriesPopup.waitFor({ state: "visible", timeout: 10000 });
+    await pm.dashboardPanelConfigs.openColorBySeries();
 
     // Verify the series name is still the comparison series
-    const savedSeriesInput = colorBySeriesPopup
+    const popup = pm.dashboardPanelConfigs.colorBySeriesPopup;
+    const savedSeriesInput = popup
       .locator('[data-test="common-auto-complete"]')
       .first();
     const savedSeriesValue = await savedSeriesInput.inputValue();
@@ -373,7 +213,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     expect(savedSeriesValue).toContain("15 Minutes ago");
 
     // Verify the color is still #1a2cf0
-    const savedColorInput = colorBySeriesPopup
+    const savedColorInput = popup
       .locator(".color-section input")
       .first();
     await savedColorInput.waitFor({ state: "visible", timeout: 5000 });
@@ -385,9 +225,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     expect(savedColor.toUpperCase()).toContain("1A2CF0");
 
     // Close the popup
-    await page
-      .locator('[data-test="dashboard-color-by-series-cancel"]')
-      .click();
+    await pm.dashboardPanelConfigs.cancelColorBySeries();
 
     // Save the panel again to go back to dashboard view
     await pm.dashboardPanelActions.savePanel();
@@ -417,31 +255,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
 
     // Step 3: Open config and add time shift (15m)
     await pm.dashboardPanelConfigs.openConfigPanel();
-
-    const sidebar = page.locator(".sidebar-content");
-    await sidebar.waitFor({ state: "visible" });
-
-    const timeShiftAddBtn = page.locator(
-      '[data-test="dashboard-addpanel-config-time-shift-add-btn"]'
-    );
-
-    await sidebar.hover();
-    for (let i = 0; i < 15; i++) {
-      if (await timeShiftAddBtn.isVisible().catch(() => false)) break;
-      await page.mouse.wheel(0, 300);
-      await page.waitForTimeout(200);
-    }
-
-    if (!(await timeShiftAddBtn.isVisible().catch(() => false))) {
-      await page.evaluate(() => {
-        const el = document.querySelector(".sidebar-content");
-        if (el) el.scrollTop = el.scrollHeight;
-      });
-      await page.waitForTimeout(500);
-    }
-
-    await timeShiftAddBtn.waitFor({ state: "visible", timeout: 15000 });
-    await timeShiftAddBtn.click();
+    await pm.dashboardPanelConfigs.addTimeShift();
 
     // Step 4: Apply with time shift — wait for API responses (multi-window fires 2 calls)
     const apiPromise2 = page.waitForResponse(
@@ -456,93 +270,15 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
       testLogger.warn("waitForChartToRender timed out after time shift apply, continuing");
     });
 
-    // Step 5: Open Color By Series — add ONLY one entry for the comparison series
-    const colorBySeriesBtn = page.locator(
-      '[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]'
-    );
-
-    await sidebar.hover();
-    for (let i = 0; i < 15; i++) {
-      if (await colorBySeriesBtn.isVisible().catch(() => false)) break;
-      await page.mouse.wheel(0, 300);
-      await page.waitForTimeout(200);
-    }
-
-    if (!(await colorBySeriesBtn.isVisible().catch(() => false))) {
-      await page.evaluate(() => {
-        const btn = document.querySelector(
-          '[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]'
-        );
-        if (btn) btn.scrollIntoView({ behavior: "smooth", block: "center" });
-      });
-      await page.waitForTimeout(500);
-    }
-
-    await colorBySeriesBtn.waitFor({ state: "visible", timeout: 15000 });
-    await colorBySeriesBtn.click();
-
-    const colorBySeriesPopup = page.locator(
-      '[data-test="dashboard-color-by-series-popup"]'
-    );
-    await colorBySeriesPopup.waitFor({ state: "visible", timeout: 10000 });
-
-    // Select ONLY "Kubernetes Container Name (15 Minutes ago)" — NOT the base series
-    const autoComplete = colorBySeriesPopup
-      .locator('[data-test="common-auto-complete"]')
-      .first();
-    await autoComplete.click();
-
-    const options = colorBySeriesPopup.locator(
-      '[data-test="common-auto-complete-option"]'
-    );
-    await options.first().waitFor({ state: "visible", timeout: 10000 });
-
-    // Find the comparison series option
-    const optionCount = await options.count();
-    let comparisonOption = null;
-    for (let i = 0; i < optionCount; i++) {
-      const name = await options.nth(i).textContent();
-      if (name && name.includes("15 Minutes ago")) {
-        comparisonOption = options.nth(i);
-        break;
-      }
-    }
-    expect(comparisonOption).not.toBeNull();
-    await comparisonOption.click();
-
-    // Set #11ad29 — only for this one comparison series
+    // Step 5: Open Color By Series, select comparison series, and set #11ad29
     const customColor = "#11ad29";
-    const setColorBtn = colorBySeriesPopup.getByText("Set color").first();
-    await setColorBtn.click();
-    await page.waitForTimeout(500);
-
-    // Set color via Vue's reactive data (setupState) — the only reliable way
-    // to update Quasar's q-input v-model from Playwright
-    const colorSet2 = await page.evaluate((color) => {
-      const popup = document.querySelector(
-        '[data-test="dashboard-color-by-series-popup"]'
-      );
-      if (!popup || !popup.__vueParentComponent) return { success: false };
-
-      const vpc = popup.__vueParentComponent;
-      const series = vpc.setupState?.editColorBySeries;
-      if (Array.isArray(series) && series.length > 0) {
-        series[0].color = color;
-        return { success: true, color: series[0].color };
-      }
-      return { success: false };
-    }, customColor);
-
-    testLogger.info("Color set result", colorSet2);
-    expect(colorSet2.success).toBe(true);
-    await page.waitForTimeout(500);
-
-    // Save — only one color entry exists (no entry for base "Kubernetes Container Name")
-    const saveBtn = page.locator(
-      '[data-test="dashboard-addpanel-config-color-by-series-apply-btn"]'
-    );
-    await saveBtn.click();
-    await colorBySeriesPopup.waitFor({ state: "hidden", timeout: 10000 });
+    await pm.dashboardPanelConfigs.openColorBySeries();
+    await pm.dashboardPanelConfigs.configureColorBySeries({
+      rowIndex: 0,
+      matchText: "15 Minutes ago",
+      color: customColor,
+    });
+    await pm.dashboardPanelConfigs.saveColorBySeries();
 
     // Step 6: Apply and verify — wait for API responses
     const finalApiPromise2 = page.waitForResponse(
