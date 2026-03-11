@@ -7,6 +7,8 @@ const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js
  * Page Object Model for Search Job Inspector
  * Handles the Inspector page at /web/logs/inspector
  * Enterprise-only feature for viewing search query execution profiles
+ *
+ * IMPORTANT: Selectors must match actual data-test attributes in Vue components
  */
 export class SearchJobInspectorPage {
   constructor(page) {
@@ -15,66 +17,42 @@ export class SearchJobInspectorPage {
     // Inspector Page URL
     this.inspectorPath = '/web/logs/inspector';
 
-    // ===== INSPECT BUTTON SELECTORS (SearchResult.vue) =====
-    this.inspectButton = '[data-test="logs-search-result-inspect-btn"]';
-    this.searchResultText = '[data-test="logs-search-search-result"]';
+    // ===== SEARCH BAR SELECTORS (SearchBar.vue) =====
+    this.utilitiesMenuBtn = '[data-test="logs-search-bar-utilities-menu-btn"]';
+    this.moreOptionsMenuBtn = '[data-test="logs-search-bar-more-options-btn"]';
+    this.searchHistoryItemBtn = '[data-test="search-history-item-btn"]';
+    this.searchInspectBtn = '[data-test="search-inspect-btn"]';
+    this.refreshBtn = '[data-test="logs-search-bar-refresh-btn"]';
+    this.showQueryToggleBtn = '[data-test="logs-search-bar-show-query-toggle-btn"]';
 
-    // ===== OVERFLOW MENU SELECTORS (SearchBar.vue) =====
-    this.overflowMenuBtn = '[data-test="logs-search-bar-overflow-menu-btn"]';
-    this.searchInspectMenuBtn = '[data-test="logs-search-bar-search-inspect-btn"]';
-
-    // ===== SEARCH INSPECT DIALOG SELECTORS =====
-    this.searchInspectDialog = '[data-test="search-inspect-dialog"]';
+    // ===== SEARCH INSPECT DIALOG SELECTORS (SearchBar.vue) =====
     this.traceIdInput = '[data-test="search-inspect-trace-id-input"]';
     this.inspectSubmitBtn = '[data-test="search-inspect-submit-btn"]';
-    this.inspectCancelBtn = '[data-test="search-inspect-cancel-btn"]';
-
-    // ===== UTILITIES MENU SELECTORS =====
-    this.utilitiesMenuBtn = '[data-test="logs-search-bar-utilities-menu-btn"]';
-    this.historyOption = 'text=History';
 
     // ===== SEARCH HISTORY SELECTORS (SearchHistory.vue) =====
-    this.searchHistoryPanel = '[data-test="search-history-panel"]';
-    this.historyInspectBtn = '[data-test="search-history-inspect-btn"]';
+    // Note: History rows use dynamic data-test with trace_id
+    this.searchHistoryRow = '[data-test^="stream-association-table-"]';
 
     // ===== INSPECTOR PAGE SELECTORS (SearchJobInspector.vue) =====
-    this.inspectorPageTitle = 'text=Search Job Inspector';
-    this.inspectorCloseBtn = '[data-test="search-inspector-close-btn"]';
+    this.inspectorTitle = '[data-test="inspector-title"]';
+    this.inspectorCloseBtn = '[data-test="inspector-close-button"]';
+    this.inspectorErrorBanner = '[data-test="inspector-error-banner"]';
+    this.inspectorEventsTable = '[data-test="inspector-events-table"]';
+    this.inspectorCopySqlBtn = '[data-test="inspector-copy-sql-btn"]';
 
-    // Stats tiles
-    this.resultsTile = '[data-test="search-inspector-results-tile"]';
-    this.eventsTile = '[data-test="search-inspector-events-tile"]';
-    this.timeTakenTile = '[data-test="search-inspector-time-taken-tile"]';
-    this.traceIdTile = '[data-test="search-inspector-trace-id-tile"]';
-    this.viewQueryBtn = '[data-test="search-inspector-view-query-btn"]';
-
-    // Events table
-    this.eventsTable = '[data-test="search-inspector-events-table"]';
-    this.eventsTableRow = '[data-test="search-inspector-event-row"]';
-
-    // SQL Query Dialog
-    this.sqlQueryDialog = '[data-test="search-inspector-sql-dialog"]';
-    this.sqlQueryContent = '[data-test="search-inspector-sql-content"]';
-    this.sqlDialogCloseBtn = '[data-test="search-inspector-sql-close-btn"]';
-
-    // Error states
-    this.noEventsMessage = 'text=No events found';
-    this.errorBanner = '[data-test="search-inspector-error"]';
-
-    // Time range badge
-    this.timeRangeBadge = '[data-test="search-inspector-time-range"]';
-
-    // ===== DATE TIME SELECTORS (shared with LogsPage) =====
-    this.dateTimeBtn = '[data-test="date-time-btn"]';
-    this.relative15MinBtn = '[data-test="date-time-relative-15-m-btn"]';
-    this.relative1HourBtn = '[data-test="date-time-relative-1-h-btn"]';
-
-    // ===== INSPECTOR PAGE CONTENT SELECTORS =====
+    // ===== TEXT-BASED SELECTORS (for elements without data-test) =====
+    // These are fallbacks for elements that don't have data-test attributes
+    this.inspectorPageTitleText = 'text=Search Job Inspector';
     this.resultsTileText = 'text=Results';
     this.eventsTileText = 'text=Events';
     this.timeTakenTileText = 'text=Time Taken';
     this.traceIdTileText = 'text=Trace ID';
     this.viewQueryBtnText = 'text=View Query';
+    this.noEventsText = 'text=No events found';
+    this.inspectBtnText = 'button:has-text("Inspect")';
+
+    // ===== SEARCH RESULTS (Index.vue) =====
+    this.searchResultText = '[data-test="logs-search-search-result"]';
   }
 
   // ===== NAVIGATION METHODS =====
@@ -98,28 +76,95 @@ export class SearchJobInspectorPage {
     }
 
     await this.page.goto(url);
-    await this.page.waitForTimeout(3000);
+    await this.page.waitForLoadState('networkidle');
   }
 
   /**
-   * Check if the Inspect button is visible in search results
+   * Wait for inspector page to load
+   */
+  async waitForInspectorPage() {
+    await expect(this.page.locator(this.inspectorTitle)).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Check if on inspector page
    * @returns {Promise<boolean>}
    */
-  async isInspectButtonVisible() {
-    try {
-      const button = this.page.locator(this.inspectButton);
-      return await button.isVisible({ timeout: 5000 });
-    } catch {
-      return false;
-    }
+  async isOnInspectorPage() {
+    return await this.page.locator(this.inspectorTitle).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  // ===== OVERFLOW MENU METHODS =====
+
+  /**
+   * Open the more options menu (three dots)
+   */
+  async openMoreOptionsMenu() {
+    await this.page.locator(this.moreOptionsMenuBtn).click();
+    await this.page.waitForLoadState('domcontentloaded');
   }
 
   /**
-   * Click the Inspect button in search results to navigate to inspector
+   * Click Search Inspect option in menu (for Enterprise)
    */
-  async clickInspectButton() {
-    await this.page.locator(this.inspectButton).click();
-    await this.page.waitForTimeout(3000);
+  async clickSearchInspectOption() {
+    await this.openMoreOptionsMenu();
+    await expect(this.page.locator(this.searchInspectBtn)).toBeVisible({ timeout: 5000 });
+    await this.page.locator(this.searchInspectBtn).click();
+  }
+
+  /**
+   * Check if Search Inspect button is visible (Enterprise feature)
+   * @returns {Promise<boolean>}
+   */
+  async isSearchInspectVisible() {
+    await this.openMoreOptionsMenu();
+    const visible = await this.page.locator(this.searchInspectBtn).isVisible({ timeout: 3000 }).catch(() => false);
+    await this.page.keyboard.press('Escape'); // Close menu
+    return visible;
+  }
+
+  /**
+   * Open Search Inspect dialog and enter a trace ID
+   * @param {string} traceId - The trace ID to inspect
+   */
+  async inspectViaDialog(traceId) {
+    await this.clickSearchInspectOption();
+    await expect(this.page.locator(this.traceIdInput)).toBeVisible({ timeout: 5000 });
+    await this.page.locator(this.traceIdInput).fill(traceId);
+    await this.page.locator(this.inspectSubmitBtn).click();
+    await this.waitForInspectorPage();
+  }
+
+  // ===== SEARCH HISTORY METHODS =====
+
+  /**
+   * Open Search History via more options menu
+   */
+  async openSearchHistory() {
+    await this.openMoreOptionsMenu();
+    await expect(this.page.locator(this.searchHistoryItemBtn)).toBeVisible({ timeout: 5000 });
+    await this.page.locator(this.searchHistoryItemBtn).click();
+    await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  /**
+   * Click Inspect button on a history row
+   * Uses text-based selector since history rows don't have dedicated inspect buttons
+   */
+  async inspectFromHistory() {
+    const inspectBtn = this.page.locator(this.inspectBtnText).first();
+    await expect(inspectBtn).toBeVisible({ timeout: 5000 });
+    await inspectBtn.click();
+    await this.waitForInspectorPage();
+  }
+
+  /**
+   * Check if history has Inspect buttons available
+   * @returns {Promise<boolean>}
+   */
+  async hasHistoryInspectButtons() {
+    return await this.page.locator(this.inspectBtnText).first().isVisible({ timeout: 5000 }).catch(() => false);
   }
 
   // ===== SEARCH RESULTS PARSING =====
@@ -129,12 +174,11 @@ export class SearchJobInspectorPage {
    * @returns {Promise<string>}
    */
   async getSearchResultsText() {
-    try {
-      const resultText = await this.page.locator('text=/Showing.*events.*ms/').textContent();
-      return resultText || '';
-    } catch {
-      return '';
+    const resultLocator = this.page.locator(this.searchResultText);
+    if (await resultLocator.isVisible({ timeout: 5000 }).catch(() => false)) {
+      return await resultLocator.textContent() || '';
     }
+    return '';
   }
 
   /**
@@ -153,93 +197,10 @@ export class SearchJobInspectorPage {
     };
   }
 
-  // ===== OVERFLOW MENU METHODS =====
-
-  /**
-   * Open the overflow menu (three dots)
-   */
-  async openOverflowMenu() {
-    const menuBtn = this.page.locator(this.overflowMenuBtn);
-    if (await menuBtn.isVisible()) {
-      await menuBtn.click();
-      await this.page.waitForTimeout(1000);
-    }
-  }
-
-  /**
-   * Click Search Inspect option in overflow menu
-   */
-  async clickSearchInspectOption() {
-    await this.openOverflowMenu();
-    const inspectOption = this.page.locator(this.searchInspectMenuBtn);
-    if (await inspectOption.isVisible()) {
-      await inspectOption.click();
-      await this.page.waitForTimeout(1000);
-    }
-  }
-
-  /**
-   * Open Search Inspect dialog and enter a trace ID
-   * @param {string} traceId - The trace ID to inspect
-   */
-  async inspectViaDialog(traceId) {
-    await this.clickSearchInspectOption();
-
-    const input = this.page.locator(this.traceIdInput);
-    await input.fill(traceId);
-
-    await this.page.locator(this.inspectSubmitBtn).click();
-    await this.page.waitForTimeout(3000);
-  }
-
-  // ===== SEARCH HISTORY METHODS =====
-
-  /**
-   * Open Search History panel via utilities menu
-   */
-  async openSearchHistory() {
-    const utilitiesBtn = this.page.locator(this.utilitiesMenuBtn);
-    if (await utilitiesBtn.isVisible()) {
-      await utilitiesBtn.click();
-      await this.page.waitForTimeout(1000);
-
-      const historyOption = this.page.locator(this.historyOption).first();
-      if (await historyOption.isVisible()) {
-        await historyOption.click();
-        await this.page.waitForTimeout(2000);
-      }
-    }
-  }
-
-  /**
-   * Click Inspect button on a history row
-   * @param {number} rowIndex - The row index (0-based)
-   */
-  async inspectFromHistory(rowIndex = 0) {
-    const inspectBtn = this.page.locator(this.historyInspectBtn).nth(rowIndex);
-    if (await inspectBtn.isVisible()) {
-      await inspectBtn.click();
-      await this.page.waitForTimeout(3000);
-    }
-  }
-
   // ===== INSPECTOR PAGE METHODS =====
 
   /**
-   * Check if on inspector page
-   * @returns {Promise<boolean>}
-   */
-  async isOnInspectorPage() {
-    try {
-      const title = this.page.locator(this.inspectorPageTitle);
-      return await title.isVisible({ timeout: 5000 });
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Get inspector stats values
+   * Get inspector stats values using text-based locators
    * @returns {Promise<{results: string, events: string, timeTaken: string, traceId: string}>}
    */
   async getInspectorStats() {
@@ -250,464 +211,47 @@ export class SearchJobInspectorPage {
       traceId: 'N/A'
     };
 
-    try {
-      // Get Results value
-      const resultsLocator = this.page.locator('text=Results').locator('..').locator('text=/^\\d+$/').first();
-      if (await resultsLocator.isVisible({ timeout: 3000 })) {
-        stats.results = await resultsLocator.textContent();
-      }
-    } catch { /* continue */ }
+    // Get values adjacent to label text
+    const tiles = [
+      { label: 'Results', key: 'results' },
+      { label: 'Events', key: 'events' },
+      { label: 'Time Taken', key: 'timeTaken' },
+      { label: 'Trace ID', key: 'traceId' }
+    ];
 
-    try {
-      // Get Events value (format: X,XXX)
-      const eventsLocator = this.page.locator('text=Events').locator('..').locator('text=/^[\\d,]+$/').first();
-      if (await eventsLocator.isVisible({ timeout: 3000 })) {
-        stats.events = await eventsLocator.textContent();
-      }
-    } catch { /* continue */ }
-
-    try {
-      // Get Time Taken value (format: Xms)
-      const timeLocator = this.page.locator('text=Time Taken').locator('..').locator('text=/\\d+ms/').first();
-      if (await timeLocator.isVisible({ timeout: 3000 })) {
-        stats.timeTaken = await timeLocator.textContent();
-      }
-    } catch { /* continue */ }
-
-    try {
-      // Get Trace ID
-      const traceIdLocator = this.page.locator('text=Trace ID').locator('..').locator('text=/[a-zA-Z0-9-]+/').first();
-      if (await traceIdLocator.isVisible({ timeout: 3000 })) {
-        stats.traceId = await traceIdLocator.textContent();
-      }
-    } catch { /* continue */ }
+    for (const tile of tiles) {
+      try {
+        const labelLocator = this.page.locator(`text=${tile.label}`).first();
+        if (await labelLocator.isVisible({ timeout: 2000 })) {
+          // Get parent container and find the value
+          const parent = labelLocator.locator('xpath=..');
+          const valueText = await parent.textContent();
+          // Extract numeric value or ID
+          const value = valueText?.replace(tile.label, '').trim() || 'N/A';
+          stats[tile.key] = value;
+        }
+      } catch { /* continue */ }
+    }
 
     return stats;
   }
 
   /**
-   * Parse inspector stats to extract numeric values
-   * @returns {Promise<{results: number, events: number, timeMs: number}>}
-   */
-  async parseInspectorStats() {
-    const stats = await this.getInspectorStats();
-
-    return {
-      results: stats.results !== 'N/A' ? parseInt(stats.results.replace(/,/g, ''), 10) : null,
-      events: stats.events !== 'N/A' ? parseInt(stats.events.replace(/,/g, ''), 10) : null,
-      timeMs: stats.timeTaken !== 'N/A' ? parseInt(stats.timeTaken.replace('ms', ''), 10) : null
-    };
-  }
-
-  /**
-   * Compare search results with inspector stats
-   * @returns {Promise<{eventsMatch: boolean, timeMatch: boolean, searchEvents: number, inspectorEvents: number, searchTimeMs: number, inspectorTimeMs: number}>}
-   */
-  async compareSearchAndInspectorStats() {
-    // First get search results (should be called before navigating to inspector)
-    const searchResults = await this.parseSearchResults();
-
-    // Navigate to inspector and get stats
-    await this.clickInspectButton();
-    const inspectorStats = await this.parseInspectorStats();
-
-    const searchEvents = parseInt(searchResults.eventsCount, 10);
-    const searchTimeMs = parseInt(searchResults.timeMs, 10);
-    const inspectorEvents = inspectorStats.events;
-    const inspectorTimeMs = inspectorStats.timeMs;
-
-    // Allow 20% tolerance for time comparison
-    const timeTolerance = 0.2;
-    const timeMatch = Math.abs(searchTimeMs - inspectorTimeMs) / searchTimeMs <= timeTolerance;
-
-    return {
-      eventsMatch: searchEvents === inspectorEvents,
-      timeMatch,
-      searchEvents,
-      inspectorEvents,
-      searchTimeMs,
-      inspectorTimeMs
-    };
-  }
-
-  /**
    * Click View Query button to open SQL dialog
    */
-  async openSqlQueryDialog() {
-    await this.page.locator(this.viewQueryBtn).click();
-    await this.page.waitForTimeout(1000);
-  }
-
-  /**
-   * Get SQL query from dialog
-   * @returns {Promise<string>}
-   */
-  async getSqlQuery() {
-    try {
-      const sqlContent = this.page.locator(this.sqlQueryContent);
-      if (await sqlContent.isVisible()) {
-        return await sqlContent.textContent();
-      }
-    } catch { /* continue */ }
-    return '';
-  }
-
-  /**
-   * Close the inspector page
-   */
-  async closeInspector() {
-    const closeBtn = this.page.locator(this.inspectorCloseBtn);
-    if (await closeBtn.isVisible()) {
-      await closeBtn.click();
-      await this.page.waitForTimeout(1000);
-    }
-  }
-
-  /**
-   * Check if no events message is displayed
-   * @returns {Promise<boolean>}
-   */
-  async hasNoEventsMessage() {
-    try {
-      const message = this.page.locator(this.noEventsMessage);
-      return await message.isVisible({ timeout: 3000 });
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Check if error banner is displayed
-   * @returns {Promise<boolean>}
-   */
-  async hasError() {
-    try {
-      const error = this.page.locator(this.errorBanner);
-      return await error.isVisible({ timeout: 3000 });
-    } catch {
-      return false;
-    }
-  }
-
-  // ===== DATE TIME METHODS =====
-
-  /**
-   * Click the date time button
-   */
-  async clickDateTimeBtn() {
-    await this.page.locator(this.dateTimeBtn).click();
-    await this.page.waitForTimeout(500);
-  }
-
-  /**
-   * Select relative 15 minutes time range
-   */
-  async selectRelative15Minutes() {
-    await this.clickDateTimeBtn();
-    const btn = this.page.locator(this.relative15MinBtn);
-    if (await btn.isVisible()) {
-      await btn.click();
-      await this.page.waitForTimeout(500);
-    }
-  }
-
-  /**
-   * Select relative 1 hour time range
-   */
-  async selectRelative1Hour() {
-    await this.clickDateTimeBtn();
-    const btn = this.page.locator(this.relative1HourBtn);
-    if (await btn.isVisible()) {
-      await btn.click();
-      await this.page.waitForTimeout(500);
-    }
-  }
-
-  // ===== INSPECTOR TILE VERIFICATION METHODS =====
-
-  /**
-   * Check if Results tile is visible
-   * @returns {Promise<boolean>}
-   */
-  async isResultsTileVisible() {
-    return await this.page.locator(this.resultsTileText).isVisible().catch(() => false);
-  }
-
-  /**
-   * Check if Events tile is visible
-   * @returns {Promise<boolean>}
-   */
-  async isEventsTileVisible() {
-    return await this.page.locator(this.eventsTileText).isVisible().catch(() => false);
-  }
-
-  /**
-   * Check if Time Taken tile is visible
-   * @returns {Promise<boolean>}
-   */
-  async isTimeTakenTileVisible() {
-    return await this.page.locator(this.timeTakenTileText).isVisible().catch(() => false);
-  }
-
-  /**
-   * Check if Trace ID tile is visible
-   * @returns {Promise<boolean>}
-   */
-  async isTraceIdTileVisible() {
-    return await this.page.locator(this.traceIdTileText).isVisible().catch(() => false);
+  async openViewQueryDialog() {
+    const viewQueryBtn = this.page.locator(this.viewQueryBtnText);
+    await expect(viewQueryBtn).toBeVisible({ timeout: 5000 });
+    await viewQueryBtn.click();
+    await this.page.waitForLoadState('domcontentloaded');
   }
 
   /**
    * Check if View Query button is visible
    * @returns {Promise<boolean>}
    */
-  async isViewQueryBtnVisible() {
-    return await this.page.locator(this.viewQueryBtnText).isVisible().catch(() => false);
-  }
-
-  /**
-   * Click View Query button (text-based)
-   */
-  async clickViewQueryBtn() {
-    await this.page.locator(this.viewQueryBtnText).click();
-    await this.page.waitForTimeout(1000);
-  }
-
-  /**
-   * Check if Search Inspect option is visible in overflow menu
-   * @returns {Promise<boolean>}
-   */
-  async isSearchInspectOptionVisible() {
-    return await this.page.locator(this.searchInspectMenuBtn).isVisible().catch(() => false);
-  }
-
-  /**
-   * Check if Search Inspect dialog is visible
-   * @returns {Promise<boolean>}
-   */
-  async isSearchInspectDialogVisible() {
-    return await this.page.locator(this.searchInspectDialog).isVisible().catch(() => false);
-  }
-
-  /**
-   * Click Search Inspect option and open dialog
-   */
-  async clickSearchInspectMenuOption() {
-    await this.page.locator(this.searchInspectMenuBtn).click();
-    await this.page.waitForTimeout(1000);
-  }
-
-  /**
-   * Check if History Inspect button is visible
-   * @returns {Promise<boolean>}
-   */
-  async isHistoryInspectBtnVisible() {
-    const btn = this.page.locator('[data-test*="inspect"], button:has-text("Inspect")').first();
-    return await btn.isVisible().catch(() => false);
-  }
-
-  /**
-   * Click History Inspect button
-   */
-  async clickHistoryInspectBtn() {
-    const btn = this.page.locator('[data-test*="inspect"], button:has-text("Inspect")').first();
-    await btn.click();
-    await this.page.waitForTimeout(3000);
-  }
-
-  // ===== EVENTS TABLE METHODS =====
-
-  /**
-   * Check if events table is visible
-   * @returns {Promise<boolean>}
-   */
-  async isEventsTableVisible() {
-    return await this.page.locator(this.eventsTable).isVisible().catch(() => false);
-  }
-
-  /**
-   * Get count of event rows in the table
-   * @returns {Promise<number>}
-   */
-  async getEventRowCount() {
-    try {
-      const rows = this.page.locator(this.eventsTableRow);
-      return await rows.count();
-    } catch {
-      return 0;
-    }
-  }
-
-  /**
-   * Check if any expandable rows exist in events table
-   * @returns {Promise<boolean>}
-   */
-  async hasExpandableRows() {
-    try {
-      const expandIcons = this.page.locator('[data-test*="expand"], .q-expansion-item, [class*="expand"]');
-      return (await expandIcons.count()) > 0;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Click first expandable row to expand it
-   */
-  async expandFirstEventRow() {
-    const expandIcon = this.page.locator('[data-test*="expand"], .q-expansion-item__toggle, [class*="expand-icon"]').first();
-    if (await expandIcon.isVisible()) {
-      await expandIcon.click();
-      await this.page.waitForTimeout(500);
-    }
-  }
-
-  // ===== DURATION BARS METHODS =====
-
-  /**
-   * Check if duration bars are visible
-   * @returns {Promise<boolean>}
-   */
-  async hasDurationBars() {
-    try {
-      const bars = this.page.locator('[class*="duration"], [class*="progress"], [data-test*="duration-bar"]');
-      return (await bars.count()) > 0;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Get duration bar colors (checks for color classes)
-   * @returns {Promise<string[]>}
-   */
-  async getDurationBarColors() {
-    const colors = [];
-    try {
-      const bars = this.page.locator('[class*="duration"], [class*="progress"]');
-      const count = await bars.count();
-      for (let i = 0; i < Math.min(count, 5); i++) {
-        const bar = bars.nth(i);
-        const className = await bar.getAttribute('class') || '';
-        const style = await bar.getAttribute('style') || '';
-        colors.push({ className, style });
-      }
-    } catch { /* continue */ }
-    return colors;
-  }
-
-  // ===== CLOSE BUTTON METHODS =====
-
-  /**
-   * Check if close button is visible
-   * @returns {Promise<boolean>}
-   */
-  async isCloseBtnVisible() {
-    return await this.page.locator(this.inspectorCloseBtn).isVisible().catch(() => false);
-  }
-
-  /**
-   * Click close button to go back
-   */
-  async clickCloseBtn() {
-    const closeBtn = this.page.locator(this.inspectorCloseBtn);
-    if (await closeBtn.isVisible()) {
-      await closeBtn.click();
-      await this.page.waitForTimeout(1000);
-    }
-  }
-
-  /**
-   * Get current URL before closing
-   * @returns {Promise<string>}
-   */
-  async getCurrentUrl() {
-    return this.page.url();
-  }
-
-  // ===== COPY TRACE ID METHODS =====
-
-  /**
-   * Click on trace ID tile to copy
-   */
-  async clickTraceIdToCopy() {
-    const traceIdTile = this.page.locator(this.traceIdTileText).locator('..');
-    if (await traceIdTile.isVisible()) {
-      await traceIdTile.click();
-      await this.page.waitForTimeout(500);
-    }
-  }
-
-  /**
-   * Check if copy success notification appears
-   * @returns {Promise<boolean>}
-   */
-  async hasCopySuccessNotification() {
-    try {
-      const notification = this.page.locator('text=/copied|clipboard/i, .q-notification');
-      return await notification.isVisible({ timeout: 3000 });
-    } catch {
-      return false;
-    }
-  }
-
-  // ===== TIME RANGE BADGE METHODS =====
-
-  /**
-   * Check if time range badge is visible
-   * @returns {Promise<boolean>}
-   */
-  async isTimeRangeBadgeVisible() {
-    return await this.page.locator(this.timeRangeBadge).isVisible().catch(() => false);
-  }
-
-  /**
-   * Get time range badge text
-   * @returns {Promise<string>}
-   */
-  async getTimeRangeBadgeText() {
-    try {
-      const badge = this.page.locator(this.timeRangeBadge);
-      if (await badge.isVisible()) {
-        return await badge.textContent();
-      }
-    } catch { /* continue */ }
-    return '';
-  }
-
-  /**
-   * Check if timezone is displayed
-   * @returns {Promise<boolean>}
-   */
-  async hasTimezoneDisplay() {
-    try {
-      // Look for common timezone patterns like UTC, GMT, Asia/Kolkata, etc.
-      const timezoneText = this.page.locator('text=/UTC|GMT|Asia|America|Europe|Pacific/');
-      return await timezoneText.isVisible().catch(() => false);
-    } catch {
-      return false;
-    }
-  }
-
-  // ===== SQL QUERY DIALOG METHODS =====
-
-  /**
-   * Check if SQL query dialog is visible
-   * @returns {Promise<boolean>}
-   */
-  async isSqlDialogVisible() {
-    try {
-      // Try data-test selector first, then fallback to text-based detection
-      const dialog = this.page.locator(this.sqlQueryDialog);
-      if (await dialog.isVisible({ timeout: 2000 })) {
-        return true;
-      }
-      // Fallback: look for SQL content or dialog with SQL text
-      const sqlText = this.page.locator('text=/SELECT|FROM|WHERE/i').first();
-      return await sqlText.isVisible({ timeout: 2000 });
-    } catch {
-      return false;
-    }
+  async isViewQueryVisible() {
+    return await this.page.locator(this.viewQueryBtnText).isVisible({ timeout: 5000 }).catch(() => false);
   }
 
   /**
@@ -715,18 +259,18 @@ export class SearchJobInspectorPage {
    * @returns {Promise<string>}
    */
   async getSqlQueryContent() {
-    try {
-      // Try data-test selector first
-      const content = this.page.locator(this.sqlQueryContent);
-      if (await content.isVisible({ timeout: 2000 })) {
-        return await content.textContent();
+    // Look for SQL content in dialog (pre/code elements or SQL keywords)
+    const sqlLocators = [
+      this.page.locator('pre').first(),
+      this.page.locator('code').first(),
+      this.page.locator('text=/SELECT.*FROM/i').first()
+    ];
+
+    for (const locator of sqlLocators) {
+      if (await locator.isVisible({ timeout: 2000 }).catch(() => false)) {
+        return await locator.textContent() || '';
       }
-      // Fallback: look for pre/code element containing SQL
-      const sqlCode = this.page.locator('pre, code, .sql-content, [class*="sql"]').first();
-      if (await sqlCode.isVisible({ timeout: 2000 })) {
-        return await sqlCode.textContent();
-      }
-    } catch { /* continue */ }
+    }
     return '';
   }
 
@@ -734,42 +278,84 @@ export class SearchJobInspectorPage {
    * Close SQL query dialog
    */
   async closeSqlDialog() {
-    try {
-      // Try data-test close button first
-      const closeBtn = this.page.locator(this.sqlDialogCloseBtn);
-      if (await closeBtn.isVisible({ timeout: 2000 })) {
-        await closeBtn.click();
-        await this.page.waitForTimeout(500);
-        return;
-      }
-      // Fallback: look for close button in dialog
-      const fallbackClose = this.page.locator('.q-dialog button:has-text("Close"), .q-dialog .q-btn--flat').first();
-      if (await fallbackClose.isVisible({ timeout: 2000 })) {
-        await fallbackClose.click();
-        await this.page.waitForTimeout(500);
-        return;
-      }
-      // Last resort: press Escape
-      await this.page.keyboard.press('Escape');
-      await this.page.waitForTimeout(500);
-    } catch { /* continue */ }
+    // Try pressing Escape to close any dialog
+    await this.page.keyboard.press('Escape');
+    await this.page.waitForLoadState('domcontentloaded');
   }
 
   /**
-   * Check if SQL content contains expected keywords
-   * @param {string} sqlContent - The SQL content to check
-   * @returns {boolean}
+   * Close the inspector page
    */
-  hasSqlKeywords(sqlContent) {
-    const keywords = ['SELECT', 'FROM', 'WHERE'];
-    const upperContent = sqlContent.toUpperCase();
-    return keywords.some(keyword => upperContent.includes(keyword));
+  async closeInspector() {
+    const closeBtn = this.page.locator(this.inspectorCloseBtn);
+    await expect(closeBtn).toBeVisible({ timeout: 5000 });
+    await closeBtn.click();
+    await this.page.waitForLoadState('networkidle');
   }
 
-  // ===== SCREENSHOT METHODS =====
+  /**
+   * Check if close button is visible
+   * @returns {Promise<boolean>}
+   */
+  async isCloseBtnVisible() {
+    return await this.page.locator(this.inspectorCloseBtn).isVisible({ timeout: 5000 }).catch(() => false);
+  }
 
   /**
-   * Take a screenshot of the current page
+   * Check if events table is visible
+   * @returns {Promise<boolean>}
+   */
+  async isEventsTableVisible() {
+    return await this.page.locator(this.inspectorEventsTable).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if no events message is displayed
+   * @returns {Promise<boolean>}
+   */
+  async hasNoEventsMessage() {
+    return await this.page.locator(this.noEventsText).isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Check if error banner is displayed
+   * @returns {Promise<boolean>}
+   */
+  async hasError() {
+    return await this.page.locator(this.inspectorErrorBanner).isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Check if inspector tiles are visible
+   * @returns {Promise<{results: boolean, events: boolean, timeTaken: boolean, traceId: boolean}>}
+   */
+  async getTilesVisibility() {
+    return {
+      results: await this.page.locator(this.resultsTileText).isVisible({ timeout: 3000 }).catch(() => false),
+      events: await this.page.locator(this.eventsTileText).isVisible({ timeout: 3000 }).catch(() => false),
+      timeTaken: await this.page.locator(this.timeTakenTileText).isVisible({ timeout: 3000 }).catch(() => false),
+      traceId: await this.page.locator(this.traceIdTileText).isVisible({ timeout: 3000 }).catch(() => false)
+    };
+  }
+
+  /**
+   * Run search by clicking refresh button
+   */
+  async runSearch() {
+    await this.page.locator(this.refreshBtn).click();
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  /**
+   * Get current URL
+   * @returns {Promise<string>}
+   */
+  async getCurrentUrl() {
+    return this.page.url();
+  }
+
+  /**
+   * Take a screenshot
    * @param {string} name - Screenshot name
    */
   async takeScreenshot(name) {
@@ -779,19 +365,17 @@ export class SearchJobInspectorPage {
   // ===== ASSERTION HELPERS =====
 
   /**
-   * Assert Inspector page title is visible
+   * Assert Inspector page is visible
    */
   async assertInspectorPageVisible() {
-    const title = this.page.locator(this.inspectorPageTitle);
-    await expect(title).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.inspectorTitle)).toBeVisible({ timeout: 10000 });
   }
 
   /**
-   * Assert Inspect button is visible
+   * Assert URL contains trace_id
    */
-  async assertInspectButtonVisible() {
-    const button = this.page.locator(this.inspectButton);
-    await expect(button).toBeVisible({ timeout: 10000 });
+  async assertUrlHasTraceId() {
+    await expect(this.page).toHaveURL(/trace_id=/, { timeout: 10000 });
   }
 
   /**
@@ -799,7 +383,7 @@ export class SearchJobInspectorPage {
    * @param {number} searchEvents - Events count from search results
    * @param {number} inspectorEvents - Events count from inspector
    */
-  async assertEventsCountMatch(searchEvents, inspectorEvents) {
+  assertEventsCountMatch(searchEvents, inspectorEvents) {
     expect(searchEvents).toBe(inspectorEvents);
   }
 
@@ -809,7 +393,7 @@ export class SearchJobInspectorPage {
    * @param {number} inspectorTimeMs - Time from inspector
    * @param {number} tolerancePercent - Tolerance percentage (default 20%)
    */
-  async assertTimeWithinTolerance(searchTimeMs, inspectorTimeMs, tolerancePercent = 20) {
+  assertTimeWithinTolerance(searchTimeMs, inspectorTimeMs, tolerancePercent = 20) {
     const tolerance = searchTimeMs * (tolerancePercent / 100);
     const diff = Math.abs(searchTimeMs - inspectorTimeMs);
     expect(diff).toBeLessThanOrEqual(tolerance);
