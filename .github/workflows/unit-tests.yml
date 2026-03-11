@@ -141,6 +141,10 @@ jobs:
     # Skips when the push itself was made by the bot (prevents infinite loops after auto-commit).
     # github.actor is only accessible in the caller, not inside workflow_call context.
     if: github.actor != 'github-actions[bot]'
+    permissions:
+      contents: write
+      id-token: write
+      actions: read
     uses: ./.github/workflows/generate-unit-tests.yml
     with:
       event_name: ${{ github.event_name }}
