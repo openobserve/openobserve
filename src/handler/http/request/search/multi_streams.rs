@@ -1368,6 +1368,39 @@ pub async fn search_multi_stream(
         }
     }
 
+    // Extract top-level query_fn (VRL function) and per_query_response, mirroring
+    // search_multi(). Decode the base64-encoded VRL and ensure it ends with '.' for
+    // correct VRL evaluation.
+    let per_query_resp = multi_req.per_query_response;
+    let mut top_level_query_fn = multi_req
+        .query_fn
+        .as_ref()
+        .and_then(|v| base64::decode_url(v).ok());
+
+    if let Some(vrl_function) = &top_level_query_fn
+        && !vrl_function.trim().ends_with('.')
+    {
+        top_level_query_fn = Some(format!("{vrl_function} \n ."));
+    }
+
+    // Determine whether the VRL is a #ResultArray# type. This controls how VRL is applied:
+    //
+    // 1. ResultArray VRL + per_query_response=true: The VRL function expects the full 2D result
+    //    array as input (all queries combined). We must buffer all query results, then apply VRL on
+    //    the combined array post-hoc. query_fn must NOT be set on individual requests.
+    //
+    // 2. Non-ResultArray VRL (regardless of per_query_response), OR no VRL: The VRL function
+    //    operates per-hit. Set query_fn on each individual request so the search engine applies VRL
+    //    per-query during execution. This is the same behavior whether per_query_response is true
+    //    or false.
+    let is_result_array_vrl = top_level_query_fn
+        .as_ref()
+        .is_some_and(|v| RESULT_ARRAY.is_match(v));
+
+    // Only use post-hoc (buffered) VRL when per_query_response=true AND VRL is ResultArray.
+    // In all other cases, VRL goes on individual requests for per-query application.
+    let needs_post_vrl = per_query_resp && is_result_array_vrl;
+
     let mut queries = multi_req.to_query_req();
 
     // Set each of the sql queries with use_cache from query params
@@ -1383,6 +1416,26 @@ pub async fn search_multi_stream(
         // Update `use_cache` & `clear_cache` from query params
         req.use_cache = use_cache;
         req.clear_cache = clear_cache;
+
+        // VRL propagation:
+        // - needs_post_vrl=true (ResultArray + per_query_response): clear query_fn from individual
+        //   requests — VRL will be applied on the combined 2D array after all queries complete.
+        // - needs_post_vrl=false: set query_fn on each request so VRL is applied per-query by the
+        //   search engine (covers both per_query_response=false and non-ResultArray VRL with
+        //   per_query_response=true).
+        if needs_post_vrl {
+            req.query.query_fn = None;
+        } else if req.query.query_fn.is_none() && top_level_query_fn.is_some() {
+            req.query.query_fn = top_level_query_fn.clone();
+        }
+
+        // Detect transform function usage in SQL
+        for fn_name in functions::get_all_transform_keys(&org_id).await {
+            if req.query.sql.contains(&format!("{fn_name}(")) {
+                req.query.uses_zo_fn = true;
+                break;
+            }
+        }
 
         if let Err(e) = req.decode() {
             #[cfg(feature = "enterprise")]
@@ -1440,7 +1493,10 @@ pub async fn search_multi_stream(
         .await
     };
 
-    // Spawn the multi-stream search task
+    // Spawn the multi-stream search task.
+    // Pass needs_post_vrl (true only when per_query_response=true AND ResultArray VRL) and
+    // the top-level query_fn for post-hoc application. When needs_post_vrl is false,
+    // query_fn is already set on individual requests and this param is unused.
     tokio::spawn(process_search_stream_request_multi(
         org_id.clone(),
         user_id,
@@ -1454,6 +1510,8 @@ pub async fn search_multi_stream(
         dashboard_info,
         search_type,
         search_event_context,
+        needs_post_vrl,
+        top_level_query_fn,
     ));
 
     // Return streaming response
@@ -1827,5 +1885,332 @@ mod tests {
         let invalid = "invalid_base64!@#";
         let decoded = config::utils::base64::decode_url(invalid);
         assert!(decoded.is_err());
+    }
+
+    // Tests for VRL propagation logic in search_multi_stream handler.
+    // These test that to_query_req() + handler-level logic correctly determines
+    // how query_fn is propagated to individual requests.
+
+    /// When per_query_response=false and query_fn is at the top level only (new format
+    /// queries with query_fn=null), to_query_req() loses the top-level query_fn.
+    /// The handler must propagate it to individual requests.
+    #[test]
+    fn test_to_query_req_new_format_loses_top_level_query_fn() {
+        // Simulate the real-world payload: new-format SqlQuery with query_fn=null,
+        // top-level query_fn set
+        let request = MultiStreamRequest {
+            sql: vec![
+                config::meta::search::SqlQuery {
+                    sql: "SELECT * FROM logs".to_string(),
+                    start_time: Some(1000),
+                    end_time: Some(2000),
+                    query_fn: None, // per-query is null
+                    is_old_format: false,
+                },
+                config::meta::search::SqlQuery {
+                    sql: "SELECT * FROM logs".to_string(),
+                    start_time: Some(3000),
+                    end_time: Some(4000),
+                    query_fn: None,
+                    is_old_format: false,
+                },
+            ],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10,
+            start_time: 1000,
+            end_time: 4000,
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl" base64
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: false,
+        };
+
+        // to_query_req() uses query.query_fn (None) for new-format, so query_fn is lost
+        let queries = request.to_query_req();
+        assert!(
+            queries[0].query.query_fn.is_none(),
+            "to_query_req loses top-level query_fn for new-format queries"
+        );
+        assert!(queries[1].query.query_fn.is_none());
+    }
+
+    /// When per_query_response=false and old-format queries are used, to_query_req()
+    /// correctly picks up the top-level query_fn.
+    #[test]
+    fn test_to_query_req_old_format_uses_top_level_query_fn() {
+        let request = MultiStreamRequest {
+            sql: vec![config::meta::search::SqlQuery {
+                sql: "SELECT * FROM logs".to_string(),
+                start_time: None,
+                end_time: None,
+                query_fn: None,
+                is_old_format: true, // old format
+            }],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10,
+            start_time: 1000,
+            end_time: 2000,
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl"
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: false,
+        };
+
+        let queries = request.to_query_req();
+        assert!(
+            queries[0].query.query_fn.is_some(),
+            "old-format uses top-level query_fn"
+        );
+        assert_eq!(
+            queries[0].query.query_fn.as_deref().unwrap(),
+            "top_level_vrl"
+        );
+    }
+
+    /// Verify RESULT_ARRAY detection works on decoded VRL strings.
+    /// This is the check the handler uses to decide between buffered and per-query VRL.
+    #[test]
+    fn test_result_array_detection() {
+        use config::meta::function::RESULT_ARRAY;
+
+        // #ResultArray# prefix should match
+        assert!(RESULT_ARRAY.is_match("#ResultArray# \nsome_vrl_code\n."));
+        assert!(RESULT_ARRAY.is_match("# Result Array # \nsome_vrl_code\n."));
+
+        // Without prefix should not match
+        assert!(!RESULT_ARRAY.is_match("some_vrl_code\n."));
+        assert!(!RESULT_ARRAY.is_match(".foo = .bar\n."));
+    }
+
+    /// When per_query_response=true and VRL is a #ResultArray# type, needs_post_vrl
+    /// should be true (handler clears query_fn from individual requests).
+    #[test]
+    fn test_needs_post_vrl_result_array_with_per_query_response() {
+        use config::{meta::function::RESULT_ARRAY, utils::base64};
+
+        let vrl_code = "#ResultArray# \nresult = array!(.)\n. = result\n.";
+        let encoded = config::utils::base64::encode_url(vrl_code);
+
+        let request = MultiStreamRequest {
+            sql: vec![config::meta::search::SqlQuery {
+                sql: "SELECT * FROM logs".to_string(),
+                start_time: Some(1000),
+                end_time: Some(2000),
+                query_fn: None,
+                is_old_format: false,
+            }],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10,
+            start_time: 1000,
+            end_time: 2000,
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: Some(encoded),
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: true,
+        };
+
+        // Simulate handler logic: decode query_fn and check RESULT_ARRAY
+        let top_level_query_fn = request
+            .query_fn
+            .as_ref()
+            .and_then(|v| base64::decode_url(v).ok());
+
+        let is_result_array_vrl = top_level_query_fn
+            .as_ref()
+            .is_some_and(|v| RESULT_ARRAY.is_match(v));
+
+        let needs_post_vrl = request.per_query_response && is_result_array_vrl;
+
+        assert!(
+            needs_post_vrl,
+            "ResultArray VRL + per_query_response should need post-hoc VRL"
+        );
+
+        // When needs_post_vrl, individual requests should NOT have query_fn
+        let mut queries = request.to_query_req();
+        for req in queries.iter_mut() {
+            if needs_post_vrl {
+                req.query.query_fn = None;
+            }
+        }
+        assert!(queries[0].query.query_fn.is_none());
+    }
+
+    /// When per_query_response=true but VRL is NOT a #ResultArray# type, needs_post_vrl
+    /// should be false — VRL should be set on individual requests instead.
+    #[test]
+    fn test_needs_post_vrl_non_result_array_with_per_query_response() {
+        use config::{meta::function::RESULT_ARRAY, utils::base64};
+
+        // A per-hit VRL function (no #ResultArray# prefix)
+        let vrl_code = ".new_field = .old_field\n.";
+        let encoded = config::utils::base64::encode_url(vrl_code);
+
+        let request = MultiStreamRequest {
+            sql: vec![config::meta::search::SqlQuery {
+                sql: "SELECT * FROM logs".to_string(),
+                start_time: Some(1000),
+                end_time: Some(2000),
+                query_fn: None,
+                is_old_format: false,
+            }],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10,
+            start_time: 1000,
+            end_time: 2000,
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: Some(encoded),
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: true,
+        };
+
+        // Simulate handler logic
+        let mut top_level_query_fn = request
+            .query_fn
+            .as_ref()
+            .and_then(|v| base64::decode_url(v).ok());
+
+        if let Some(vrl_function) = &top_level_query_fn {
+            if !vrl_function.trim().ends_with('.') {
+                top_level_query_fn = Some(format!("{vrl_function} \n ."));
+            }
+        }
+
+        let is_result_array_vrl = top_level_query_fn
+            .as_ref()
+            .is_some_and(|v| RESULT_ARRAY.is_match(v));
+
+        let needs_post_vrl = request.per_query_response && is_result_array_vrl;
+
+        assert!(
+            !needs_post_vrl,
+            "Non-ResultArray VRL should NOT need post-hoc VRL even with per_query_response"
+        );
+
+        // When !needs_post_vrl, individual requests should get the query_fn
+        let mut queries = request.to_query_req();
+        for req in queries.iter_mut() {
+            if !needs_post_vrl && req.query.query_fn.is_none() && top_level_query_fn.is_some() {
+                req.query.query_fn = top_level_query_fn.clone();
+            }
+        }
+        assert!(
+            queries[0].query.query_fn.is_some(),
+            "Non-ResultArray VRL should be set on individual requests"
+        );
+    }
+
+    /// When per_query_response=false, VRL should always be set on individual requests
+    /// regardless of whether it's a #ResultArray# type.
+    #[test]
+    fn test_per_query_response_false_always_sets_query_fn() {
+        use config::utils::base64;
+
+        let vrl_code = "#ResultArray# \nresult = array!(.)\n. = result\n.";
+        let encoded = config::utils::base64::encode_url(vrl_code);
+
+        let request = MultiStreamRequest {
+            sql: vec![config::meta::search::SqlQuery {
+                sql: "SELECT * FROM logs".to_string(),
+                start_time: Some(1000),
+                end_time: Some(2000),
+                query_fn: None,
+                is_old_format: false,
+            }],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10,
+            start_time: 1000,
+            end_time: 2000,
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: Some(encoded),
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: false, // false
+        };
+
+        let mut top_level_query_fn = request
+            .query_fn
+            .as_ref()
+            .and_then(|v| base64::decode_url(v).ok());
+
+        if let Some(vrl_function) = &top_level_query_fn {
+            if !vrl_function.trim().ends_with('.') {
+                top_level_query_fn = Some(format!("{vrl_function} \n ."));
+            }
+        }
+
+        let is_result_array_vrl = top_level_query_fn
+            .as_ref()
+            .is_some_and(|v| config::meta::function::RESULT_ARRAY.is_match(v));
+
+        // per_query_response=false, so needs_post_vrl is always false
+        let needs_post_vrl = request.per_query_response && is_result_array_vrl;
+        assert!(!needs_post_vrl);
+
+        // VRL should be propagated to individual requests
+        let mut queries = request.to_query_req();
+        for req in queries.iter_mut() {
+            if !needs_post_vrl && req.query.query_fn.is_none() && top_level_query_fn.is_some() {
+                req.query.query_fn = top_level_query_fn.clone();
+            }
+        }
+        assert!(
+            queries[0].query.query_fn.is_some(),
+            "per_query_response=false should always set query_fn on requests"
+        );
     }
 }
