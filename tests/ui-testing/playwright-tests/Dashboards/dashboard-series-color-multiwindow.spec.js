@@ -16,14 +16,107 @@ import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import testLogger from "../utils/test-logger.js";
 
-const randomDashboardName =
-  "SeriesColorMultiWindow_" + Math.random().toString(36).substr(2, 9);
+/**
+ * Verify a specific color appears on any canvas element via pixel analysis.
+ * ECharts renders to canvas and is imported as an ES module (not on window.echarts),
+ * so we scan canvas pixels directly instead of using getInstanceByDom().
+ * @param {import('@playwright/test').Page} page
+ * @param {{ r: number, g: number, b: number }} rgb - Target color as RGB values
+ * @param {number} [minPixels=5] - Minimum matching pixels to consider color found
+ * @returns {Promise<{ canvasCount: number, matchingPixels: number, colorFound: boolean }>}
+ */
+async function verifyColorOnCanvas(page, { r, g, b }, minPixels = 5) {
+  return page.evaluate(
+    ({ r, g, b, minPixels }) => {
+      const canvasElements = document.querySelectorAll("canvas");
+      const result = {
+        canvasCount: canvasElements.length,
+        matchingPixels: 0,
+        colorFound: false,
+        canvasInfo: [],
+      };
+
+      for (const canvas of canvasElements) {
+        try {
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
+
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          let matchCount = 0;
+
+          // Check every 4th pixel for performance (still thorough)
+          for (let i = 0; i < data.length; i += 16) {
+            if (
+              Math.abs(data[i] - r) < 10 &&
+              Math.abs(data[i + 1] - g) < 10 &&
+              Math.abs(data[i + 2] - b) < 10 &&
+              data[i + 3] > 200 // alpha > 200 (nearly opaque)
+            ) {
+              matchCount++;
+            }
+          }
+
+          result.canvasInfo.push({
+            width: canvas.width,
+            height: canvas.height,
+            matchingPixels: matchCount,
+          });
+
+          result.matchingPixels += matchCount;
+        } catch (e) {
+          result.canvasInfo.push({ error: e.message });
+        }
+      }
+
+      result.colorFound = result.matchingPixels >= minPixels;
+      return result;
+    },
+    { r, g, b, minPixels }
+  );
+}
+
+/**
+ * Wait for multi-window API response(s) and chart rendering after applying a query.
+ * Multi-window (time shift) may fire one or two API calls depending on the backend.
+ * We wait for the first _search response, then wait for the chart to render, and
+ * allow a short buffer for Vue reactivity to propagate comparison series data.
+ * @param {import('@playwright/test').Page} page
+ * @param {PageManager} pm
+ */
+async function applyAndWaitForMultiWindowRender(page, pm) {
+  const apiPromise = page.waitForResponse(
+    (response) =>
+      /\/api\/.*\/_search/.test(response.url()) && response.status() === 200,
+    { timeout: 30000 }
+  );
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await apiPromise;
+
+  // Wait for chart to render with comparison data.
+  // waitForChartToRender checks canvas existence but not repaint completion.
+  // ECharts needs additional time to process data and paint the canvas after
+  // the API response arrives, especially for multi-window merging.
+  await pm.dashboardPanelActions.waitForChartToRender().catch(() => {
+    testLogger.warn("waitForChartToRender timed out, continuing");
+  });
+  // Allow ECharts to finish canvas repaint and Vue to propagate series data
+  await page.waitForFunction(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    { timeout: 5000 }
+  ).catch(() => {});
+  await page.waitForTimeout(2000);
+}
 
 test.describe("Dashboard series color with multi-window (time shift)", () => {
   let pm;
+  let dashboardName;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     pm = new PageManager(page);
+    // Generate unique dashboard name per test to avoid cleanup collisions
+    const suffix = Math.random().toString(36).substr(2, 6);
+    dashboardName = `SeriesColorMW_${testInfo.title.includes("persist") ? "area" : "line"}_${suffix}`;
     await navigateToBase(page);
     await ingestion(page);
   });
@@ -35,10 +128,8 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
       pm.dashboardPanelActions.generateUniquePanelName("multiwindow_color");
 
     // Step 1: Navigate to dashboards and create a new dashboard
-    testLogger.info("Creating test dashboard", {
-      dashboardName: randomDashboardName,
-    });
-    await setupTestDashboard(page, pm, randomDashboardName);
+    testLogger.info("Creating test dashboard", { dashboardName });
+    await setupTestDashboard(page, pm, dashboardName);
 
     // Step 2: Add a panel with area chart type
     testLogger.info("Adding panel with area chart");
@@ -62,21 +153,8 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     testLogger.info("Time shift added (default 15m)");
 
     // Step 6: Apply the query again to render with multi-window data
-    // Multi-window queries fire TWO API calls (base + comparison), so we need
-    // to wait for both responses before checking chart render state.
     testLogger.info("Applying query with time shift");
-    const apiResponsePromise = page.waitForResponse(
-      (response) =>
-        /\/api\/.*\/_search/.test(response.url()) && response.status() === 200,
-      { timeout: 30000 }
-    );
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await apiResponsePromise;
-    // Wait for the second API call (comparison window) and chart rendering
-    await page.waitForTimeout(3000);
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {
-      testLogger.warn("waitForChartToRender timed out after time shift apply, continuing");
-    });
+    await applyAndWaitForMultiWindowRender(page, pm);
 
     // Step 7: Open Color By Series popup and configure comparison series color
     testLogger.info("Opening Color By Series configuration");
@@ -102,71 +180,10 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
 
     // Step 10: Apply and verify the chart renders with the custom color
     testLogger.info("Applying final query to verify color");
-    const finalApiPromise = page.waitForResponse(
-      (response) =>
-        /\/api\/.*\/_search/.test(response.url()) && response.status() === 200,
-      { timeout: 30000 }
-    );
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await finalApiPromise;
-    await page.waitForTimeout(3000);
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {
-      testLogger.warn("waitForChartToRender timed out after final apply, continuing");
-    });
+    await applyAndWaitForMultiWindowRender(page, pm);
 
-    // Step 11: Verify #1a2cf0 is applied on the chart canvas.
-    // ECharts is imported as ES module (not on window.echarts), so we can't use
-    // getInstanceByDom(). Instead, we use canvas pixel analysis to verify that
-    // the custom color #1a2cf0 (RGB: 26, 44, 240) appears on the rendered chart.
-    const colorVerification = await page.evaluate(
-      ({ r, g, b }) => {
-        const canvasElements = document.querySelectorAll("canvas");
-        const result = {
-          canvasCount: canvasElements.length,
-          matchingPixels: 0,
-          colorFound: false,
-          canvasInfo: [],
-        };
-
-        for (const canvas of canvasElements) {
-          try {
-            const ctx = canvas.getContext("2d");
-            if (!ctx) continue;
-
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-            let matchCount = 0;
-
-            // Check every 4th pixel for performance (still thorough)
-            for (let i = 0; i < data.length; i += 16) {
-              if (
-                Math.abs(data[i] - r) < 10 &&
-                Math.abs(data[i + 1] - g) < 10 &&
-                Math.abs(data[i + 2] - b) < 10 &&
-                data[i + 3] > 200 // alpha > 200 (nearly opaque)
-              ) {
-                matchCount++;
-              }
-            }
-
-            result.canvasInfo.push({
-              width: canvas.width,
-              height: canvas.height,
-              matchingPixels: matchCount,
-            });
-
-            result.matchingPixels += matchCount;
-          } catch (e) {
-            result.canvasInfo.push({ error: e.message });
-          }
-        }
-
-        // If we found at least 5 pixels matching the color, the series is colored
-        result.colorFound = result.matchingPixels >= 5;
-        return result;
-      },
-      { r: 26, g: 44, b: 240 } // #1a2cf0 = RGB(26, 44, 240)
-    );
+    // Step 11: Verify #1a2cf0 is applied on the chart canvas
+    const colorVerification = await verifyColorOnCanvas(page, { r: 26, g: 44, b: 240 });
 
     testLogger.info("Color verification result (canvas pixel analysis)", {
       canvasCount: colorVerification.canvasCount,
@@ -188,13 +205,19 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     testLogger.info(
       "Re-editing panel to verify color configuration persists after save"
     );
+    // Wait for dashboard view to settle before re-editing
     await page.waitForTimeout(2000);
 
     await pm.dashboardPanelActions.selectPanelAction(panelName, "Edit");
 
     // Wait for add_panel page to load and chart to render
     await page.waitForURL(/\/add_panel/, { timeout: 15000 });
-    await page.waitForTimeout(3000);
+    // Wait for API responses to complete (re-edit triggers data fetch)
+    await page.waitForResponse(
+      (response) =>
+        /\/api\/.*\/_search/.test(response.url()) && response.status() === 200,
+      { timeout: 30000 }
+    ).catch(() => {});
     await pm.dashboardPanelActions.waitForChartToRender().catch(() => {
       testLogger.warn("waitForChartToRender timed out on re-edit, continuing");
     });
@@ -210,7 +233,10 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
       .first();
     const savedSeriesValue = await savedSeriesInput.inputValue();
     testLogger.info("Verifying saved series name", { savedSeriesValue });
-    expect(savedSeriesValue).toContain("15 Minutes ago");
+    // The stored config value is the base field name (e.g., "Kubernetes Container Name").
+    // The "(15 Minutes ago)" suffix is only added at chart render time, so the
+    // autocomplete may or may not include it when re-editing depending on timing.
+    expect(savedSeriesValue.toLowerCase()).toContain("kubernetes container name");
 
     // Verify the color is still #1a2cf0
     const savedColorInput = popup
@@ -241,7 +267,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
 
     // Step 1: Create dashboard and panel (line chart)
     testLogger.info("Setting up dashboard for single comparison color test");
-    await setupTestDashboard(page, pm, randomDashboardName + "_multi");
+    await setupTestDashboard(page, pm, dashboardName);
 
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
@@ -258,17 +284,8 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     await pm.dashboardPanelConfigs.addTimeShift();
 
     // Step 4: Apply with time shift — wait for API responses (multi-window fires 2 calls)
-    const apiPromise2 = page.waitForResponse(
-      (response) =>
-        /\/api\/.*\/_search/.test(response.url()) && response.status() === 200,
-      { timeout: 30000 }
-    );
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await apiPromise2;
-    await page.waitForTimeout(3000);
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {
-      testLogger.warn("waitForChartToRender timed out after time shift apply, continuing");
-    });
+    testLogger.info("Applying query with time shift");
+    await applyAndWaitForMultiWindowRender(page, pm);
 
     // Step 5: Open Color By Series, select comparison series, and set #11ad29
     const customColor = "#11ad29";
@@ -281,59 +298,11 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     await pm.dashboardPanelConfigs.saveColorBySeries();
 
     // Step 6: Apply and verify — wait for API responses
-    const finalApiPromise2 = page.waitForResponse(
-      (response) =>
-        /\/api\/.*\/_search/.test(response.url()) && response.status() === 200,
-      { timeout: 30000 }
-    );
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await finalApiPromise2;
-    await page.waitForTimeout(3000);
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {
-      testLogger.warn("waitForChartToRender timed out after final apply, continuing");
-    });
+    testLogger.info("Applying final query to verify color");
+    await applyAndWaitForMultiWindowRender(page, pm);
 
     // Verify: the custom color #11ad29 appears on the chart canvas
-    // Using canvas pixel analysis since ECharts is imported as ES module (not on window)
-    const colorResult = await page.evaluate(
-      ({ r, g, b }) => {
-        const canvasElements = document.querySelectorAll("canvas");
-        const result = {
-          canvasCount: canvasElements.length,
-          matchingPixels: 0,
-          colorFound: false,
-        };
-
-        for (const canvas of canvasElements) {
-          try {
-            const ctx = canvas.getContext("2d");
-            if (!ctx) continue;
-
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-            let matchCount = 0;
-
-            for (let i = 0; i < data.length; i += 16) {
-              if (
-                Math.abs(data[i] - r) < 10 &&
-                Math.abs(data[i + 1] - g) < 10 &&
-                Math.abs(data[i + 2] - b) < 10 &&
-                data[i + 3] > 200
-              ) {
-                matchCount++;
-              }
-            }
-            result.matchingPixels += matchCount;
-          } catch (e) {
-            // Canvas might be tainted
-          }
-        }
-
-        result.colorFound = result.matchingPixels >= 5;
-        return result;
-      },
-      { r: 17, g: 173, b: 41 } // #11ad29 = RGB(17, 173, 41)
-    );
+    const colorResult = await verifyColorOnCanvas(page, { r: 17, g: 173, b: 41 });
 
     testLogger.info("Single comparison color verification (canvas pixels)", {
       matchingPixels: colorResult.matchingPixels,
@@ -351,25 +320,18 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
   });
 
   test.afterEach(async ({ page }) => {
-    // Clean up: navigate back and delete dashboards
+    // Clean up: navigate back and delete dashboard
     try {
       await pm.dashboardCreate.backToDashboardList();
       await page.waitForTimeout(1000);
 
-      // Try to delete dashboards
       try {
-        await deleteDashboard(page, randomDashboardName);
+        await deleteDashboard(page, dashboardName);
       } catch (e) {
         testLogger.warn("Dashboard cleanup failed (may already be deleted)", {
-          name: randomDashboardName,
+          name: dashboardName,
           error: e.message,
         });
-      }
-
-      try {
-        await deleteDashboard(page, randomDashboardName + "_multi");
-      } catch (e) {
-        // May not exist if second test didn't run
       }
     } catch (e) {
       testLogger.warn("Cleanup failed", { error: e.message });

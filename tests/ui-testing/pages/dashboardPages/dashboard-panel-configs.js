@@ -583,12 +583,15 @@ export default class DashboardPanelConfigs {
 
         // Strategy 1: Vue setupState (dev builds only)
         if (popup.__vueParentComponent) {
+          console.warn("[test] setColorForSeriesRow: using __vueParentComponent (dev build detected)");
           const vpc = popup.__vueParentComponent;
           const series = vpc.setupState?.editColorBySeries;
           if (Array.isArray(series) && series.length > rowIndex) {
             series[rowIndex].color = color;
             return { success: true, method: "vue-setupState", color: series[rowIndex].color };
           }
+        } else {
+          console.warn("[test] setColorForSeriesRow: __vueParentComponent not found (prod build), using native input fallback");
         }
 
         // Strategy 2: Native input events fallback (works in prod builds)
