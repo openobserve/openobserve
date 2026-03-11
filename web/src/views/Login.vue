@@ -416,7 +416,3 @@ export default defineComponent({
   }
 }
 </style>
-
-<style lang="scss">
-@import "@/styles/app.scss";
-</style>
