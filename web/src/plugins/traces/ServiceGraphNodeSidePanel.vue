@@ -286,7 +286,7 @@ const TelemetryCorrelationDashboard = defineAsyncComponent(
 );
 
 export default defineComponent({
-  name: 'ServiceGraphSidePanel',
+  name: 'ServiceGraphNodeSidePanel',
   components: {
     TelemetryCorrelationDashboard,
   },
