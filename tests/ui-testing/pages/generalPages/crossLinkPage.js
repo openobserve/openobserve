@@ -26,6 +26,10 @@ export class CrossLinkPage {
 
         // Schema update button
         this.schemaUpdateSettingsBtn = '[data-test="schema-update-settings-button"]';
+
+        // Organization Settings page selectors
+        this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
+        this.orgSettingsSaveBtn = '[data-test="add-alert-submit-btn"]';
     }
 
     // Dynamic selectors
@@ -253,5 +257,44 @@ export class CrossLinkPage {
 
     async getCrossLinkItemText(idx) {
         return await this.page.locator(this.crossLinkItem(idx)).textContent();
+    }
+
+    // Organization-level cross-link methods
+
+    async navigateToOrgSettings() {
+        testLogger.debug('Navigating to Organization Settings page via URL');
+        const orgId = process.env["ORGNAME"] || 'default';
+        await this.page.goto(`${process.env["ZO_BASE_URL"] || 'http://localhost:5080'}/web/settings/organization?org_identifier=${orgId}`);
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        await this.page.waitForTimeout(3000);
+        // Scroll to Cross-Linking Configuration section if it exists
+        const addBtn = this.page.locator(this.addCrossLinkBtn);
+        try {
+            await addBtn.scrollIntoViewIfNeeded({ timeout: 5000 });
+        } catch {
+            // Button may not exist if feature is disabled
+        }
+    }
+
+    async clickOrgSettingsSave() {
+        testLogger.debug('Clicking org settings save button');
+        await this.page.locator(this.orgSettingsSaveBtn).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Delete all existing cross-links on the current page (stream or org settings).
+     * Useful for cleanup at the start/end of tests.
+     */
+    async deleteAllCrossLinks() {
+        testLogger.debug('Deleting all existing cross-links');
+        let count = await this.page.locator('[data-test^="cross-link-item-"]').count();
+        while (count > 0) {
+            await this.clickDeleteCrossLink(0);
+            await this.page.waitForTimeout(500);
+            count = await this.page.locator('[data-test^="cross-link-item-"]').count();
+        }
+        testLogger.debug('All cross-links deleted', { remaining: count });
     }
 }
