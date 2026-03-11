@@ -1404,60 +1404,25 @@ const setHistogramDate = async (date: any) => {
 // Simply replace the query editor content with metrics filters
 // User can manually add their own filters before clicking "Run Query"
 const onMetricsFiltersUpdated = (filters: string[]) => {
-  // Add Error Only filter if toggle is enabled
   const allFilters = [...filters];
-  if (searchObj.meta.showErrorOnly) {
+  // Add error filter only if toggle is on and not already present from Error panel brush
+  if (
+    searchObj.meta.showErrorOnly &&
+    !allFilters.includes("span_status = 'ERROR'")
+  ) {
     allFilters.push("span_status = 'ERROR'");
   }
-
-  // Join filters with AND
-  const newFilters = allFilters.join(" AND ");
-
-  searchObj.data.editorValue = newFilters;
-
-  // Update the query editor UI via ref
-  if (searchBarRef.value?.setEditorValue) {
-    searchBarRef.value.setEditorValue(newFilters);
-  }
+  // Apply each filter term independently so replace-or-append works per field
+  searchBarRef.value?.applyFilters(allFilters);
 };
 
-// Handler for Error Only toggle
-// Triggers re-emission of filters from metrics dashboard
+// Handler for Error Only toggle — only adds/removes span_status condition,
+// leaving all other filters (field sidebar, duration, etc.) intact.
 const onErrorOnlyToggled = (value: boolean) => {
-  // The toggle value is already updated in searchObj.meta.showErrorOnly
-  // Now we need to re-trigger filter emission from metrics dashboard
-  // We'll do this by manually calling the filter update logic
-
-  // Build filters from current brush selections
-  const filters: string[] = [];
-
-  searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
-    if (rangeFilter.panelTitle === "Duration") {
-      if (rangeFilter.start !== null && rangeFilter.end !== null) {
-        filters.push(
-          `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
-        );
-      } else if (rangeFilter.start !== null) {
-        filters.push(`duration >= ${rangeFilter.start}`);
-      } else if (rangeFilter.end !== null) {
-        filters.push(`duration <= ${rangeFilter.end}`);
-      }
-    } else if (rangeFilter.panelTitle === "Errors") {
-      filters.push("span_status = 'ERROR'");
-    }
-  });
-
-  // Add Error Only filter if toggle is enabled
-  if (value && !filters.includes("span_status = 'ERROR'")) {
-    filters.push("span_status = 'ERROR'");
-  }
-
-  // Update Query Editor
-  const newFilters = filters.join(" AND ");
-  searchObj.data.editorValue = newFilters;
-
-  if (searchBarRef.value?.setEditorValue) {
-    searchBarRef.value.setEditorValue(newFilters);
+  if (value) {
+    searchBarRef.value?.applyFilters(["span_status = 'ERROR'"]);
+  } else {
+    searchBarRef.value?.removeFilterByField("span_status");
   }
 };
 
