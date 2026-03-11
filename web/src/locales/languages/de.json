@@ -731,9 +731,9 @@
     "usage_information": "Informationen zur Nutzung",
     "license_allows_ingestion": "Ihre Lizenz erlaubt die Datenaufnahme von <strong>{limit} GB</strong> pro Tag.",
     "limit_exceeded_days": "Das Limit wurde am <strong class=\"{colorClass}\">{days} Tag {plural} in diesem Monat</strong> überschritten",
-    "limit_exceeded_warning": " (max. 3 Tage erlaubt). Die Anwendungsfunktion wird eingeschränkt",
-    "limit_exceeded_info": " ({remaining} Freibetrag {plural} übrig von maximal 3)",
-    "no_limit_exceedances": "In diesem Monat sind keine Grenzwertüberschreitungen möglich (maximal 3 pro Monat zulässig).",
+    "limit_exceeded_warning": " (max. {max} Tage erlaubt). Die Anwendungsfunktion wird eingeschränkt",
+    "limit_exceeded_info": " ({remaining} Freibetrag {plural} übrig von maximal {max})",
+    "no_limit_exceedances": "In diesem Monat sind keine Grenzwertüberschreitungen möglich (maximal {max} pro Monat zulässig).",
     "usage_shows_zero_unlimited": "* Die Nutzung zeigt 0% für unbegrenzte Tarife",
     "license_updated_success": "Lizenz wurde erfolgreich aktualisiert",
     "failed_to_update_license": "Lizenz konnte nicht aktualisiert werden",
@@ -744,7 +744,8 @@
     "yes_update_license": "Ja, Lizenz aktualisieren",
     "no_keep_current": "Nein, auf dem Laufenden bleiben",
     "feature_correlation_management": "Korrelationsmanagement",
-    "feature_log_patterns": "Muster protokollieren"
+    "feature_log_patterns": "Muster protokollieren",
+    "environment_type": "Art der Umgebung"
   },
   "login": {
     "userid": "Benutzer-ID",
@@ -2068,7 +2069,35 @@
     "noStreamSelected": "Kein Stream ausgewählt",
     "resultsIncludeAllWindows": "Die Ergebnisse beinhalten alle Ergänzungen mit mehreren Fenstern",
     "runQueryForOutput": "Bitte klicken Sie auf Abfrage ausführen, um die Ausgabe zu sehen",
-    "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen"
+    "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen",
+    "anomalyDetection": "Erkennung von Anomalien",
+    "newAnomalyDetection": "Erkennung neuer Anomalien",
+    "editAnomalyDetection": "Anomalieerkennung bearbeiten",
+    "anomalyDetectionSubtitle": "Erkennen Sie mithilfe von maschinellem Lernen Anomalien in Ihren Observability-Daten",
+    "anomalyDetectionConfig": "Erkennungskonfiguration",
+    "alerting": "Alarmierend",
+    "saveAndTrain": "Sparen & Trainieren",
+    "detectionInterval": "Erkennungsintervall",
+    "trainingWindow": "Trainingsfenster",
+    "sensitivity": "Empfindlichkeit",
+    "sensitivityHint": "Höheres Perzentil = weniger Alarme. Nur die extremsten Anomalien werden gemeldet.",
+    "queryMode": "Abfragemodus",
+    "detectionFunction": "Erkennungsfunktion",
+    "trained": "Geschult",
+    "notTrained": "Nicht trainiert",
+    "lastDetection": "Letzte Erkennung",
+    "nextRun": "Nächster Lauf",
+    "triggerTraining": "Triggertraining",
+    "retraining": "Umschulung...",
+    "sqlPreview": "SQL-Vorschau",
+    "configSummary": "Zusammenfassung",
+    "anomalyStatus": {
+      "waiting": "Wartend",
+      "training": "Schulung",
+      "active": "Aktiv",
+      "failed": "Fehlgeschlagen",
+      "disabled": "Deaktiviert"
+    }
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2600,7 +2629,9 @@
     "today": "Heute",
     "yesterday": "Gestern",
     "spanColorPalettePreview": "Vorschau der Span-Farbpalette",
-    "errorsFound": "Fehlerspuren"
+    "errorsFound": "Fehlerspuren",
+    "spansTitle": "SPANNT",
+    "spansFound": "Gefundene Spannweiten"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -3063,8 +3094,8 @@
     "namePlaceholder": "z. B. Trace-Details anzeigen",
     "urlTemplate": "URL-Vorlage",
     "urlRequired": "URL ist erforderlich",
-    "urlPlaceholder": "z. B. https://example.com/trace/${field. __Wert}? von=$ {start_time} &bis=$ {end_time}",
-    "urlHint": "Verwenden Sie $ {field. __name}, $ {field. __value}, $ {start_time}, $ {end_time}, $ {query}, $ {query_encoded}",
+    "urlPlaceholder": "z. B. https://example.com/trace/{'${field.__value}'}?von={'${start_time}'}&bis={'${end_time}'}",
+    "urlHint": "Verwenden Sie {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Felder",
     "fieldsHint": "Link nur anzeigen, wenn mindestens ein Feld im Datensatz vorhanden ist",
     "fieldSearchPlaceholder": "Geben Sie ein, um ein benutzerdefiniertes Feld zu suchen oder einzugeben",

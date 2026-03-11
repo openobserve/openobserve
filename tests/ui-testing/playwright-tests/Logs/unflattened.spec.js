@@ -36,16 +36,23 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 async function toggleQuickModeIfOff(page) {
-  
-  const toggleButton = await page.$(
-    '[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner'
+  // Quick mode is now inside the utilities hamburger menu
+  await page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').click();
+  await page.waitForTimeout(200);
+  const toggleInner = await page.$(
+    '[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner'
   );
-  const isSwitchedOff = await toggleButton.evaluate((node) =>
-    node.classList.contains("q-toggle__inner--falsy")
-  );
-
-  if (isSwitchedOff) {
-    await toggleButton.click();
+  if (toggleInner) {
+    const isSwitchedOff = await toggleInner.evaluate((node) =>
+      node.classList.contains("q-toggle__inner--falsy")
+    );
+    if (isSwitchedOff) {
+      await toggleInner.click();
+    } else {
+      await page.keyboard.press('Escape');
+    }
+  } else {
+    await page.keyboard.press('Escape');
   }
 }
 

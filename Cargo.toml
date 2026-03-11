@@ -204,6 +204,7 @@ chromiumoxide.workspace = true
 lettre.workspace = true
 tantivy.workspace = true
 tantivy-fst.workspace = true
+tantivy_utils.workspace = true
 zip.workspace = true
 futures-util = "0.3.31"
 tokio-util.workspace = true
@@ -234,6 +235,7 @@ members = [
     "src/proto",
     "src/report_server",
     "src/flight",
+    "src/tantivy_utils",
 ]
 resolver = "2"
 
@@ -250,6 +252,7 @@ wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
+tantivy_utils = { path = "src/tantivy_utils" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }

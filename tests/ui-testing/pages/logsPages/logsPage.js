@@ -73,8 +73,7 @@ export class LogsPage {
         this.exploreButtonRole = { role: 'button', name: 'Explore' };
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
-        this.listSavedViewsButton = '[data-test="logs-search-bar-list-saved-views-btn"]';
-        this.createSavedViewButton = '[data-test="logs-search-bar-create-saved-view-btn"]';
+        this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
         this.closeDialog = '[data-test="close-dialog"] > .q-btn__content';
@@ -1111,17 +1110,24 @@ export class LogsPage {
         await this.page.locator(this.sqlModeToggle).first().click();
     }
 
-    // Quick Mode methods
+    // Quick Mode methods (now inside the utilities hamburger menu)
     async verifyQuickModeToggle() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+        await this.page.keyboard.press('Escape');
     }
 
     async clickQuickModeToggle() {
-        await this.page.locator(this.quickModeToggle).click();
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
     }
 
     // Histogram methods
     async toggleHistogram() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await this.page.locator(this.histogramToggle).click();
     }
 
@@ -1151,8 +1157,12 @@ export class LogsPage {
     }
 
     async verifyHistogramState() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const isHistogramOff = await this.page.locator(this.histogramToggle)
+            .locator('[role="switch"]')
             .evaluate(el => el.getAttribute('aria-checked') === 'false');
+        await this.page.keyboard.press('Escape');
         expect(isHistogramOff).toBeTruthy();
     }
 
@@ -1873,12 +1883,7 @@ export class LogsPage {
     }
 
     async clickSavedViewsButton() {
-        // This method is used to create a new saved view
-        // It should open the utilities menu and click "Create Saved View"
-        // This is the same as clickSaveViewButton but without the dialog cleanup
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(300);
-        return await this.page.locator(this.createSavedViewButton).click();
+        return await this.clickSaveViewButton();
     }
 
     async clickSavedViewsExpand() {
@@ -1921,29 +1926,20 @@ export class LogsPage {
             // This is expected on first load or when no data exists
         }
 
-        // Now it's safe to open the saved views dialog
-        // Open the utilities menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        // Wait for menu animation to complete and be visible
-        await this.page.waitForTimeout(300);
-        // Click list saved views button to show the saved views panel
-        await this.page.locator(this.listSavedViewsButton).click();
-        // Wait for dialog to open, render, and stabilize
-        await this.page.waitForTimeout(500);
+        // Now it's safe to open the saved views dropdown
+        await this.clickSavedViewsDropdownArrow();
     }
 
     async clickSaveViewButton() {
-        // Close any open dialogs first (e.g., saved views list dialog)
-        const escapeKey = 'Escape';
-        await this.page.keyboard.press(escapeKey);
+        // Close any open dialogs/menus first (e.g., saved views dropdown)
+        await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(200);
 
-        // Open the utilities menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(300);
-
-        // Click create saved view button
-        return await this.page.locator(this.createSavedViewButton).click();
+        // Saved views is now a split dropdown button on the toolbar.
+        // The left (first) button triggers the save dialog (fnSavedView).
+        const savedViewsGroup = this.page.locator(this.savedViewsDropdownBtn);
+        const saveButton = savedViewsGroup.locator('button').first();
+        return await saveButton.click();
     }
 
     async fillSavedViewName(name) {
@@ -2096,11 +2092,7 @@ export class LogsPage {
     }
 
     async clickResetFiltersButton() {
-        // First open the utilities menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        // Wait for menu to be visible
-        await this.page.waitForTimeout(300);
-        // Then click reset filters button
+        // Reset filters button is now directly on the toolbar
         return await this.page.locator(this.resetFiltersButton).click({ force: true });
     }
 
@@ -3112,7 +3104,9 @@ export class LogsPage {
     }
 
     async clickHistogramToggleDiv() {
-        return await this.page.locator(this.histogramToggleDiv).nth(2).click();
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        return await this.page.locator(this.histogramToggle).click();
     }
 
     async expectQueryEditorContainsExpectedQuery(expectedQuery) {
@@ -3355,14 +3349,19 @@ export class LogsPage {
     }
 
     async enableQuickModeIfDisabled() {
-        // Enable quick mode toggle if it's not already enabled
-        const toggleButton = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
-        if (toggleButton) {
-            // Evaluate the class attribute to determine if the toggle is in the off state
-            const isSwitchedOff = await toggleButton.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        if (toggleInner) {
+            const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
             if (isSwitchedOff) {
-                await toggleButton.click();
+                await toggleInner.click();
+            } else {
+                await this.page.keyboard.press('Escape');
             }
+        } else {
+            await this.page.keyboard.press('Escape');
         }
     }
 
@@ -3468,16 +3467,21 @@ export class LogsPage {
 
     async addIncludeSearchTermFromLogDetails() {
         // Ensure Quick Mode is OFF for include/exclude buttons to work
-        const quickModeToggle = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] div').nth(1);
-        const quickModeClass = await quickModeToggle.getAttribute('class');
-        const isQuickModeOn = quickModeClass && quickModeClass.includes('text-primary');
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isQuickModeOn = toggleInner
+            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
+            : false;
 
         if (isQuickModeOn) {
             testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
-            await quickModeToggle.click();
+            await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
             await this.page.waitForTimeout(1000);
         } else {
             testLogger.info('Quick Mode is already OFF');
+            await this.page.keyboard.press('Escape');
         }
 
         // Check if there's a direct include button (newer UI)
@@ -3692,36 +3696,54 @@ export class LogsPage {
     }
 
     async ensureQuickModeState(desiredState) {
-        const quickModeToggle = this.page.locator(this.quickModeToggle);
-        const isEnabled = await quickModeToggle.getAttribute('aria-pressed');
-        
-        if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
-            await quickModeToggle.click();
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isOn = toggleInner
+            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
+            : false;
+
+        if (desiredState !== isOn) {
+            await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
             await this.page.waitForTimeout(500);
+        } else {
+            await this.page.keyboard.press('Escape');
         }
     }
 
     async ensureHistogramToggleState(desiredState) {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const histogramToggle = this.page.locator(this.histogramToggle);
         const isEnabled = await histogramToggle.getAttribute('aria-pressed');
-        
+
         if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
             await histogramToggle.click();
             await this.page.waitForTimeout(500);
             return true; // State was changed
         }
+        await this.page.keyboard.press('Escape');
         return false; // State was already correct
     }
 
     async getQuickModeToggleAttributes() {
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const quickModeToggle = this.page.locator(this.quickModeToggle);
         const ariaPressed = await quickModeToggle.getAttribute('aria-pressed');
         const classNames = await quickModeToggle.getAttribute('class');
+        await this.page.keyboard.press('Escape');
         return { ariaPressed, classNames };
     }
 
     async expectQuickModeToggleVisible() {
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+        await this.page.keyboard.press('Escape');
     }
 
     async waitForUI(timeout = 500) {
@@ -5455,12 +5477,16 @@ export class LogsPage {
      * Bug #8928 - Histogram rendering
      */
     async enableHistogram() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const histogramToggle = this.page.locator(this.histogramToggle);
         const isPressed = await histogramToggle.getAttribute('aria-pressed').catch(() => 'false');
         if (isPressed === 'false') {
             await histogramToggle.click();
             await this.page.waitForTimeout(500);
             testLogger.info('Histogram enabled');
+        } else {
+            await this.page.keyboard.press('Escape');
         }
     }
 
@@ -5469,6 +5495,8 @@ export class LogsPage {
      * Bug #8928 - Histogram rendering
      */
     async toggleHistogram() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const histogramToggle = this.page.locator(this.histogramToggle);
         await histogramToggle.click();
         await this.page.waitForTimeout(500);
@@ -5622,11 +5650,11 @@ export class LogsPage {
     }
 
     /**
-     * Get the saved views button locator (now utilities menu button)
-     * @returns {import('@playwright/test').Locator} Utilities menu button locator
+     * Get the saved views button group locator
+     * @returns {import('@playwright/test').Locator} Saved views split dropdown button locator
      */
     getSavedViewsButtonLocator() {
-        return this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+        return this.page.locator(this.savedViewsDropdownBtn);
     }
 
     /**
@@ -5634,15 +5662,14 @@ export class LogsPage {
      * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
-        const menuButton = this.page.locator(this.utilitiesMenuButton);
-        await menuButton.waitFor({ state: 'visible', timeout: 10000 });
-        await menuButton.click();
-        // Wait for menu to appear
-        await this.page.waitForTimeout(300);
-        // Click list saved views
-        await this.page.locator(this.listSavedViewsButton).click();
+        // Saved views are now a split dropdown button on the toolbar.
+        // Click the dropdown arrow (second button) to expand the saved views list.
+        const savedViewsGroup = this.page.locator(this.savedViewsDropdownBtn);
+        await savedViewsGroup.waitFor({ state: 'visible', timeout: 10000 });
+        const dropdownArrow = savedViewsGroup.locator('button[aria-label="Expand"], button[aria-haspopup="true"]').first();
+        await dropdownArrow.click();
         await this.page.waitForTimeout(500);
-        testLogger.info('Opened utilities menu and clicked List Saved Views');
+        testLogger.info('Clicked saved views dropdown arrow');
     }
 
     /**
@@ -5660,9 +5687,10 @@ export class LogsPage {
             testLogger.debug('Arrow click did not show search input, trying main button');
         }
 
-        // Fallback: try clicking the main button
+        // Fallback: retry the dropdown arrow click on the saved views button
         const btn = this.getSavedViewsButtonLocator();
-        await btn.click();
+        const dropdownArrow = btn.locator('button[aria-label="Expand"], button[aria-haspopup="true"]').first();
+        await dropdownArrow.click();
         await this.page.waitForTimeout(500);
     }
 
