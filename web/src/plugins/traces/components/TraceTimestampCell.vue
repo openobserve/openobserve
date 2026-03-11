@@ -40,6 +40,7 @@ import { useI18n } from "vue-i18n";
 
 const props = defineProps<{
   item: Record<string, any>;
+  searchMode?: "traces" | "spans";
 }>();
 
 const store = useStore();
@@ -49,7 +50,11 @@ const formatted = ref({ day: "", time: "" });
 function buildFormatted() {
   if (!_moment) return;
   const tz = store.state.timezone;
-  const ts = (props.item.trace_start_time || 0) / 1000;
+  // traces mode: trace_start_time is µs → divide by 1000 for ms
+  // spans mode:  start_time is ns       → divide by 1_000_000 for ms
+  const ts = props.item.trace_start_time != null
+    ? props.item.trace_start_time / 1000
+    : (props.item.start_time || 0) / 1_000_000;
   const tsMoment = _moment.tz(new Date(ts), tz);
   const diffSec = _moment.tz(new Date(), tz).diff(tsMoment, "seconds");
 
@@ -61,7 +66,7 @@ function buildFormatted() {
   formatted.value = { day, time: tsMoment.format("hh:mm:ss A") };
 }
 
-watch(() => props.item?.trace_start_time, buildFormatted);
+watch(() => props.item?.trace_start_time ?? props.item?.start_time, buildFormatted);
 
 onBeforeMount(async () => {
   await _momentReady;

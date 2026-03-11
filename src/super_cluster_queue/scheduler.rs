@@ -208,6 +208,31 @@ async fn update(msg: Message) -> Result<()> {
         TriggerModule::QueryRecommendations => {
             todo!("We will get here eventually")
         }
+        TriggerModule::AnomalyDetection => {
+            // Only sync if the anomaly detection config still exists in this region.
+            use infra::table::entity::anomaly_detection_config;
+            use sea_orm::EntityTrait;
+            if anomaly_detection_config::Entity::find_by_id(&trigger.module_key)
+                .one(conn)
+                .await
+                .unwrap_or(None)
+                .is_some()
+            {
+                scheduler::push(trigger.clone()).await.map_err(|e| {
+                    let error_msg = format!(
+                        "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
+                        trigger.org, trigger.module, trigger.module_key, e
+                    );
+                    log::error!("{error_msg}");
+                    anyhow::anyhow!(error_msg)
+                })?;
+            } else {
+                log::warn!(
+                    "[SUPER_CLUSTER:sync] Anomaly detection config not found for module_key: {}. No need to sync this trigger",
+                    trigger.module_key
+                );
+            }
+        }
     }
     Ok(())
 }

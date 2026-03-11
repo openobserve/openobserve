@@ -19,7 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row tw:m-0! tw:p-[0.375rem]">
       <div class="float-right col flex items-center">
         <!-- Tab Toggle Buttons -->
-        <div v-if="store.state.zoConfig.service_graph_enabled" class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]">
+        <div
+          v-if="store.state.zoConfig.service_graph_enabled"
+          class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]"
+        >
           <div class="row">
             <div>
               <q-btn
@@ -29,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[2rem]"
+                class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]!"
               >
                 <q-tooltip>
                   {{ t("common.search") }}
@@ -44,11 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="hub"
-                class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[2rem]"
+                class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]!"
               >
-                <q-tooltip>
-                  Service Graph
-                </q-tooltip>
+                <q-tooltip> Service Graph </q-tooltip>
               </q-btn>
             </div>
           </div>
@@ -111,7 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onErrorOnlyToggle"
             >
             </q-toggle>
-            <q-icon name="error" size="1.1rem" class="tw:mx-1 tw:text-red-500" />
+            <q-icon
+              name="error"
+              size="1.1rem"
+              class="tw:mx-1 tw:text-red-500"
+            />
             <q-tooltip>
               {{ t("traces.showErrorOnly") }}
             </q-tooltip>
@@ -119,7 +124,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <syntax-guide
             data-test="logs-search-bar-sql-mode-toggle-btn"
             :sqlmode="searchObj.meta.sqlMode"
+            class="tw:border! tw:border-[var(--o2-border-color)]! tw:h-[2rem]! tw:w-[2.25rem]!"
           />
+          <!-- Search Mode Toggle: Traces / Spans -->
+          <template v-if="activeTab === 'search'">
+            <div
+              class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem] tw:ml-[0.625rem]"
+            >
+              <div class="row">
+                <div>
+                  <q-btn
+                    data-test="traces-search-mode-traces-btn"
+                    :class="
+                      searchObj.meta.searchMode === 'traces' ? 'selected' : ''
+                    "
+                    @click="$emit('update:searchMode', 'traces')"
+                    no-caps
+                    size="sm"
+                    class="button tw:w-[3.85rem]! button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
+                  >
+                    Traces
+                    <q-tooltip>Search by Traces</q-tooltip>
+                  </q-btn>
+                </div>
+                <div>
+                  <q-btn
+                    data-test="traces-search-mode-spans-btn"
+                    :class="
+                      searchObj.meta.searchMode === 'spans' ? 'selected' : ''
+                    "
+                    @click="$emit('update:searchMode', 'spans')"
+                    no-caps
+                    size="sm"
+                    class="button tw:w-[3.85rem]! button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
+                  >
+                    Spans
+                    <q-tooltip>Search by Spans</q-tooltip>
+                  </q-btn>
+                </div>
+              </div>
+            </div>
+          </template>
         </template>
       </div>
       <div v-if="activeTab === 'search'" class="float-right col-auto">
@@ -147,6 +192,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="search-time tw:mr-[0.375rem] float-left">
           <q-btn
+            v-if="config.isEnterprise == 'true' && isLoading"
+            data-test="traces-search-bar-cancel-btn"
+            dense
+            :title="t('search.cancel')"
+            class="q-pa-none o2-run-query-button o2-color-primary tw:bg-[var(--o2-cancel-query-bg)]! tw:h-[30px] element-box-shadow tw:leading-8!"
+            @click="cancelQueryData"
+            >{{ t("search.cancel") }}</q-btn
+          >
+          <q-btn
+            v-else
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
             dense
@@ -285,7 +340,15 @@ export default defineComponent({
     ),
     SyntaxGuide,
   },
-  emits: ["searchdata", "update:activeTab"],
+  emits: [
+    "searchdata",
+    "update:activeTab",
+    "cancel-query",
+    "update:searchMode",
+    "error-only-toggled",
+    "filters-reset",
+    "onChangeTimezone",
+  ],
   props: {
     fieldValues: {
       type: Object,
@@ -309,6 +372,9 @@ export default defineComponent({
         // this.searchObj.runQuery = true;
         this.$emit("searchdata");
       }
+    },
+    cancelQueryData() {
+      this.$emit("cancel-query");
     },
   },
   setup(props, { emit }) {
@@ -602,6 +668,7 @@ export default defineComponent({
       updateNewDateTime,
       metricsIcon,
       tracesShareURL,
+      config,
     };
   },
   computed: {
@@ -629,7 +696,11 @@ export default defineComponent({
           if (currentQuery[1].trim() != "") {
             const fieldName = getFieldFromExpression(filter);
             const replaced = fieldName
-              ? replaceExistingFieldCondition(currentQuery[1], fieldName, filter)
+              ? replaceExistingFieldCondition(
+                  currentQuery[1],
+                  fieldName,
+                  filter,
+                )
               : currentQuery[1];
             if (replaced !== currentQuery[1]) {
               currentQuery[1] = replaced;
@@ -643,8 +714,12 @@ export default defineComponent({
         } else {
           const fieldName = getFieldFromExpression(filter);
           const replaced = fieldName
-            ? replaceExistingFieldCondition(currentQuery[0] as string, fieldName, filter)
-            : currentQuery[0] as string;
+            ? replaceExistingFieldCondition(
+                currentQuery[0] as string,
+                fieldName,
+                filter,
+              )
+            : (currentQuery[0] as string);
           if (replaced !== currentQuery[0]) {
             currentQuery[0] = replaced;
           } else {

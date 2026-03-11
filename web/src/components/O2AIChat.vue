@@ -357,6 +357,17 @@
                       <span class="tool-call-name">
                         {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
                       </span>
+                      <!-- Navigation icon -->
+                      <q-icon
+                        v-if="block.navigationAction && !block.pendingConfirmation"
+                        name="open_in_new"
+                        size="14px"
+                        color="primary"
+                        class="navigation-icon"
+                        @click.stop="handleNavigationAction(block.navigationAction)"
+                      >
+                        <q-tooltip>{{ block.navigationAction.label }}</q-tooltip>
+                      </q-icon>
                       <q-icon
                         v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
                         :name="isToolCallExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
@@ -587,6 +598,23 @@
                     <div v-if="block.recoverable" class="stream-error-recoverable">
                       This error may be temporary. You can try again.
                     </div>
+                  </div>
+                  <!-- Navigation block - standalone navigation button -->
+                  <div
+                    v-else-if="block.type === 'navigation' && block.navigationAction"
+                    class="navigation-block"
+                    :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+                  >
+                    <q-btn
+                      dense
+                      no-caps
+                      unelevated
+                      color="primary"
+                      :icon="'open_in_new'"
+                      :label="block.navigationAction.label"
+                      class="navigation-block-btn"
+                      @click="handleNavigationAction(block.navigationAction)"
+                    />
                   </div>
                   <!-- Text block - render with markdown processing -->
                   <template v-else-if="block.type === 'text' && block.text">
@@ -1799,6 +1827,16 @@ export default defineComponent({
                       response: data.response || undefined,
                     };
 
+                    // Generate navigation from tool result if applicable
+                    let navigationAction: NavigationAction | null = null;
+                    if (data.success !== false && data.call_args) {
+                      navigationAction = generateNavigationFromToolResult(
+                        data.tool,
+                        data.call_args,
+                        data
+                      );
+                    }
+
                     // If active tool call matches, complete it with result data
                     if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
                       const completedToolBlock: ContentBlock = {
@@ -1806,7 +1844,8 @@ export default defineComponent({
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context,
-                        ...resultData
+                        ...resultData,
+                        ...(navigationAction && { navigationAction })
                       };
                       let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
@@ -1824,6 +1863,9 @@ export default defineComponent({
                           const block = lastMessage.contentBlocks[i];
                           if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
                             Object.assign(block, resultData);
+                            if (navigationAction) {
+                              block.navigationAction = navigationAction;
+                            }
                             break;
                           }
                         }
@@ -5565,6 +5607,30 @@ export default defineComponent({
   .expand-icon {
     opacity: 0.6;
     transition: transform 0.2s;
+  }
+
+  .navigation-icon {
+    cursor: pointer;
+    margin-left: auto;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  .navigation-block {
+    margin: 4px 0;
+    &.light-mode {
+      background: rgba(66, 165, 245, 0.08);
+    }
+    &.dark-mode {
+      background: rgba(66, 165, 245, 0.12);
+    }
+
+    .navigation-block-btn {
+      font-size: 13px;
+    }
   }
 
   .tool-call-details {

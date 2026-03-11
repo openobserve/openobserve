@@ -19,6 +19,8 @@ use opentelemetry::trace::TraceContextExt;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub mod alerts;
+#[cfg(feature = "enterprise")]
+pub mod anomaly_detection;
 pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
