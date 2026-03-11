@@ -36,7 +36,7 @@ use std::{
     collections::HashMap,
     sync::{
         Arc, RwLock,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicI64, AtomicU64, Ordering},
     },
 };
 
@@ -79,6 +79,11 @@ static FLUSH_RX: once_cell::sync::OnceCell<
 
 /// Dedicated NATS queue for HA sync of quota deductions across nodes.
 pub const TRIAL_QUOTA_HA_QUEUE: &str = "trial_quota_ha_queue";
+
+/// Max `updated_at` (micros) from DB rows loaded during init_from_db.
+/// NATS messages with timestamp <= this are already reflected in the DB
+/// snapshot and must be skipped to avoid double-counting.
+static INIT_WATERMARK: AtomicI64 = AtomicI64::new(0);
 
 /// The checkpoints at which quota notification emails are sent.
 const QUOTA_CHECKPOINTS: &[u8] = &[80, 90, 95, 100];
@@ -199,6 +204,9 @@ pub struct TrialQuotaHaMsg {
     pub org_id: String,
     pub cost: u64,
     pub source_node: Node,
+    /// Microsecond timestamp of when the deduction happened.
+    /// Used to skip messages older than the DB snapshot loaded at init.
+    pub timestamp: i64,
 }
 
 /// Check if the org has an active Stripe subscription (valid subscription_id + customer_id).
@@ -311,6 +319,7 @@ pub async fn try_deduct(
                     org_id: org_id.to_string(),
                     cost,
                     source_node: LOCAL_NODE.clone(),
+                    timestamp: config::utils::time::now_micros(),
                 };
                 if let Err(e) = publish_ha_msg(&msg).await {
                     log::warn!(
@@ -413,7 +422,14 @@ pub async fn subscribe_ha_queue() {
         return;
     }
 
-    let mut receiver = match q.consume(TRIAL_QUOTA_HA_QUEUE, None).await {
+    // DeliverPolicy::All — replay all messages, but skip any with timestamp
+    // <= INIT_WATERMARK (those are already reflected in the DB snapshot).
+    // This ensures we don't miss deltas published between init_from_db and
+    // subscribe, while avoiding double-counting old messages.
+    let mut receiver = match q
+        .consume(TRIAL_QUOTA_HA_QUEUE, Some(infra::queue::DeliverPolicy::All))
+        .await
+    {
         Ok(rx) => rx,
         Err(e) => {
             log::error!("[TRIAL_QUOTA] Failed to consume from HA queue: {e}");
@@ -446,6 +462,21 @@ pub async fn subscribe_ha_queue() {
 
         // Skip messages from self — we already applied the deduction locally
         if ha_msg.source_node.eq(&LOCAL_NODE) {
+            if let Err(e) = msg.ack().await {
+                log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
+            }
+            continue;
+        }
+
+        // Skip messages older than the DB snapshot — already counted in init_from_db
+        let watermark = INIT_WATERMARK.load(Ordering::Relaxed);
+        if ha_msg.timestamp <= watermark {
+            log::debug!(
+                "[TRIAL_QUOTA] Skipping stale HA message: org={} ts={} watermark={}",
+                ha_msg.org_id,
+                ha_msg.timestamp,
+                watermark,
+            );
             if let Err(e) = msg.ack().await {
                 log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
             }
@@ -760,6 +791,11 @@ pub fn build_quota_email_message(
 pub async fn init_from_db() {
     match infra::table::trial_quota_usage::load_all().await {
         Ok(records) => {
+            // Find the max updated_at across all rows — this is our watermark.
+            // NATS messages with timestamp <= this are already in the DB snapshot.
+            let max_updated_at = records.iter().map(|r| r.updated_at).max().unwrap_or(0);
+            INIT_WATERMARK.store(max_updated_at, Ordering::Relaxed);
+
             // Sum per-feature counts into per-org totals
             let mut org_totals: HashMap<String, u64> = HashMap::new();
             for record in &records {
@@ -774,7 +810,11 @@ pub async fn init_from_db() {
                 }
             }
 
-            log::info!("[TRIAL_QUOTA] Loaded quota records from DB");
+            log::info!(
+                "[TRIAL_QUOTA] Loaded {} quota records from DB, watermark={}",
+                records.len(),
+                max_updated_at,
+            );
         }
         Err(e) => {
             log::error!("[TRIAL_QUOTA] Failed to load quota from DB: {e}");
