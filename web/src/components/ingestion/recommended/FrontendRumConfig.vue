@@ -111,6 +111,8 @@ openobserveRum.init({
   apiVersion: options.apiVersion,
   insecureHTTP: options.insecureHTTP,
   defaultPrivacyLevel: 'allow' // 'allow' or 'mask-user-input' or 'mask'. Use one of the 3 values.
+  sessionSampleRate: 100, // Track 100% of sessions
+  sessionReplaySampleRate: 100, // Record 100% sessions (Set 50 to Record 50% of sessions)
 });
 
 openobserveLogs.init({
