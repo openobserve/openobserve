@@ -139,7 +139,6 @@ import { useStore } from "vuex";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
-import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useDurationPercentiles, {
   parseDurationWhereClause,
 } from "@/composables/useDurationPercentiles";
@@ -148,7 +147,6 @@ import {
   outlinedArrowBackIos,
   outlinedArrowForwardIos,
 } from "@quasar/extras/material-icons-outlined";
-import useStreamingSearch from "@/composables/useStreamingSearch";
 
 const props = defineProps({
   row: {
@@ -204,10 +202,8 @@ const formatDuration = (us: number | null): string => {
 
 const store = useStore();
 const { searchObj } = useTraces();
-const { fetchQueryDataWithHttpStream } = useStreamingSearch();
 const { fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues } =
   useFieldValuesStream();
-const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
 
 const defaultValuesCount = computed(
   () => store.state.zoConfig?.query_values_default_num || 10,
