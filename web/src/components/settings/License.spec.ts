@@ -719,6 +719,117 @@ describe('License.vue', () => {
     });
   });
 
+  describe('limitBreachAllowedCount', () => {
+    it('should return limit_breach_allowed_count from license when version >= 2', async () => {
+      const v2LicenseData = {
+        ...mockLicenseData,
+        license: {
+          ...mockLicenseData.license,
+          version: 2,
+          limit_breach_allowed_count: 2,
+        },
+      };
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(v2LicenseData));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.limitBreachAllowedCount).toBe(2);
+    });
+
+    it('should return limit_breach_allowed_count when version is 3 (>= 2)', async () => {
+      const v3LicenseData = {
+        ...mockLicenseData,
+        license: {
+          ...mockLicenseData.license,
+          version: 3,
+          limit_breach_allowed_count: 5,
+        },
+      };
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(v3LicenseData));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.limitBreachAllowedCount).toBe(5);
+    });
+
+    it('should return 3 when license has no version (v1 implied)', async () => {
+      const v1LicenseData = {
+        ...mockLicenseData,
+        license: {
+          ...mockLicenseData.license,
+          // no version field
+        },
+      };
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(v1LicenseData));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
+    });
+
+    it('should return 3 when license version is 1', async () => {
+      const v1LicenseData = {
+        ...mockLicenseData,
+        license: {
+          ...mockLicenseData.license,
+          version: 1,
+          limit_breach_allowed_count: 10,
+        },
+      };
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(v1LicenseData));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
+    });
+
+    it('should return 3 when license is null', async () => {
+      const noLicenseData = {
+        installation_id: 'test-installation-123',
+        license: null,
+      };
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(noLicenseData));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
+    });
+
+    it('should fall back to 3 when version >= 2 but limit_breach_allowed_count is missing', async () => {
+      const v2NoCountData = {
+        ...mockLicenseData,
+        license: {
+          ...mockLicenseData.license,
+          version: 2,
+          // limit_breach_allowed_count not set
+        },
+      };
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(v2NoCountData));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
+    });
+
+    it('should use limitBreachAllowedCount in remaining days calculation', async () => {
+      const v2LicenseData = {
+        ...mockLicenseData,
+        license: {
+          ...mockLicenseData.license,
+          version: 2,
+          limit_breach_allowed_count: 2,
+        },
+        ingestion_exceeded: 1,
+      };
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(v2LicenseData));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // With limit_breach_allowed_count=2 and ingestion_exceeded=1, remaining=1
+      expect(wrapper.vm.limitBreachAllowedCount - wrapper.vm.licenseData.ingestion_exceeded).toBe(1);
+    });
+  });
+
   describe('Component Cleanup', () => {
     it('should cleanup properly on unmount', async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));

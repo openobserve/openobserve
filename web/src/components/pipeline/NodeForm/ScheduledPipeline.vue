@@ -2168,10 +2168,13 @@ const getStreamFields = () => {
       .then((stream: any) => {
         streamFields.value = [];
         userDefinedFields.value = [];
+        const ftsKeys: string[] = stream.settings?.full_text_search_keys || [];
+        const timestampColumn: string = store.state.zoConfig.timestamp_column;
         stream.schema?.forEach((field: any) => {
           streamFields.value.push({
             ...field,
-            showValues: true,
+            showValues: field.name !== timestampColumn,
+            ftsKey: ftsKeys.includes(field.name),
           });
         });
         stream.uds_schema?.forEach((field: any) => {
@@ -2340,7 +2343,7 @@ const runQuery = async () => {
           page_type: selectedStreamType.value,
           validate: true,
         },
-        "derived_stream",
+        "ui",
       )
       .then((res: any) => {
         if (res.data.hits.length > 0) {

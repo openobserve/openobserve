@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,7 @@ use tantivy::{
     directory::{Directory, FileHandle, OwnedBytes, error::OpenReadError},
 };
 
-use crate::service::tantivy::{
+use crate::{
     puffin::{BlobMetadata, reader::PuffinBytesReader},
     puffin_directory::{
         EMPTY_PUFFIN_DIRECTORY, EMPTY_PUFFIN_SEG_ID, get_file_from_empty_puffin_dir_with_ext,

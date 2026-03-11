@@ -731,9 +731,9 @@
     "usage_information": "Informatie over het gebruik",
     "license_allows_ingestion": "Uw licentie staat <strong>{limit} GB</strong> aan gegevensinvoer per dag toe.",
     "limit_exceeded_days": "Limiet overschreden op <strong class=\"{colorClass}\">{days} day{plural}</strong> deze maand",
-    "limit_exceeded_warning": " (maximaal 3 dagen toegestaan). De toepassingsfunctie wordt beperkt",
-    "limit_exceeded_info": " ({remaining} vergoeding {plural} links van maximaal 3)",
-    "no_limit_exceedances": "Geen limietoverschrijdingen deze maand (max. 3 per maand toegestaan).",
+    "limit_exceeded_warning": " (maximaal {max} dagen toegestaan). De toepassingsfunctie wordt beperkt",
+    "limit_exceeded_info": " ({remaining} vergoeding {plural} links van maximaal {max})",
+    "no_limit_exceedances": "Geen limietoverschrijdingen deze maand (max. {max} per maand toegestaan).",
     "usage_shows_zero_unlimited": "* Het gebruik toont 0% voor onbeperkte abonnementen",
     "license_updated_success": "Licentie succesvol bijgewerkt",
     "failed_to_update_license": "Het updaten van de licentie is mislukt",
@@ -744,7 +744,8 @@
     "yes_update_license": "Ja, licentie bijwerken",
     "no_keep_current": "Nee, blijf op de hoogte",
     "feature_correlation_management": "Correlatiebeheer",
-    "feature_log_patterns": "Logpatronen"
+    "feature_log_patterns": "Logpatronen",
+    "environment_type": "Omgevingstype"
   },
   "login": {
     "userid": "Gebruikers-ID",
@@ -2068,7 +2069,35 @@
     "noStreamSelected": "Geen stream geselecteerd",
     "resultsIncludeAllWindows": "De resultaten omvatten alle toevoegingen met meerdere vensters",
     "runQueryForOutput": "Klik op Query uitvoeren om de uitvoer te zien",
-    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien"
+    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien",
+    "anomalyDetection": "Detectie van afwijkingen",
+    "newAnomalyDetection": "Nieuwe detectie van afwijkingen",
+    "editAnomalyDetection": "Anomaliedetectie bewerken",
+    "anomalyDetectionSubtitle": "Detecteer afwijkingen in uw waarneembaarheidsgegevens met behulp van machine learning",
+    "anomalyDetectionConfig": "Opsporingsconfiguratie",
+    "alerting": "Alarmering",
+    "saveAndTrain": "Opslaan en trainen",
+    "detectionInterval": "Detectie-interval",
+    "trainingWindow": "Trainingsvenster",
+    "sensitivity": "Gevoeligheid",
+    "sensitivityHint": "Hoger percentiel = minder meldingen. Alleen de meest extreme afwijkingen worden gemarkeerd.",
+    "queryMode": "Query-modus",
+    "detectionFunction": "Detectiefunctie",
+    "trained": "Getraind",
+    "notTrained": "Niet opgeleid",
+    "lastDetection": "Laatste detectie",
+    "nextRun": "Volgende run",
+    "triggerTraining": "Triggertraining",
+    "retraining": "Omscholing...",
+    "sqlPreview": "SQL-voorbeeld",
+    "configSummary": "Samenvatting",
+    "anomalyStatus": {
+      "waiting": "Wachtend",
+      "training": "Opleiding",
+      "active": "Actief",
+      "failed": "Mislukt",
+      "disabled": "Uitgeschakeld"
+    }
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2600,7 +2629,9 @@
     "today": "Vandaag",
     "yesterday": "Gisteren",
     "spanColorPalettePreview": "Voorbeeld van het kleurenpalet van Span",
-    "errorsFound": "Foutsporen"
+    "errorsFound": "Foutsporen",
+    "spansTitle": "OVERSPANT",
+    "spansFound": "Overspanningen gevonden"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -3063,8 +3094,8 @@
     "namePlaceholder": "bijv. Traceergegevens bekijken",
     "urlTemplate": "URL-sjabloon",
     "urlRequired": "URL is vereist",
-    "urlPlaceholder": "bijvoorbeeld https://example.com/trace/${field. __waarde}? van=$ {starttijd} &to=$ {eindtijd}",
-    "urlHint": "Gebruik $ {field. __name}, $ {veld. __value}, $ {start_time}, $ {end_time}, $ {query}, $ {query_encoded}",
+    "urlPlaceholder": "bijv. https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "Gebruik {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Velden",
     "fieldsHint": "Link alleen tonen als er minstens één veld in de record aanwezig is",
     "fieldSearchPlaceholder": "Typ om te zoeken of voer een aangepast veld in",

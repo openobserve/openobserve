@@ -17,14 +17,4 @@
 
 .field-expand-icon {
   position: absolute;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.field-expansion-header:hover .field-type-badge {
-  opacity: 0;
-}
-
-.field-expansion-header:hover .field-expand-icon {
-  opacity: 1;
 }

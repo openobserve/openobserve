@@ -673,7 +673,15 @@ export class AlertDestinationsPage {
      * Click Cancel button
      */
     async clickCancel() {
-        await this.page.locator(this.cancelButton).click();
+        // Force-click bypasses any backdrop interception (don't pre-press Escape — it closes the dialog itself)
+        try {
+            await this.page.locator(this.cancelButton).click({ force: true, timeout: 10000 });
+        } catch (e) {
+            testLogger.warn('Cancel button click failed, using keyboard escape', { error: e.message });
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
+        }
+        await this.page.waitForTimeout(500);
         testLogger.debug('Clicked Cancel button');
     }
 

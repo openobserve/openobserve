@@ -54,6 +54,10 @@ pub enum TriggerDataType {
     DerivedStream,
     #[serde(rename = "backfill")]
     Backfill,
+    #[serde(rename = "anomaly_detection")]
+    AnomalyDetection,
+    #[serde(rename = "anomaly_detection_training")]
+    AnomalyDetectionTraining,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -335,6 +339,8 @@ pub enum UsageEvent {
     Functions,
     Pipeline,
     RemotePipeline,
+    NewIncident,
+    IncidentReAnalysis,
     Other,
 }
 
@@ -346,6 +352,8 @@ impl std::fmt::Display for UsageEvent {
             UsageEvent::Functions => write!(f, "Functions"),
             UsageEvent::Pipeline => write!(f, "Pipeline"),
             UsageEvent::RemotePipeline => write!(f, "RemotePipeline"),
+            UsageEvent::NewIncident => write!(f, "NewIncident"),
+            UsageEvent::IncidentReAnalysis => write!(f, "IncidentReAnalysis"),
             UsageEvent::Other => write!(f, "Other"),
         }
     }
@@ -363,6 +371,10 @@ impl From<UsageType> for UsageEvent {
             UsageEvent::Pipeline
         } else if usage.is_remote_pipeline() {
             UsageEvent::RemotePipeline
+        } else if matches!(usage, UsageType::NewIncident) {
+            UsageEvent::NewIncident
+        } else if matches!(usage, UsageType::IncidentReAnalysis) {
+            UsageEvent::IncidentReAnalysis
         } else {
             UsageEvent::Other
         }
@@ -419,6 +431,10 @@ pub enum UsageType {
     Syslog,
     #[serde(rename = "enrichment_table")]
     EnrichmentTable,
+    #[serde(rename = "new_incident")]
+    NewIncident,
+    #[serde(rename = "incident_reanalysis")]
+    IncidentReAnalysis,
 }
 
 impl UsageType {
@@ -465,6 +481,10 @@ impl UsageType {
     pub fn is_remote_pipeline(&self) -> bool {
         matches!(self, UsageType::RemotePipeline)
     }
+
+    pub fn is_incident(&self) -> bool {
+        matches!(self, UsageType::NewIncident | UsageType::IncidentReAnalysis)
+    }
 }
 
 impl std::fmt::Display for UsageType {
@@ -494,6 +514,8 @@ impl std::fmt::Display for UsageType {
             UsageType::Retention => write!(f, "data_retention"),
             UsageType::Syslog => write!(f, "syslog"),
             UsageType::EnrichmentTable => write!(f, "enrichment_table"),
+            UsageType::NewIncident => write!(f, "new_incident"),
+            UsageType::IncidentReAnalysis => write!(f, "incident_reanalysis"),
         }
     }
 }

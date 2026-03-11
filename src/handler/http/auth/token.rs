@@ -163,10 +163,11 @@ pub async fn token_validator(
                     // invite based on the user email got from sso provider, and
                     // nothing else. Similarly for accepting invite, we will not have the
                     // user in db anymore, and the fn checks based on email and token, so ok to
-                    // bypass
+                    // bypass. Similarly specifically for org list, we check by email
                     None if (is_list_invite_call
                         || is_member_subscription
-                        || allow_nonexistent_user) =>
+                        || allow_nonexistent_user
+                        || (path_suffix.eq(&"organizations") && auth_info.method.eq("LIST"))) =>
                     {
                         // Allow these special cases without requiring user in DB
                         Ok(AuthValidationResult {

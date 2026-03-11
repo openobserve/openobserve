@@ -42,12 +42,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-section-title"
           class="tw:text-[0.75rem] tw:font-bold tw:tracking-[0.0625rem]! tw:text-[var(--o2-text-1)]! tw:mr-[0.85rem]"
         >
-          {{ t("traces.tracesTitle") }}
+          {{
+            props.searchMode === "spans"
+              ? t("traces.spansTitle")
+              : t("traces.tracesTitle")
+          }}
         </span>
         <q-badge
           data-test="traces-count-badge"
           rounded
-          :label="`${props.total != null ? props.total : hits.length} ${t('traces.tracesFound')}`"
+          :label="`${props.total != null ? props.total : hits.length} ${props.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}`"
           class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
         />
         <div
@@ -150,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-timestamp="{ item }">
-            <TraceTimestampCell :item="item" />
+            <TraceTimestampCell :item="item" :search-mode="props.searchMode" />
           </template>
 
           <template #cell-service="{ item }">
@@ -183,8 +187,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
+          <template #cell-method="{ item }">
+            {{ item.http_method || item.rpc_method || "—" }}
+          </template>
+
+          <template #cell-status_code="{ item }">
+            <SpanStatusCodeBadge
+              :code="item.http_status_code"
+              :grpc-code="item.rpc_grpc_status_code"
+            />
+          </template>
+
           <template #cell-status="{ item }">
-            <TraceStatusCell :item="item" />
+            <TraceStatusCell v-if="props.searchMode !== 'spans'" :item="item" />
+            <SpanStatusPill v-else :status="item.span_status" />
           </template>
 
           <template #cell-input_tokens="{ item }">
@@ -237,6 +253,8 @@ import TraceTimestampCell from "./TraceTimestampCell.vue";
 import TraceServiceCell from "./TraceServiceCell.vue";
 import TraceLatencyCell from "./TraceLatencyCell.vue";
 import TraceStatusCell from "./TraceStatusCell.vue";
+import SpanStatusPill from "./SpanStatusPill.vue";
+import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import {
   isLLMTrace,
   extractLLMData,
@@ -266,6 +284,8 @@ interface Props {
   sortBy?: string;
   /** Active sort direction */
   sortOrder?: "asc" | "desc";
+  /** Current search mode */
+  searchMode?: "traces" | "spans";
 }
 
 const { t } = useI18n();
@@ -280,6 +300,7 @@ const props = withDefaults(defineProps<Props>(), {
   errorCount: undefined,
   sortBy: undefined,
   sortOrder: undefined,
+  searchMode: "traces",
 });
 
 const emit = defineEmits<{
@@ -295,10 +316,16 @@ const hasLlmTraces = computed(() =>
   props.hits.some((hit: any) => isLLMTrace(hit)),
 );
 
-const tracesColumns = useTracesTableColumns(hasLlmTraces);
+const searchModeRef = computed(() => props.searchMode ?? "traces");
 
-const traceRowClass = (row: any) =>
-  (row.errors ?? 0) > 0 ? "oz-table__row--error" : "";
+const tracesColumns = useTracesTableColumns(hasLlmTraces, searchModeRef);
+
+const traceRowClass = (row: any) => {
+  if (props.searchMode === "spans") {
+    return row.span_status === "ERROR" ? "oz-table__row--error" : "";
+  }
+  return (row.errors ?? 0) > 0 ? "oz-table__row--error" : "";
+};
 
 const noResults = computed(
   () => props.searchPerformed && !props.loading && props.hits.length === 0,

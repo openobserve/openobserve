@@ -731,9 +731,9 @@
     "usage_information": "使用信息",
     "license_allows_ingestion": "您的许可证允许每天摄取 <strong>{限制} GB</strong> 的数据。",
     "limit_exceeded_days": "本月 {days<strong class=\"{colorClass}\">} 天 {plural}</strong> 已超过上限",
-    "limit_exceeded_warning": " （最多允许 3 天）。应用程序功能将受到限制",
-    "limit_exceeded_info": " （最多 3 个 {剩余} 余额 {复数}）",
-    "no_limit_exceedances": "本月不超过限额（每月最多允许 3 次）。",
+    "limit_exceeded_warning": " （最多允许 {max} 天）。应用程序功能将受到限制",
+    "limit_exceeded_info": " （最多 {max} 个 {剩余} 余额 {复数}）",
+    "no_limit_exceedances": "本月不超过限额（每月最多允许 {max} 次）。",
     "usage_shows_zero_unlimited": "* 无限套餐的使用量显示为 0%",
     "license_updated_success": "许可证已成功更新",
     "failed_to_update_license": "更新许可证失败",
@@ -744,7 +744,8 @@
     "yes_update_license": "是的，更新许可证",
     "no_keep_current": "不，保持最新状态",
     "feature_correlation_management": "关联管理",
-    "feature_log_patterns": "日志模式"
+    "feature_log_patterns": "日志模式",
+    "environment_type": "环境类型"
   },
   "login": {
     "userid": "账号",
@@ -2068,7 +2069,35 @@
     "noStreamSelected": "未选择任何直播",
     "resultsIncludeAllWindows": "结果包括所有多窗口新增内容",
     "runQueryForOutput": "请单击 “运行查询” 以查看输出",
-    "applyVRLForOutput": "请单击 Apply VRL 查看组合输出"
+    "applyVRLForOutput": "请单击 Apply VRL 查看组合输出",
+    "anomalyDetection": "异常检测",
+    "newAnomalyDetection": "新的异常检测",
+    "editAnomalyDetection": "编辑异常检测",
+    "anomalyDetectionSubtitle": "使用机器学习检测可观测性数据中的异常",
+    "anomalyDetectionConfig": "检测配置",
+    "alerting": "警报",
+    "saveAndTrain": "保存并训练",
+    "detectionInterval": "检测间隔",
+    "trainingWindow": "训练窗口",
+    "sensitivity": "灵敏度",
+    "sensitivityHint": "更高的百分位数 = 更少的警报。仅标记最极端的异常。",
+    "queryMode": "查询模式",
+    "detectionFunction": "检测功能",
+    "trained": "训练有素",
+    "notTrained": "未受过训练",
+    "lastDetection": "上次检测",
+    "nextRun": "下次运行",
+    "triggerTraining": "触发训练",
+    "retraining": "再训练...",
+    "sqlPreview": "SQL 预览",
+    "configSummary": "摘要",
+    "anomalyStatus": {
+      "waiting": "等待",
+      "training": "训练",
+      "active": "活跃",
+      "failed": "失败",
+      "disabled": "已禁用"
+    }
   },
   "alert_templates": {
     "header": "模板",
@@ -2605,7 +2634,9 @@
     "today": "今天",
     "yesterday": "昨天",
     "spanColorPalettePreview": "Span 调色板预览",
-    "errorsFound": "错误跟踪"
+    "errorsFound": "错误跟踪",
+    "spansTitle": "跨度",
+    "spansFound": "已找到跨度"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -3068,8 +3099,8 @@
     "namePlaceholder": "例如，查看追踪详情",
     "urlTemplate": "网址模板",
     "urlRequired": "网址为必填项",
-    "urlPlaceholder": "例如，https://example.com/trace/${field。__value}？from=$ {start_time} &to=$ {end_time}",
-    "urlHint": "使用 $ {字段。__name}，$ {字段。__value}、$ {开始时间}、$ {结束时间}、$ {查询}、$ {query_encoded}",
+    "urlPlaceholder": "例如，https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "使用 {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "字段",
     "fieldsHint": "仅当记录中至少存在一个字段时才显示链接",
     "fieldSearchPlaceholder": "键入搜索或输入自定义字段",

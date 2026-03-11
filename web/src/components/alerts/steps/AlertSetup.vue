@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Alert Type (Scheduled/Real-time) -->
+        <!-- Alert Type (Scheduled/Real-time/Anomaly Detection) -->
         <div class="form-field tw:mb-4 tw:mt-4">
           <div class="tw:flex tw:items-center tw:gap-5">
             <q-radio
@@ -130,6 +130,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.realTime')"
               class="q-ml-none o2-radio-button"
             />
+            <q-radio
+              v-if="isAnomalyDetectionEnabled"
+              data-test="add-alert-anomaly-detection-radio"
+              v-bind:readonly="beingUpdated"
+              v-bind:disable="beingUpdated"
+              v-model="formData.is_real_time"
+              val="anomaly"
+              dense
+              :label="t('alerts.anomalyDetection')"
+              class="q-ml-none o2-radio-button"
+            />
           </div>
         </div>
       </q-form>
@@ -138,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type PropType } from "vue";
+import { defineComponent, ref, computed, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { isValidResourceName } from "@/utils/zincutils";
@@ -189,6 +200,10 @@ export default defineComponent({
     const store = useStore();
     const step1Form = ref(null);
 
+    const isAnomalyDetectionEnabled = computed(
+      () => store.state.zoConfig.anomaly_detection_enabled === true,
+    );
+
     const updateStreams = () => {
       emit("update:streams");
     };
@@ -217,6 +232,7 @@ export default defineComponent({
       store,
       step1Form,
       isValidResourceName,
+      isAnomalyDetectionEnabled,
       updateStreams,
       filterStreams,
       handleStreamNameChange,
