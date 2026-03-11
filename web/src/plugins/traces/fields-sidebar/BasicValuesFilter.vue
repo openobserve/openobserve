@@ -17,7 +17,7 @@
           style="width: calc(100% - 28px); font-size: 14px"
           :title="row.label || row.name"
         >
-          <span v-if="row.dataType" class="field-type-container">
+          <span class="field-type-container">
             <q-icon
               class="field-expand-icon"
               :name="isExpanded ? 'expand_less' : 'expand_more'"

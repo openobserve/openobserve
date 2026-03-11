@@ -330,10 +330,7 @@ const loadDashboard = async () => {
         // Traces mode: restrict Duration percentiles to root spans only so that
         // each trace contributes exactly one duration value. Root spans are
         // identified by an absent reference_parent_span_id (NULL or empty string).
-        const durationFilters = [
-          ...baseFilters,
-          "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')",
-        ];
+        const durationFilters = [...baseFilters];
         whereClause = "WHERE " + durationFilters.join(" AND ");
       } else {
         // Spans mode Duration, and Rate panel for both modes: apply combined filters

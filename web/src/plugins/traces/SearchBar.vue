@@ -285,6 +285,51 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import useStreams from "@/composables/useStreams";
 import { getImageURL } from "@/utils/zincutils";
 
+/**
+ * Extracts the field name from a filter expression such as `field='val'`,
+ * `field!='val'`, `(field='x' OR field='y')`, etc.
+ */
+const getFieldFromExpression = (expression: string): string | null => {
+  const cleaned = expression.trim().replace(/^\(\s*/, "");
+  const match =
+    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
+    cleaned.match(/^(\w+)\s*(?:=|!=|>=|<=|>|<|is)/i);
+  return match ? match[1] : null;
+};
+
+/**
+ * Tries to replace an existing condition for `fieldName` in `queryStr` with
+ * `newExpression`. Returns the modified string, or the original if not found.
+ * Handles both parenthesized multi-value groups and single conditions.
+ */
+const replaceExistingFieldCondition = (
+  queryStr: string,
+  fieldName: string,
+  newExpression: string,
+): string => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const opPat = `(?:=|!=|>=|<=|>|<|is(?:\\s+not)?)`;
+  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
+
+  // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
+  const multiRegex = new RegExp(
+    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
+    "gi",
+  );
+  if (multiRegex.test(queryStr)) {
+    return queryStr.replace(multiRegex, newExpression);
+  }
+
+  // Try single condition
+  const singleRegex = new RegExp(condPat, "gi");
+  if (singleRegex.test(queryStr)) {
+    return queryStr.replace(singleRegex, newExpression);
+  }
+
+  return queryStr;
+};
+
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
@@ -678,9 +723,13 @@ export default defineComponent({
           if (replaced !== currentQuery[0]) {
             currentQuery[0] = replaced;
           } else {
-            currentQuery = filter;
+            if (currentQuery[0] != "") {
+              currentQuery[0] += " and " + filter;
+            } else {
+              currentQuery[0] = filter;
+            }
           }
-          this.searchObj.data.query = currentQuery;
+          this.searchObj.data.query = currentQuery[0];
         }
         this.searchObj.data.stream.addToFilter = "";
         if (this.queryEditorRef?.setValue)
