@@ -108,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import {
   ref,
+  watch,
   onMounted,
   onBeforeUnmount,
   computed,
@@ -120,6 +121,8 @@ import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboar
 import metrics from "./metrics.json";
 import { deepCopy, formatTimeWithSuffix } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
+import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import useParser from "@/composables/useParser";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -210,57 +213,6 @@ const showErrorOnly = computed({
 });
 const rangeFilters = computed(() => searchObj.meta.metricsRangeFilters);
 
-// Check if duration filter exists
-const hasDurationFilter = computed(() => {
-  // Force reactivity by accessing rangeFiltersVersion
-  rangeFiltersVersion.value;
-
-  let hasFilter = false;
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Duration") {
-      // Show analyze button if we have any duration filter (start or end)
-      if (filter.start !== null || filter.end !== null) {
-        hasFilter = true;
-      }
-    }
-  });
-  return hasFilter;
-});
-
-// Check if rate filter exists
-const hasRateFilter = computed(() => {
-  // Force reactivity by accessing rangeFiltersVersion
-  rangeFiltersVersion.value;
-
-  let hasFilter = false;
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Rate") {
-      // Show volume analyze button if we have any rate filter (start or end)
-      if (filter.start !== null || filter.end !== null) {
-        hasFilter = true;
-      }
-    }
-  });
-  return hasFilter;
-});
-
-// Check if error filter exists
-const hasErrorFilter = computed(() => {
-  // Force reactivity by accessing rangeFiltersVersion
-  rangeFiltersVersion.value;
-
-  let hasFilter = false;
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Errors") {
-      // Show error analyze button if we have any error filter (start or end)
-      if (filter.start !== null || filter.end !== null) {
-        hasFilter = true;
-      }
-    }
-  });
-  return hasFilter;
-});
-
 // Check if ANY RED panel has a time-based brush selection
 // This controls the visibility of the "Analyze Dimensions" button
 // - Button shows ONLY when user has made a brush selection on Rate, Duration, or Errors panel
@@ -293,6 +245,7 @@ const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuValue = ref(0);
 const contextMenuFieldName = ref("");
 const contextMenuData = ref<any>(null);
+const sqlParser = ref<any>(null);
 
 const getBaseFilters = () => {
   let baseFilters = [];
@@ -310,14 +263,15 @@ const getBaseFilters = () => {
     }
   });
 
-  // Add error filter if showErrorOnly is enabled
-  if (showErrorOnly.value) {
-    baseFilters.push("span_status = 'ERROR'");
-  }
-
-  // Add user-provided filters from query editor
+  // Add user-provided filters from query editor, parsing any human-readable
+  // duration values (e.g. '1.50ms') back to raw microseconds for SQL.
   if (props.filter?.trim().length) {
-    baseFilters.push(props.filter.trim());
+    const parsed = parseDurationWhereClause(
+      props.filter.trim(),
+      sqlParser.value,
+      searchObj.data.stream.selectedStream.value,
+    );
+    baseFilters.push(typeof parsed === "string" ? parsed : props.filter.trim());
   }
 
   return baseFilters;
@@ -337,6 +291,7 @@ const loadDashboard = async () => {
     // Convert the dashboard schema and update stream names
     const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
 
+    const isSpansMode = searchObj.meta.searchMode === "spans";
     const baseFilters: string[] = getBaseFilters();
     convertedDashboard.tabs[0].panels.forEach((panel, index) => {
       // Build WHERE clause based on filters
@@ -346,7 +301,17 @@ const loadDashboard = async () => {
       if (panel.title === "Errors") {
         const errorFilters = ["span_status = 'ERROR'"];
         if (props.filter?.trim().length) {
-          errorFilters.push(props.filter.trim());
+          // Parse human-readable duration values back to raw µs for SQL
+          const parsedFilter = parseDurationWhereClause(
+            props.filter.trim(),
+            sqlParser.value,
+            searchObj.data.stream.selectedStream.value,
+          );
+          errorFilters.push(
+            typeof parsedFilter === "string"
+              ? parsedFilter
+              : props.filter.trim(),
+          );
         }
 
         if (baseFilters.length) {
@@ -356,8 +321,15 @@ const loadDashboard = async () => {
         whereClause = errorFilters.length
           ? "WHERE " + errorFilters.join(" AND ")
           : "";
+      } else if (panel.title === "Duration" && !isSpansMode) {
+        // Traces mode: restrict Duration percentiles to root spans only so that
+        // each trace contributes exactly one duration value. Root spans are
+        // identified by an absent reference_parent_span_id (NULL or empty string).
+        const durationFilters = [...baseFilters];
+        if (durationFilters.length)
+          whereClause = "WHERE " + durationFilters.join(" AND ");
       } else {
-        // For Rate and Duration panels, apply the combined filters
+        // Spans mode Duration, and Rate panel for both modes: apply combined filters
         whereClause = baseFilters.length
           ? "WHERE " + baseFilters.join(" AND ")
           : "";
@@ -365,13 +337,23 @@ const loadDashboard = async () => {
 
       const streamName = searchObj.data.stream.selectedStream.value;
 
-      convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
-        "queries"
-      ][0].query.replace("[STREAM_NAME]", `"${streamName}"`);
+      // Build the final query: substitute placeholders then apply mode transforms
+      let query = panel["queries"][0].query
+        .replace("[STREAM_NAME]", `"${streamName}"`)
+        .replace("[WHERE_CLAUSE]", whereClause);
 
-      convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
-        "queries"
-      ][0].query.replace("[WHERE_CLAUSE]", whereClause);
+      // Spans mode: replace trace-level distinct counts with span-level counts
+      // in the Rate and Errors panels.
+      if (isSpansMode && (panel.title === "Rate" || panel.title === "Errors")) {
+        query = query
+          .replace(
+            /approx_distinct\(trace_id\)\s+filter\s*\(where\s+span_status\s*=\s*'ERROR'\)/gi,
+            "count(*) FILTER (WHERE span_status = 'ERROR')",
+          )
+          .replace(/approx_distinct\(trace_id\)/gi, "count(*)");
+      }
+
+      convertedDashboard.tabs[0].panels[index]["queries"][0].query = query;
     });
 
     dashboardData.value = convertedDashboard;
@@ -432,15 +414,18 @@ const emitFiltersToQueryEditor = () => {
 
   searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
     if (rangeFilter.panelTitle === "Duration") {
-      // Duration filter: use microseconds values from Y-axis
+      // Duration filter: format µs values as human-readable strings so they
+      // render nicely in the query editor and are decoded by parseDurationWhereClause.
       if (rangeFilter.start !== null && rangeFilter.end !== null) {
         filters.push(
-          `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
+          `duration >= '${formatTimeWithSuffix(rangeFilter.start)}' and duration <= '${formatTimeWithSuffix(rangeFilter.end)}'`,
         );
       } else if (rangeFilter.start !== null) {
-        filters.push(`duration >= ${rangeFilter.start}`);
+        filters.push(
+          `duration >= '${formatTimeWithSuffix(rangeFilter.start)}'`,
+        );
       } else if (rangeFilter.end !== null) {
-        filters.push(`duration <= ${rangeFilter.end}`);
+        filters.push(`duration <= '${formatTimeWithSuffix(rangeFilter.end)}'`);
       }
     } else if (rangeFilter.panelTitle === "Errors") {
       // Error filter: just add span_status check
@@ -474,6 +459,8 @@ const onDataZoom = ({
       startTime: props.timeRange.startTime,
       endTime: props.timeRange.endTime,
     };
+
+    searchObj.meta.metricsRangeFilters.clear();
 
     // For Rate and Errors panels: use placeholder values to indicate time-based selection
     // Volume/Error analysis will use the time range, not Y-axis values
@@ -738,7 +725,9 @@ const stopAutoRefresh = () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  const { sqlParser: loadSqlParser } = useParser();
+  sqlParser.value = await loadSqlParser();
   loadDashboard();
 });
 
@@ -753,6 +742,7 @@ defineExpose({
   },
   loadDashboard,
   getBaseFilters,
+  rangeFiltersVersion,
 });
 </script>
 

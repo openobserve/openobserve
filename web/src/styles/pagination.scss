@@ -17,6 +17,10 @@
     border-radius: 0.25rem;
     line-height: 1rem;
   }
+
+  :deep(.q-pagination__middle .q-btn){
+    min-width: 2em !important;
+  }
 }
 
 .select-pagination {

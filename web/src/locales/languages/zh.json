@@ -2558,7 +2558,10 @@
     "success": "成功",
     "today": "今天",
     "yesterday": "昨天",
-    "spanColorPalettePreview": "Span 调色板预览"
+    "spanColorPalettePreview": "Span 调色板预览",
+    "errorsFound": "错误跟踪",
+    "spansTitle": "跨度",
+    "spansFound": "已找到跨度"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",

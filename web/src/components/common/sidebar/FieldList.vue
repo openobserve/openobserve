@@ -301,6 +301,14 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    query: {
+      type: String,
+      default: "",
+    },
+    showCount: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["event-emitted"],
   setup(props, { emit }) {

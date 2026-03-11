@@ -2558,7 +2558,10 @@
     "success": "SUCCES",
     "today": "Vandaag",
     "yesterday": "Gisteren",
-    "spanColorPalettePreview": "Voorbeeld van het kleurenpalet van Span"
+    "spanColorPalettePreview": "Voorbeeld van het kleurenpalet van Span",
+    "errorsFound": "Foutsporen",
+    "spansTitle": "OVERSPANT",
+    "spansFound": "Overspanningen gevonden"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

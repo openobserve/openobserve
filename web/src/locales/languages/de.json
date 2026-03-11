@@ -2558,7 +2558,10 @@
     "success": "ERFOLG",
     "today": "Heute",
     "yesterday": "Gestern",
-    "spanColorPalettePreview": "Vorschau der Span-Farbpalette"
+    "spanColorPalettePreview": "Vorschau der Span-Farbpalette",
+    "errorsFound": "Fehlerspuren",
+    "spansTitle": "SPANNT",
+    "spansFound": "Gefundene Spannweiten"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
