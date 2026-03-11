@@ -178,6 +178,8 @@ export const convertTraceServiceMapData = (
         data: data,
         symbolSize: 30,
         initialTreeDepth: treeDepth,
+        roam: true,
+        expandAndCollapse: false,
         label: {
           position: "bottom",
           verticalAlign: "bottom",

@@ -20,6 +20,31 @@ export class AlertCreationWizard {
     }
 
     /**
+     * Select a stream from the stream name dropdown using keyboard filtering.
+     * The dropdown uses Quasar virtual scroll which only renders visible items.
+     * Typing the stream name triggers QSelect's built-in filter to narrow results.
+     */
+    async selectStreamByName(streamName) {
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.locators.streamNameDropdown).click();
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.type(streamName, { delay: 30 });
+        await this.page.waitForTimeout(1000);
+        try {
+            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        } catch (e) {
+            testLogger.warn('Stream not visible after typing, retrying dropdown', { streamName });
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
+            await this.page.locator(this.locators.streamNameDropdown).click();
+            await this.page.waitForTimeout(500);
+            await this.page.keyboard.type(streamName, { delay: 30 });
+            await this.page.waitForTimeout(1000);
+        }
+        await this.page.getByText(streamName, { exact: true }).click();
+    }
+
+    /**
      * Create a real-time alert using Alerts 2.0 wizard UI
      * Wizard steps for real-time: Step 1 (Setup) -> Step 2 (Conditions) -> Step 4 (Settings) -> Step 6 (Advanced) -> Submit
      * @param {string} streamName - Name of the stream
@@ -46,18 +71,7 @@ export class AlertCreationWizard {
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
         await this.page.waitForTimeout(1000);
 
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-
-        try {
-            await expect(this.page.getByText(`${streamName}`, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            testLogger.warn('Stream dropdown options not visible after first click, retrying');
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-            await expect(this.page.getByText(`${streamName}`, { exact: true })).toBeVisible({ timeout: 5000 });
-        }
-        await this.page.getByText(`${streamName}`, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         await expect(this.page.locator(this.locators.realtimeAlertRadio)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.locators.realtimeAlertRadio).click();
@@ -181,15 +195,7 @@ export class AlertCreationWizard {
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
         await this.page.waitForTimeout(1000);
 
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         await expect(this.page.locator(this.locators.realtimeAlertRadio)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.locators.realtimeAlertRadio).click();
@@ -306,18 +312,7 @@ export class AlertCreationWizard {
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
         await this.page.waitForTimeout(1000);
 
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            testLogger.warn('Stream dropdown options not visible after first click, retrying');
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.locators.scheduledAlertRadio).click();
@@ -349,17 +344,14 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
-        // Close SQL editor dialog
+        // Close SQL editor dialog — force-click bypasses any backdrop interception
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            if (await closeButton.isVisible({ timeout: 3000 })) {
-                await closeButton.click();
-            } else {
-                await this.page.locator(this.locators.qDialogLocator).getByText('arrow_back_ios_new').click();
-            }
+            await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
+            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
         }
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
@@ -469,14 +461,7 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
 
         // Select stream name
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         // Select Real-time alert type
         await this.page.locator(this.locators.realtimeAlertRadio).click();
@@ -665,15 +650,7 @@ export class AlertCreationWizard {
         testLogger.info('Selected stream type: logs');
 
         // Select stream name
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
         testLogger.info('Selected stream name', { streamName });
 
         // Select Scheduled alert type
@@ -713,17 +690,14 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
-        // Close dialog
+        // Close dialog — force-click bypasses any backdrop interception
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            if (await closeButton.isVisible({ timeout: 3000 })) {
-                await closeButton.click();
-            } else {
-                await this.page.locator(this.locators.qDialogLocator).getByText('arrow_back_ios_new').click();
-            }
+            await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
+            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
         }
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
@@ -871,10 +845,7 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
 
         // Select stream
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        await this.page.waitForTimeout(500);
-        await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         // Select real-time alert type
         await this.page.locator(this.locators.realtimeAlertRadio).click();
@@ -1074,15 +1045,7 @@ export class AlertCreationWizard {
         testLogger.info('Selected stream type: logs');
 
         // Select stream name
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
         testLogger.info('Selected stream name', { streamName });
 
         // Select Scheduled alert type
@@ -1125,18 +1088,14 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
-        // Close dialog - use same approach as working createScheduledAlertWithSQL method
-        // The close button may be intercepted by backdrop, so use Escape as fallback
+        // Close dialog — force-click bypasses any backdrop interception
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            if (await closeButton.isVisible({ timeout: 3000 })) {
-                await closeButton.click();
-            } else {
-                await this.page.locator(this.locators.qDialogLocator).getByText('arrow_back_ios_new').click();
-            }
+            await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
+            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
         }
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
@@ -1306,7 +1265,8 @@ export class AlertCreationWizard {
 
         // ==================== STEP 1: ALERT SETUP ====================
         await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout after addAlert click — continuing'));
 
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
@@ -1316,16 +1276,7 @@ export class AlertCreationWizard {
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
         await this.page.waitForTimeout(1000);
 
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        }
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.selectStreamByName(streamName);
 
         // Select Scheduled alert type
         await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
@@ -1334,7 +1285,8 @@ export class AlertCreationWizard {
 
         // ==================== STEP 2: CONDITIONS + AGGREGATION ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout at Step 2 — continuing'));
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 2');
 
@@ -1421,12 +1373,14 @@ export class AlertCreationWizard {
 
         // ==================== STEP 3: COMPARE WITH PAST (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout at Step 3 — continuing'));
         await this.page.waitForTimeout(1000);
 
         // ==================== STEP 4: ALERT SETTINGS ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout at Step 4 — continuing'));
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 4: Settings');
 
@@ -1472,12 +1426,14 @@ export class AlertCreationWizard {
 
         // ==================== STEP 5: DEDUPLICATION (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout at Step 5 — continuing'));
         await this.page.waitForTimeout(500);
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
         await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 })
+            .catch(() => testLogger.debug('networkidle timeout at Step 6 — continuing'));
         await this.page.waitForTimeout(500);
 
         // ==================== SUBMIT ====================
@@ -1546,18 +1502,7 @@ export class AlertCreationWizard {
         testLogger.info('Selected stream type: metrics');
 
         // Select metrics stream name
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-
-        try {
-            await expect(this.page.getByText(metricsStreamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            testLogger.warn('Stream dropdown options not visible after first click, retrying');
-            await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(1000);
-            await expect(this.page.getByText(metricsStreamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        }
-        await this.page.getByText(metricsStreamName, { exact: true }).click();
+        await this.selectStreamByName(metricsStreamName);
         testLogger.info('Selected metrics stream name', { metricsStreamName });
 
         // Select Scheduled alert type
@@ -1598,17 +1543,14 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran PromQL query');
 
-        // Close PromQL editor dialog
+        // Close PromQL editor dialog — force-click bypasses any backdrop interception
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            if (await closeButton.isVisible({ timeout: 3000 })) {
-                await closeButton.click();
-            } else {
-                await this.page.locator(this.locators.qDialogLocator).getByText('arrow_back_ios_new').click();
-            }
+            await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
+            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
             await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
         }
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);

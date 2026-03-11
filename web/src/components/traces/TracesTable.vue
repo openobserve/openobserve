@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="virtualRow in rowVirtualizer.getVirtualItems()"
           :key="virtualRow.key"
-          class="oz-table__row tw:absolute tw:top-0 tw:left-0 tw:w-full tw:min-w-max tw:bg-[var(--o2-card-bg)] row no-wrap items-center q-px-sm cursor-pointer tw:border-b tw:border-[var(--o2-border-2)]!"
+          class="oz-table__row tw:absolute tw:top-0 tw:left-0 tw:w-full tw:min-w-max tw:bg-[var(--o2-card-bg)] row no-wrap items-center q-px-sm cursor-pointer tw:border-b tw:border-b-[var(--o2-border-2)]!"
           :class="rowClass?.(allRows[virtualRow.index].original)"
           :style="{
             height: `${virtualRow.size}px`,
