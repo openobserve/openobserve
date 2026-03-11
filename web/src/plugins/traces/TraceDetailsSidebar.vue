@@ -1317,6 +1317,17 @@ export default defineComponent({
           ),
           "MMM DD, YYYY HH:mm:ss.SSS Z",
         );
+
+      spanDetails.attrs["start_time"] = date.formatDate(
+        Math.floor(spanDetails.attrs["start_time"] / 1000000),
+        "MMM DD, YYYY HH:mm:ss.SSS Z",
+      );
+
+      spanDetails.attrs["end_time"] = date.formatDate(
+        Math.floor(spanDetails.attrs["end_time"] / 1000000),
+        "MMM DD, YYYY HH:mm:ss.SSS Z",
+      );
+
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       try {
