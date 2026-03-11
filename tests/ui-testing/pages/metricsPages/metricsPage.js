@@ -1,5 +1,6 @@
 // metricsPage.js
 import { expect } from '@playwright/test';
+const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 
 
 export class MetricsPage {
@@ -36,9 +37,20 @@ export class MetricsPage {
 
     }
     async gotoMetricsPage() {
-
         await this.metricsPageMenu.click();
 
+        // Cloud: sidebar click may silently fail — verify URL and fallback to direct navigation
+        if (isCloudEnvironment()) {
+            await this.page.waitForURL('**/metrics**', { timeout: 5000 }).catch(async () => {
+                const orgId = process.env.ORGNAME || 'default';
+                await this.page.goto(
+                    `${process.env.ZO_BASE_URL}/web/metrics?org_identifier=${orgId}`
+                );
+            });
+        }
+
+        // Wait for a key metrics page element to be visible before proceeding
+        await this.page.locator(this.applyButton).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     }
 
     async metricsPageValidation() {
