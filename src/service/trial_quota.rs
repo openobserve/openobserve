@@ -201,10 +201,13 @@ fn update_org_counter_max(org_id: &str, new_total: u64) {
 pub async fn org_has_active_subscription(org_id: &str) -> bool {
     #[cfg(feature = "cloud")]
     {
-        matches!(
-            o2_enterprise::enterprise::cloud::billings::get_billing_by_org_id(org_id).await,
-            Ok(Some(_))
-        )
+        if let Ok(Some(sub)) =
+            o2_enterprise::enterprise::cloud::billings::get_billing_by_org_id(org_id).await
+        {
+            !sub.subscription_type.is_free_sub()
+        } else {
+            false
+        }
     }
     #[cfg(not(feature = "cloud"))]
     {

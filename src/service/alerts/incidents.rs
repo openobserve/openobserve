@@ -309,7 +309,7 @@ pub async fn correlate_alert_to_incident(
         .await;
 
         let usage_ctx = crate::service::trial_quota::AiUsageContext {
-            user_email: "incident_rca@system.local".to_string(),
+            user_email: "system@openobserve.ai".to_string(),
             incident_id: None, // not yet created
             ..Default::default()
         };
