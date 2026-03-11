@@ -18,8 +18,6 @@ on:
     secrets:
       ANTHROPIC_API_KEY:
         required: true
-      GITHUB_TOKEN:
-        required: false
 
 permissions: {}
 
@@ -38,7 +36,7 @@ jobs:
         with:
           # Full history required to diff against PR base and check git log timestamps.
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
 
       - name: Get changed web source files
         id: changed_files

@@ -151,7 +151,6 @@ jobs:
       base_ref: ${{ github.base_ref || 'main' }}
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   ui_unit_tests:
     # Must wait for generate_unit_tests so the full test suite (including newly generated
