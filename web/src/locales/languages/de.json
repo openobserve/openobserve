@@ -2069,7 +2069,35 @@
     "noStreamSelected": "Kein Stream ausgewählt",
     "resultsIncludeAllWindows": "Die Ergebnisse beinhalten alle Ergänzungen mit mehreren Fenstern",
     "runQueryForOutput": "Bitte klicken Sie auf Abfrage ausführen, um die Ausgabe zu sehen",
-    "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen"
+    "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen",
+    "anomalyDetection": "Erkennung von Anomalien",
+    "newAnomalyDetection": "Erkennung neuer Anomalien",
+    "editAnomalyDetection": "Anomalieerkennung bearbeiten",
+    "anomalyDetectionSubtitle": "Erkennen Sie mithilfe von maschinellem Lernen Anomalien in Ihren Observability-Daten",
+    "anomalyDetectionConfig": "Erkennungskonfiguration",
+    "alerting": "Alarmierend",
+    "saveAndTrain": "Sparen & Trainieren",
+    "detectionInterval": "Erkennungsintervall",
+    "trainingWindow": "Trainingsfenster",
+    "sensitivity": "Empfindlichkeit",
+    "sensitivityHint": "Höheres Perzentil = weniger Alarme. Nur die extremsten Anomalien werden gemeldet.",
+    "queryMode": "Abfragemodus",
+    "detectionFunction": "Erkennungsfunktion",
+    "trained": "Geschult",
+    "notTrained": "Nicht trainiert",
+    "lastDetection": "Letzte Erkennung",
+    "nextRun": "Nächster Lauf",
+    "triggerTraining": "Triggertraining",
+    "retraining": "Umschulung...",
+    "sqlPreview": "SQL-Vorschau",
+    "configSummary": "Zusammenfassung",
+    "anomalyStatus": {
+      "waiting": "Wartend",
+      "training": "Schulung",
+      "active": "Aktiv",
+      "failed": "Fehlgeschlagen",
+      "disabled": "Deaktiviert"
+    }
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2601,7 +2629,9 @@
     "today": "Heute",
     "yesterday": "Gestern",
     "spanColorPalettePreview": "Vorschau der Span-Farbpalette",
-    "errorsFound": "Fehlerspuren"
+    "errorsFound": "Fehlerspuren",
+    "spansTitle": "SPANNT",
+    "spansFound": "Gefundene Spannweiten"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -3064,8 +3094,8 @@
     "namePlaceholder": "z. B. Trace-Details anzeigen",
     "urlTemplate": "URL-Vorlage",
     "urlRequired": "URL ist erforderlich",
-    "urlPlaceholder": "z. B. https://example.com/trace/${field. __Wert}? von=$ {start_time} &bis=$ {end_time}",
-    "urlHint": "Verwenden Sie $ {field. __name}, $ {field. __value}, $ {start_time}, $ {end_time}, $ {query}, $ {query_encoded}",
+    "urlPlaceholder": "z. B. https://example.com/trace/{'${field.__value}'}?von={'${start_time}'}&bis={'${end_time}'}",
+    "urlHint": "Verwenden Sie {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Felder",
     "fieldsHint": "Link nur anzeigen, wenn mindestens ein Feld im Datensatz vorhanden ist",
     "fieldSearchPlaceholder": "Geben Sie ein, um ein benutzerdefiniertes Feld zu suchen oder einzugeben",

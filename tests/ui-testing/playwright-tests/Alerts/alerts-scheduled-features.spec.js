@@ -24,6 +24,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // ============================================================================
 // TEST DATA CONFIGURATION
@@ -41,33 +42,24 @@ const FOLDER_NAME = `E2E Scheduled ${RUN_ID}`;
 // SETUP HELPER FUNCTIONS (API-based, same pattern as incident-correlation tests)
 // ============================================================================
 
-function getAuthToken() {
-    return Buffer.from(
-        `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
-    ).toString('base64');
-}
-
 async function apiCall(page, method, path, body = null) {
     const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-    const authToken = getAuthToken();
+    const headers = getAuthHeaders();
 
-    return page.evaluate(async ({ url, method, authToken, body }) => {
+    return page.evaluate(async ({ url, method, headers, body }) => {
         const opts = {
             method,
-            headers: {
-                'Authorization': `Basic ${authToken}`,
-                'Content-Type': 'application/json'
-            }
+            headers,
         };
         if (body) opts.body = JSON.stringify(body);
         const resp = await fetch(url, opts);
         const data = await resp.json().catch(() => ({}));
         return { status: resp.status, data };
-    }, { url: `${baseUrl}${path}`, method, authToken, body });
+    }, { url: `${baseUrl}${path}`, method, headers, body });
 }
 
 async function ensureTemplate(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const resp = await apiCall(page, 'POST', `/api/${org}/alerts/templates`, {
         name: TEMPLATE_NAME,
         body: JSON.stringify({ text: "E2E Alert: {alert_name}" }),
@@ -77,7 +69,7 @@ async function ensureTemplate(page) {
 }
 
 async function ensureDestination(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const resp = await apiCall(page, 'POST', `/api/${org}/alerts/destinations`, {
         name: DESTINATION_NAME,
         url: 'https://httpbin.org/post',
@@ -90,7 +82,7 @@ async function ensureDestination(page) {
 }
 
 async function ensureFolder(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const createResp = await apiCall(page, 'POST', `/api/v2/${org}/folders/alerts`, {
         name: FOLDER_NAME,
         description: 'Auto-created by scheduled alert feature E2E tests'
@@ -112,7 +104,7 @@ async function ensureFolder(page) {
  * for history dialog tests (without needing UI wizard)
  */
 async function createAlertViaApi(page, folderId, alertName) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const payload = {
         name: alertName,
         stream_type: 'logs',
@@ -139,7 +131,7 @@ async function createAlertViaApi(page, folderId, alertName) {
 }
 
 async function ingestTestData(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const now = Date.now() * 1000;
     const records = [];
     for (let i = 0; i < 10; i++) {
@@ -162,7 +154,7 @@ async function ingestTestData(page) {
 // ============================================================================
 
 async function cleanupAlerts(page, folderId, alertNames) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const listResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts?folder=${folderId}`);
     const alerts = (listResp.status === 200) ? (listResp.data.list || listResp.data || []) : [];
 
@@ -178,17 +170,17 @@ async function cleanupAlerts(page, folderId, alertNames) {
 
 async function cleanupFolder(page, folderId) {
     if (!folderId || folderId === 'default') return;
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     await apiCall(page, 'DELETE', `/api/v2/${org}/folders/alerts/${folderId}`);
 }
 
 async function cleanupDestination(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     await apiCall(page, 'DELETE', `/api/${org}/alerts/destinations/${DESTINATION_NAME}`);
 }
 
 async function cleanupTemplate(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     await apiCall(page, 'DELETE', `/api/${org}/alerts/templates/${TEMPLATE_NAME}`);
 }
 
@@ -216,7 +208,7 @@ test.describe("Scheduled Alert Features", () => {
 
         try {
             const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-            const org = process.env.ORGNAME || 'default';
+            const org = getOrgIdentifier();
             await page.goto(`${baseUrl}?org_identifier=${org}`);
             await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
@@ -255,7 +247,7 @@ test.describe("Scheduled Alert Features", () => {
 
         try {
             const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-            const org = process.env.ORGNAME || 'default';
+            const org = getOrgIdentifier();
             await page.goto(`${baseUrl}?org_identifier=${org}`);
             await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
@@ -286,7 +278,7 @@ test.describe("Scheduled Alert Features", () => {
 
         // Navigate to alerts page
         const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-        const org = process.env.ORGNAME || 'default';
+        const org = getOrgIdentifier();
         await page.goto(`${baseUrl}/web/alerts?org_identifier=${org}`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
         await pm.alertsPage.waitForLoadingOverlayToDisappear();
@@ -353,9 +345,11 @@ test.describe("Scheduled Alert Features", () => {
         await pm.alertsPage.openAlertDetailsDialog(API_ALERT_NAME);
         await pm.alertsPage.expectAlertDetailsDialogVisible();
         await pm.alertsPage.clickAlertDetailsEditButton();
+        await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+        await page.waitForTimeout(3000);
 
         const alertSetupText = page.getByText('Alert Setup').first();
-        const wizardVisible = await alertSetupText.isVisible({ timeout: 10000 }).catch(() => false);
+        const wizardVisible = await alertSetupText.isVisible({ timeout: 15000 }).catch(() => false);
         expect(wizardVisible).toBe(true);
         testLogger.info('Edit button navigated to alert wizard');
 

@@ -2069,7 +2069,35 @@
     "noStreamSelected": "Nessuno stream selezionato",
     "resultsIncludeAllWindows": "I risultati includono tutte le aggiunte multi-finestra",
     "runQueryForOutput": "Fai clic su Esegui query per vedere l'output",
-    "applyVRLForOutput": "Fai clic su Applica VRL per vedere l'output combinato"
+    "applyVRLForOutput": "Fai clic su Applica VRL per vedere l'output combinato",
+    "anomalyDetection": "Rilevamento di anomalie",
+    "newAnomalyDetection": "Nuovo rilevamento delle anomalie",
+    "editAnomalyDetection": "Modifica il rilevamento delle anomalie",
+    "anomalyDetectionSubtitle": "Rileva le anomalie nei tuoi dati di osservabilità utilizzando l'apprendimento automatico",
+    "anomalyDetectionConfig": "Configurazione del rilevamento",
+    "alerting": "Avvisi",
+    "saveAndTrain": "Risparmia e allenati",
+    "detectionInterval": "Intervallo di rilevamento",
+    "trainingWindow": "Finestra di formazione",
+    "sensitivity": "Sensibilità",
+    "sensitivityHint": "Percentile più alto = meno avvisi. Vengono segnalate solo le anomalie più estreme.",
+    "queryMode": "Modalità interrogazione",
+    "detectionFunction": "Funzione di rilevamento",
+    "trained": "Addestrato",
+    "notTrained": "Non addestrato",
+    "lastDetection": "Ultimo rilevamento",
+    "nextRun": "Prossima corsa",
+    "triggerTraining": "Allenamento con trigger",
+    "retraining": "Riqualificazione...",
+    "sqlPreview": "Anteprima SQL",
+    "configSummary": "Riepilogo",
+    "anomalyStatus": {
+      "waiting": "Aspettando",
+      "training": "Allenamento",
+      "active": "Attivo",
+      "failed": "Fallito",
+      "disabled": "Disabili"
+    }
   },
   "alert_templates": {
     "header": "Modelli",
@@ -2599,7 +2627,9 @@
     "today": "Oggi",
     "yesterday": "Ieri",
     "spanColorPalettePreview": "Anteprima della palette di colori Span",
-    "errorsFound": "Tracce di errore"
+    "errorsFound": "Tracce di errore",
+    "spansTitle": "SI ESTENDE",
+    "spansFound": "Spacchi trovati"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -3062,8 +3092,8 @@
     "namePlaceholder": "ad esempio, Visualizza i dettagli della traccia",
     "urlTemplate": "Modello di URL",
     "urlRequired": "L'URL è obbligatorio",
-    "urlPlaceholder": "ad esempio, https://example.com/trace/${field. __value}? da=$ {start_time} &a=$ {end_time}",
-    "urlHint": "Usa $ {field. __name}, $ {campo. __valore}, $ {start_time}, $ {end_time}, $ {query}, $ {query_encoded}",
+    "urlPlaceholder": "ad es., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "Usa {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Campi",
     "fieldsHint": "Mostra il link solo quando nel record è presente almeno un campo",
     "fieldSearchPlaceholder": "Digita per cercare o inserisci un campo personalizzato",
