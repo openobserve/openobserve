@@ -2069,7 +2069,35 @@
     "noStreamSelected": "No se ha seleccionado ninguna transmisión",
     "resultsIncludeAllWindows": "Los resultados incluyen todas las adiciones de ventanas múltiples",
     "runQueryForOutput": "Haga clic en Ejecutar consulta para ver el resultado",
-    "applyVRLForOutput": "Haga clic en Aplicar VRL para ver la salida combinada"
+    "applyVRLForOutput": "Haga clic en Aplicar VRL para ver la salida combinada",
+    "anomalyDetection": "Detección de anomalías",
+    "newAnomalyDetection": "Detección de nuevas anomalías",
+    "editAnomalyDetection": "Editar detección de anomalías",
+    "anomalyDetectionSubtitle": "Detecte anomalías en sus datos de observabilidad mediante el aprendizaje automático",
+    "anomalyDetectionConfig": "Configuración de detección",
+    "alerting": "Alertar",
+    "saveAndTrain": "Ahorra y entrena",
+    "detectionInterval": "Intervalo de detección",
+    "trainingWindow": "Ventana de entrenamiento",
+    "sensitivity": "Sensibilidad",
+    "sensitivityHint": "Un percentil más alto = menos alertas. Solo se marcan las anomalías más extremas.",
+    "queryMode": "Modo de consulta",
+    "detectionFunction": "Función de detección",
+    "trained": "Entrenado",
+    "notTrained": "No está entrenado",
+    "lastDetection": "Última detección",
+    "nextRun": "Próxima ejecución",
+    "triggerTraining": "Entrenamiento de desencadenantes",
+    "retraining": "Readiestramiento...",
+    "sqlPreview": "Vista previa de SQL",
+    "configSummary": "Resumen",
+    "anomalyStatus": {
+      "waiting": "Esperando",
+      "training": "Entrenamiento",
+      "active": "Activo",
+      "failed": "Falló",
+      "disabled": "Discapacitado"
+    }
   },
   "alert_templates": {
     "header": "Plantillas",
@@ -2599,7 +2627,9 @@
     "today": "Hoy",
     "yesterday": "Ayer",
     "spanColorPalettePreview": "Vista previa de la paleta de colores Span",
-    "errorsFound": "Rastreos de errores"
+    "errorsFound": "Rastreos de errores",
+    "spansTitle": "SE EXTIENDE",
+    "spansFound": "Vanos encontrados"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -3062,8 +3092,8 @@
     "namePlaceholder": "p. ej., Ver detalles de rastreo",
     "urlTemplate": "Plantilla de URL",
     "urlRequired": "La URL es obligatoria",
-    "urlPlaceholder": "por ejemplo, https://example.com/trace/${field. __valor}? desde=$ {start_time} &a=$ {end_time}",
-    "urlHint": "Usa $ {field. __name}, $ {field. __value}, $ {start_time}, $ {end_time}, $ {query}, $ {query_coded}",
+    "urlPlaceholder": "p. ej., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "Usa {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Campos",
     "fieldsHint": "Mostrar enlace solo cuando hay al menos un campo en el registro",
     "fieldSearchPlaceholder": "Escriba para buscar o introduzca un campo personalizado",

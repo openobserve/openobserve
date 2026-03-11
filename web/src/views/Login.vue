@@ -103,7 +103,7 @@ export default defineComponent({
     const getDefaultOrganization = () => {
       organizationsService
         .list(0, 100000, "id", false, "")
-        .then((res: any) => {
+        .then(async (res: any) => {
           const localOrg: any = useLocalOrganization();
           let tempDefaultOrg = {};
           let localOrgFlag = false;
@@ -181,7 +181,18 @@ export default defineComponent({
             username: store.state.userInfo.email,
             type: "email",
           });
-          // Check for pending invites
+          // Show pending invitations screen if user has no orgs and has pending invites
+          if (config.isCloud == "true" && !res.data.data?.length) {
+            try {
+              const invitations = await usersService.getPendingInvites();
+              if (invitations.data?.data?.length) {
+                showInvitations.value = true;
+                return;
+              }
+            } catch {
+              // ignore, proceed to redirect
+            }
+          }
           setTimeout(() => {
             redirectUser();
           }, 800);
@@ -318,19 +329,6 @@ export default defineComponent({
               ? JSON.parse(sessionUserInfo as string)
               : null;
 
-          // Check for pending invites before login
-          if (config.isCloud == "true") {
-            try {
-              const invitations = await usersService.getPendingInvites();
-              if (invitations.data?.data?.length) {
-                this.showInvitations = true;
-                return;
-              }
-            } catch (err) {
-              console.log("Failed to fetch pending invitations");
-            }
-          }
-
           if (
             (this.userInfo !== null &&
               this.userInfo.hasOwnProperty("pgdata")) ||
@@ -417,4 +415,8 @@ export default defineComponent({
     width: 30px;
   }
 }
+</style>
+
+<style lang="scss">
+@import "@/styles/app.scss";
 </style>

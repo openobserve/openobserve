@@ -1,4 +1,5 @@
 const testLogger = require('./test-logger');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('./cloud-auth');
 
 /**
  * OTLP Metrics Ingestion Module for OpenObserve E2E Tests
@@ -10,7 +11,7 @@ class MetricsIngestion {
         // Configuration for local OpenObserve instance
         // Normalize base URL to avoid double slashes
         const baseUrl = (process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, ''); // Remove trailing slash if present
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier();
 
         // If METRICS_ENDPOINT is provided, normalize it too
         let endpoint = process.env.METRICS_ENDPOINT;
@@ -21,15 +22,18 @@ class MetricsIngestion {
             endpoint = `${baseUrl}/api/${orgName}/v1/metrics`;
         }
 
-        // Require environment variables - no fallback credentials
-        if (!process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD) {
-            throw new Error('ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD environment variables must be set');
+        // On cloud, auth is handled by getAuthHeaders() (email:passcode from cloud-config.json)
+        // On self-hosted, require ZO_ROOT_USER_EMAIL/ZO_ROOT_USER_PASSWORD
+        if (!isCloudEnvironment()) {
+            if (!process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD) {
+                throw new Error('ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD environment variables must be set');
+            }
         }
 
         this.config = {
             endpoint: endpoint,
-            username: process.env.ZO_ROOT_USER_EMAIL,
-            password: process.env.ZO_ROOT_USER_PASSWORD,
+            username: process.env.ZO_ROOT_USER_EMAIL || '',
+            password: process.env.ZO_ROOT_USER_PASSWORD || '',
             orgId: orgName,
             streamName: 'default'
         };
@@ -326,9 +330,12 @@ class MetricsIngestion {
     /**
      * Check if the metrics endpoint is healthy
      */
-    async checkEndpointHealth(config) {
+    async checkEndpointHealth(config, useExternal = false) {
         try {
-            const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
+            // Use cloud-compatible auth for local, manual auth for external
+            const headers = useExternal
+                ? { 'Authorization': `Basic ${Buffer.from(`${config.username}:${config.password}`).toString('base64')}` }
+                : getAuthHeaders();
 
             // Try a simple GET to the base API endpoint
             const baseUrl = config.endpoint.replace('/v1/metrics', '');
@@ -337,9 +344,7 @@ class MetricsIngestion {
 
             const response = await fetch(baseUrl, {
                 method: 'GET',
-                headers: {
-                    'Authorization': `Basic ${auth}`
-                },
+                headers,
                 signal: controller.signal
             });
 
@@ -388,7 +393,14 @@ class MetricsIngestion {
      */
     async sendMetrics(metricsData, useExternal = false, maxRetries = 3) {
         const config = useExternal ? this.externalConfig : this.config;
-        const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
+
+        // Use cloud-compatible auth for local, manual auth for external
+        const authHeaders = useExternal
+            ? {
+                'Content-Type': 'application/json',
+                'Authorization': `Basic ${Buffer.from(`${config.username}:${config.password}`).toString('base64')}`,
+            }
+            : getAuthHeaders();
 
         let lastError = null;
         let retryDelay = 500;
@@ -401,8 +413,7 @@ class MetricsIngestion {
                 const response = await fetch(config.endpoint, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Basic ${auth}`,
+                        ...authHeaders,
                         'organization': config.orgId,
                         'stream-name': config.streamName
                     },

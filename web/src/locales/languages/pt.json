@@ -2069,7 +2069,35 @@
     "noStreamSelected": "Nenhum stream selecionado",
     "resultsIncludeAllWindows": "Os resultados incluem todas as adições de várias janelas",
     "runQueryForOutput": "Clique em Executar consulta para ver a saída",
-    "applyVRLForOutput": "Clique em Aplicar VRL para ver a saída combinada"
+    "applyVRLForOutput": "Clique em Aplicar VRL para ver a saída combinada",
+    "anomalyDetection": "Detecção de anomalias",
+    "newAnomalyDetection": "Nova detecção de anomalias",
+    "editAnomalyDetection": "Editar detecção de anomalias",
+    "anomalyDetectionSubtitle": "Detecte anomalias em seus dados de observabilidade usando aprendizado de máquina",
+    "anomalyDetectionConfig": "Configuração de detecção",
+    "alerting": "Alertando",
+    "saveAndTrain": "Economize e treine",
+    "detectionInterval": "Intervalo de detecção",
+    "trainingWindow": "Janela de treinamento",
+    "sensitivity": "Sensibilidade",
+    "sensitivityHint": "Percentil mais alto = menos alertas. Somente as anomalias mais extremas são sinalizadas.",
+    "queryMode": "Modo de consulta",
+    "detectionFunction": "Função de detecção",
+    "trained": "Treinado",
+    "notTrained": "Não treinado",
+    "lastDetection": "Última detecção",
+    "nextRun": "Próxima corrida",
+    "triggerTraining": "Trigger o treinamento",
+    "retraining": "Reciclagem...",
+    "sqlPreview": "Pré-visualização do SQL",
+    "configSummary": "Resumo",
+    "anomalyStatus": {
+      "waiting": "Esperando",
+      "training": "Treinamento",
+      "active": "Ativo",
+      "failed": "Falhou",
+      "disabled": "Desativado"
+    }
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2601,7 +2629,9 @@
     "today": "Hoje",
     "yesterday": "Ontem",
     "spanColorPalettePreview": "Pré-visualização da paleta de cores Span",
-    "errorsFound": "Traços de erro"
+    "errorsFound": "Traços de erro",
+    "spansTitle": "VÃOS",
+    "spansFound": "Vãos encontrados"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -3064,8 +3094,8 @@
     "namePlaceholder": "por exemplo, Exibir detalhes do rastreamento",
     "urlTemplate": "Modelo de URL",
     "urlRequired": "O URL é obrigatório",
-    "urlPlaceholder": "por exemplo, https://example.com/trace/${field. __valor}? de=$ {start_time} &a=$ {end_time}",
-    "urlHint": "Use $ {field. __name}, $ {field. __value}, $ {start_time}, $ {end_time}, $ {query}, $ {query_encoded}",
+    "urlPlaceholder": "ex., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "Use {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Campos",
     "fieldsHint": "Mostrar link somente quando pelo menos um campo estiver presente no registro",
     "fieldSearchPlaceholder": "Digite para pesquisar ou inserir um campo personalizado",
