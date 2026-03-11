@@ -308,9 +308,22 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         )
           .then((res) => {
             dataLoading.value = false;
-            res.data.data.forEach((item: any) => {  
+            res.data.data.forEach((item: any) => {
               const numericValue = parseFloat(item.value);
-              usageData.value[item.event.toLowerCase()] =  numericValue.toFixed(2);
+              // Map API event names to usageData keys
+              const eventKeyMap: Record<string, string> = {
+                "ingestion": "ingestion",
+                "search": "search",
+                "functions": "functions",
+                "pipeline": "pipeline",
+                "remotepipeline": "remotepipeline",
+                "dataretention": "dataretention",
+                "aicredits": "ai_credits",
+              };
+              const key = eventKeyMap[item.event.toLowerCase()];
+              if (key) {
+                usageData.value[key] = numericValue.toFixed(2);
+              }
             });
 
             dismiss();
