@@ -31,7 +31,8 @@ export class SearchJobInspectorPage {
 
     // ===== SEARCH HISTORY SELECTORS (SearchHistory.vue) =====
     // Note: History rows use dynamic data-test with trace_id
-    this.searchHistoryRow = '[data-test^="stream-association-table-"]';
+    this.searchHistoryRow = '[data-test*="stream-association-table-"]';
+    this.expandedListTabs = '[data-test="expanded-list-tabs"]';
 
     // ===== INSPECTOR PAGE SELECTORS (SearchJobInspector.vue) =====
     this.inspectorTitle = '[data-test="inspector-title"]';
@@ -49,7 +50,8 @@ export class SearchJobInspectorPage {
     this.traceIdTileText = 'text=Trace ID';
     this.viewQueryBtnText = 'text=View Query';
     this.noEventsText = 'text=No events found';
-    this.inspectBtnText = 'button:has-text("Inspect")';
+    // Exclude the search bar inspect button (data-test="logs-inspect-button")
+    this.inspectBtnText = 'button.q-btn:has-text("Inspect"):not([data-test="logs-inspect-button"])';
 
     // ===== SEARCH RESULTS (Index.vue) =====
     this.searchResultText = '[data-test="logs-search-search-result"]';
@@ -84,6 +86,8 @@ export class SearchJobInspectorPage {
    */
   async waitForInspectorPage() {
     await expect(this.page.locator(this.inspectorTitle)).toBeVisible({ timeout: 10000 });
+    // Wait for page to finish loading (stats tiles load asynchronously)
+    await this.page.waitForLoadState('networkidle');
   }
 
   /**
@@ -145,14 +149,28 @@ export class SearchJobInspectorPage {
     await this.openMoreOptionsMenu();
     await expect(this.page.locator(this.searchHistoryItemBtn)).toBeVisible({ timeout: 5000 });
     await this.page.locator(this.searchHistoryItemBtn).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForLoadState('networkidle');
+    // Wait for history rows to load
+    await this.page.locator(this.searchHistoryRow).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  }
+
+  /**
+   * Expand the first history row to reveal Inspect button
+   */
+  async expandFirstHistoryRow() {
+    const firstRow = this.page.locator(this.searchHistoryRow).first();
+    await expect(firstRow).toBeVisible({ timeout: 10000 });
+    await firstRow.click();
+    // Wait for expanded section to appear
+    await expect(this.page.locator(this.expandedListTabs).first()).toBeVisible({ timeout: 5000 });
   }
 
   /**
    * Click Inspect button on a history row
-   * Uses text-based selector since history rows don't have dedicated inspect buttons
+   * Must expand row first to reveal the Inspect button
    */
   async inspectFromHistory() {
+    await this.expandFirstHistoryRow();
     const inspectBtn = this.page.locator(this.inspectBtnText).first();
     await expect(inspectBtn).toBeVisible({ timeout: 5000 });
     await inspectBtn.click();
@@ -164,7 +182,25 @@ export class SearchJobInspectorPage {
    * @returns {Promise<boolean>}
    */
   async hasHistoryInspectButtons() {
-    return await this.page.locator(this.inspectBtnText).first().isVisible({ timeout: 5000 }).catch(() => false);
+    try {
+      // Check if any history rows exist first
+      const rowCount = await this.page.locator(this.searchHistoryRow).count();
+      console.log(`Search history rows found: ${rowCount}`);
+      if (rowCount === 0) {
+        console.log('No search history rows found');
+        return false;
+      }
+
+      // Check if Inspect button exists in DOM
+      const inspectCount = await this.page.locator(this.inspectBtnText).count();
+      console.log(`Inspect button elements found: ${inspectCount}`);
+
+      // If we have rows and inspect buttons exist, the feature is available
+      return inspectCount > 0;
+    } catch (e) {
+      console.log(`hasHistoryInspectButtons error: ${e.message}`);
+      return false;
+    }
   }
 
   // ===== SEARCH RESULTS PARSING =====
@@ -251,7 +287,9 @@ export class SearchJobInspectorPage {
    * @returns {Promise<boolean>}
    */
   async isViewQueryVisible() {
-    return await this.page.locator(this.viewQueryBtnText).isVisible({ timeout: 5000 }).catch(() => false);
+    // Wait a bit for the tile to render after API response
+    await this.page.waitForTimeout(1000);
+    return await this.page.locator(this.viewQueryBtnText).isVisible({ timeout: 10000 }).catch(() => false);
   }
 
   /**
@@ -330,11 +368,13 @@ export class SearchJobInspectorPage {
    * @returns {Promise<{results: boolean, events: boolean, timeTaken: boolean, traceId: boolean}>}
    */
   async getTilesVisibility() {
+    // Wait for tiles to render (async API call after page load)
+    await this.page.waitForTimeout(2000);
     return {
-      results: await this.page.locator(this.resultsTileText).isVisible({ timeout: 3000 }).catch(() => false),
-      events: await this.page.locator(this.eventsTileText).isVisible({ timeout: 3000 }).catch(() => false),
-      timeTaken: await this.page.locator(this.timeTakenTileText).isVisible({ timeout: 3000 }).catch(() => false),
-      traceId: await this.page.locator(this.traceIdTileText).isVisible({ timeout: 3000 }).catch(() => false)
+      results: await this.page.locator(this.resultsTileText).isVisible({ timeout: 5000 }).catch(() => false),
+      events: await this.page.locator(this.eventsTileText).isVisible({ timeout: 5000 }).catch(() => false),
+      timeTaken: await this.page.locator(this.timeTakenTileText).isVisible({ timeout: 5000 }).catch(() => false),
+      traceId: await this.page.locator(this.traceIdTileText).isVisible({ timeout: 5000 }).catch(() => false)
     };
   }
 
