@@ -128,21 +128,14 @@ impl SearchResultType {
     pub fn stats(&self) -> (ScanStats, usize) {
         let mut hits = 0;
         let mut stats = ScanStats::default();
-        match self {
-            SearchResultType::Cached(resp) => {
-                stats.original_size += resp.scan_size as i64;
-                stats.idx_scan_size += resp.idx_scan_size as i64;
-                stats.records += resp.scan_records as i64;
-
-                hits += resp.hits.len();
-            }
-            SearchResultType::Search(resp) => {
-                stats.original_size += resp.scan_size as i64;
-                stats.idx_scan_size += resp.idx_scan_size as i64;
-                stats.records += resp.scan_records as i64;
-                hits += resp.hits.len();
-            }
-        }
+        let resp = match self {
+            SearchResultType::Cached(resp) => resp,
+            SearchResultType::Search(resp) => resp,
+        };
+        stats.original_size += resp.scan_size as i64;
+        stats.idx_scan_size += resp.idx_scan_size as i64;
+        stats.records += resp.scan_records as i64;
+        hits += resp.hits.len();
         (stats, hits)
     }
 }
