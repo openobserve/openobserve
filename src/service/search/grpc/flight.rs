@@ -476,17 +476,29 @@ pub async fn search(
         )
     );
 
-    if cfg.common.feature_pushdown_filter_enabled {
-        let pushdown_filter = FilterPushdown::new();
-        physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
-        let projection_pushdown = ProjectionPushdown::new();
-        physical_plan =
-            projection_pushdown.optimize(physical_plan, ctx.state().config_options())?;
-    }
+    let pushdown_filter = FilterPushdown::new();
+    physical_plan = pushdown_filter
+        .optimize(physical_plan, ctx.state().config_options())
+        .map_err(|e| {
+            log::error!("[trace_id {trace_id}] flight->search: pushdown filter error: {e}");
+            e
+        })?;
+    let projection_pushdown = ProjectionPushdown::new();
+    physical_plan = projection_pushdown
+        .optimize(physical_plan, ctx.state().config_options())
+        .map_err(|e| {
+            log::error!("[trace_id {trace_id}] flight->search: projection pushdown error: {e}");
+            e
+        })?;
 
     if cfg.common.feature_dynamic_pushdown_filter_enabled {
         let pushdown_filter = FilterPushdown::new_post_optimization();
-        physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
+        physical_plan = pushdown_filter
+            .optimize(physical_plan, ctx.state().config_options())
+            .map_err(|e| {
+                log::error!("[trace_id {trace_id}] flight->search: pushdown filter post optimization error: {e}");
+                e
+            })?;
     }
 
     if !tantivy_file_list.is_empty() {
