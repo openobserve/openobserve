@@ -294,7 +294,7 @@ describe("TraceTree", () => {
   describe("Span selection", () => {
     it("should emit selectSpan when span is clicked", async () => {
       const selectBtn = wrapper.find(
-        '[data-test="trace-tree-span-select-btn-d9603ec7f76eb499"]',
+        '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
       );
       await selectBtn.trigger("click");
 
@@ -304,7 +304,7 @@ describe("TraceTree", () => {
 
     it("should emit selectSpan with correct span ID", async () => {
       const selectBtn = wrapper.find(
-        '[data-test="trace-tree-span-select-btn-6702b0494b2b6e57"]',
+        '[data-test="trace-tree-span-operation-name-container-6702b0494b2b6e57"]',
       );
       await selectBtn.trigger("click");
 
