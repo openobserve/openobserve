@@ -217,10 +217,8 @@ pub async fn chat(
         };
 
         // Extract headers to pass through to the agent
-        // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
-        // For now, use empty string (no passthrough) until config is updated
-        let passthrough_config = ""; // TODO: Replace with config.ai.passthrough_headers once field is added
-        let passthrough_headers = extract_passthrough_headers(in_req.headers(), passthrough_config);
+        let passthrough_headers =
+            extract_passthrough_headers(in_req.headers(), &config.ai.passthrough_headers);
 
         // Transform PromptRequest -> QueryRequest
         // Extract the last user message as the query
@@ -440,16 +438,19 @@ pub async fn chat_stream(
         }
     }
 
+    // Add user_id to forwarded headers
+    if !user_id.is_empty() {
+        forward_headers.insert("user_id".to_string(), user_id.clone());
+    }
+
     // Extract and merge passthrough headers from config
     #[cfg(feature = "enterprise")]
     {
-        let _config = get_o2_config();
-        // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
-        // For now, use empty string (no passthrough) until config is updated
-        let passthrough_config = ""; // TODO: Replace with _config.ai.passthrough_headers once field is added
-        let passthrough_headers = extract_passthrough_headers(in_req.headers(), passthrough_config);
+        let config = get_o2_config();
+        let passthrough_headers =
+            extract_passthrough_headers(in_req.headers(), &config.ai.passthrough_headers);
         // Merge passthrough headers, but don't override already-set headers (like session_id,
-        // traceparent)
+        // traceparent, user_id)
         for (key, value) in passthrough_headers {
             forward_headers.entry(key).or_insert(value);
         }
