@@ -2,6 +2,7 @@
 import { expect } from '@playwright/test';
 
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
+const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 
 
 export class TracesPage {
@@ -123,8 +124,13 @@ export class TracesPage {
   }
 
   async navigateToTraces() {
-
     await this.tracesMenuItem.click();
+    // Cloud: sidebar click may silently fail — verify URL and fallback to direct navigation
+    if (isCloudEnvironment()) {
+      await this.page.waitForURL('**/traces**', { timeout: 5000 }).catch(async () => {
+        await this.navigateToTracesUrl();
+      });
+    }
   }
 
   async validateTracesPage() {
