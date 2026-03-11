@@ -136,7 +136,6 @@ export default defineComponent({
 }
 
 .sidebar-content {
-  padding: 0px 10px;
   height: calc(100vh - 176px);
   overflow-y: auto;
 }
