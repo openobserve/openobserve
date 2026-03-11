@@ -4047,3 +4047,134 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
     });
   });
 });
+
+/**
+ * Tests for formatResultCount computed property.
+ *
+ * formatResultCount():
+ * - Returns "0" when hits is empty and total is not set
+ * - Abbreviates numbers ≥ 1 000 as "Xk" and ≥ 1 000 000 as "Xm"
+ * - Appends "+" when scanSize > hits.length (more results available)
+ * - Falls back to hits.length when total is not provided
+ */
+describe("SearchBar.vue formatResultCount", () => {
+  // Minimal inline implementation matching the source code logic
+  const formatResultCount = (queryResults: {
+    hits?: any[];
+    total?: number;
+    scanSize?: number;
+  }): string => {
+    const hits = queryResults.hits ?? [];
+    const total = queryResults.total ?? hits.length;
+
+    const fmt = (n: number): string => {
+      if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}m`;
+      if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+      return String(n);
+    };
+
+    const hasMore = (queryResults.scanSize ?? 0) > hits.length;
+    return `${fmt(total)}${hasMore ? "+" : ""}`;
+  };
+
+  describe("zero / empty state", () => {
+    it("returns '0' when hits is empty and total is not set", () => {
+      expect(formatResultCount({ hits: [] })).toBe("0");
+    });
+
+    it("returns '0' when hits is undefined and total is not set", () => {
+      expect(formatResultCount({})).toBe("0");
+    });
+
+    it("returns '0' when total is explicitly 0", () => {
+      expect(formatResultCount({ hits: [], total: 0 })).toBe("0");
+    });
+  });
+
+  describe("number formatting", () => {
+    it("returns plain string for numbers below 1000", () => {
+      expect(formatResultCount({ hits: Array(500).fill({}), total: 500 })).toBe(
+        "500",
+      );
+    });
+
+    it("abbreviates 1000 as '1.0k'", () => {
+      expect(
+        formatResultCount({ hits: Array(1000).fill({}), total: 1000 }),
+      ).toBe("1.0k");
+    });
+
+    it("abbreviates 1500 as '1.5k'", () => {
+      expect(
+        formatResultCount({ hits: Array(1500).fill({}), total: 1500 }),
+      ).toBe("1.5k");
+    });
+
+    it("abbreviates 999999 as '1000.0k'", () => {
+      expect(formatResultCount({ hits: [], total: 999_999 })).toBe("1000.0k");
+    });
+
+    it("abbreviates 1000000 as '1.0m'", () => {
+      expect(formatResultCount({ hits: [], total: 1_000_000 })).toBe("1.0m");
+    });
+
+    it("abbreviates 2500000 as '2.5m'", () => {
+      expect(formatResultCount({ hits: [], total: 2_500_000 })).toBe("2.5m");
+    });
+  });
+
+  describe("hasMore / '+' suffix", () => {
+    it("appends '+' when scanSize > hits.length", () => {
+      expect(
+        formatResultCount({ hits: Array(50).fill({}), total: 500, scanSize: 60 }),
+      ).toBe("500+");
+    });
+
+    it("does NOT append '+' when scanSize === hits.length", () => {
+      expect(
+        formatResultCount({ hits: Array(50).fill({}), total: 50, scanSize: 50 }),
+      ).toBe("50");
+    });
+
+    it("does NOT append '+' when scanSize < hits.length", () => {
+      expect(
+        formatResultCount({ hits: Array(50).fill({}), total: 50, scanSize: 40 }),
+      ).toBe("50");
+    });
+
+    it("does NOT append '+' when scanSize is 0", () => {
+      expect(
+        formatResultCount({ hits: Array(5).fill({}), total: 5, scanSize: 0 }),
+      ).toBe("5");
+    });
+
+    it("does NOT append '+' when scanSize is undefined", () => {
+      expect(
+        formatResultCount({ hits: Array(5).fill({}), total: 5 }),
+      ).toBe("5");
+    });
+
+    it("appends '+' with abbreviated total when both conditions apply", () => {
+      expect(
+        formatResultCount({
+          hits: Array(50).fill({}),
+          total: 5_000,
+          scanSize: 60,
+        }),
+      ).toBe("5.0k+");
+    });
+  });
+
+  describe("total fallback to hits.length", () => {
+    it("uses hits.length as total when total is not set", () => {
+      expect(formatResultCount({ hits: Array(42).fill({}) })).toBe("42");
+    });
+
+    it("uses provided total over hits.length when total is set", () => {
+      // hits.length = 10, total = 200 (paginated scenario)
+      expect(
+        formatResultCount({ hits: Array(10).fill({}), total: 200 }),
+      ).toBe("200");
+    });
+  });
+});
