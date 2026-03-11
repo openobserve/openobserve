@@ -104,6 +104,13 @@
               </div>
             </div>
           </template>
+          <!-- No values found -->
+          <div
+            v-else-if="!hasPercentiles"
+            class="q-pl-md q-py-xs text-subtitle2"
+          >
+            {{ percentileErrMsg || "No values found" }}
+          </div>
         </template>
         <FieldValuesPanel
           v-else
@@ -186,6 +193,7 @@ const {
   isLoading: durationPercentilesLoading,
   fetchPercentiles,
   cancelFetch: cancelPercentileFetch,
+  errMsg: percentileErrMsg,
 } = useDurationPercentiles();
 
 const hasPercentiles = computed(() =>
