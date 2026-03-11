@@ -263,11 +263,6 @@ const getBaseFilters = () => {
     }
   });
 
-  // Add error filter if showErrorOnly is enabled
-  if (showErrorOnly.value) {
-    baseFilters.push("span_status = 'ERROR'");
-  }
-
   // Add user-provided filters from query editor, parsing any human-readable
   // duration values (e.g. '1.50ms') back to raw microseconds for SQL.
   if (props.filter?.trim().length) {
