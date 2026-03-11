@@ -306,7 +306,8 @@ jobs:
             browser: "chrome"
             run_files: 
               [
-                "dashboard-table-pagination.spec.js"
+                "dashboard-table-pagination.spec.js",
+                "dashboard-series-color-multiwindow.spec.js",
               ]
           - testfolder: "Dashboards-Panel-Level-DateTime-Config"
             browser: "chrome"
