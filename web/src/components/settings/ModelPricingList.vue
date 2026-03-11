@@ -305,13 +305,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
         <q-btn
+          v-if="selectedCount > 0"
           class="o2-secondary-button q-ml-sm tw:h-[36px]"
           no-caps
           flat
           icon="upload"
-          label="Export All"
-          @click="exportAll"
-          data-test="model-pricing-export-all-btn"
+          :label="`Export (${selectedCount})`"
+          @click="exportSelected"
+          data-test="model-pricing-export-selected-btn"
+        />
+        <q-btn
+          v-if="selectedCount > 0"
+          class="o2-secondary-button q-ml-sm tw:h-[36px]"
+          no-caps
+          flat
+          :icon="outlinedDelete"
+          :label="`Delete (${selectedCount})`"
+          color="negative"
+          @click="confirmDeleteSelected"
+          data-test="model-pricing-delete-selected-btn"
         />
         <q-btn
           class="o2-secondary-button q-ml-sm tw:h-[36px]"
@@ -347,6 +359,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'width: 100%'
       "
     >
+      <template #header-cell-select>
+        <q-th style="width: 40px; text-align: center;">
+          <q-checkbox
+            :model-value="allSelected"
+            :indeterminate="someSelected"
+            dense
+            @update:model-value="toggleSelectAll"
+            data-test="model-pricing-select-all"
+          />
+        </q-th>
+      </template>
+
       <template #no-data>
         <div class="full-width column flex-center q-mt-xs full-height" style="font-size: 1.5rem">
           <div class="text-subtitle1 q-mb-sm">No model pricing definitions</div>
@@ -380,7 +404,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{ 'inherited-row': props.row.inherited }"
         >
           <q-td v-for="col in columns" :key="col.name" :props="props" :style="col.style">
-            <template v-if="col.name === 'name'">
+            <template v-if="col.name === 'select'">
+              <q-checkbox
+                v-if="!props.row.inherited"
+                :model-value="selectedIds.has(props.row.id)"
+                dense
+                @update:model-value="toggleSelect(props.row.id)"
+                :data-test="`model-pricing-select-${props.rowIndex}`"
+              />
+            </template>
+            <template v-else-if="col.name === 'name'">
               <div class="o2-table-cell-content tw:font-semibold tw:flex tw:items-center tw:gap-2">
                 {{ props.row.name }}
                 <q-badge
@@ -506,8 +539,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #bottom="scope">
         <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-          <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
-            {{ resultTotal }} models
+          <div class="o2-table-footer-title tw:flex tw:items-center tw:gap-4 tw:mr-md">
+            <span>{{ resultTotal }} models</span>
+            <span v-if="selectedCount > 0" class="text-primary tw:font-semibold">
+              {{ selectedCount }} selected
+            </span>
           </div>
         </div>
       </template>
@@ -534,6 +570,7 @@ const filterQuery = ref("");
 const showEditor = ref(false);
 const showImportModelPricingPage = ref(false);
 const saving = ref(false);
+const selectedIds = ref<Set<string>>(new Set());
 
 // Per-tier add-price state: array of { key, value } indexed by tier position
 const addState = ref<Array<{ key: string; value: number }>>([{ key: "", value: 0 }]);
@@ -588,6 +625,7 @@ const operators = [
 ];
 
 const columns: any[] = [
+  { name: "select", label: "", field: "select", align: "center", style: "width: 40px" },
   { name: "name", label: "Model", field: "name", align: "left", sortable: true },
   { name: "match_pattern", label: "Pattern", field: "match_pattern", align: "left", style: "max-width: 300px; overflow: hidden;" },
   { name: "pricing", label: "Input / Output (per 1M)", field: "pricing", align: "left" },
@@ -598,6 +636,37 @@ const columns: any[] = [
 const pagination = ref({ rowsPerPage: 20 });
 
 const resultTotal = computed(() => filteredModels.value.length);
+
+// Selection helpers — only own (non-inherited) models can be selected
+const selectableModels = computed(() =>
+  filteredModels.value.filter((m: any) => !m.inherited)
+);
+const selectedCount = computed(() => selectedIds.value.size);
+const allSelected = computed(() =>
+  selectableModels.value.length > 0 &&
+  selectableModels.value.every((m: any) => selectedIds.value.has(m.id))
+);
+const someSelected = computed(() =>
+  selectedCount.value > 0 && !allSelected.value
+);
+
+function toggleSelectAll() {
+  if (allSelected.value) {
+    selectedIds.value = new Set();
+  } else {
+    selectedIds.value = new Set(selectableModels.value.map((m: any) => m.id));
+  }
+}
+
+function toggleSelect(id: string) {
+  const next = new Set(selectedIds.value);
+  if (next.has(id)) {
+    next.delete(id);
+  } else {
+    next.add(id);
+  }
+  selectedIds.value = next;
+}
 
 const filteredModels = computed(() => {
   let items = models.value;
@@ -862,13 +931,15 @@ function exportModel(model: any) {
   URL.revokeObjectURL(url);
 }
 
-function exportAll() {
-  const ownModels = models.value.filter((m: any) => !m.inherited);
-  if (ownModels.length === 0) {
-    q.notify({ type: "warning", message: "No model pricing definitions to export" });
+function exportSelected() {
+  const selected = models.value.filter(
+    (m: any) => !m.inherited && selectedIds.value.has(m.id)
+  );
+  if (selected.length === 0) {
+    q.notify({ type: "warning", message: "No models selected to export" });
     return;
   }
-  const exportData = ownModels.map((m: any) => ({
+  const exportData = selected.map((m: any) => ({
     name: m.name,
     match_pattern: m.match_pattern,
     enabled: m.enabled,
@@ -885,6 +956,31 @@ function exportAll() {
   link.download = "model_pricing_export.json";
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function confirmDeleteSelected() {
+  const count = selectedIds.value.size;
+  q.dialog({
+    title: "Delete Selected Models",
+    message: `Are you sure you want to delete ${count} selected model${count !== 1 ? "s" : ""}?`,
+    cancel: true,
+    persistent: true,
+  }).onOk(async () => {
+    let successCount = 0;
+    for (const id of selectedIds.value) {
+      try {
+        await modelPricingService.delete(orgIdentifier.value, id);
+        successCount++;
+      } catch (e: any) {
+        q.notify({ type: "negative", message: `Failed to delete model: ${e.message}` });
+      }
+    }
+    if (successCount > 0) {
+      q.notify({ type: "positive", message: `Deleted ${successCount} model${successCount !== 1 ? "s" : ""}` });
+      selectedIds.value = new Set();
+      await fetchModels();
+    }
+  });
 }
 
 onBeforeMount(() => {
