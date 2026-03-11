@@ -202,7 +202,7 @@ export const convertServiceGraphToTree = (
   graphData: { nodes: any[]; edges: any[] },
   layoutType: string = 'horizontal',
   isDarkMode: boolean = true,
-  edgeBaselines?: Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>
+  _edgeBaselines?: Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>
 ) => {
   // Build adjacency map for edges
   const edgesMap = new Map<string, any[]>();
@@ -241,19 +241,9 @@ export const convertServiceGraphToTree = (
     .filter((r: number) => r > 0)
     .sort((a: number, b: number) => a - b);
 
-  // Edge P95 latencies in ms
-  const allLatenciesMs = graphData.edges
-    .map((e: any) => (e.p95_latency_ns ?? 0) / 1000000)
-    .filter((l: number) => l > 0)
-    .sort((a: number, b: number) => a - b);
-
   const errP50 = percentile(allErrorRates, 50);
   const errP75 = percentile(allErrorRates, 75);
   const errP90 = percentile(allErrorRates, 90);
-
-  const latP50 = percentile(allLatenciesMs, 50);
-  const latP75 = percentile(allLatenciesMs, 75);
-  const latP90 = percentile(allLatenciesMs, 90);
 
   const green = isDarkMode ? "#10b981" : "#52c41a";
 
@@ -266,14 +256,6 @@ export const convertServiceGraphToTree = (
     return green;
   };
 
-  // Edge color: latency relative to the tree's latency baseline
-  const getEdgeColor = (p95Ms: number): string => {
-    if (allLatenciesMs.length === 0 || p95Ms === 0) return isDarkMode ? "#4a5568" : "#d9d9d9";
-    if (p95Ms >= latP90) return "#f5222d";  // Red — top 10%
-    if (p95Ms >= latP75) return "#ff7875";  // Light red — top 25%
-    if (p95Ms >= latP50) return "#ffc069";  // Light orange — above median
-    return green; // Below median — healthy
-  };
 
   // Track all visited nodes across all trees to find orphaned components
   const globalVisited = new Set<string>();
@@ -313,33 +295,20 @@ export const convertServiceGraphToTree = (
     const nodeErrorRate = node.error_rate ?? (node.requests > 0 ? (node.errors / node.requests) * 100 : 0);
     const borderColor = getNodeColor(nodeErrorRate);
 
-    // Edge line: colored by this edge's P95 latency vs 24h baseline (if available), else percentile-relative
-    const edgeP95Ms = incomingEdge ? (incomingEdge.p95_latency_ns || 0) / 1000000 : 0;
-    let edgeColor: string;
-    if (!incomingEdge) {
-      edgeColor = isDarkMode ? "#4a5568" : "#d9d9d9";
-    } else {
-      const bKey = `${incomingEdge.from}->${incomingEdge.to}`;
-      const baseline = edgeBaselines?.get(bKey);
-      if (baseline && baseline.p95_avg > 0) {
-        const ratio = (incomingEdge.p95_latency_ns || 0) / baseline.p95_avg;
-        edgeColor = ratio > 2.0 ? "#ff7875" : ratio > 1.5 ? "#ffc069" : "#52c41a";
-      } else {
-        edgeColor = getEdgeColor(edgeP95Ms);
-      }
-    }
+    // Tree edges are always neutral gray — color belongs on node borders only
+    const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
 
-    // Dynamic size based on request volume — matches graph view formula
-    const nodeRequests = node.requests ?? totalRequests;
-    const symbolSize = Math.max(40, Math.min(80, Math.log10(nodeRequests + 1) * 20));
+    // Reuse the same SVG icon as graph view (circle + service-type icon)
+    const iconDataUrl = getServiceIconSvg(node.id, isDarkMode, borderColor);
 
     return {
       name: node.label || node.id,
       value: totalRequests,
-      symbolSize: symbolSize,
+      symbol: iconDataUrl,
+      symbolSize: 30, // Fixed size so ECharts tree layout spaces nodes consistently
       lineStyle: {
         color: edgeColor,
-        width: incomingEdge ? Math.max(1, Math.min(4, 1 + (totalRequests || 0) / 150)) : 1.5,
+        width: 2,
       },
       itemStyle: {
         color: isDarkMode ? '#1a1f2e' : '#ffffff',
@@ -381,24 +350,23 @@ export const convertServiceGraphToTree = (
       },
       label: {
         show: true,
-        position: 'inside',
+        position: layoutType === 'vertical' ? 'bottom' : 'right',
+        distance: 6,
         formatter: (params: any) => {
           return `{name|${params.name}}\n{requests|${formatNumber(totalRequests)} req}`;
         },
         rich: {
           name: {
-            fontSize: 11,
-            fontWeight: '500',
-            color: isDarkMode ? '#e4e7eb' : '#333',
-            align: 'center',
-            lineHeight: 14,
+            fontSize: 12,
+            fontWeight: '600',
+            color: isDarkMode ? '#e4e7eb' : '#1f2937',
+            lineHeight: 16,
           },
           requests: {
-            fontSize: 9,
+            fontSize: 10,
             fontWeight: 'normal',
-            color: isDarkMode ? '#9ca3af' : '#666',
-            align: 'center',
-            lineHeight: 12,
+            color: isDarkMode ? '#9ca3af' : '#6b7280',
+            lineHeight: 14,
           },
         },
       },
@@ -476,28 +444,37 @@ export const convertServiceGraphToTree = (
         layout: 'orthogonal',
         orient: layoutType === 'vertical' ? 'TB' : 'LR',
         // Maximize layout space so siblings spread further apart
-        left: layoutType === 'vertical' ? '1%' : '3%',
-        right: layoutType === 'vertical' ? '1%' : '3%',
-        top: layoutType === 'vertical' ? '3%' : '1%',
-        bottom: layoutType === 'vertical' ? '3%' : '1%',
+        left: layoutType === 'vertical' ? '2%' : '3%',
+        right: layoutType === 'vertical' ? '2%' : '20%',
+        top: layoutType === 'vertical' ? '8%' : '2%',
+        bottom: layoutType === 'vertical' ? '8%' : '2%',
         initialTreeDepth: -1,
-        symbol: 'circle',
-        symbolSize: 50, // Default; each node overrides with dynamic size
-        roam: true, // Enable panning and zooming
-        selectedMode: 'single', // Enable single node selection
+        symbolSize: 30,
+        roam: true,
+        selectedMode: 'single',
         label: {
-          position: 'inside',
-          fontSize: 11,
+          position: layoutType === 'vertical' ? 'bottom' : 'right',
+          distance: 6,
+          fontSize: 12,
           rotate: 0,
         },
         leaves: {
           label: {
-            position: 'inside',
-            fontSize: 11,
+            position: layoutType === 'vertical' ? 'bottom' : 'right',
+            distance: 6,
+            fontSize: 12,
             rotate: 0,
           },
         },
-        expandAndCollapse: false, // Disable collapse on click - clicking only selects the node
+        emphasis: {
+          focus: 'relative', // dims nodes not connected to the hovered node
+        },
+        blur: {
+          itemStyle: { opacity: 0.15 },
+          label: { opacity: 0.15 },
+          lineStyle: { opacity: 0.08 },
+        },
+        expandAndCollapse: false,
         animationDuration: 550,
         animationDurationUpdate: 750,
       },
@@ -1145,6 +1122,77 @@ export const convertServiceGraphToNetwork = (
     console.log('[convertServiceGraphToNetwork] Using cached positions for', cachedPositions.size, 'nodes');
   }
 
+  // ── Dynamic label positioning ──────────────────────────────────────────────
+  // For each node with a known position: place the label away from the neighbor
+  // centroid (into open space). Prefers 'right' and 'bottom' — only falls back
+  // to 'left' or 'top' when the node is significantly closer to the opposite edge.
+  {
+    const adjMap = new Map<string, string[]>();
+    nodes.forEach((n: any) => adjMap.set(n.id, []));
+    graphData.edges.forEach((e: any) => {
+      adjMap.get(e.from)?.push(e.to);
+      adjMap.get(e.to)?.push(e.from);
+    });
+
+    nodes.forEach((node: any) => {
+      if (node.x == null || node.y == null) return;
+
+      const neighbors = adjMap.get(node.id) || [];
+      let sumDx = 0, sumDy = 0, validNeighbors = 0;
+
+      neighbors.forEach((nbrId: string) => {
+        const nbr = nodes.find((n: any) => n.id === nbrId);
+        if (nbr && nbr.x != null && nbr.y != null) {
+          sumDx += nbr.x - node.x;
+          sumDy += nbr.y - node.y;
+          validNeighbors++;
+        }
+      });
+
+      const rightSpace  = canvasWidth  - node.x;
+      const bottomSpace = canvasHeight - node.y;
+
+      let labelPos: string;
+
+      if (validNeighbors === 0) {
+        // Isolated node: pick side with most canvas room, prefer right > bottom
+        labelPos = rightSpace >= bottomSpace ? 'right' : 'bottom';
+      } else {
+        const awayX = -sumDx; // direction away from neighbour centroid
+        const awayY = -sumDy;
+        const absX  = Math.abs(awayX);
+        const absY  = Math.abs(awayY);
+
+        if (absX >= absY) {
+          // Horizontal dominant
+          if (awayX > 0) {
+            // Push right — only fall back to 'bottom' if nearly no room on right
+            labelPos = rightSpace > 80 ? 'right' : 'bottom';
+          } else {
+            // Push left — prefer 'left' only when clearly more room; otherwise 'bottom'
+            labelPos = node.x > rightSpace * 1.6 ? 'left' : 'bottom';
+          }
+        } else {
+          // Vertical dominant
+          if (awayY > 0) {
+            // Push down — only fall back to 'right' if nearly no room below
+            labelPos = bottomSpace > 60 ? 'bottom' : 'right';
+          } else {
+            // Push up — prefer 'top' only when clearly more room; otherwise 'right'
+            labelPos = node.y > bottomSpace * 1.6 ? 'top' : 'right';
+          }
+        }
+      }
+
+      node.label = {
+        show: true,
+        position: labelPos,
+        // Shift horizontal labels slightly upward so text clears the node boundary
+        offset: (labelPos === 'right' || labelPos === 'left') ? [0, -14] : [0, 4],
+      };
+    });
+  }
+
   // Use "none" layout when we have fixed positions (D3-force computed or cached)
   const layoutMode = "none";
 
@@ -1189,7 +1237,10 @@ export const convertServiceGraphToNetwork = (
           formatter: (params: any) => params.data.name,
           fontSize: 12,
           fontWeight: 500,
-          color: isDarkMode ? '#e4e7eb' : '#374151',
+          color: isDarkMode ? '#e4e7eb' : '#1f2937',
+          // White outline so labels remain readable over any background color
+          textBorderColor: isDarkMode ? 'rgba(15, 20, 35, 0.85)' : 'rgba(255, 255, 255, 0.92)',
+          textBorderWidth: 3,
         },
         emphasis: {
           focus: "adjacency",
