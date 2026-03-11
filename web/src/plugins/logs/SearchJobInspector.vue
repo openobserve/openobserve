@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-base tw:font-small"
                   :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                 >
-                  Events
+                  Scanned Events
                 </div>
                 <div
                   class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-[10px]"
                   :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
                 >
-                  Scanned in total
+                  Scanned events for this query
                 </div>
               </div>
             </div>

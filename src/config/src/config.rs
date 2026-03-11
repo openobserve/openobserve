@@ -1894,20 +1894,6 @@ pub struct Log {
     // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%SZ
     #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
     pub local_time_format: String,
-    #[env_config(name = "ZO_EVENTS_ENABLED", default = false)]
-    pub events_enabled: bool,
-    #[env_config(
-        name = "ZO_EVENTS_AUTH",
-        default = "cm9vdEBleGFtcGxlLmNvbTpUZ0ZzZFpzTUZQdzg2SzRK"
-    )]
-    pub events_auth: String,
-    #[env_config(
-        name = "ZO_EVENTS_EP",
-        default = "https://api.openobserve.ai/api/debug/events/_json"
-    )]
-    pub events_url: String,
-    #[env_config(name = "ZO_EVENTS_BATCH_SIZE", default = 10)]
-    pub events_batch_size: usize,
 }
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
