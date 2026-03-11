@@ -36,9 +36,19 @@ export class MetricsPage {
 
     }
     async gotoMetricsPage() {
-
         await this.metricsPageMenu.click();
 
+        // Verify navigation succeeded — sidebar click may silently fail on cloud
+        await this.page.waitForTimeout(2000);
+        if (!this.page.url().includes('/metrics')) {
+            const orgId = process.env.ORGNAME || 'default';
+            await this.page.goto(
+                `${process.env.ZO_BASE_URL}/web/metrics?org_identifier=${orgId}`
+            );
+        }
+
+        // Wait for a key metrics page element to be visible before proceeding
+        await this.page.locator(this.applyButton).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     }
 
     async metricsPageValidation() {

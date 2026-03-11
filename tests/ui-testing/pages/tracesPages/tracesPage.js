@@ -123,8 +123,12 @@ export class TracesPage {
   }
 
   async navigateToTraces() {
-
     await this.tracesMenuItem.click();
+    // Verify navigation succeeded — sidebar click may silently fail on cloud
+    await this.page.waitForTimeout(2000);
+    if (!this.page.url().includes('/traces')) {
+      await this.navigateToTracesUrl();
+    }
   }
 
   async validateTracesPage() {

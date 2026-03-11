@@ -2,7 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
-const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
+
 
 test.describe("Metrics testcases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -235,11 +235,9 @@ test.describe("Metrics testcases", () => {
     testLogger.info('Auto-refresh interval test completed');
   });
 
-  // SKIP on cloud: collapsible toggle selector not found on alpha1 — field-list-collapsed-icon element missing
   test("Field list collapse and expand functionality", {
     tag: ['@metrics', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    test.skip(isCloudEnvironment(), 'Collapsible toggle element not present on cloud — selector mismatch');
     testLogger.info('Testing field list collapse/expand');
 
     // Try to find any collapsible element using page object
@@ -308,11 +306,9 @@ test.describe("Metrics testcases", () => {
     }
   });
 
-  // SKIP on cloud: findSearchInput() returns null — field search input selector not found on alpha1
   test("Search metrics in field list", {
     tag: ['@metrics', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    test.skip(isCloudEnvironment(), 'Field search input element not found on cloud — selector mismatch');
     testLogger.info('Testing metrics search in field list');
 
     // Find search input using page object method
