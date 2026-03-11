@@ -460,6 +460,8 @@ const onDataZoom = ({
       endTime: props.timeRange.endTime,
     };
 
+    searchObj.meta.metricsRangeFilters.clear();
+
     // For Rate and Errors panels: use placeholder values to indicate time-based selection
     // Volume/Error analysis will use the time range, not Y-axis values
     if (panelTitle === "Rate" || panelTitle === "Errors") {
