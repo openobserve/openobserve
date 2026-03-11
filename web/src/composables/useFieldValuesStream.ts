@@ -189,9 +189,11 @@ const useFieldValuesStream = () => {
         fieldValues.value[fieldName].values = isAppend
           ? aggregatedArray
           : aggregatedArray.slice(0, pageSize);
-        fieldValues.value[fieldName].hasMore = Object.values(
-          streamFieldValues.value[fieldName],
-        ).some((s) => s.hasMore);
+        fieldValues.value[fieldName].hasMore = isAppend
+          ? Object.values(streamFieldValues.value[fieldName]).some(
+              (s) => s.hasMore,
+            )
+          : aggregatedArray.length >= pageSize;
       }
 
       fieldValues.value[fieldName].isLoading = false;
