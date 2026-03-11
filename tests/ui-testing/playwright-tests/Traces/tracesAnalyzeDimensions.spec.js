@@ -5,6 +5,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 test.describe("Traces Analyze Dimensions testcases", () => {
   let pm;
@@ -63,6 +64,7 @@ test.describe("Traces Analyze Dimensions testcases", () => {
   test("P0: Insights button opens analysis dashboard with 3 tabs", {
     tag: ['@tracesAnalyze', '@traces', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), 'RED metrics dashboard not visible on cloud');
     testLogger.info('Verifying insights button opens dashboard with Rate/Latency/Errors tabs');
 
     await searchAndOpenInsightsDashboard();
@@ -87,6 +89,7 @@ test.describe("Traces Analyze Dimensions testcases", () => {
   test("P0: Error-only toggle filters trace results", {
     tag: ['@tracesAnalyze', '@traces', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), 'RED metrics dashboard not visible on cloud');
     testLogger.info('Testing error-only toggle functionality');
 
     await searchAndAssertResults();
@@ -115,6 +118,7 @@ test.describe("Traces Analyze Dimensions testcases", () => {
   test("P1: Tab switching works and loads chart content", {
     tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), 'RED metrics dashboard not visible on cloud');
     testLogger.info('Testing tab navigation and chart content across all tabs');
 
     await searchAndOpenInsightsDashboard();
@@ -152,9 +156,11 @@ test.describe("Traces Analyze Dimensions testcases", () => {
     await pm.tracesPage.closeAnalysisDashboard();
   });
 
+  // SKIP on cloud: RED metrics dashboard not visible on alpha1 — ensureMetricsDashboardVisible() returns false
   test("P1: Dashboard close button works", {
     tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), 'RED metrics dashboard not visible on cloud');
     testLogger.info('Testing dashboard close button functionality');
 
     await searchAndOpenInsightsDashboard();
@@ -176,6 +182,7 @@ test.describe("Traces Analyze Dimensions testcases", () => {
   test("P1: Dimension sidebar visible, collapse, and expand", {
     tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), 'RED metrics dashboard not visible on cloud');
     testLogger.info('Testing dimension sidebar visibility and collapse/expand');
 
     await searchAndOpenInsightsDashboard();
@@ -207,6 +214,7 @@ test.describe("Traces Analyze Dimensions testcases", () => {
   test("P1: Dimension search input filters checkboxes", {
     tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), 'RED metrics dashboard not visible on cloud');
     testLogger.info('Testing dimension search filtering');
 
     await searchAndOpenInsightsDashboard();
@@ -242,6 +250,7 @@ test.describe("Traces Analyze Dimensions testcases", () => {
   test("P1: Toggling a dimension checkbox updates chart content", {
     tag: ['@tracesAnalyze', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), 'RED metrics dashboard not visible on cloud');
     testLogger.info('Testing dimension checkbox toggle triggers chart update');
 
     await searchAndOpenInsightsDashboard();
@@ -272,6 +281,7 @@ test.describe("Traces Analyze Dimensions testcases", () => {
   test("P2: Brush selection on chart enables comparison mode", {
     tag: ['@tracesAnalyze', '@traces', '@edge', '@P2', '@all']
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), 'RED metrics dashboard not visible on cloud');
     testLogger.info('Testing brush selection enables comparison mode');
 
     await searchAndAssertResults();
@@ -300,6 +310,7 @@ test.describe("Traces Analyze Dimensions testcases", () => {
   test("P2: Dashboard loading state appears before content", {
     tag: ['@tracesAnalyze', '@traces', '@edge', '@P2', '@all']
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), 'RED metrics dashboard not visible on cloud');
     testLogger.info('Testing dashboard loading state');
 
     await searchAndAssertResults();
