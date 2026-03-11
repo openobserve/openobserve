@@ -101,34 +101,29 @@ async fn reload_org(org_id: &str) {
 
 // ── Public cache API ──────────────────────────────────────────────────────────
 
-/// Return the pre-loaded pricing entries for an org with `META_ORG` fallback.
-///
-/// Resolution: org-specific entries first, then `META_ORG` entries appended as fallback.
-/// Since `find_pricing_sync_at` picks the first regex match, org-specific entries naturally
-/// take priority over inherited meta org entries.
+/// Return the effective pricing entries for an org: org-specific entries merged with `META_ORG`
+/// entries. Both sets are treated equally — there is no automatic priority. Admins control
+/// which entries are active via the `enabled` flag. To customise an inherited entry, duplicate
+/// it into the org and disable the inherited one.
 ///
 /// Returns an `Arc` so the caller gets a cheap refcount bump instead of cloning.
 pub fn get_org_pricing_entries(org_id: &str) -> Arc<Vec<CachedModelPricing>> {
     let org_entries = CACHE.get(org_id).map(|e| Arc::clone(e.value()));
-    let default_entries = if org_id != META_ORG {
+    let meta_entries = if org_id != META_ORG {
         CACHE.get(META_ORG).map(|e| Arc::clone(e.value()))
     } else {
         None
     };
 
-    match (org_entries, default_entries) {
-        // Org has entries, no defaults — return org entries directly (zero-copy).
+    match (org_entries, meta_entries) {
         (Some(org), None) => org,
-        // No org entries, has defaults — return defaults directly (zero-copy).
-        (None, Some(def)) => def,
-        // Both present — merge: org first, then defaults.
-        (Some(org), Some(def)) => {
-            let mut merged = Vec::with_capacity(org.len() + def.len());
+        (None, Some(meta)) => meta,
+        (Some(org), Some(meta)) => {
+            let mut merged = Vec::with_capacity(org.len() + meta.len());
             merged.extend_from_slice(&org);
-            merged.extend_from_slice(&def);
+            merged.extend_from_slice(&meta);
             Arc::new(merged)
         }
-        // Neither — empty.
         (None, None) => Arc::default(),
     }
 }
@@ -753,10 +748,9 @@ mod tests {
     // These tests share the static CACHE so they use a single test to avoid
     // parallel-test interference on the META_ORG key.
     #[test]
-    fn test_default_org_fallback() {
-        // Setup: insert META_ORG entries
-        let default_entries = Arc::new(build_entries(vec![ModelPricingDefinition {
-            name: "gpt-4o-default".to_string(),
+    fn test_meta_org_merge() {
+        let meta_entries = Arc::new(build_entries(vec![ModelPricingDefinition {
+            name: "gpt-4o-meta".to_string(),
             match_pattern: "(?i)^gpt-4o".to_string(),
             enabled: true,
             tiers: vec![PricingTierDefinition {
@@ -766,18 +760,18 @@ mod tests {
             }],
             ..Default::default()
         }]));
-        CACHE.insert(META_ORG.to_string(), default_entries);
+        CACHE.insert(META_ORG.to_string(), meta_entries);
 
-        // --- Case 1: Org with no entries inherits META_ORG ---
-        let entries = get_org_pricing_entries("test_fallback_org_empty");
+        // --- Case 1: Org with no own entries gets META_ORG entries ---
+        let entries = get_org_pricing_entries("test_merge_org_empty");
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].definition.name, "gpt-4o-default");
+        assert_eq!(entries[0].definition.name, "gpt-4o-meta");
 
-        // --- Case 2: META_ORG itself does NOT duplicate ---
+        // --- Case 2: META_ORG itself does NOT include itself twice ---
         let entries = get_org_pricing_entries(META_ORG);
         assert_eq!(entries.len(), 1);
 
-        // --- Case 3: Org-specific entries take priority, defaults appended ---
+        // --- Case 3: Org with own entries gets both merged (no implicit priority) ---
         let org_entries = Arc::new(build_entries(vec![ModelPricingDefinition {
             name: "gpt-4o-acme".to_string(),
             match_pattern: "(?i)^gpt-4o".to_string(),
@@ -789,19 +783,18 @@ mod tests {
             }],
             ..Default::default()
         }]));
-        CACHE.insert("test_fallback_org_acme".to_string(), org_entries);
+        CACHE.insert("test_merge_org_acme".to_string(), org_entries);
 
-        let entries = get_org_pricing_entries("test_fallback_org_acme");
+        let entries = get_org_pricing_entries("test_merge_org_acme");
         assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].definition.name, "gpt-4o-acme");
-        assert_eq!(entries[1].definition.name, "gpt-4o-default");
-
-        // find_pricing_sync_at should pick the org-specific one (first match)
-        let matched = find_pricing_sync_at(&entries, "gpt-4o-2024-05-13", None);
-        assert_eq!(matched.unwrap().name, "gpt-4o-acme");
+        // Both entries are present; which one matches is determined by enabled status + sort_order,
+        // not by implicit priority between org and meta.
+        let names: Vec<&str> = entries.iter().map(|e| e.definition.name.as_str()).collect();
+        assert!(names.contains(&"gpt-4o-acme"));
+        assert!(names.contains(&"gpt-4o-meta"));
 
         // Cleanup
         CACHE.remove(META_ORG);
-        CACHE.remove("test_fallback_org_acme");
+        CACHE.remove("test_merge_org_acme");
     }
 }

@@ -13,9 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{Json, extract::Path, response::Response};
+use axum::{
+    Json,
+    extract::{Path, Query},
+    response::Response,
+};
 use config::meta::model_pricing::ModelPricingDefinition;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::model_pricing};
 
@@ -243,6 +247,97 @@ pub async fn delete(Path((org_id, model_id)): Path<(String, String)>) -> Respons
         Ok(_) => MetaHttpResponse::ok("Model pricing definition deleted"),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BuiltInQuery {
+    #[serde(default)]
+    pub search: String,
+}
+
+/// A model pricing entry from the community/built-in source.
+#[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct BuiltInModelPricingEntry {
+    pub name: String,
+    pub match_pattern: String,
+    pub tiers: Vec<config::meta::model_pricing::PricingTierDefinition>,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub provider: String,
+}
+
+/// BuiltInModelPricingResponse
+#[derive(serde::Serialize)]
+pub struct BuiltInModelPricingResponse {
+    pub models: Vec<BuiltInModelPricingEntry>,
+    pub source_url: String,
+    pub last_updated: i64,
+}
+
+/// GetBuiltInModelPricing
+///
+/// #{"ratelimit_module":"ModelPricing", "ratelimit_module_operation":"list"}#
+#[utoipa::path(
+    get,
+    path = "/{org_id}/llm/models/built-in",
+    context_path = "/api",
+    tag = "LLM",
+    operation_id = "GetBuiltInModelPricing",
+    summary = "Get built-in community model pricing definitions",
+    description = "Fetches standard model pricing from the configured community source (GitHub). Results are cached on the frontend.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("search" = Option<String>, Query, description = "Filter by name"),
+    ),
+    responses(
+        (status = 200, description = "Success"),
+        (status = 500, description = "Internal server error"),
+    ),
+)]
+pub async fn get_built_in(
+    Path(_org_id): Path<String>,
+    Query(query): Query<BuiltInQuery>,
+) -> Response {
+    use crate::service::github::GitHubDataService;
+
+    let source_url = config::get_config().common.model_pricing_source_url.clone();
+
+    let github_service = GitHubDataService::new();
+
+    let models: Vec<BuiltInModelPricingEntry> = match github_service
+        .fetch_json::<Vec<BuiltInModelPricingEntry>>(&source_url)
+        .await
+    {
+        Ok(m) => m,
+        Err(e) => {
+            log::error!("[model_pricing] failed to fetch built-in models from {source_url}: {e}");
+            return MetaHttpResponse::internal_error(format!(
+                "Failed to fetch built-in model pricing: {e}"
+            ));
+        }
+    };
+
+    let search = query.search.to_lowercase();
+    let models = if search.is_empty() {
+        models
+    } else {
+        models
+            .into_iter()
+            .filter(|m| {
+                m.name.to_lowercase().contains(&search)
+                    || m.provider.to_lowercase().contains(&search)
+                    || m.description.to_lowercase().contains(&search)
+            })
+            .collect()
+    };
+
+    MetaHttpResponse::json(BuiltInModelPricingResponse {
+        models,
+        source_url,
+        last_updated: chrono::Utc::now().timestamp(),
+    })
 }
 
 /// Max compiled NFA size for user-supplied regex patterns (64 KB).

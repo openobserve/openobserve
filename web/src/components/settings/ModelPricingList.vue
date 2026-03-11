@@ -16,12 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px)">
+
+    <!-- Full-page Import View -->
+    <ImportModelPricing
+      v-if="showImportModelPricingPage"
+      :existing-models="models.filter((m: any) => !m.inherited).map((m: any) => m.name)"
+      @cancel:hideform="showImportModelPricingPage = false"
+      @update:list="fetchModels"
+    />
+
+    <!-- Main List View -->
+    <div v-if="!showImportModelPricingPage">
+
     <!-- Editor Dialog -->
     <q-dialog v-model="showEditor" persistent>
       <q-card style="min-width: 600px; max-width: 800px">
         <q-card-section>
           <div class="text-h6">
-            {{ editingModel?.id ? "Edit Model Pricing" : (editingModel?.name ? "Override Inherited Pricing" : "New Model Pricing") }}
+            {{ editingModel?.id ? "Edit Model Pricing" : "New Model Pricing" }}
           </div>
         </q-card-section>
 
@@ -32,7 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             outlined
             :rules="[(val: string) => !!val?.trim() || 'Model name is required']"
-            hint='Display name (e.g., "GPT-4o", "Claude Sonnet 4.6")'
+            reactive-rules
+            lazy-rules
             data-test="model-pricing-name-input"
           />
 
@@ -42,10 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Match Pattern (Regex) *"
             dense
             outlined
-            :error="!!patternError"
-            :error-message="patternError"
-            :rules="[(val: string) => !!val?.trim() || 'Match pattern is required']"
-            hint='Exact case-insensitive match: (?i)^(modelname)$'
+            :rules="[
+              (val: string) => !!val?.trim() || 'Match pattern is required',
+              () => !patternError || patternError,
+            ]"
+            reactive-rules
+            lazy-rules
             data-test="model-pricing-pattern-input"
           >
             <template #append>
@@ -290,6 +305,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
         <q-btn
+          class="o2-secondary-button q-ml-sm tw:h-[36px]"
+          no-caps
+          flat
+          icon="upload"
+          label="Export All"
+          @click="exportAll"
+          data-test="model-pricing-export-all-btn"
+        />
+        <q-btn
+          class="o2-secondary-button q-ml-sm tw:h-[36px]"
+          no-caps
+          flat
+          icon="download"
+          label="Import Models"
+          @click="openImport"
+          data-test="model-pricing-import-btn"
+        />
+        <q-btn
           class="o2-primary-button q-ml-sm tw:h-[36px]"
           no-caps
           flat
@@ -336,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Inherited from Meta Org
               </span>
               <span class="text-caption" style="color: #888;">
-                &mdash; These apply to all orgs. Override by creating your own definition for the same model.
+                &mdash; Read-only. Duplicate to create your own copy, then disable this one if needed.
               </span>
             </div>
           </q-td>
@@ -388,6 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else-if="col.name === 'actions'">
               <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+                <!-- Own entries: edit + delete + duplicate + export -->
                 <template v-if="!props.row.inherited">
                   <q-btn
                     padding="sm"
@@ -406,24 +440,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     round
                     flat
+                    icon="content_copy"
+                    title="Duplicate"
+                    @click.stop="duplicateModel(props.row)"
+                    data-test="model-pricing-duplicate-btn"
+                  />
+                  <q-btn
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    icon="upload"
+                    title="Export"
+                    @click.stop="exportModel(props.row)"
+                    data-test="model-pricing-export-btn"
+                  />
+                  <q-btn
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
                     :icon="outlinedDelete"
                     title="Delete"
                     @click.stop="confirmDelete(props.row)"
                     data-test="model-pricing-delete-btn"
                   />
                 </template>
+                <!-- Inherited entries: duplicate + export (read-only otherwise) -->
                 <template v-else>
                   <q-btn
-                    flat
-                    no-caps
-                    dense
+                    padding="sm"
+                    unelevated
                     size="sm"
-                    label="Override"
-                    color="primary"
+                    round
+                    flat
                     icon="content_copy"
-                    title="Create an org-specific override for this model"
-                    @click.stop="overrideInherited(props.row)"
-                    data-test="model-pricing-override-btn"
+                    title="Duplicate to this org"
+                    @click.stop="duplicateModel(props.row)"
+                    data-test="model-pricing-duplicate-btn"
+                  />
+                  <q-btn
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    icon="upload"
+                    title="Export"
+                    @click.stop="exportModel(props.row)"
+                    data-test="model-pricing-export-inherited-btn"
                   />
                 </template>
               </div>
@@ -445,22 +512,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </q-table>
+    </div> <!-- end v-if="!showImportModelPricingPage" -->
   </q-page>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch, onBeforeMount } from "vue";
+import { ref, computed, watch, onBeforeMount, onActivated } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import modelPricingService from "@/services/model_pricing";
+import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";
 
 const store = useStore();
+const router = useRouter();
 const q = useQuasar();
 
 const models = ref<any[]>([]);
 const filterQuery = ref("");
 const showEditor = ref(false);
+const showImportModelPricingPage = ref(false);
 const saving = ref(false);
 
 // Per-tier add-price state: array of { key, value } indexed by tier position
@@ -481,7 +553,10 @@ watch(
       return;
     }
     try {
-      new RegExp(pattern);
+      // Strip inline flags like (?i), (?m), (?s), (?ims) etc.
+      // These are valid in Rust regex but not in JS RegExp.
+      const jsPattern = pattern.replace(/\(\?[imsx]+\)/g, "");
+      new RegExp(jsPattern);
       patternError.value = "";
       patternPreview.value = true;
     } catch (e: any) {
@@ -730,11 +805,11 @@ async function toggleEnabled(model: any, enabled: boolean) {
   }
 }
 
-function overrideInherited(model: any) {
-  // Pre-fill the editor with the inherited model's data but as a new org-specific entry
+function duplicateModel(model: any) {
   const copy = JSON.parse(JSON.stringify(model));
-  copy.id = null; // Force new entry (not an update of the inherited one)
+  copy.id = null; // new entry
   copy.inherited = false;
+  copy.name = copy.name + " (Copy)";
   delete copy.__inheritedSectionStart;
   openEditor(copy);
 }
@@ -756,8 +831,73 @@ async function confirmDelete(model: any) {
   });
 }
 
+function openImport() {
+  showImportModelPricingPage.value = true;
+  router.push({
+    name: "modelPricing",
+    query: {
+      org_identifier: store.state.selectedOrganization?.identifier,
+      action: "import",
+    },
+  });
+}
+
+function exportModel(model: any) {
+  const exportData = {
+    name: model.name,
+    match_pattern: model.match_pattern,
+    enabled: model.enabled,
+    tiers: model.tiers,
+    sort_order: model.sort_order ?? 0,
+    valid_from: model.valid_from ?? null,
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${model.name}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportAll() {
+  const ownModels = models.value.filter((m: any) => !m.inherited);
+  if (ownModels.length === 0) {
+    q.notify({ type: "warning", message: "No model pricing definitions to export" });
+    return;
+  }
+  const exportData = ownModels.map((m: any) => ({
+    name: m.name,
+    match_pattern: m.match_pattern,
+    enabled: m.enabled,
+    tiers: m.tiers,
+    sort_order: m.sort_order ?? 0,
+    valid_from: m.valid_from ?? null,
+  }));
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "model_pricing_export.json";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 onBeforeMount(() => {
   fetchModels();
+  if (router.currentRoute.value.query.action === "import") {
+    showImportModelPricingPage.value = true;
+  }
+});
+
+onActivated(() => {
+  if (router.currentRoute.value.query.action === "import") {
+    showImportModelPricingPage.value = true;
+  }
 });
 </script>
 

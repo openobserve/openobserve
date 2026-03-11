@@ -578,6 +578,8 @@ pub fn service_routes() -> Router {
 
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
+        // NOTE: built-in MUST be registered before {model_id} to avoid "built-in" being matched as a model ID
+        .route("/{org_id}/llm/models/built-in", get(model_pricing::get_built_in))
         .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
 
         // Metrics

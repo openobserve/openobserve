@@ -31,6 +31,10 @@ const modelPricing = {
   delete: (org_identifier: string, model_id: string) => {
     return http().delete(`/api/${org_identifier}/llm/models/${model_id}`);
   },
+  getBuiltIn: (org_identifier: string, search?: string) => {
+    const params = search ? `?search=${encodeURIComponent(search)}` : "";
+    return http().get(`/api/${org_identifier}/llm/models/built-in${params}`);
+  },
 };
 
 export default modelPricing;

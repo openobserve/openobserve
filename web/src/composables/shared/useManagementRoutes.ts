@@ -57,6 +57,7 @@ const useManagementRoutes = () => {
           path: "model_pricing",
           name: "modelPricing",
           meta: {
+            keepAlive: true,
             title: "LLM Model Pricing",
           },
           component: () =>

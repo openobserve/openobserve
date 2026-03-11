@@ -1233,6 +1233,12 @@ pub struct Common {
         help = "URL for built-in regex patterns JSON source. Can be customized to use different pattern libraries."
     )]
     pub regex_patterns_source_url: String,
+    #[env_config(
+        name = "ZO_MODEL_PRICING_SOURCE_URL",
+        default = "https://raw.githubusercontent.com/openobserve/model_pricing/main/pricing.json",
+        help = "URL for built-in LLM model pricing JSON source."
+    )]
+    pub model_pricing_source_url: String,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
     #[env_config(name = "ZO_ES_VERSION", default = "")]
