@@ -171,6 +171,17 @@ export const convertMultiSQLData = async (
     }
   }
 
+  // Re-apply color mappings on the fully merged+renamed series so that
+  // comparison-against series (which now carry the "(X ago)" suffix) match
+  // any user-configured colorBySeries entries that include the suffix.
+  if (options[0]?.options?.series) {
+    applySeriesColorMappings(
+      options[0].options.series,
+      panelSchema?.config?.color?.colorBySeries,
+      store.state.theme,
+    );
+  }
+
   return options[0];
 };
 
