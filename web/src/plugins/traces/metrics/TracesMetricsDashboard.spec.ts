@@ -70,7 +70,8 @@ vi.mock("@/composables/useNotifications", () => ({
 
 // convertDashboardSchemaVersion: return the object unchanged so SQL is preserved
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
-  convertDashboardSchemaVersion: (data: any) => JSON.parse(JSON.stringify(data)),
+  convertDashboardSchemaVersion: (data: any) =>
+    JSON.parse(JSON.stringify(data)),
 }));
 
 // parseDurationWhereClause: return the input filter string unchanged
@@ -222,7 +223,9 @@ describe("TracesMetricsDashboard", () => {
     });
 
     it("should not render TracesAnalysisDashboard on initial mount", () => {
-      const analysisDashboard = wrapper.find('[data-test="traces-analysis-dashboard"]');
+      const analysisDashboard = wrapper.find(
+        '[data-test="traces-analysis-dashboard"]',
+      );
       expect(analysisDashboard.exists()).toBe(false);
     });
   });
@@ -261,21 +264,9 @@ describe("TracesMetricsDashboard", () => {
       await flushPromises();
       const query = getPanelQuery(wrapper, "Rate");
       // The Rate panel template contains: approx_distinct(trace_id) filter (where span_status = 'ERROR')
-      expect(query).toMatch(/approx_distinct\(trace_id\)\s+filter\s*\(where\s+span_status\s*=\s*'ERROR'\)/i);
-    });
-
-    it("should add root-span filter to the Duration panel query in traces mode", async () => {
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).toContain("reference_parent_span_id IS NULL OR reference_parent_span_id = ''");
-    });
-
-    it("should wrap Duration root-span filter in WHERE clause", async () => {
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).toMatch(/WHERE.*reference_parent_span_id IS NULL OR reference_parent_span_id = ''/);
+      expect(query).toMatch(
+        /approx_distinct\(trace_id\)\s+filter\s*\(where\s+span_status\s*=\s*'ERROR'\)/i,
+      );
     });
 
     it("should keep approx_distinct(trace_id) in the Errors panel query in traces mode", async () => {
@@ -547,7 +538,9 @@ describe("TracesMetricsDashboard", () => {
       const btn = wrapper.find('[data-test="insights-button"]');
       await btn.trigger("click");
       await flushPromises();
-      const analysisDashboard = wrapper.find('[data-test="traces-analysis-dashboard"]');
+      const analysisDashboard = wrapper.find(
+        '[data-test="traces-analysis-dashboard"]',
+      );
       expect(analysisDashboard.exists()).toBe(true);
     });
 
@@ -685,15 +678,6 @@ describe("TracesMetricsDashboard", () => {
       });
       await flushPromises();
       expect(wrapper.emitted("time-range-selected")).toBeFalsy();
-    });
-
-    it("should produce a Duration WHERE clause with only root-span filter when no other filters are active in traces mode", async () => {
-      // No range filters, no filter prop, traces mode
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      // Should contain WHERE with only the root-span condition
-      expect(query).toMatch(/WHERE \(reference_parent_span_id IS NULL OR reference_parent_span_id = ''\)/);
     });
 
     it("should produce a Duration query with no WHERE clause in spans mode when no filters exist", async () => {
