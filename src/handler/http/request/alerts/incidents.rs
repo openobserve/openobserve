@@ -577,8 +577,6 @@ pub async fn trigger_incident_rca(
         )
         .await;
 
-        // Usage reporting handled by try_deduct quota block above (paid orgs only).
-
         MetaHttpResponse::json(RcaResponse { rca_content })
     }
 }
