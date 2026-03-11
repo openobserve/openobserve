@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-separator />
         <q-card-section>
-          <div class="sql-query-container">
+          <div :class="['sql-query-container', store.state.theme === 'dark' ? 'sql-query-container--dark' : '']">
             <pre class="sql-query">{{ profileData?.sql || 'No SQL query available' }}</pre>
           </div>
         </q-card-section>
@@ -851,6 +851,10 @@ export default defineComponent({
   padding: 16px;
   max-height: calc(100vh - 150px);
   overflow: auto;
+}
+
+.sql-query-container--dark {
+  background-color: #1e1e1e;
 }
 
 .sql-query {

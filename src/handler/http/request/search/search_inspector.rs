@@ -332,7 +332,7 @@ pub async fn get_search_profile(
 
             if stream_summary.is_empty() {
                 for event in search_summary {
-                    si.sql = event.sql.unwrap();
+                    si.sql = event.sql.unwrap_or_default();
                     let time_range = event.time_range.unwrap_or_default();
                     si.start_time = if si.start_time.is_empty() {
                         time_range.0
@@ -347,7 +347,7 @@ pub async fn get_search_profile(
                 }
             } else {
                 for event in stream_summary {
-                    si.sql = event.sql.unwrap();
+                    si.sql = event.sql.unwrap_or_default();
                     let time_range = event.time_range.unwrap_or_default();
                     si.start_time = if si.start_time.is_empty() {
                         time_range.0

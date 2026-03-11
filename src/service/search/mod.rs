@@ -145,6 +145,17 @@ pub async fn search(
         search_role = "super".to_string();
     }
 
+    let trace_id = if trace_id.is_empty() {
+        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+            let ctx = tracing::Span::current().context();
+            ctx.span().span_context().trace_id().to_string()
+        } else {
+            ider::generate_trace_id()
+        }
+    } else {
+        trace_id.to_string()
+    };
+
     log::info!(
         "{}",
         search_inspector_fields(
@@ -157,17 +168,6 @@ pub async fn search(
                 .build()
         )
     );
-
-    let trace_id = if trace_id.is_empty() {
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-            let ctx = tracing::Span::current().context();
-            ctx.span().span_context().trace_id().to_string()
-        } else {
-            ider::generate_trace_id()
-        }
-    } else {
-        trace_id.to_string()
-    };
 
     #[cfg(not(feature = "enterprise"))]
     let req_regions = vec![];
