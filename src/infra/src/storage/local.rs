@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{ops::Range, os::unix::fs::FileExt, path::PathBuf};
+#[cfg(unix)]
+use std::os::unix::fs::FileExt;
+use std::{ops::Range, path::PathBuf};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -194,12 +196,47 @@ impl ObjectStore for Local {
         Ok(result)
     }
 
+    #[cfg(not(unix))]
+    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
+        let start = std::time::Instant::now();
+        let file = location.to_string();
+        let data = self
+            .client
+            .get_range(&(format_key(&file, self.with_prefix).into()), range.clone())
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[STORAGE] get_range local file: {file}, range: {range:?}, error: {e:?}"
+                );
+                e
+            })?;
+
+        // metrics
+        let data_len = data.len() as u64;
+        let columns = file.split('/').collect::<Vec<&str>>();
+        if columns[0] == "files" {
+            metrics::STORAGE_READ_BYTES
+                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
+                .inc_by(data_len);
+            metrics::STORAGE_READ_REQUESTS
+                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
+                .inc();
+            let time = start.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
+                .inc_by(time);
+        }
+
+        Ok(data)
+    }
+
     /// Read a byte range using `pread` (positioned read) via `block_in_place`.
     ///
     /// Compared to the default `LocalFileSystem` implementation this avoids:
     /// - An extra `lseek` syscall (pread combines seek + read in one syscall)
     /// - A buffer copy before handing work to the blocking thread pool
     /// - Thread-spawn / synchronisation overhead of `spawn_blocking`
+    #[cfg(unix)]
     async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
         let start = std::time::Instant::now();
         let file = location.to_string();
@@ -247,6 +284,7 @@ impl ObjectStore for Local {
     /// multiple ranges per row-group). Opening the file once and batching all
     /// reads in a single blocking section avoids per-range thread scheduling
     /// overhead and repeated file-open cost.
+    #[cfg(unix)]
     async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
         let file = location.to_string();
         let full_path = self.full_path(location);
