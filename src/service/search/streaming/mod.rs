@@ -1038,16 +1038,11 @@ pub async fn process_search_stream_request_multi(
     }
 }
 
-/// Apply a #ResultArray# VRL function to the combined 2D result array from all queries,
-/// then send the transformed results back through the sender with appropriate query_index.
+/// Synchronous VRL compilation and execution for multi-stream results.
 ///
-/// This is only called when per_query_response=true AND the VRL is a #ResultArray# type.
-/// The VRL function receives the full 2D array `[[query0_hits...], [query1_hits...]]` and
-/// is expected to return a 2D array of the same structure.
-///
-/// This mirrors the VRL application logic in the non-streaming `search_multi()` handler
-/// (multi_streams.rs lines 518-639) for the `per_query_response=true` case.
-async fn apply_vrl_to_multi_results(
+/// This is extracted as a non-async function because `VRLRuntimeConfig` is `!Send` and
+/// cannot exist across `.await` points in the async `apply_vrl_to_multi_results`.
+fn compute_vrl_responses(
     trace_id: &str,
     org_id: &str,
     input_fn: &str,
@@ -1057,15 +1052,12 @@ async fn apply_vrl_to_multi_results(
         Option<config::meta::search::Response>,
     )>,
     total_queries: usize,
-    sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
-) {
+) -> Vec<config::meta::search::Response> {
     let input_fn = input_fn.trim().to_string();
-    // This should always be true since the handler only calls this for ResultArray VRL,
-    // but we check defensively.
     let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
 
     log::debug!(
-        "[trace_id {trace_id}] apply_vrl_to_multi_results: apply_over_hits={apply_over_hits}, total_queries={total_queries}, vrl_fn_len={}",
+        "[trace_id {trace_id}] compute_vrl_responses: apply_over_hits={apply_over_hits}, total_queries={total_queries}, vrl_fn_len={}",
         input_fn.len()
     );
 
@@ -1088,7 +1080,7 @@ async fn apply_vrl_to_multi_results(
             .join(", ")
     );
 
-    // Resolve stream name for VRL context (use first query's stream)
+    // Resolve stream name for VRL context
     let vrl_stream_name = buffered_results
         .first()
         .and_then(|(_, _, meta)| meta.as_ref())
@@ -1101,33 +1093,24 @@ async fn apply_vrl_to_multi_results(
         Ok(program) => {
             let registry = program.config.get_custom::<TableRegistry>().unwrap();
             registry.finish_load();
-            Some(program)
+            program
         }
         Err(err) => {
             log::error!("[trace_id {trace_id}] search_multi_stream->vrl: compile err: {err:?}");
-            // Send the un-transformed results with function_error
-            for (qi, hits, meta) in buffered_results.drain(..) {
-                let mut resp = meta.unwrap_or_else(|| config::meta::search::Response::new(0, 0));
-                resp.hits = hits;
-                resp.query_index = Some(qi);
-                resp.function_error = vec![err.to_string()];
-                let _ = sender
-                    .send(Ok(StreamResponses::SearchResponse {
-                        results: resp,
-                        streaming_aggs: false,
-                        streaming_id: None,
-                        time_offset: TimeOffset {
-                            start_time: 0,
-                            end_time: 0,
-                        },
-                    }))
-                    .await;
-            }
-            return;
+            // Return un-transformed results with function_error
+            return buffered_results
+                .drain(..)
+                .map(|(qi, hits, meta)| {
+                    let mut resp =
+                        meta.unwrap_or_else(|| config::meta::search::Response::new(0, 0));
+                    resp.hits = hits;
+                    resp.query_index = Some(qi);
+                    resp.function_error = vec![err.to_string()];
+                    resp
+                })
+                .collect();
         }
     };
-
-    let Some(program) = program else { return };
 
     log::debug!("[trace_id {trace_id}] VRL compiled successfully, applying to results...");
 
@@ -1205,44 +1188,74 @@ async fn apply_vrl_to_multi_results(
             .join(", ")
     );
 
-    // Send the transformed results back, one per query_index
-    for qi in 0..total_queries {
-        let hits_for_query = transformed_hits
-            .get(qi)
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
+    // Build the response objects
+    (0..total_queries)
+        .map(|qi| {
+            let hits_for_query = transformed_hits
+                .get(qi)
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
 
-        // Flatten each hit if needed (for apply_over_hits path)
-        let hits_for_query: Vec<json::Value> = if apply_over_hits {
-            hits_for_query
-                .into_iter()
-                .filter_map(|v| {
-                    if !v.is_null() && v.is_object() {
-                        flatten::flatten(v).ok()
-                    } else if v.is_array() {
-                        // Inner array — return as-is (nested per_query structure)
-                        Some(v)
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        } else {
-            hits_for_query
-        };
+            // Flatten each hit if needed (for apply_over_hits path)
+            let hits_for_query: Vec<json::Value> = if apply_over_hits {
+                hits_for_query
+                    .into_iter()
+                    .filter_map(|v| {
+                        if !v.is_null() && v.is_object() {
+                            flatten::flatten(v).ok()
+                        } else if v.is_array() {
+                            Some(v)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            } else {
+                hits_for_query
+            };
 
-        // Use the original response metadata if available
-        let mut resp = buffered_results
-            .get(qi)
-            .and_then(|(_, _, meta)| meta.clone())
-            .unwrap_or_else(|| config::meta::search::Response::new(0, 0));
+            let mut resp = buffered_results
+                .get(qi)
+                .and_then(|(_, _, meta)| meta.clone())
+                .unwrap_or_else(|| config::meta::search::Response::new(0, 0));
 
-        resp.hits = hits_for_query;
-        resp.query_index = Some(qi);
+            resp.hits = hits_for_query;
+            resp.query_index = Some(qi);
+            resp
+        })
+        .collect()
+}
 
+/// Apply a #ResultArray# VRL function to the combined 2D result array from all queries,
+/// then send the transformed results back through the sender with appropriate query_index.
+///
+/// This is only called when per_query_response=true AND the VRL is a #ResultArray# type.
+/// The VRL function receives the full 2D array `[[query0_hits...], [query1_hits...]]` and
+/// is expected to return a 2D array of the same structure.
+///
+/// VRL compilation and execution are delegated to the synchronous `compute_vrl_responses`
+/// because `VRLRuntimeConfig` is `!Send` and cannot be held across `.await` points.
+async fn apply_vrl_to_multi_results(
+    trace_id: &str,
+    org_id: &str,
+    input_fn: &str,
+    buffered_results: &mut Vec<(
+        usize,
+        Vec<json::Value>,
+        Option<config::meta::search::Response>,
+    )>,
+    total_queries: usize,
+    sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+) {
+    let responses =
+        compute_vrl_responses(trace_id, org_id, input_fn, buffered_results, total_queries);
+
+    // Send the pre-built responses asynchronously (no !Send types in scope)
+    for resp in responses {
         log::debug!(
-            "[trace_id {trace_id}] Sending VRL-transformed results for query_index={qi}, hits={}",
+            "[trace_id {trace_id}] Sending VRL-transformed results for query_index={:?}, hits={}",
+            resp.query_index,
             resp.hits.len()
         );
 
