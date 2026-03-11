@@ -511,7 +511,11 @@ export default defineComponent({
     // so the links array index order matches ECharts' internal data array.
     const updateEdgeStylesForHover = (hoveredNodeId: string | null) => {
       const chart = chartRendererRef.value?.chart;
-      if (!chart || visualizationType.value !== 'graph') return;
+      if (!chart) return;
+
+      // Tree view: emphasis.focus:'relative' in the series config handles dimming natively.
+      // No manual dispatch needed — ECharts triggers it on mouseover automatically.
+      if (visualizationType.value !== 'graph') return;
 
       const rawEdges: any[] = filteredGraphData.value.edges || [];
 
@@ -948,10 +952,10 @@ export default defineComponent({
         }
       };
 
-      // Node hover → animate adjacent edges (graph view only)
+      // Node hover → animate adjacent edges
       const onNodeMouseover = (params: any) => {
         if (params.dataType !== 'node') return;
-        updateEdgeStylesForHover(params.data?.id ?? null);
+        updateEdgeStylesForHover(params.data?.id ?? params.name ?? null);
       };
       const onNodeMouseout = (params: any) => {
         if (params.dataType !== 'node') return;
