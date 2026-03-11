@@ -331,7 +331,8 @@ const loadDashboard = async () => {
         // each trace contributes exactly one duration value. Root spans are
         // identified by an absent reference_parent_span_id (NULL or empty string).
         const durationFilters = [...baseFilters];
-        whereClause = "WHERE " + durationFilters.join(" AND ");
+        if (durationFilters.length)
+          whereClause = "WHERE " + durationFilters.join(" AND ");
       } else {
         // Spans mode Duration, and Rate panel for both modes: apply combined filters
         whereClause = baseFilters.length
