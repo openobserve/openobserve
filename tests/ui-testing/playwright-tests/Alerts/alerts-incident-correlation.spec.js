@@ -28,6 +28,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 // ============================================================================
 // TEST DATA CONFIGURATION
@@ -105,35 +106,23 @@ const ALERTS = [
 // SETUP HELPER FUNCTIONS
 // ============================================================================
 
-// NOTE: Base64 encoding runs in Node (server-side), then the token is passed to
-// page.evaluate for browser-side fetch. This is acceptable in E2E tests — the
-// credentials are already in env vars and the browser has full auth state from user.json.
-function getAuthToken() {
-    return Buffer.from(
-        `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
-    ).toString('base64');
-}
-
 /**
  * Make an API call via page.evaluate (runs in browser context, avoids CORS)
  */
 async function apiCall(page, method, path, body = null) {
     const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-    const authToken = getAuthToken();
+    const headers = getAuthHeaders();
 
-    return page.evaluate(async ({ url, method, authToken, body }) => {
+    return page.evaluate(async ({ url, method, headers, body }) => {
         const opts = {
             method,
-            headers: {
-                'Authorization': `Basic ${authToken}`,
-                'Content-Type': 'application/json'
-            }
+            headers,
         };
         if (body) opts.body = JSON.stringify(body);
         const resp = await fetch(url, opts);
         const data = await resp.json().catch(() => ({}));
         return { status: resp.status, data };
-    }, { url: `${baseUrl}${path}`, method, authToken, body });
+    }, { url: `${baseUrl}${path}`, method, headers, body });
 }
 
 /**
@@ -168,7 +157,7 @@ function generateTestData() {
  * Ingest test data into the dedicated stream
  */
 async function ingestTestData(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const records = generateTestData();
 
     const response = await apiCall(page, 'POST', `/api/${org}/${STREAM_NAME}/_json`, records);
@@ -180,7 +169,7 @@ async function ingestTestData(page) {
  * Create alert template (idempotent - 200=created, 409=already exists)
  */
 async function ensureTemplate(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const payload = {
         name: TEMPLATE_NAME,
         body: JSON.stringify({ text: "E2E Alert: {alert_name}" }),
@@ -196,7 +185,7 @@ async function ensureTemplate(page) {
  * Create alert destination (idempotent - 200=created, 409=already exists)
  */
 async function ensureDestination(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const payload = {
         name: DESTINATION_NAME,
         url: 'https://httpbin.org/post',
@@ -215,7 +204,7 @@ async function ensureDestination(page) {
  * Create or get folder for test alerts, return folder ID
  */
 async function ensureFolder(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
 
     // Try to create folder
     const createResp = await apiCall(page, 'POST', `/api/v2/${org}/folders/alerts`, {
@@ -249,7 +238,7 @@ async function ensureFolder(page) {
  * Create test alerts (idempotent - skips if already exists)
  */
 async function ensureAlerts(page, folderId) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     let created = 0;
 
     for (const alertDef of ALERTS) {
@@ -285,7 +274,7 @@ async function ensureAlerts(page, folderId) {
  * API: PATCH /api/v2/{org}/alerts/{alert_id}/trigger?folder={folder_id}
  */
 async function triggerAlerts(page, folderId) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
 
     // List alerts in folder to get their IDs
     const listResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts?folder=${folderId}`);
@@ -315,7 +304,7 @@ async function triggerAlerts(page, folderId) {
  * Returns true if incidents found, false if timed out.
  */
 async function waitForIncidents(page, maxWaitMs = 240000) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
     const incidentsUrl = `${baseUrl}/web/incidents?org_identifier=${org}`;
 
@@ -373,7 +362,7 @@ async function waitForIncidents(page, maxWaitMs = 240000) {
  * Delete all test alerts from the folder
  */
 async function cleanupAlerts(page, folderId) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
 
     // List alerts in folder to get their IDs
     const listResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts?folder=${folderId}`);
@@ -403,7 +392,7 @@ async function cleanupAlerts(page, folderId) {
  */
 async function cleanupFolder(page, folderId) {
     if (!folderId || folderId === 'default') return;
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const resp = await apiCall(page, 'DELETE', `/api/v2/${org}/folders/alerts/${folderId}`);
     testLogger.info('Cleanup folder', { folderId, status: resp.status });
 }
@@ -412,7 +401,7 @@ async function cleanupFolder(page, folderId) {
  * Delete the test destination
  */
 async function cleanupDestination(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const resp = await apiCall(page, 'DELETE', `/api/${org}/alerts/destinations/${DESTINATION_NAME}`);
     testLogger.info('Cleanup destination', { name: DESTINATION_NAME, status: resp.status });
 }
@@ -421,7 +410,7 @@ async function cleanupDestination(page) {
  * Delete the test template
  */
 async function cleanupTemplate(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
     const resp = await apiCall(page, 'DELETE', `/api/${org}/alerts/templates/${TEMPLATE_NAME}`);
     testLogger.info('Cleanup template', { name: TEMPLATE_NAME, status: resp.status });
 }
@@ -432,7 +421,7 @@ async function cleanupTemplate(page) {
  * Uses API to list incidents, filter by run ID in alert name, and resolve each.
  */
 async function resolveTestIncidents(page) {
-    const org = process.env.ORGNAME || 'default';
+    const org = getOrgIdentifier();
 
     // List open incidents
     const listResp = await apiCall(page, 'GET', `/api/v2/${org}/incidents?status=open`);
@@ -479,6 +468,8 @@ test.describe("Incident Correlation Tests", { tag: '@enterprise' }, () => {
     // afterAll: Clean up alerts, folder, destination, template. Stream persists.
     // ========================================================================
     test.beforeAll(async ({ browser }) => {
+        // Cloud environments need extra time: setup (~90s) + waitForIncidents (up to 300s) + re-trigger (120s)
+        test.setTimeout(10 * 60 * 1000); // 10 minutes
         testLogger.info('=== INCIDENT CORRELATION TEST SETUP ===');
 
         const context = await browser.newContext({
@@ -489,7 +480,7 @@ test.describe("Incident Correlation Tests", { tag: '@enterprise' }, () => {
         try {
             // Navigate to establish auth context
             const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-            const org = process.env.ORGNAME || 'default';
+            const org = getOrgIdentifier();
             await page.goto(`${baseUrl}?org_identifier=${org}`);
             await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
@@ -512,8 +503,17 @@ test.describe("Incident Correlation Tests", { tag: '@enterprise' }, () => {
             await triggerAlerts(page, setupFolderId);
 
             // Step 5: Wait for incidents to appear after trigger
-            testLogger.info('Step 5: Waiting for incidents to appear');
-            const found = await waitForIncidents(page, 120000); // 2 min should be plenty after trigger
+            // Cloud environments need more time for alert evaluation + incident creation
+            const waitMs = isCloudEnvironment() ? 300000 : 120000;
+            testLogger.info(`Step 5: Waiting for incidents to appear (${waitMs / 1000}s timeout)`);
+            let found = await waitForIncidents(page, waitMs);
+
+            // On cloud, re-trigger once if no incidents appeared (scheduler may need a nudge)
+            if (!found && isCloudEnvironment()) {
+                testLogger.info('Re-triggering alerts on cloud...');
+                await triggerAlerts(page, setupFolderId);
+                found = await waitForIncidents(page, 120000);
+            }
 
             if (!found) {
                 testLogger.warn('No incidents appeared after trigger. Tests will skip via beforeEach check.');
@@ -540,7 +540,7 @@ test.describe("Incident Correlation Tests", { tag: '@enterprise' }, () => {
 
         try {
             const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-            const org = process.env.ORGNAME || 'default';
+            const org = getOrgIdentifier();
             await page.goto(`${baseUrl}?org_identifier=${org}`);
             await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
@@ -575,7 +575,7 @@ test.describe("Incident Correlation Tests", { tag: '@enterprise' }, () => {
 
         // Navigate to incidents page directly
         const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-        const org = process.env.ORGNAME || 'default';
+        const org = getOrgIdentifier();
         await page.goto(`${baseUrl}/web/incidents?org_identifier=${org}`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
         testLogger.info('Navigated to incidents page');

@@ -1,6 +1,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 
 test.describe.configure({ mode: 'parallel' });
@@ -557,6 +558,51 @@ test.describe("Organization Management - CRUD Operations", () => {
             }
             testLogger.info('Workflow test cleanup completed');
         }
+    });
+
+    test("should fetch all organizations via GET /api/_meta/organizations?page_size=1000000", {
+        tag: ['@organization', '@all', '@api', '@adminOrg']
+    }, async ({ page }) => {
+        test.skip(!isCloudEnvironment(), 'Admin org listing via _meta is only available in cloud enterprise');
+        testLogger.info('Testing GET /api/_meta/organizations?page_size=1000000 endpoint');
+
+        testLogger.info('Calling admin org listing API for _meta org');
+
+        const { status, data } = await pageManager.createOrgPage.getAdminOrgs();
+
+        testLogger.info(`Response status: ${status}`);
+        testLogger.info(`Response data: ${JSON.stringify(data)}`);
+
+        expect(status).toBe(200);
+        expect(data).toBeDefined();
+        expect(data).toHaveProperty('list');
+        expect(Array.isArray(data.list)).toBe(true);
+        expect(data.list.length).toBeGreaterThan(0);
+
+        testLogger.info(`✓ _meta admin org listing API returned ${data.list.length} organization(s)`);
+    });
+
+    test("should return 401 unauthorized when fetching organizations with non-_meta org", {
+        tag: ['@organization', '@all', '@api', '@adminOrg', '@negative']
+    }, async ({ page }) => {
+        test.skip(!isCloudEnvironment(), 'Admin org 401 check is only applicable in cloud enterprise');
+        testLogger.info('Testing GET /api/{orgId}/organizations?page_size=1000000 with non-_meta org');
+
+        const orgId = process.env.ORGNAME || 'default';
+
+        testLogger.info(`Calling admin org listing API with non-_meta orgId: ${orgId}`);
+
+        const { status, data } = await pageManager.createOrgPage.getAdminOrgs(orgId);
+
+        testLogger.info(`Response status: ${status}`);
+        testLogger.info(`Response data: ${JSON.stringify(data)}`);
+
+        expect(status).toBe(401);
+        expect(data).toBeDefined();
+        expect(data).toHaveProperty('code', 401);
+        expect(data).toHaveProperty('message', 'Unauthorized Access');
+
+        testLogger.info(`✓ Non-_meta org correctly returned 401 Unauthorized Access`);
     });
 
     test.afterEach(async () => {

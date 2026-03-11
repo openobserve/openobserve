@@ -18,6 +18,7 @@ import {
   useLocalUserInfo,
   useLocalCurrentUser,
 } from "@/utils/zincutils";
+import config from "@/aws-exports";
 import Home from "@/views/HomeView.vue";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import About from "@/views/About.vue";
@@ -377,6 +378,42 @@ const useRoutes = () => {
         title: "Add Alert",
       },
       beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/anomaly/add",
+      name: "addAnomalyDetection",
+      component: () =>
+        import("@/views/AddAnomalyDetectionView.vue"),
+      meta: {
+        title: "Add Anomaly Detection",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
+          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/anomaly/edit/:anomaly_id",
+      name: "editAnomalyDetection",
+      component: () =>
+        import("@/views/AddAnomalyDetectionView.vue"),
+      meta: {
+        title: "Edit Anomaly Detection",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
+          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },
