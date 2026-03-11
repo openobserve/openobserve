@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-use axum::http::StatusCode;
 use axum::{
     Json,
     extract::{Path, Query},
-    http::HeaderMap,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use config::{
@@ -33,12 +31,6 @@ use hashbrown::HashMap;
 use serde_json;
 use tracing::{Instrument, Span};
 
-#[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::{
-    StreamPermissionResourceType, check_stream_permissions,
-};
-#[cfg(feature = "enterprise")]
-use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
     common::{
         meta::{self},
@@ -48,8 +40,17 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::{extractors::Headers, request::search::error_utils},
-    service::{search::inspector::*, self_reporting::http_report_metrics},
+    handler::http::{
+        extractors::Headers,
+        request::search::{
+            error_utils,
+            utils::{StreamPermissionResourceType, check_stream_permissions},
+        },
+    },
+    service::{
+        search::{inspector::*, sql::visitor::cipher_key::get_cipher_key_names},
+        self_reporting::http_report_metrics,
+    },
 };
 
 /// GetSearchProfile
@@ -191,7 +192,6 @@ pub async fn get_search_profile(
     }
 
     // Check permissions on stream
-    #[cfg(feature = "enterprise")]
     if let Some(res) = check_stream_permissions(
         &stream_name,
         org_id,
@@ -204,72 +204,68 @@ pub async fn get_search_profile(
         return res;
     }
 
-    #[cfg(feature = "enterprise")]
-    {
-        let keys_used = match get_cipher_key_names(&req.query.sql) {
-            Ok(v) => v,
-            Err(e) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)),
-                )
-                    .into_response();
-            }
-        };
-        if !keys_used.is_empty() {
-            log::info!("keys used : {keys_used:?}");
+    let keys_used = match get_cipher_key_names(&req.query.sql) {
+        Ok(v) => v,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)),
+            )
+                .into_response();
         }
-        for key in keys_used {
-            // Check permissions on keys
-            {
-                use config::meta::user::DBUser;
-                use o2_openfga::meta::mapping::OFGA_MODELS;
+    };
+    if !keys_used.is_empty() {
+        log::info!("keys used : {keys_used:?}");
+    }
+    for key in keys_used {
+        // Check permissions on keys
+        {
+            use config::meta::user::DBUser;
+            use o2_openfga::meta::mapping::OFGA_MODELS;
 
-                use crate::common::{
-                    infra::config::USERS,
-                    utils::auth::{AuthExtractor, is_root_user},
+            use crate::common::{
+                infra::config::USERS,
+                utils::auth::{AuthExtractor, is_root_user},
+            };
+
+            if !is_root_user(&user_id) {
+                let user = match USERS
+                    .get(&format!("{org_id}/{user_id}"))
+                    .and_then(|user_record| {
+                        DBUser::from(&(user_record.clone())).get_user(org_id.to_string())
+                    }) {
+                    Some(user) => user,
+                    None => {
+                        return meta::http::HttpResponse::forbidden("User not found");
+                    }
                 };
 
-                if !is_root_user(&user_id) {
-                    let user =
-                        match USERS
-                            .get(&format!("{org_id}/{user_id}"))
-                            .and_then(|user_record| {
-                                DBUser::from(&(user_record.clone())).get_user(org_id.to_string())
-                            }) {
-                            Some(user) => user,
-                            None => {
-                                return meta::http::HttpResponse::forbidden("User not found");
-                            }
-                        };
-
-                    if !crate::handler::http::auth::validator::check_permissions(
-                        &user_id,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get("cipher_keys")
-                                    .map_or("cipher_keys", |model| model.key),
-                                key
-                            ),
-                            org_id: org_id.to_string(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                        },
-                        user.role,
-                        user.is_external,
-                    )
-                    .await
-                    {
-                        return crate::common::meta::http::HttpResponse::forbidden(
-                            "Unauthorized Access to key",
-                        );
-                    }
-                    // Check permissions on key ends
+                if !crate::handler::http::auth::validator::check_permissions(
+                    &user_id,
+                    AuthExtractor {
+                        auth: "".to_string(),
+                        method: "GET".to_string(),
+                        o2_type: format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get("cipher_keys")
+                                .map_or("cipher_keys", |model| model.key),
+                            key
+                        ),
+                        org_id: org_id.to_string(),
+                        bypass_check: false,
+                        parent_id: "".to_string(),
+                    },
+                    user.role,
+                    user.is_external,
+                )
+                .await
+                {
+                    return crate::common::meta::http::HttpResponse::forbidden(
+                        "Unauthorized Access to key",
+                    );
                 }
+                // Check permissions on key ends
             }
         }
     }
@@ -398,9 +394,6 @@ pub async fn get_search_profile(
 /// the second level. Finally show the events which search_role is follower as third level and sort
 /// by _timestamp.
 fn organize_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspectorFields> {
-    #[cfg(not(feature = "enterprise"))]
-    let is_super_cluster = false;
-    #[cfg(feature = "enterprise")]
     let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled;
