@@ -664,12 +664,16 @@ pub async fn reset_checkpoint(org_id: &str) {
 
 /// Build the email message for a given checkpoint and org type (free vs paid).
 pub fn build_quota_email_message(
+    org_id: &str,
     checkpoint: u8,
     is_paid: bool,
     used: u64,
     limit: u64,
 ) -> (String, String) {
-    let subject = format!("[OpenObserve] AI Credits: {}% used", checkpoint);
+    let subject = format!(
+        "[OpenObserve] AI Credits: {}% used — {org_id}",
+        checkpoint
+    );
 
     let message = match (checkpoint, is_paid) {
         (80, false) => format!(
@@ -702,6 +706,7 @@ pub fn build_quota_email_message(
     let body = format!(
         "<html><body>\
         <h2>AI Credit Usage Alert</h2>\
+        <p><strong>Organization:</strong> {org_id}</p>\
         <p>{message}</p>\
         <p><strong>Credits used:</strong> {used} / {limit}</p>\
         <p><a href=\"https://cloud.openobserve.ai/billings\">View Billing</a></p>\

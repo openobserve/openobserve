@@ -187,7 +187,7 @@ async fn check_all_orgs_ai_quota() {
         let limit = trial_quota::get_limit(&org_id);
 
         let (subject, body) =
-            trial_quota::build_quota_email_message(checkpoint, is_paid, used, limit);
+            trial_quota::build_quota_email_message(&org_id, checkpoint, is_paid, used, limit);
 
         let email = Email {
             recipients: vec![admin.email.clone()],
