@@ -83,7 +83,7 @@ test.describe("Compare SQL query execution times", () => {
     await ingestTestData(page);
 
     // Navigate to logs page and setup for performance testing
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await selectStream(pm, logData.Stream);
     await applyQueryButton(pm);
     
@@ -289,7 +289,7 @@ test.describe("Compare SQL query execution times", () => {
     await page.waitForTimeout(5000); // Wait for data to be indexed and available
 
     // Navigate to logs page and select test stream
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await pm.logsPage.selectStream(streamName);
 
     // STEP 0: First verify ALL data is available in wide range (baseline check to eliminate false positives)
