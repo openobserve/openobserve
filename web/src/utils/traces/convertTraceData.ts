@@ -1,5 +1,4 @@
 import { toZonedTime } from "date-fns-tz";
-import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
     backgroundColor: "transparent",
@@ -506,91 +505,362 @@ export const convertServiceGraphToTree = (
   return { options, positions: null };
 };
 
-// D3-Force simulation physics parameters
-const FORCE_PHYSICS_PARAMS = {
-  // Many-Body Force (Repulsion)
-  chargeStrength: -3000,       // Lower repulsion to tighten clusters
-  chargeDistanceMax: 1200,     // Limit long-range repulsion
-
-  // Link Force
-  linkDistance: 250,           // Shorter links for tighter grouping
-  linkStrength: 0.6,           // Stronger link pull to hold structure
-  linkIterations: 3,           // Fewer passes, less "rubberiness"
-
-  // Center Force
-  centerStrength: 0.05,        // Stronger centering keeps it compact
-
-  // Position Forces
-  forceXStrength: 0.08,        // Gentle horizontal correction
-  forceYStrength: 0.08,        // Gentle vertical correction
-
-  // Collision Force
-  collisionPadding: 80,        // Reasonable padding without huge gaps
-  collisionStrength: 1.0,      // Full collision enforcement
-  collisionIterations: 2,      // Enough to resolve overlaps
-
-  // Simulation
-  velocityDecay: 0.35,         // Slightly more friction for faster settle
-  totalTicks: 5000,            // Iterations for stabilization
-};
-
 /**
- * Compute force-directed layout using D3-force simulation
- * @param nodes - Array of nodes
- * @param edges - Array of edges
- * @param width - Container width
- * @param height - Container height
- * @returns Nodes with computed x, y positions
+ * Fruchterman-Reingold force-directed layout.
+ *
+ * Produces the organic, well-spread graph layout used by tools like DataDog.
+ * No external dependencies — runs as a pure-JS physics simulation.
+ *
+ * Algorithm:
+ *  1. Initialise nodes in a circle (avoids singularities).
+ *  2. Iterate: repel all node pairs, attract connected pairs.
+ *  3. Clamp each step by a temperature that cools each iteration.
+ *  4. Normalise final bounding box → canvas with padding.
  */
 const computeForceLayout = (
   nodes: any[],
   edges: any[],
-  width: number = 800,
-  height: number = 600
-) => {
-  // Create a copy of nodes to avoid mutation
-  const nodesCopy = nodes.map(n => ({ ...n }));
+  width: number,
+  height: number
+): Map<string, { x: number; y: number }> => {
+  const PAD = 110; // padding from canvas edge
+  const W = width  - PAD * 2;
+  const H = height - PAD * 2;
+  const n = nodes.length;
 
-  // Prepare edges with proper source/target references
-  const edgesCopy = edges.map(e => ({
-    source: e.from,
-    target: e.to,
-    ...e,
-  }));
+  if (n === 0) return new Map();
+  if (n === 1) return new Map([[nodes[0].id, { x: width / 2, y: height / 2 }]]);
 
-  // Create simulation and compute layout using physics params
-  const simulation = forceSimulation(nodesCopy)
-    .force('charge', forceManyBody()
-      .strength(FORCE_PHYSICS_PARAMS.chargeStrength)
-      .distanceMax(FORCE_PHYSICS_PARAMS.chargeDistanceMax)
-    )
-    .force('link', forceLink(edgesCopy)
-      .id((d: any) => d.id)
-      .distance(FORCE_PHYSICS_PARAMS.linkDistance)
-      .strength(FORCE_PHYSICS_PARAMS.linkStrength)
-      .iterations(FORCE_PHYSICS_PARAMS.linkIterations)
-    )
-    .force('center', forceCenter(width / 2, height / 2)
-      .strength(FORCE_PHYSICS_PARAMS.centerStrength)
-    )
-    .force('x', forceX(width / 2).strength(FORCE_PHYSICS_PARAMS.forceXStrength))
-    .force('y', forceY(height / 2).strength(FORCE_PHYSICS_PARAMS.forceYStrength))
-    .force('collision', forceCollide()
-      .radius((d: any) => (d.symbolSize || 60) / 2 + FORCE_PHYSICS_PARAMS.collisionPadding)
-      .strength(FORCE_PHYSICS_PARAMS.collisionStrength)
-      .iterations(FORCE_PHYSICS_PARAMS.collisionIterations)
-    )
-    .velocityDecay(FORCE_PHYSICS_PARAMS.velocityDecay)
-    .stop();
+  // Optimal spring length: scales with canvas area / node count
+  const k = Math.sqrt((W * H) / n) * 1.0;
 
-  // Run simulation for specified iterations to stabilize layout
-  for (let i = 0; i < FORCE_PHYSICS_PARAMS.totalTicks; i++) {
-    simulation.tick();
+  // ── 1. Initialise on a circle to avoid singularities ─────────────────────
+  const pos = new Map<string, { x: number; y: number }>();
+  nodes.forEach((node, i) => {
+    const angle = (2 * Math.PI * i) / n;
+    const r = Math.min(W, H) * 0.32;
+    pos.set(node.id, {
+      x: W / 2 + r * Math.cos(angle),
+      y: H / 2 + r * Math.sin(angle),
+    });
+  });
+
+  // Deduplicate edges (undirected for layout purposes)
+  const seen = new Set<string>();
+  const layoutEdges: { u: string; v: string }[] = [];
+  edges.forEach((e: any) => {
+    const key = [e.from, e.to].sort().join('→');
+    if (!seen.has(key)) { seen.add(key); layoutEdges.push({ u: e.from, v: e.to }); }
+  });
+
+  const ids = nodes.map((nd: any) => nd.id);
+
+  // ── 2. Simulation ─────────────────────────────────────────────────────────
+  const ITERATIONS = 350;
+  let temp = Math.min(W, H) * 0.3; // initial max displacement
+  const cooling = temp / (ITERATIONS + 1);
+
+  for (let iter = 0; iter < ITERATIONS; iter++) {
+    const disp = new Map<string, { x: number; y: number }>();
+    ids.forEach((id: string) => disp.set(id, { x: 0, y: 0 }));
+
+    // Repulsive forces — O(n²), fast enough for typical service graphs (<200 nodes)
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const u = ids[i], v = ids[j];
+        const pu = pos.get(u)!, pv = pos.get(v)!;
+        const dx = pu.x - pv.x;
+        const dy = pu.y - pv.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        const fr = (k * k) / dist;
+        const nx = (dx / dist) * fr;
+        const ny = (dy / dist) * fr;
+        const du = disp.get(u)!; du.x += nx; du.y += ny;
+        const dv = disp.get(v)!; dv.x -= nx; dv.y -= ny;
+      }
+    }
+
+    // Attractive forces — along edges only
+    layoutEdges.forEach(({ u, v }) => {
+      if (!pos.has(u) || !pos.has(v)) return;
+      const pu = pos.get(u)!, pv = pos.get(v)!;
+      const dx = pu.x - pv.x;
+      const dy = pu.y - pv.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+      const fa = (dist * dist) / k;
+      const nx = (dx / dist) * fa;
+      const ny = (dy / dist) * fa;
+      const du = disp.get(u)!; du.x -= nx; du.y -= ny;
+      const dv = disp.get(v)!; dv.x += nx; dv.y += ny;
+    });
+
+    // Apply displacements clamped by temperature, keep within working area
+    ids.forEach((id: string) => {
+      const p = pos.get(id)!;
+      const d = disp.get(id)!;
+      const dlen = Math.sqrt(d.x * d.x + d.y * d.y) || 0.01;
+      const scale = Math.min(dlen, temp) / dlen;
+      p.x = Math.max(0, Math.min(W, p.x + d.x * scale));
+      p.y = Math.max(0, Math.min(H, p.y + d.y * scale));
+    });
+
+    temp = Math.max(0, temp - cooling);
   }
 
-  // Return nodes with computed positions
-  return simulation.nodes().map(n => ({ ...n }));
+  // ── 3. Normalise bounding box → full canvas with padding ─────────────────
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  pos.forEach(p => {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  });
+  const rangeX = maxX - minX || 1;
+  const rangeY = maxY - minY || 1;
+
+  // Scale uniformly so the layout fills without distortion, then centre
+  const scale  = Math.min(W / rangeX, H / rangeY);
+  const offsetX = PAD + (W - rangeX * scale) / 2;
+  const offsetY = PAD + (H - rangeY * scale) / 2;
+
+  const result = new Map<string, { x: number; y: number }>();
+  pos.forEach((p, id) => {
+    result.set(id, {
+      x: offsetX + (p.x - minX) * scale,
+      y: offsetY + (p.y - minY) * scale,
+    });
+  });
+  return result;
 };
+
+// ── Service-type icon helper ──────────────────────────────────────────────────
+
+/**
+ * Returns an ECharts image:// data URL containing a full SVG node:
+ *   outer circle (health-based border) + monochrome Feather-style icon.
+ * The icon type is inferred from the service name via keyword matching.
+ */
+// Ordered icon rules: first match wins. Priority: infra → data → domain → UI → default.
+// Each SVG path is a 24×24 Feather-style stroke icon (no fill).
+const SERVICE_ICON_RULES: { regex: RegExp; svg: string }[] = [
+  // ── Infrastructure / networking ──────────────────────────────────────────
+  {
+    // Globe — API gateway, reverse proxy, ingress, router
+    regex: /gateway|proxy|ingress|nginx|envoy|router/,
+    svg: `<circle cx="12" cy="12" r="10"/>` +
+         `<line x1="2" y1="12" x2="22" y2="12"/>` +
+         `<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>`,
+  },
+  {
+    // Wifi — websocket / realtime / streaming
+    regex: /websocket|realtime|streaming|socket/,
+    svg: `<path d="M5 12.55a11 11 0 0 1 14.08 0"/>` +
+         `<path d="M1.42 9a16 16 0 0 1 21.16 0"/>` +
+         `<path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>` +
+         `<line x1="12" y1="20" x2="12.01" y2="20"/>`,
+  },
+  {
+    // Share network — message broker, queue, pubsub
+    regex: /queue|kafka|rabbit|broker|mq|pubsub|event/,
+    svg: `<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>` +
+         `<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>` +
+         `<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>`,
+  },
+  {
+    // Clock / cog — scheduler, cron, background worker, job, consumer
+    regex: /schedul|cron|worker|job|consumer|processor/,
+    svg: `<circle cx="12" cy="12" r="10"/>` +
+         `<polyline points="12 6 12 12 16 14"/>`,
+  },
+  {
+    // Sliders — config, consul, etcd, feature flag, feature toggle
+    regex: /config|consul|etcd|flag|feature/,
+    svg: `<line x1="4" y1="21" x2="4" y2="14"/>` +
+         `<line x1="4" y1="10" x2="4" y2="3"/>` +
+         `<line x1="12" y1="21" x2="12" y2="12"/>` +
+         `<line x1="12" y1="8" x2="12" y2="3"/>` +
+         `<line x1="20" y1="21" x2="20" y2="16"/>` +
+         `<line x1="20" y1="12" x2="20" y2="3"/>` +
+         `<line x1="1" y1="14" x2="7" y2="14"/>` +
+         `<line x1="9" y1="8" x2="15" y2="8"/>` +
+         `<line x1="17" y1="16" x2="23" y2="16"/>`,
+  },
+  {
+    // Activity pulse — load generator, traffic simulator, telemetry, monitoring
+    regex: /load|generator|traffic|benchmark|prometheus|grafana|otel|telemetry|monitor/,
+    svg: `<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>`,
+  },
+  {
+    // Bell — alert manager, alarm, incident
+    regex: /alert|alarm|incident|pagerduty/,
+    svg: `<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>` +
+         `<path d="M13.73 21a2 2 0 0 1-3.46 0"/>`,
+  },
+  // ── Data / storage ───────────────────────────────────────────────────────
+  {
+    // Database cylinder — any SQL/NoSQL/search engine
+    regex: /database|elastic|opensearch|mongo|mysql|postgres|sqlite|oracle|cassandra|dynamo|\bdb\b/,
+    svg: `<ellipse cx="12" cy="5" rx="9" ry="3"/>` +
+         `<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>` +
+         `<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>`,
+  },
+  {
+    // Layers — in-memory cache
+    regex: /cache|redis|memcache/,
+    svg: `<polygon points="12 2 2 7 12 12 22 7 12 2"/>` +
+         `<polyline points="2 17 12 22 22 17"/>` +
+         `<polyline points="2 12 12 17 22 12"/>`,
+  },
+  {
+    // Download arrow — data ingestion, pipeline, ETL, collector
+    regex: /ingest|pipeline|etl|collector/,
+    svg: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>` +
+         `<polyline points="7 10 12 15 17 10"/>` +
+         `<line x1="12" y1="15" x2="12" y2="3"/>`,
+  },
+  {
+    // Minimize arrows — compactor, compressor, archiver (data compaction)
+    regex: /compact|compress|archiv/,
+    svg: `<polyline points="4 14 10 14 10 20"/>` +
+         `<polyline points="20 10 14 10 14 4"/>` +
+         `<line x1="10" y1="14" x2="3" y2="21"/>` +
+         `<line x1="21" y1="3" x2="14" y2="10"/>`,
+  },
+  {
+    // Image frame — image, media, asset, object storage
+    regex: /image|photo|media|asset|storage|blob/,
+    svg: `<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>` +
+         `<circle cx="8.5" cy="8.5" r="1.5"/>` +
+         `<polyline points="21 15 16 10 5 21"/>`,
+  },
+  // ── Auth / security ──────────────────────────────────────────────────────
+  {
+    // Shield — authentication, identity, SSO
+    regex: /auth|sso|identity|login|oauth|keycloak/,
+    svg: `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>`,
+  },
+  // ── Search ───────────────────────────────────────────────────────────────
+  {
+    // Magnifier — search and query services
+    regex: /search|quer/,
+    svg: `<circle cx="11" cy="11" r="8"/>` +
+         `<line x1="21" y1="21" x2="16.65" y2="16.65"/>`,
+  },
+  // ── AI / ML ──────────────────────────────────────────────────────────────
+  {
+    // CPU chip — ML, AI, inference, recommendation
+    regex: /\bml\b|\bai\b|model|inference|predict|recommend|suggest/,
+    svg: `<rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>` +
+         `<rect x="9" y="9" width="6" height="6"/>` +
+         `<line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>` +
+         `<line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>` +
+         `<line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/>` +
+         `<line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>`,
+  },
+  // ── Domain / business ────────────────────────────────────────────────────
+  {
+    // Envelope — email, mail, notification, newsletter tools (listmonk etc.)
+    regex: /email|mail|smtp|notification|notify|newsletter|listmonk/,
+    svg: `<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>` +
+         `<polyline points="22,6 12,13 2,6"/>`,
+  },
+  {
+    // Credit card — payment, billing, invoice
+    regex: /payment|\bpay\b|billing|invoice|stripe|paypal/,
+    svg: `<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>` +
+         `<line x1="1" y1="10" x2="23" y2="10"/>`,
+  },
+  {
+    // Shopping cart — cart, basket, checkout, order
+    regex: /cart|basket|checkout|order/,
+    svg: `<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>` +
+         `<path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>`,
+  },
+  {
+    // Truck — shipping, delivery, logistics
+    regex: /ship|delivery|courier|logistic/,
+    svg: `<rect x="1" y="3" width="15" height="13"/>` +
+         `<polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>` +
+         `<circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>`,
+  },
+  {
+    // Dollar sign — currency, accounting, finance, exchange
+    regex: /currency|exchange|forex|accounting|finance|ledger/,
+    svg: `<line x1="12" y1="1" x2="12" y2="23"/>` +
+         `<path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>`,
+  },
+  {
+    // File list — product catalog, inventory
+    regex: /catalog|inventory|product|listing/,
+    svg: `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>` +
+         `<polyline points="14 2 14 8 20 8"/>` +
+         `<line x1="16" y1="13" x2="8" y2="13"/>` +
+         `<line x1="16" y1="17" x2="8" y2="17"/>`,
+  },
+  {
+    // Megaphone — ad, advertising, marketing
+    regex: /\bad\b|\bads\b|advert|marketing/,
+    svg: `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>` +
+         `<path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>` +
+         `<path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>`,
+  },
+  {
+    // Document with plus — quote, pricing service
+    regex: /quote|pricing/,
+    svg: `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>` +
+         `<polyline points="14 2 14 8 20 8"/>` +
+         `<line x1="12" y1="18" x2="12" y2="12"/>` +
+         `<line x1="9" y1="15" x2="15" y2="15"/>`,
+  },
+  {
+    // Bot/person — SRE agent, automation agent, bot
+    regex: /\bagent\b|\bbot\b|sre|automation/,
+    svg: `<path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/>` +
+         `<path d="M16 8v1a4 4 0 0 1-8 0V8"/>` +
+         `<line x1="8" y1="13" x2="16" y2="13"/>` +
+         `<rect x="8" y="13" width="8" height="8" rx="1"/>` +
+         `<line x1="10" y1="17" x2="10.01" y2="17"/>` +
+         `<line x1="14" y1="17" x2="14.01" y2="17"/>`,
+  },
+  // ── UI / client ──────────────────────────────────────────────────────────
+  {
+    // Monitor — web frontend, client app, browser
+    regex: /frontend|\bweb\b|\bui\b|\bapp\b|client|browser/,
+    svg: `<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>` +
+         `<line x1="8" y1="21" x2="16" y2="21"/>` +
+         `<line x1="12" y1="17" x2="12" y2="21"/>`,
+  },
+];
+
+// Server SVG — used as fallback when no rule matches
+const SERVER_ICON_SVG =
+  `<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>` +
+  `<rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>` +
+  `<line x1="6" y1="6" x2="6.01" y2="6"/>` +
+  `<line x1="6" y1="18" x2="6.01" y2="18"/>`;
+
+function getServiceIconSvg(name: string, isDark: boolean, borderColor: string): string {
+  const iconColor = isDark ? '#e4e7eb' : '#374151';
+  const bgColor   = isDark ? '#1a1f2e' : '#ffffff';
+
+  // Normalize: lowercase and collapse hyphens/underscores to spaces so
+  // "load-generator" and "load_generator" both match /load/ or /generator/.
+  const n = (name || '').toLowerCase().replace(/[-_]/g, ' ');
+
+  const matched = SERVICE_ICON_RULES.find(({ regex }) => regex.test(n));
+  const icon = matched ? matched.svg : SERVER_ICON_SVG;
+
+  // 56×56 viewBox: circle r=24 centered at (28,28); icon 24×24 translated to (16,16)
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56">` +
+    `<circle cx="28" cy="28" r="24" fill="${bgColor}" stroke="${borderColor}" stroke-width="4"/>` +
+    `<g transform="translate(16,16)" fill="none" stroke="${iconColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">` +
+    icon +
+    `</g></svg>`;
+
+  // btoa with encodeURIComponent so any edge-case Unicode in service names stays safe
+  return `image://data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Convert service graph data to ECharts Graph format (force-directed network)
@@ -601,7 +871,9 @@ export const convertServiceGraphToNetwork = (
   cachedPositions?: Map<string, { x: number; y: number }>,
   isDarkMode: boolean = true,
   selectedNodeId?: string,
-  edgeBaselines?: Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>
+  edgeBaselines?: Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>,
+  canvasWidth: number = 1200,
+  canvasHeight: number = 700
 ) => {
   // Graph view only supports force-directed layout
   // Tree layouts ('horizontal', 'vertical') should use convertServiceGraphToTree instead
@@ -665,11 +937,11 @@ export const convertServiceGraphToNetwork = (
       else if (errorRate > 1) borderColor = "#faad14"; // Yellow (degraded)
     }
 
-    // Size based on request volume - much smaller nodes
-    const symbolSize = Math.max(40, Math.min(80, Math.log10(metrics.requests + 1) * 20));
+    // Node size: scales with request volume like DataDog (70–110 px range)
+    const symbolSize = Math.max(70, Math.min(110, Math.log10(metrics.requests + 1) * 28));
 
-    // Check if this node is selected
-    const isSelected = selectedNodeId === node.id;
+    // SVG symbol: circle with health-colored border + service-type icon
+    const iconDataUrl = getServiceIconSvg(node.id, isDarkMode, borderColor);
 
     // Use cached position if available
     const cachedPos = cachedPositions?.get(node.id);
@@ -678,47 +950,23 @@ export const convertServiceGraphToNetwork = (
       name: node.label || node.id,
       value: metrics.requests,
       errors: metrics.errors,
-      symbolSize: isSelected ? symbolSize * 1.1 : symbolSize, // Scale up selected node
-      itemStyle: {
-        color: isDarkMode ? '#1a1f2e' : '#ffffff',
-        borderColor: borderColor, // Keep health-based border color
-        borderWidth: 4,
-        shadowBlur: isSelected ? 25 : 10, // Enhanced shadow for selected node
-        shadowColor: isSelected
-          ? 'rgba(59, 130, 246, 0.6)' // Blue glow for selected
-          : (isDarkMode ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
-        shadowOffsetX: 0,
-        shadowOffsetY: 0,
-      },
-      label: {
-        show: true,
-      },
+      symbol: iconDataUrl,
+      symbolSize,
+      // itemStyle opacity is needed for emphasis.focus adjacency dimming to work on images
+      itemStyle: { opacity: 1 },
+      label: { show: true },
       emphasis: {
         scale: true,
-        scaleSize: 1.15,
-        itemStyle: {
-          shadowBlur: 20, // Enhanced shadow on hover
-          shadowColor: isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.3)',
-        },
+        scaleSize: 1.12,
         label: {
           show: true,
-          fontSize: 12,
           fontWeight: 'bold',
+          fontSize: 13,
         },
       },
       select: {
-        // Persistent selection styling
-        itemStyle: {
-          borderColor: borderColor, // Keep health-based border color
-          borderWidth: 5,
-          shadowBlur: 45,
-          shadowColor: 'rgba(59, 130, 246, 0.9)', // Prominent blue glow for selected
-          shadowOffsetX: 0,
-          shadowOffsetY: 0,
-        },
         label: {
           show: true,
-          fontSize: 12,
           fontWeight: 'bold',
         },
       },
@@ -828,21 +1076,21 @@ export const convertServiceGraphToNetwork = (
     const baseline = edgeBaselines?.get(baselineKey);
     let edgeColor;
     if (baseline && baseline.p95_avg > 0) {
-      // Baseline-relative coloring: compare current p95 to previous-slot weighted average
+      // Baseline-relative coloring: only highlight degraded edges
       const ratio = (edge.p95_latency_ns || 0) / baseline.p95_avg;
       if (ratio > 2.0) {
-        edgeColor = "#ff7875"; // >2x baseline
+        edgeColor = "#ff7875"; // >2x baseline → red
       } else if (ratio > 1.5) {
-        edgeColor = "#ffc069"; // 1.5–2x baseline
+        edgeColor = "#ffc069"; // 1.5–2x baseline → orange
       } else {
-        edgeColor = "#52c41a"; // Within baseline
+        edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3"; // within baseline → gray
       }
     } else if (p95Ms > 1000) {
-      edgeColor = "#ff7875"; // >1s absolute threshold
+      edgeColor = "#ff7875"; // >1s → red
     } else if (p95Ms > 500) {
-      edgeColor = "#ffc069"; // >500ms absolute threshold
+      edgeColor = "#ffc069"; // >500ms → orange
     } else {
-      edgeColor = "#52c41a"; // Green for healthy
+      edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3"; // healthy → neutral gray
     }
 
     return {
@@ -851,21 +1099,23 @@ export const convertServiceGraphToNetwork = (
       value: edge.total_requests || 0,
       // Edge tooltips are handled by the mini chart overlay — disable ECharts native tooltip
       tooltip: { show: false },
-      symbol: ['none', 'arrow'], // Arrow at target end
-      symbolSize: [0, 12], // Smaller arrows for cleaner look
+      symbol: ['none', 'arrow'],
+      symbolSize: [0, 10],
       lineStyle: {
-        width: Math.max(1, Math.min(4, 1 + (edge.total_requests || 0) / 150)),
+        width: 4,
         color: edgeColor,
         curveness: curveness,
-        opacity: 0.5, // More transparent for less visual clutter
+        type: 'solid',   // solid by default — no animation at rest
+        opacity: 0.6,
       },
       label: {
         show: false,
       },
       emphasis: {
         lineStyle: {
-          width: 5,
-          opacity: 0.9,
+          type: 'dashed', // becomes dashed on hover → triggers CSS animation
+          width: 4,
+          opacity: 1,
         },
       },
     };
@@ -874,17 +1124,17 @@ export const convertServiceGraphToNetwork = (
   // Determine if we should use force layout or fixed positions
   const hasPositions = cachedPositions && cachedPositions.size > 0;
 
-  // For force layout without cached positions, compute layout with D3-force
+  // Compute hierarchical layout when no cached positions exist.
+  // Columns = call depth from root services; rows = nodes within each column.
+  // Positions are mapped directly to canvas pixels so nodes fill the full space.
   if (normalizedLayoutType === 'force' && !hasPositions) {
-    const positionedNodes = computeForceLayout(nodes, graphData.edges, 800, 600);
-
-    // Apply computed positions to nodes and mark them as fixed
-    positionedNodes.forEach((positioned: any) => {
-      const node = nodes.find((n: any) => n.id === positioned.id);
-      if (node) {
-        node.x = positioned.x;
-        node.y = positioned.y;
-        node.fixed = true; // Lock positions so ECharts doesn't re-layout
+    const positions = computeForceLayout(nodes, graphData.edges, canvasWidth, canvasHeight);
+    nodes.forEach((node: any) => {
+      const pos = positions.get(node.id);
+      if (pos) {
+        node.x = pos.x;
+        node.y = pos.y;
+        node.fixed = true;
       }
     });
   }
@@ -920,7 +1170,7 @@ export const convertServiceGraphToNetwork = (
         data: nodes,
         links: edges,
         roam: true,
-        draggable: true, // Enable dragging to allow manual position adjustments
+        draggable: false,
         focusNodeAdjacency: true,
         selectedMode: 'single', // Enable single node selection
         scaleLimit: {
@@ -931,40 +1181,13 @@ export const convertServiceGraphToNetwork = (
         animationEasingUpdate: 'cubicOut',
         label: {
           show: true,
-          position: 'inside',
-          formatter: (params: any) => {
-            const serviceName = params.data.name;
-            const requests = params.data.value || 0;
-
-            // Format request count with K, M notation
-            let requestsDisplay;
-            if (requests >= 1000000) {
-              requestsDisplay = (requests / 1000000).toFixed(1) + 'M';
-            } else if (requests >= 1000) {
-              requestsDisplay = (requests / 1000).toFixed(1) + 'K';
-            } else {
-              requestsDisplay = requests.toString();
-            }
-
-            // Display service name and request count in the middle
-            return `{name|${serviceName}}\n{requests|${requestsDisplay} req}`;
-          },
-          rich: {
-            name: {
-              fontSize: 12,
-              fontWeight: '500',
-              color: isDarkMode ? '#e4e7eb' : '#333', // Dark: light text, Light: dark text
-              align: 'center',
-              lineHeight: 16,
-            },
-            requests: {
-              fontSize: 10,
-              fontWeight: 'normal',
-              color: isDarkMode ? '#9ca3af' : '#666', // Dark: light gray, Light: dark gray
-              align: 'center',
-              lineHeight: 14,
-            },
-          },
+          position: 'right',
+          distance: 8,
+          offset: [0, -14],
+          formatter: (params: any) => params.data.name,
+          fontSize: 12,
+          fontWeight: 500,
+          color: isDarkMode ? '#e4e7eb' : '#374151',
         },
         emphasis: {
           focus: "adjacency",
@@ -981,8 +1204,8 @@ export const convertServiceGraphToNetwork = (
           },
         },
         lineStyle: {
-          opacity: 0.7,
-          curveness: 'auto', // Let individual edges control curveness
+          type: 'solid',
+          opacity: 0.6,
         },
         edgeSymbol: ['none', 'arrow'],
         edgeSymbolSize: [0, 15],

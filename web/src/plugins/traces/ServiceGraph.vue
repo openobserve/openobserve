@@ -145,7 +145,7 @@
                 </div>
               </div>
             </div>
-            <div v-else class="tw:h-full graph-with-panel-container">
+            <div v-else ref="graphContainerRef" class="tw:h-full graph-with-panel-container">
               <ChartRenderer
                 ref="chartRendererRef"
                 data-test="service-graph-chart"
@@ -305,6 +305,7 @@ export default defineComponent({
     }
     const layoutType = ref(storedLayoutType || defaultLayoutType);
     const chartRendererRef = ref<any>(null);
+    const graphContainerRef = ref<HTMLElement | null>(null);
 
     const searchFilter = ref("");
 
@@ -388,10 +389,12 @@ export default defineComponent({
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
               layoutType.value,
-              new Map(), // Empty position cache to allow free movement
-              $q.dark.isActive, // Pass dark mode state
-              undefined, // Don't pass selected node - we'll use dispatchAction instead
+              new Map(),
+              $q.dark.isActive,
+              undefined,
               edgeBaselines.value,
+              graphContainerRef.value?.clientWidth  || 1200,
+              graphContainerRef.value?.clientHeight || 700,
             );
 
       // Cache the options for graph view
@@ -496,6 +499,53 @@ export default defineComponent({
         }, 500); // Longer delay to ensure chart has recalculated positions
       }
     );
+
+    // --- Graph view: flowing edge animation on node hover ---
+    //
+    // ECharts' emphasis.lineStyle only fires on direct edge hover, NOT when a
+    // connected node is hovered. We handle it explicitly: on node mouseover we
+    // call setOption to switch adjacent edges to dashed (→ CSS animation fires),
+    // on mouseout we restore them to solid.
+    //
+    // We replicate the same edge deduplication used in convertServiceGraphToNetwork
+    // so the links array index order matches ECharts' internal data array.
+    const updateEdgeStylesForHover = (hoveredNodeId: string | null) => {
+      const chart = chartRendererRef.value?.chart;
+      if (!chart || visualizationType.value !== 'graph') return;
+
+      const rawEdges: any[] = filteredGraphData.value.edges || [];
+
+      // Deduplicate exactly as convertServiceGraphToNetwork does
+      const edgeMap = new Map<string, any>();
+      rawEdges.forEach((edge: any) => {
+        const key = `${edge.from}|||${edge.to}`;
+        if (!edgeMap.has(key) ||
+            (edge.total_requests || 0) > (edgeMap.get(key).total_requests || 0)) {
+          edgeMap.set(key, edge);
+        }
+      });
+
+      const updatedLinks = Array.from(edgeMap.values()).map((edge: any) => {
+        const isAdj = hoveredNodeId !== null &&
+          (edge.from === hoveredNodeId || edge.to === hoveredNodeId);
+        return {
+          source: edge.from,
+          target: edge.to,
+          // Preserve tooltip suppression so ECharts merge doesn't re-enable native edge tooltip
+          tooltip: { show: false },
+          lineStyle: {
+            width: 4,
+            type: isAdj ? 'dashed' : 'solid',
+            opacity: hoveredNodeId !== null ? (isAdj ? 1 : 0.15) : 0.6,
+          },
+        };
+      });
+
+      chart.setOption(
+        { series: [{ links: updatedLinks }] },
+        { notMerge: false, lazyUpdate: false },
+      );
+    };
 
     // --- Tree edge tooltip: show node tooltip when hovering edge lines ---
     let edgeTooltipCleanup: (() => void) | null = null;
@@ -898,8 +948,20 @@ export default defineComponent({
         }
       };
 
+      // Node hover → animate adjacent edges (graph view only)
+      const onNodeMouseover = (params: any) => {
+        if (params.dataType !== 'node') return;
+        updateEdgeStylesForHover(params.data?.id ?? null);
+      };
+      const onNodeMouseout = (params: any) => {
+        if (params.dataType !== 'node') return;
+        updateEdgeStylesForHover(null);
+      };
+
       chart.on('mouseover', onEChartsEdgeMouseover);
       chart.on('mouseout', onEChartsEdgeMouseout);
+      chart.on('mouseover', onNodeMouseover);
+      chart.on('mouseout', onNodeMouseout);
 
       return () => {
         zr.off('mousemove', onMouseMove);
@@ -907,6 +969,8 @@ export default defineComponent({
         zr.off('click', onZrClick);
         chart.off('mouseover', onEChartsEdgeMouseover);
         chart.off('mouseout', onEChartsEdgeMouseout);
+        chart.off('mouseover', onNodeMouseover);
+        chart.off('mouseout', onNodeMouseout);
         chart.off('finished', debouncedBuild);
         if (buildTimer) clearTimeout(buildTimer);
         if (hideTimer) clearTimeout(hideTimer);
@@ -1498,5 +1562,24 @@ code {
   border-radius: 3px;
   font-family: "Courier New", monospace;
   font-size: 0.9em;
+}
+</style>
+
+<!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
+<style lang="scss">
+@keyframes sg-edge-flow {
+  from { stroke-dashoffset: 14; }
+  to   { stroke-dashoffset: 0;  }
+}
+
+/*
+ * Target dashed edge paths rendered by ECharts graph series.
+ * ECharts SVG mode may set stroke-dasharray as an HTML attribute OR inside
+ * an inline style depending on the version — we cover both.
+ */
+.graph-container svg path[stroke-dasharray],
+.graph-container svg path[style*="stroke-dasharray"] {
+  animation: sg-edge-flow 0.5s linear infinite;
+  animation-fill-mode: both;
 }
 </style>
