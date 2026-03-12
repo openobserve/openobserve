@@ -13,49 +13,147 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+/**
+ * TenstackTable — generic features spec
+ *
+ * Covers the generic props/features added for traces usage:
+ *   - rowClass prop
+ *   - #cell-{columnId} scoped slots
+ *   - meta.align (center / right)
+ *   - meta.cellClass
+ *   - #loading / #loading-banner / #empty slots
+ *   - sort-change emit (server-side sort mode)
+ *
+ * The full logs-specific behavior (column resize, drag-reorder, FTS highlight,
+ * row expand) is tested in the existing logs test suite.
+ */
+
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // ---------------------------------------------------------------------------
-// Mock @tanstack/vue-virtual — real virtualizer needs a sized DOM element
+// Module mocks (hoisted)
 // ---------------------------------------------------------------------------
+
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: (optsRef: any) => ({
-    getTotalSize: () => optsRef.value.count * 52,
-    getVirtualItems: () =>
-      Array.from({ length: optsRef.value.count }, (_, i) => ({
-        key: i,
-        index: i,
-        start: i * 52,
-        size: 52,
-      })),
+    // __v_isRef makes Vue auto-unwrap this in templates so rowVirtualizer.measureElement works
+    __v_isRef: true,
+    value: {
+      getTotalSize: () => optsRef.value.count * 24,
+      getVirtualItems: () =>
+        Array.from({ length: optsRef.value.count }, (_, i) => ({
+          key: i,
+          index: i,
+          start: i * 24,
+          size: 24,
+        })),
+      measureElement: vi.fn(),
+    },
   }),
 }));
 
-// Remove debounce delay so scroll tests fire synchronously
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return { ...actual, debounce: (fn: any) => fn };
 });
 
-import TracesTable from "./TracesTable.vue";
+vi.mock("vuex", () => ({
+  useStore: () => ({
+    state: {
+      theme: "light",
+      zoConfig: { timestamp_column: "_timestamp" },
+    },
+  }),
+}));
+
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({ t: (k: string) => k }),
+}));
+
+vi.mock("vue-draggable-next", () => ({
+  VueDraggableNext: {
+    name: "VueDraggable",
+    template: "<tr><slot /></tr>",
+    props: ["modelValue", "animation", "sort", "disabled", "handle", "tag"],
+  },
+}));
+
+vi.mock("@/plugins/logs/JsonPreview.vue", () => ({
+  default: { template: "<div />" },
+}));
+
+vi.mock("@/plugins/logs/data-table/CellActions.vue", () => ({
+  default: { template: "<div />" },
+}));
+
+vi.mock("@/components/common/O2AIContextAddBtn.vue", () => ({
+  default: { template: "<div />" },
+}));
+
+vi.mock("@/utils/logs/statusParser", () => ({
+  extractStatusFromLog: () => ({ color: "" }),
+}));
+
+vi.mock("@/composables/useTextHighlighter", () => ({
+  useTextHighlighter: () => ({ isFTSColumn: vi.fn() }),
+}));
+
+vi.mock("@/composables/useLogsHighlighter", () => ({
+  useLogsHighlighter: () => ({
+    processedResults: {},
+    processHitsInChunks: vi.fn(),
+  }),
+}));
+
+// CSS.supports is not available in jsdom
+vi.stubGlobal("CSS", { supports: () => false });
+
+import TenstackTable from "@/components/TenstackTable.vue";
 
 installQuasar();
 
-const testColumns = [
-  { id: "name", header: "NAME", size: 200 },
-  { id: "value", header: "VALUE", meta: { grow: true, width: 300 } },
+// ---------------------------------------------------------------------------
+// Test fixtures
+// ---------------------------------------------------------------------------
+
+const baseColumns = [
+  { id: "name", accessorKey: "name", header: "NAME", size: 200 },
+  { id: "value", accessorKey: "value", header: "VALUE", size: 300 },
 ];
 
-const testRows = [
+const baseRows = [
   { name: "alpha", value: "v1" },
   { name: "beta", value: "v2" },
   { name: "gamma", value: "v3" },
 ];
 
-describe("TracesTable", () => {
+function mountTable(
+  props: Record<string, any> = {},
+  slots: Record<string, any> = {},
+) {
+  return mount(TenstackTable, {
+    props: {
+      columns: baseColumns,
+      rows: baseRows,
+      enableColumnReorder: false,
+      enableRowExpand: false,
+      enableTextHighlight: false,
+      enableCellActions: false,
+      enableStatusBar: false,
+      ...props,
+    },
+    slots,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("TenstackTable — generic features", () => {
   let wrapper: VueWrapper;
 
   afterEach(() => {
@@ -63,276 +161,240 @@ describe("TracesTable", () => {
     vi.clearAllMocks();
   });
 
-  // ─── Mounting ─────────────────────────────────────────────────────────────
+  // ── Mounting ──────────────────────────────────────────────────────────────
   describe("mounting", () => {
-    it("mounts without errors", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: testRows },
-      });
+    it("should mount without errors", () => {
+      wrapper = mountTable();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("accepts an empty rows array", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: [] },
-      });
+    it("should accept an empty rows array", () => {
+      wrapper = mountTable({ rows: [] });
       expect(wrapper.exists()).toBe(true);
     });
   });
 
-  // ─── Header ───────────────────────────────────────────────────────────────
-  describe("header", () => {
-    it("renders a header cell for each column", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: [] },
-      });
-      // The sticky header uses FlexRender per column
-      // Each column contributes one div to the header group
-      const headerRow = wrapper.find(".tw\\:sticky");
-      expect(headerRow.exists()).toBe(true);
-    });
-
-    it("shows column header text", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: [] },
-      });
-      expect(wrapper.text()).toContain("NAME");
-      expect(wrapper.text()).toContain("VALUE");
-    });
-  });
-
-  // ─── Rows ─────────────────────────────────────────────────────────────────
-  describe("rows", () => {
-    it("renders a row for each data item", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: testRows },
-      });
-      const rows = wrapper.findAll(".oz-table__row");
-      expect(rows).toHaveLength(testRows.length);
-    });
-
-    it("renders no rows when rows is empty", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: [] },
-      });
-      expect(wrapper.findAll(".oz-table__row")).toHaveLength(0);
-    });
-  });
-
-  // ─── Loading slot ─────────────────────────────────────────────────────────
-  describe("loading slot", () => {
-    it("renders the loading slot when loading=true", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: [], loading: true },
-        slots: { loading: '<div data-test="custom-loading">Loading…</div>' },
-      });
-      expect(wrapper.find('[data-test="custom-loading"]').exists()).toBe(true);
-    });
-
-    it("still renders existing rows while a new load is in progress", () => {
-      // The component keeps rows visible while loading more (infinite-scroll pattern).
-      // The loading slot is only shown when rows is empty.
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: testRows, loading: true },
-        slots: { loading: '<div data-test="custom-loading" />' },
-      });
-      expect(wrapper.findAll(".oz-table__row")).toHaveLength(testRows.length);
-      expect(wrapper.find('[data-test="custom-loading"]').exists()).toBe(false);
-    });
-  });
-
-  // ─── Empty slot ───────────────────────────────────────────────────────────
-  describe("empty slot", () => {
-    it("renders the empty slot when rows is empty and not loading", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: [], loading: false },
-        slots: { empty: '<div data-test="custom-empty">No data</div>' },
-      });
-      expect(wrapper.find('[data-test="custom-empty"]').exists()).toBe(true);
-    });
-
-    it("does not render the empty slot when rows exist", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: testRows, loading: false },
-        slots: { empty: '<div data-test="custom-empty">No data</div>' },
-      });
-      expect(wrapper.find('[data-test="custom-empty"]').exists()).toBe(false);
-    });
-  });
-
-  // ─── row-click event ──────────────────────────────────────────────────────
-  describe("row-click event", () => {
-    it("emits row-click with the row data when a row is clicked", async () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: testRows },
-      });
-      const rows = wrapper.findAll(".oz-table__row");
-      await rows[0].trigger("click");
-      expect(wrapper.emitted("row-click")).toBeTruthy();
-      expect(wrapper.emitted("row-click")![0]).toEqual([testRows[0]]);
-    });
-
-    it("emits row-click for any row that is clicked", async () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: testRows },
-      });
-      const rows = wrapper.findAll(".oz-table__row");
-      await rows[1].trigger("click");
-      expect(wrapper.emitted("row-click")![0]).toEqual([testRows[1]]);
-    });
-  });
-
-  // ─── load-more event ──────────────────────────────────────────────────────
-  // TracesTable does not emit 'load-more'; callers use an external scroll
-  // listener on the container. These tests are intentionally skipped.
-  describe.skip("load-more event", () => {
-    it("emits load-more when scrolled near the bottom", async () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: testRows },
-      });
-      const scroller = wrapper.element as HTMLElement;
-
-      Object.defineProperties(scroller, {
-        scrollTop: { value: 700, configurable: true },
-        clientHeight: { value: 300, configurable: true },
-        scrollHeight: { value: 1000, configurable: true },
-      });
-
-      await wrapper.trigger("scroll");
-      expect(wrapper.emitted("load-more")).toBeTruthy();
-    });
-
-    it("does not emit load-more when far from the bottom", async () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: testRows },
-      });
-      const scroller = wrapper.element as HTMLElement;
-
-      Object.defineProperties(scroller, {
-        scrollTop: { value: 0, configurable: true },
-        clientHeight: { value: 300, configurable: true },
-        scrollHeight: { value: 10000, configurable: true },
-      });
-
-      await wrapper.trigger("scroll");
-      expect(wrapper.emitted("load-more")).toBeFalsy();
-    });
-  });
-
-  // ─── Empty stream list ────────────────────────────────────────────────────
-  describe("empty stream list", () => {
-    it("should handle empty stream list gracefully", () => {
-      // Simulates the case where the backend returns no traces (empty stream).
-      // The component must not throw, must render no rows, and must show the
-      // empty slot so the parent can display a "no results" message.
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: [], loading: false },
-        slots: { empty: '<div data-test="no-traces">No traces found</div>' },
-      });
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.findAll(".oz-table__row")).toHaveLength(0);
-      expect(wrapper.find('[data-test="no-traces"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="no-traces"]').text()).toBe("No traces found");
-    });
-  });
-
-  // ─── rowClass prop ────────────────────────────────────────────────────────
+  // ── rowClass prop ─────────────────────────────────────────────────────────
   describe("rowClass prop", () => {
-    it("applies the class returned by rowClass to the matching row", () => {
-      wrapper = mount(TracesTable, {
-        props: {
-          columns: testColumns,
-          rows: testRows,
-          rowClass: (row: any) => (row.name === "alpha" ? "oz-table__row--error" : ""),
-        },
+    it("should apply the class returned by rowClass to matching rows", () => {
+      wrapper = mountTable({
+        rowClass: (row: any) =>
+          row.name === "alpha" ? "oz-table__row--error" : "",
       });
-      const rows = wrapper.findAll(".oz-table__row");
+      const rows = wrapper.findAll("tr[data-test]");
       expect(rows[0].classes()).toContain("oz-table__row--error");
       expect(rows[1].classes()).not.toContain("oz-table__row--error");
     });
 
-    it("works without a rowClass prop (no crash)", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: testRows },
-      });
-      expect(wrapper.findAll(".oz-table__row")).toHaveLength(testRows.length);
+    it("should work without a rowClass prop (no crash)", () => {
+      wrapper = mountTable();
+      expect(wrapper.findAll("tr[data-test]").length).toBeGreaterThan(0);
     });
   });
 
-  // ─── Custom cell slot ─────────────────────────────────────────────────────
+  // ── #cell-{columnId} scoped slot ──────────────────────────────────────────
   describe("cell slots", () => {
-    it("renders a custom slot for a specific column", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: testColumns, rows: testRows },
-        slots: {
+    it("should render a custom slot for a specific column", () => {
+      wrapper = mountTable(
+        {
+          columns: [
+            {
+              id: "name",
+              accessorKey: "name",
+              header: "NAME",
+              size: 200,
+              meta: { slot: true },
+            },
+            { id: "value", accessorKey: "value", header: "VALUE", size: 300 },
+          ],
+        },
+        {
           "cell-name": ({ item }: any) =>
             h("span", { "data-test": "custom-name-cell" }, item.name),
         },
-      });
+      );
       const cells = wrapper.findAll('[data-test="custom-name-cell"]');
-      expect(cells).toHaveLength(testRows.length);
+      expect(cells).toHaveLength(baseRows.length);
       expect(cells[0].text()).toBe("alpha");
     });
-  });
 
-  // ─── Column alignment ─────────────────────────────────────────────────────
-  describe("column alignment", () => {
-    it("applies text-center class for center-aligned columns", () => {
-      const centeredCols = [
-        { id: "id", header: "ID", size: 100, meta: { align: "center" as const } },
-      ];
-      wrapper = mount(TracesTable, {
-        props: { columns: centeredCols, rows: [{ id: "x" }] },
-      });
-      // The first data cell should have text-center
-      const cell = wrapper.find(".oz-table__row div");
-      expect(cell.classes()).toContain("text-center");
-    });
-
-    it("applies text-right class for right-aligned columns", () => {
-      const rightCols = [
-        { id: "val", header: "VAL", size: 100, meta: { align: "right" as const } },
-      ];
-      wrapper = mount(TracesTable, {
-        props: { columns: rightCols, rows: [{ val: 42 }] },
-      });
-      const cell = wrapper.find(".oz-table__row div");
-      expect(cell.classes()).toContain("text-right");
-    });
-
-    it("applies no alignment class for default (left) columns", () => {
-      wrapper = mount(TracesTable, {
-        props: { columns: [{ id: "name", header: "N", size: 100 }], rows: [{ name: "x" }] },
-      });
-      const cell = wrapper.find(".oz-table__row div");
-      expect(cell.classes()).not.toContain("text-center");
-      expect(cell.classes()).not.toContain("text-right");
+    it("should fall back to renderValue when no cell slot is provided", () => {
+      wrapper = mountTable();
+      expect(wrapper.text()).toContain("alpha");
+      expect(wrapper.text()).toContain("v1");
     });
   });
 
-  // ─── Column sizing ────────────────────────────────────────────────────────
-  describe("column sizing", () => {
-    it("applies fixed width style for non-grow columns", () => {
-      wrapper = mount(TracesTable, {
-        props: {
-          columns: [{ id: "name", header: "N", size: 250 }],
-          rows: [{ name: "x" }],
-        },
+  // ── meta.align ────────────────────────────────────────────────────────────
+  describe("meta.align", () => {
+    it("should apply tw:text-center for center-aligned columns", () => {
+      wrapper = mountTable({
+        columns: [
+          {
+            id: "id",
+            accessorKey: "id",
+            header: "ID",
+            size: 100,
+            meta: { align: "center" as const },
+          },
+        ],
+        rows: [{ id: "x" }],
       });
-      const cell = wrapper.find(".oz-table__row div");
-      expect(cell.attributes("style")).toContain("width: 250px");
+      const tds = wrapper.findAll("td[data-test]");
+      expect(tds[0].classes()).toContain("tw:text-center!");
     });
 
-    it("applies flex-grow style for grow columns", () => {
-      wrapper = mount(TracesTable, {
-        props: {
-          columns: [{ id: "desc", header: "D", meta: { grow: true, width: 200 } }],
-          rows: [{ desc: "y" }],
-        },
+    it("should apply tw:text-right for right-aligned columns", () => {
+      wrapper = mountTable({
+        columns: [
+          {
+            id: "val",
+            accessorKey: "val",
+            header: "VAL",
+            size: 100,
+            meta: { align: "right" as const },
+          },
+        ],
+        rows: [{ val: 42 }],
       });
-      const cell = wrapper.find(".oz-table__row div");
-      // happy-dom expands flex shorthand; check for flex-basis 0px in any form
-      expect(cell.attributes("style")).toMatch(/flex(?:-basis)?[^;]*0px/);
+      const tds = wrapper.findAll("td[data-test]");
+      expect(tds[0].classes()).toContain("tw:text-right!");
+    });
+
+    it("should apply no alignment class for default (left) columns", () => {
+      wrapper = mountTable({
+        columns: [{ id: "name", accessorKey: "name", header: "N", size: 100 }],
+        rows: [{ name: "x" }],
+      });
+      const tds = wrapper.findAll("td[data-test]");
+      expect(tds[0].classes()).not.toContain("tw:text-center");
+      expect(tds[0].classes()).not.toContain("tw:text-right");
+    });
+  });
+
+  // ── meta.cellClass ────────────────────────────────────────────────────────
+  describe("meta.cellClass", () => {
+    it("should apply cellClass to matching td elements", () => {
+      wrapper = mountTable({
+        columns: [
+          {
+            id: "svc",
+            accessorKey: "svc",
+            header: "SVC",
+            size: 150,
+            meta: { cellClass: "tw:text-[var(--o2-text-1)]" },
+          },
+        ],
+        rows: [{ svc: "auth" }],
+      });
+      const tds = wrapper.findAll("td[data-test]");
+      expect(tds[0].classes()).toContain("tw:text-[var(--o2-text-1)]");
+    });
+  });
+
+  // ── #loading slot ─────────────────────────────────────────────────────────
+  describe("loading slot", () => {
+    it("should render the loading slot when loading=true and no rows", () => {
+      wrapper = mountTable(
+        { rows: [], loading: true },
+        { loading: '<div data-test="custom-loading">Loading…</div>' },
+      );
+      expect(wrapper.find('[data-test="custom-loading"]').exists()).toBe(true);
+    });
+
+    it("should not render the loading slot when rows exist", () => {
+      wrapper = mountTable(
+        { loading: true },
+        { loading: '<div data-test="custom-loading">Loading…</div>' },
+      );
+      expect(wrapper.find('[data-test="custom-loading"]').exists()).toBe(false);
+    });
+  });
+
+  // ── #loading-banner slot ──────────────────────────────────────────────────
+  describe("loading-banner slot", () => {
+    it("should render the loading-banner slot when loading=true and rows exist", () => {
+      wrapper = mountTable(
+        { loading: true },
+        { "loading-banner": '<div data-test="banner">Fetching…</div>' },
+      );
+      expect(wrapper.find('[data-test="banner"]').exists()).toBe(true);
+    });
+
+    it("should not render loading-banner when rows are empty", () => {
+      wrapper = mountTable(
+        { rows: [], loading: true },
+        { "loading-banner": '<div data-test="banner">Fetching…</div>' },
+      );
+      expect(wrapper.find('[data-test="banner"]').exists()).toBe(false);
+    });
+  });
+
+  // ── #empty slot ───────────────────────────────────────────────────────────
+  describe("empty slot", () => {
+    it("should render the empty slot when rows is empty and not loading", () => {
+      wrapper = mountTable(
+        { rows: [], loading: false },
+        { empty: '<div data-test="custom-empty">No data</div>' },
+      );
+      expect(wrapper.find('[data-test="custom-empty"]').exists()).toBe(true);
+    });
+
+    it("should not render the empty slot when rows exist", () => {
+      wrapper = mountTable(
+        {},
+        { empty: '<div data-test="custom-empty">No data</div>' },
+      );
+      expect(wrapper.find('[data-test="custom-empty"]').exists()).toBe(false);
+    });
+  });
+
+  // ── sort-change emit ──────────────────────────────────────────────────────
+  describe("sort-change emit", () => {
+    it("should emit sort-change with desc on first click of an unsorted sortable column", async () => {
+      wrapper = mountTable({
+        columns: [
+          {
+            id: "timestamp",
+            header: "TIMESTAMP",
+            size: 160,
+            meta: { sortable: true },
+          },
+        ],
+        rows: [],
+        sortBy: "other_field",
+        sortOrder: "asc" as const,
+        sortFieldMap: { timestamp: "start_time" },
+      });
+      await wrapper
+        .find('[data-test="o2-table-th-sort-timestamp"]')
+        .trigger("click");
+      expect(wrapper.emitted("sort-change")).toBeTruthy();
+      expect(wrapper.emitted("sort-change")![0]).toEqual([
+        "start_time",
+        "desc",
+      ]);
+    });
+
+    it("should toggle sort order when clicking the active sort column", async () => {
+      wrapper = mountTable({
+        columns: [
+          {
+            id: "duration",
+            header: "DURATION",
+            size: 120,
+            meta: { sortable: true },
+          },
+        ],
+        rows: [],
+        sortBy: "duration",
+        sortOrder: "desc" as const,
+        sortFieldMap: {},
+      });
+      await wrapper
+        .find('[data-test="o2-table-th-sort-duration"]')
+        .trigger("click");
+      expect(wrapper.emitted("sort-change")![0]).toEqual(["duration", "asc"]);
     });
   });
 });

@@ -13,8 +13,8 @@
         :title="row.name"
       >
         <div
-          class="field_label ellipsis tw:flex tw:items-center"
-          style="width: calc(100% - 28px); font-size: 14px"
+          class="field_label tw:ellipsis! tw:flex tw:items-center tw:w-full"
+          style="font-size: 14px"
           :title="row.label || row.name"
         >
           <span v-if="row.dataType" class="field-type-container">
@@ -26,15 +26,34 @@
           </span>
           {{ row.label || row.name }}
         </div>
-        <div class="field_overlay">
+        <div
+          class="field_overlay tw:bg-[var(--o2-hover-accent)] tw:absolute tw:right-0! tw:h-full tw:top-0 tw:flex! tw:items-center! tw:rounded"
+        >
           <q-btn
             :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
             :icon="outlinedAdd"
-            style="margin-right: 0.375rem"
-            size="6px"
-            class="q-mr-sm"
+            size="0.4rem"
+            class="tw:mx-[0.375rem]!"
             @click.stop="addSearchTerm(`${row.name}=''`)"
             round
+          />
+          <q-icon
+            :data-test="`log-search-index-list-add-${row.name}-field-btn`"
+            v-if="showVisibilityToggle && !isFieldSelected"
+            :name="outlinedVisibility"
+            size="1.1rem"
+            title="Add field to table"
+            class="tw:cursor-pointer! tw:mr-[0.375rem]!"
+            @click.stop="$emit('toggle-field', row)"
+          />
+          <q-icon
+            :data-test="`log-search-index-list-remove-${row.name}-field-btn`"
+            v-if="showVisibilityToggle && isFieldSelected"
+            :name="outlinedVisibilityOff"
+            size="1.1rem"
+            title="Remove field from table"
+            class="tw:cursor-pointer! tw:mr-[0.375rem]!"
+            @click.stop="$emit('toggle-field', row)"
           />
         </div>
       </div>
@@ -146,7 +165,11 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
-import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedAdd,
+  outlinedVisibility,
+  outlinedVisibilityOff,
+} from "@quasar/extras/material-icons-outlined";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import {
   removeFieldFromWhereAST,
@@ -175,7 +198,23 @@ const props = defineProps({
     type: Array as () => string[],
     default: () => [],
   },
+  selectedFields: {
+    type: Array as () => string[],
+    default: () => [],
+  },
+  showVisibilityToggle: {
+    type: Boolean,
+    default: true,
+  },
 });
+
+defineEmits<{
+  "toggle-field": [field: any];
+}>();
+
+const isFieldSelected = computed(() =>
+  props.selectedFields.includes(props.row?.name),
+);
 
 const isExpanded = ref(false);
 const fieldValuesPanelRef = ref();
