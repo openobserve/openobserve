@@ -183,7 +183,10 @@ export class SearchJobInspectorPage {
    */
   async hasHistoryInspectButtons() {
     try {
-      // Check if any history rows exist first
+      // Wait for history rows to load (they may take time to appear)
+      await this.page.locator(this.searchHistoryRow).first().waitFor({ state: 'visible', timeout: 15000 });
+
+      // Check if any history rows exist
       const rowCount = await this.page.locator(this.searchHistoryRow).count();
       console.log(`Search history rows found: ${rowCount}`);
       if (rowCount === 0) {

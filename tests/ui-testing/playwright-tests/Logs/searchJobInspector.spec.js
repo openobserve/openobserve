@@ -26,7 +26,7 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
 
   test("should show Search Inspect option in menu (Enterprise feature)", async ({ page }) => {
     await logsPage.navigateToLogs();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Check if Search Inspect option is visible in more options menu
     const isVisible = await inspectorPage.isSearchInspectVisible();
@@ -39,10 +39,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
   test("should navigate to Inspector page via Search History", async ({ page }) => {
     // Select stream and run search to generate history
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await inspectorPage.runSearch();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Open Search History
     await inspectorPage.openSearchHistory();
@@ -86,7 +86,7 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
 
   test("should open Search Inspect dialog and submit trace ID", async ({ page }) => {
     await logsPage.navigateToLogs();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await inspectorPage.takeScreenshot('before-inspect-dialog');
 
@@ -105,7 +105,7 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
     // Fill and submit
     await traceIdInput.fill('dialog-test-trace-123');
     await submitBtn.click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Verify navigation to inspector
     await inspectorPage.assertUrlHasTraceId();
@@ -114,10 +114,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
   test("should display inspector page components", async ({ page }) => {
     // Run search to get valid trace_id
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await inspectorPage.runSearch();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Navigate to inspector via history
     await inspectorPage.openSearchHistory();
@@ -154,10 +154,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
   test("should display events table when data exists", async ({ page }) => {
     // Run search first
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await inspectorPage.runSearch();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Navigate to inspector via history
     await inspectorPage.openSearchHistory();
@@ -187,10 +187,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
   test("should open View Query dialog and display SQL content", async ({ page }) => {
     // Run search first
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await inspectorPage.runSearch();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Navigate to inspector via history
     await inspectorPage.openSearchHistory();
@@ -225,10 +225,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
   test("should close inspector and navigate back", async ({ page }) => {
     // Run search first
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await inspectorPage.runSearch();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Navigate to inspector
     await inspectorPage.openSearchHistory();
@@ -284,10 +284,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
   test("should display inspector stats after search", async ({ page }) => {
     // Run search
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await inspectorPage.runSearch();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Get search results before going to inspector
     const searchResults = await inspectorPage.parseSearchResults();
@@ -320,10 +320,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
   test("should show Inspect button after running search", async ({ page }) => {
     // Select stream and run search
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await logsPage.selectRunQuery();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await inspectorPage.takeScreenshot('search-results-with-inspect-btn');
 
@@ -338,10 +338,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
   test("should navigate to Inspector page from Inspect button", async ({ page }) => {
     // Select stream and run search
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await logsPage.selectRunQuery();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Capture search results before clicking Inspect
     const searchResults = await inspectorPage.parseSearchResults();
@@ -365,14 +365,14 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
   test("should verify data appears in recent time ranges", async ({ page }) => {
     // Select stream
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Set time range to Past 15 Minutes
     await inspectorPage.selectRelative15Minutes();
 
     // Run search
     await logsPage.selectRunQuery();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await inspectorPage.takeScreenshot('past-15-minutes');
 
@@ -386,7 +386,7 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
       // Try a wider time range
       await inspectorPage.selectRelative1Hour();
       await logsPage.selectRunQuery();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const widerResults = await inspectorPage.parseSearchResults();
       testLogger.info(`Past 1 Hour - Events: ${widerResults.eventsCount}`);
@@ -406,14 +406,14 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
 
     // Select stream
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Set wider time range to ensure we get data
     await inspectorPage.selectRelative1Hour();
 
     // Run search
     await logsPage.selectRunQuery();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const searchResults = await inspectorPage.parseSearchResults();
     testLogger.info(`With ingested data - Events: ${searchResults.eventsCount}, Time: ${searchResults.timeMs}ms`);
@@ -436,10 +436,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
   test("should copy trace ID to clipboard", async ({ page }) => {
     // Run search first
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await inspectorPage.runSearch();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Navigate to inspector via history
     await inspectorPage.openSearchHistory();
@@ -477,10 +477,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
   test("should display time range badge with timezone", async ({ page }) => {
     // Run search first
     await logsPage.selectStream(stream, 3, 0);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await inspectorPage.runSearch();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Navigate to inspector via history
     await inspectorPage.openSearchHistory();
