@@ -13,10 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  formatUnitValue,
-  getUnitValue,
-} from "./convertDataIntoUnitValue";
 import { getDataValue } from "./aliasUtils";
 import {
   PIVOT_TABLE_MAX_COLUMNS,
@@ -25,6 +21,11 @@ import {
   PIVOT_TABLE_TOTAL_LABEL,
   PIVOT_TABLE_OTHERS_LABEL,
 } from "./constants";
+import {
+  buildValueMappingCache,
+  parseOverrideConfigs,
+  formatNumericValue,
+} from "./tableConfigUtils";
 
 /**
  * Builds N-level header metadata for the TableRenderer.
@@ -205,6 +206,7 @@ export const convertPivotTableData = (
 
   const query = panelSchema.queries[0];
   const config = panelSchema.config || {};
+  const valueMappingCache = buildValueMappingCache(config.mappings);
   const xFields = query.fields?.x || [];
   const yFields = query.fields?.y || [];
   const breakdownFields = query.fields?.breakdown || [];
@@ -364,19 +366,9 @@ export const convertPivotTableData = (
   }
 
   // --- Step 5: Build column definitions ---
-  const overrideConfigs = config.override_config || [];
-  const unitConfigMap: Record<string, any> = {};
-
-  for (const o of overrideConfigs) {
-    const alias = o?.field?.value;
-    const cfg = o?.config?.[0];
-    if (alias && cfg?.type === "unit") {
-      unitConfigMap[alias.toLowerCase()] = {
-        unit: cfg.value?.unit,
-        customUnit: cfg.value?.customUnit,
-      };
-    }
-  }
+  const { colorConfigMap, unitConfigMap } = parseOverrideConfigs(
+    config.override_config,
+  );
 
   const columns: any[] = [];
   const isSingleValueField = yAliases.length === 1;
@@ -385,14 +377,18 @@ export const convertPivotTableData = (
 
   // Row field columns (x-axis) — marked with _isRowField for header rendering
   for (const xField of xFields) {
-    columns.push({
+    const col: any = {
       name: xField.alias,
       field: xField.alias,
       label: xField.label,
       align: "left",
       sortable: true,
       _isRowField: true,
-    });
+    };
+    if (colorConfigMap[xField.alias.toLowerCase()]?.autoColor) {
+      col.colorMode = "auto";
+    }
+    columns.push(col);
   }
 
   // Pivot value columns
@@ -427,12 +423,8 @@ export const convertPivotTableData = (
         sortable: true,
         _groupStart: isGroupStart,
         sort: (a: any, b: any) => (Number(a) || 0) - (Number(b) || 0),
-        format: (val: any) => {
-          if (val === null || val === undefined) return String(missingValue);
-          return typeof val === 'number' && !Number.isNaN(val)
-            ? `${formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, decimals)) ?? 0}`
-            : val;
-        },
+        format: (val: any) =>
+          formatNumericValue(val, valueMappingCache, unitToUse, customUnitToUse, decimals, missingValue),
       });
     }
   }
@@ -464,12 +456,8 @@ export const convertPivotTableData = (
         _isTotalColumn: true,
         _totalColRightIndex: yFields.length - 1 - tIdx,
         sort: (a: any, b: any) => (Number(a) || 0) - (Number(b) || 0),
-        format: (val: any) => {
-          if (val === null || val === undefined) return String(missingValue);
-          return typeof val === 'number' && !Number.isNaN(val)
-            ? `${formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, decimals)) ?? 0}`
-            : val;
-        },
+        format: (val: any) =>
+          formatNumericValue(val, valueMappingCache, unitToUse, customUnitToUse, decimals, missingValue),
         headerStyle: "font-weight: bold",
       });
     }

@@ -18,77 +18,17 @@ import {
   formatUnitValue,
   getUnitValue,
 } from "./convertDataIntoUnitValue";
-import { findFirstValidMappedValue } from "./panelValidation";
 import {
   formatDate,
   isTimeSeries,
   isTimeStamp,
 } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
-
-// Build a lookup map for value mappings to avoid repeated searches
-const buildValueMappingCache = (mappings: any) => {
-  if (!mappings || !Array.isArray(mappings)) {
-    return null;
-  }
-
-  const cache = new Map<any, string>();
-
-  mappings.forEach((mapping: any) => {
-    if (mapping && mapping.text) {
-      // Handle range mappings
-      if (mapping.from !== undefined && mapping.to !== undefined) {
-        // Store range info for later lookup
-        cache.set(`__range_${mapping.from}_${mapping.to}`, mapping.text);
-      } else if (mapping.value !== undefined && mapping.value !== null) {
-        // Direct value mapping
-        cache.set(mapping.value, mapping.text);
-      }
-    }
-  });
-
-  return cache.size > 0 ? cache : null;
-};
-
-const applyValueMapping = (value: any, mappings: any) => {
-  // Find the first valid mapping with a valid text
-  const foundValue = findFirstValidMappedValue(value, mappings, "text");
-
-  // if foundValue is not null and foundValue.text is not null, then return foundValue.text
-  if (foundValue && foundValue.text) {
-    return foundValue.text;
-  }
-
-  return null;
-};
-
-// Fast lookup using pre-built cache
-const lookupValueMapping = (value: any, cache: Map<any, string> | null) => {
-  if (!cache) return null;
-
-  // Direct lookup first
-  if (cache.has(value)) {
-    return cache.get(value);
-  }
-
-  // Check range mappings
-  if (typeof value === 'number') {
-    const entries = Array.from(cache.entries());
-    for (let i = 0; i < entries.length; i++) {
-      const [key, text] = entries[i];
-      if (typeof key === 'string' && key.startsWith('__range_')) {
-        const parts = key.split('_');
-        const from = parseFloat(parts[2]);
-        const to = parseFloat(parts[3]);
-        if (!isNaN(from) && !isNaN(to) && value >= from && value <= to) {
-          return text;
-        }
-      }
-    }
-  }
-
-  return null;
-};
+import {
+  buildValueMappingCache,
+  lookupValueMapping,
+  parseOverrideConfigs,
+} from "./tableConfigUtils";
 
 /**
  * Parses a potential timestamp value (string, number, or Date) and returns a formatted string.
@@ -175,33 +115,15 @@ export const convertTableData = (
   // Build value mapping cache once for all cells
   const valueMappingCache = buildValueMappingCache(panelSchema.config?.mappings);
 
-  const overrideConfigs = panelSchema.config.override_config || [];
-  const colorConfigMap: Record<string, any> = {};
-  const unitConfigMap: Record<string, any> = {};
+  const { colorConfigMap, unitConfigMap } = parseOverrideConfigs(
+    panelSchema.config.override_config,
+  );
   const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
 
  // Cache timezone to avoid repeated store lookups
   const timezone = store.state.timezone;
 
   try {
-    // Build maps for both color and unit configs
-    overrideConfigs.forEach((o: any) => {
-      const alias = o?.field?.value;
-      const config = o?.config?.[0];
-
-      if (alias && config) {
-        const aliasLower = alias.toLowerCase();
-        if (config.type === "unique_value_color") {
-          const autoColor = config.autoColor;
-          colorConfigMap[aliasLower] = { autoColor };
-        } else if (config.type === "unit") {
-          const unit = config.value?.unit;
-          const customUnit = config.value?.customUnit;
-          unitConfigMap[aliasLower] = { unit, customUnit };
-        }
-      }
-    });
-
     // Pre-build case-insensitive field name cache
     if (tableRows.length > 0) {
       Object.keys(tableRows[0]).forEach((key) => {

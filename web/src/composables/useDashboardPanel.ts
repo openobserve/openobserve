@@ -579,7 +579,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           ].fields.breakdown?.length >= 1
         );
       case "table":
-        // Allow up to 2 breakdown fields for table charts
+        // Allow up to 3 breakdown fields for table charts
         return (
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
