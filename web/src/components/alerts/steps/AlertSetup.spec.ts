@@ -870,9 +870,90 @@ describe("AlertSetup.vue", () => {
 
       for (const type of allStreamTypes) {
         wrapper.props().formData.stream_type = type;
+
         await nextTick();
         expect(wrapper.props().formData.stream_type).toBe(type);
       }
+    });
+  });
+
+  describe("Anomaly Detection", () => {
+    it("should not show anomaly detection radio when not enabled", () => {
+      // Default mock store has no anomaly_detection_enabled
+      expect(
+        wrapper.find('[data-test="add-alert-anomaly-detection-radio"]').exists()
+      ).toBe(false);
+    });
+
+    it("isAnomalyDetectionEnabled is false when anomaly_detection_enabled is false", () => {
+      const storeWithAnomaly = createMockStore({
+        zoConfig: { build_type: "opensource", anomaly_detection_enabled: false },
+      });
+      const w2 = mount(AlertSetup, {
+        global: {
+          mocks: { $store: storeWithAnomaly },
+          provide: { store: storeWithAnomaly },
+          plugins: [i18n],
+        },
+        props: {
+          formData: { ...mockFormData },
+          beingUpdated: false,
+          streamTypes: ["logs"],
+          filteredStreams: [],
+          isFetchingStreams: false,
+          activeFolderId: "",
+        },
+      });
+      expect((w2.vm as any).isAnomalyDetectionEnabled).toBe(false);
+      w2.unmount();
+    });
+
+    it("isAnomalyDetectionEnabled is true when anomaly_detection_enabled is true", () => {
+      const storeWithAnomaly = createMockStore({
+        zoConfig: { build_type: "opensource", anomaly_detection_enabled: true },
+      });
+      const w2 = mount(AlertSetup, {
+        global: {
+          mocks: { $store: storeWithAnomaly },
+          provide: { store: storeWithAnomaly },
+          plugins: [i18n],
+        },
+        props: {
+          formData: { ...mockFormData },
+          beingUpdated: false,
+          streamTypes: ["logs"],
+          filteredStreams: [],
+          isFetchingStreams: false,
+          activeFolderId: "",
+        },
+      });
+      expect((w2.vm as any).isAnomalyDetectionEnabled).toBe(true);
+      w2.unmount();
+    });
+
+    it("shows anomaly detection radio button when enabled", async () => {
+      const storeWithAnomaly = createMockStore({
+        zoConfig: { build_type: "opensource", anomaly_detection_enabled: true },
+      });
+      const w2 = mount(AlertSetup, {
+        global: {
+          mocks: { $store: storeWithAnomaly },
+          provide: { store: storeWithAnomaly },
+          plugins: [i18n],
+        },
+        props: {
+          formData: { ...mockFormData },
+          beingUpdated: false,
+          streamTypes: ["logs"],
+          filteredStreams: [],
+          isFetchingStreams: false,
+          activeFolderId: "",
+        },
+      });
+      expect(
+        w2.find('[data-test="add-alert-anomaly-detection-radio"]').exists()
+      ).toBe(true);
+      w2.unmount();
     });
   });
 });

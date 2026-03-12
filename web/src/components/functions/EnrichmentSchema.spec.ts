@@ -391,4 +391,335 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       expect(wrapper.find('.stream_details_container').exists()).toBe(true);
     });
   });
+
+  describe('Search Field Input Coverage', () => {
+    it('should render schema field search input', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+      await nextTick();
+
+      // data-test="schema-field-search-input" should exist after loading
+      const searchInput = wrapper.find('[data-test="schema-field-search-input"]');
+      expect(searchInput.exists()).toBe(true);
+    });
+
+    it('should update filterField when search input changes', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.filterField).toBe('');
+
+      vm.filterField = 'test_field';
+      expect(vm.filterField).toBe('test_field');
+    });
+  });
+
+  describe('Result Total and Field Count Coverage', () => {
+    it('should set resultTotal from schema length after data load', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      // mockSchemaData has 2 schema fields
+      expect(vm.resultTotal).toBe(2);
+    });
+
+    it('should display all-fields count in the display-total-fields element', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+      await nextTick();
+
+      // display-total-fields element shows "All Fields (count)"
+      const totalFields = wrapper.find('.display-total-fields');
+      expect(totalFields.exists()).toBe(true);
+      expect(totalFields.text()).toContain('2');
+    });
+  });
+
+  describe('Pagination Coverage', () => {
+    it('should update pagination values in changePagination', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      // qTable ref is null by default in tests (optional chaining handles this)
+      vm.changePagination({ label: '10', value: 10 });
+
+      expect(vm.selectedPerPage).toBe(10);
+      expect(vm.pagination.rowsPerPage).toBe(10);
+    });
+
+    it('should handle changePagination when qTable ref is null (optional chaining)', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      vm.qTable = null;
+
+      // Should not throw due to optional chaining (qTable.value?.setPagination)
+      expect(() => {
+        vm.changePagination({ label: '20', value: 20 });
+      }).not.toThrow();
+
+      expect(vm.selectedPerPage).toBe(20);
+    });
+
+    it('should have correct perPageOptions', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const values = vm.perPageOptions.map((o: any) => o.value);
+      expect(values).toContain(5);
+      expect(values).toContain(10);
+      expect(values).toContain(20);
+      expect(values).toContain(50);
+    });
+  });
+
+  describe('filterFieldFn Comprehensive Coverage', () => {
+    it('should return all rows when terms is empty string', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const rows = [
+        { name: 'field_a', type: 'string' },
+        { name: 'field_b', type: 'number' },
+      ];
+
+      // Empty string - includes('') is always true
+      const result = vm.filterFieldFn(rows, '');
+      expect(result).toHaveLength(2);
+    });
+
+    it('should filter case-insensitively', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const rows = [
+        { name: 'USERNAME', type: 'string' },
+        { name: 'email_address', type: 'string' },
+      ];
+
+      const result = vm.filterFieldFn(rows, 'username');
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('USERNAME');
+    });
+
+    it('should return empty array when no rows match', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const rows = [{ name: 'field1', type: 'string' }];
+
+      const result = vm.filterFieldFn(rows, 'xyz_not_found');
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('Schema Data Loading Coverage', () => {
+    it('should set schemaData correctly after successful load', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.schemaData.name).toBe('test_stream');
+      expect(vm.schemaData.schema).toHaveLength(2);
+    });
+
+    it('should reset loadingState to false after successful load', async () => {
+      const wrapper = mount(EnrichmentSchema, {
+        props: defaultProps,
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.loadingState).toBe(false);
+    });
+
+    it('should call getStream with enrichment_tables type', async () => {
+      mount(EnrichmentSchema, {
+        props: { selectedEnrichmentTable: 'my_table' },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            $store: mockStore,
+            store: mockStore,
+          },
+          stubs: {
+            'QTablePagination': true,
+          },
+        },
+      });
+
+      await nextTick();
+      await nextTick();
+
+      expect(mockGetStream).toHaveBeenCalledWith('my_table', 'enrichment_tables', true);
+    });
+  });
 });
