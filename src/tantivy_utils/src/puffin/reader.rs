@@ -81,12 +81,11 @@ impl PuffinBytesReader {
             ));
         }
 
-        // check MAGIC
-        let magic =
-            infra::cache::storage::get_range(&self.account, &self.source.location, 0..MAGIC_SIZE)
-                .await?;
-        ensure!(magic.to_vec() == MAGIC, anyhow!("Header MAGIC mismatch"));
-
+        // Skip the separate header-magic read (0..4 bytes). The footer tail
+        // already contains FootMagic at bytes 8..12, which PuffinFooterBytesReader
+        // validates before parsing any payload. That check is sufficient to confirm
+        // the file is a valid puffin file, so the redundant head-magic read is
+        // eliminated — reducing footer parsing from 3 IOs to 2 IOs at zero overhead.
         let puffin_meta = PuffinFooterBytesReader::new(self.account.clone(), self.source.clone())
             .parse()
             .await?;

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { test: baseTest } = require('@playwright/test');
 const testLogger = require('./test-logger.js');
 const { waitUtils } = require('./wait-helpers.js');
+const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 const istanbulCLIOutput = path.join(process.cwd(), '.nyc_output');
 const authFile = path.join(__dirname, 'auth', 'user.json');
@@ -119,6 +120,10 @@ async function navigateToBase(page) {
 
   await page.goto(baseUrlWithOrg);
   await page.waitForLoadState('domcontentloaded');
+  // Cloud needs full hydration before sidebar clicks — without this, clicks trigger Dex redirect
+  if (isCloudEnvironment()) {
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+  }
   
   const isAuthenticated = await verifyAuthentication(page);
   
