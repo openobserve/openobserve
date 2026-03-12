@@ -358,9 +358,12 @@ export class MetricsQueryEditorPage {
         this.testLogger.info('Looking for Add Query button...');
 
         // Try multiple selectors for the add query button
+        // Note: on cloud, the data-test attribute contains literal backticks
+        // e.g. `dashboard-panel-query-tab-add` — use contains-match to handle both
         const selectors = [
-            '[data-test="dashboard-panel-query-tab-add"]',  // Exact data-test attribute
-            'button[data-test*="panel-query-tab-add"]',        // Partial match
+            '[data-test*="dashboard-panel-query-tab-add"]',   // Contains match (handles backtick variant)
+            '[data-test="dashboard-panel-query-tab-add"]',    // Exact data-test attribute
+            'button[data-test*="panel-query-tab-add"]',       // Partial match
             'button.q-btn[icon="add"]',                        // Button with add icon
             'button.q-btn.q-btn--round.q-btn--flat',          // Round flat button (likely the add button)
             '.q-tab__content + button[icon="add"]',           // Add button next to tabs
@@ -445,8 +448,9 @@ export class MetricsQueryEditorPage {
         await this.page.keyboard.press(selectAllKey);
         await this.page.waitForTimeout(100);
 
-        // Type the new query
-        await this.page.keyboard.type(query, { delay: 50 });
+        // Use insertText instead of type — keyboard.type() triggers Monaco
+        // autocomplete on cloud which corrupts the query text
+        await this.page.keyboard.insertText(query);
         await this.page.waitForTimeout(500);
     }
 

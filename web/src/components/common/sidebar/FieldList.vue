@@ -79,9 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="props.row.name"
                   >
                     <div class="field_label ellipsis tw:flex tw:items-center">
-                      <span
-                        class="field-type-container"
-                      >
+                      <span class="field-type-container">
                         <q-icon
                           class="field-expand-icon"
                           :name="
@@ -213,10 +211,19 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
-import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
+import {
+  formatLargeNumber,
+  getImageURL,
+  b64EncodeUnicode,
+} from "@/utils/zincutils";
+import streamService from "@/services/stream";
+import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import useHttpStreaming from "@/composables/useStreamingSearch";
+import { generateTraceContext } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "IndexList",
@@ -249,6 +256,14 @@ export default defineComponent({
       default: true,
     },
     hideAddSearchTerm: {
+      type: Boolean,
+      default: false,
+    },
+    query: {
+      type: String,
+      default: "",
+    },
+    showCount: {
       type: Boolean,
       default: false,
     },
@@ -319,6 +334,9 @@ export default defineComponent({
     } = useFieldValuesStream();
 
     // ─── Filter ──────────────────────────────────────────────────────────
+
+    const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+    const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
     const filterFieldFn = (rows: any, terms: any) => {
       const filtered = [];
@@ -507,7 +525,6 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-field-table {
-  height: calc(100vh - 212px) !important;
 }
 
 .field-list-pagination {
