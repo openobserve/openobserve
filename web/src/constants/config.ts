@@ -26,5 +26,5 @@ export const config = {
 export const siteURL = {
   contactSales: "https://openobserve.ai/contactus/",
   contactSupport: "https://openobserve.ai/contactus/",
-  pricingJsonUrl: "https://update-pricing-page-based-on.o2-staging-website-cpn.pages.dev/pricing.json",
+  pricingJsonUrl: "https://openobserve.ai/pricing.json",
 }
