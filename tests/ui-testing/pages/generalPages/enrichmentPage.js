@@ -1,5 +1,6 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 
 class EnrichmentPage {
     constructor(page) {
@@ -227,7 +228,9 @@ class EnrichmentPage {
     // Navigation Methods
     async navigateToEnrichmentTable() {
         // Wait for the app to be fully interactive before sidebar navigation (cloud needs full hydration)
-        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        if (isCloudEnvironment()) {
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        }
         await this.page.locator(this.pipelineMenuItem).click();
         await this.page.locator(this.enrichmentTableTab).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});

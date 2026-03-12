@@ -39,12 +39,6 @@ installQuasar({
   plugins: [quasar.Dialog, quasar.Notify],
 });
 
-// Mock clipboard API
-Object.assign(navigator, {
-  clipboard: {
-    writeText: vi.fn().mockResolvedValue(undefined),
-  },
-});
 
 /**
  * Test Suite: TraceDetails Component - Missing span_kind Field
@@ -340,15 +334,14 @@ describe("TraceDetails - Missing span_kind Field", () => {
       expect(result).toBe("Unspecified");
     });
 
-    it("should return undefined for unmapped span_kind values", () => {
+    it("should return the raw value as-is for unmapped span_kind values", () => {
+      // SPAN_KIND_MAP only covers "0"–"5"; anything else falls back to String(spanKind)
       const result = wrapper.vm.getSpanKind("999");
-      expect(result).toBe("Unknown");
+      expect(result).toBe("999");
     });
 
-    it("should handle non-string span_kind gracefully", () => {
-      expect(() => {
-        wrapper.vm.getSpanKind(undefined);
-      }).not.toThrow();
+    it("should return Unspecified for null span_kind", () => {
+      expect(wrapper.vm.getSpanKind(null)).toBe("Unspecified");
     });
   });
 
@@ -402,14 +395,11 @@ describe("TraceDetails - Missing span_kind Field", () => {
     });
 
     it("should not crash when formatting span with missing span_kind", () => {
+      // hits[0] has no span_kind property — getSpanKind(undefined) must return "Unspecified"
       const mockSpan = mockSpansWithoutSpanKind.hits[0];
-      expect(() => {
-        // This simulates what happens in getFormattedSpan
-        const spanKind = mockSpan.span_kind
-          ? wrapper.vm.getSpanKind(mockSpan.span_kind.toString())
-          : undefined;
-        expect(spanKind).toBeUndefined();
-      }).not.toThrow();
+      expect(mockSpan.span_kind).toBeUndefined();
+      expect(() => wrapper.vm.getSpanKind(mockSpan.span_kind)).not.toThrow();
+      expect(wrapper.vm.getSpanKind(mockSpan.span_kind)).toBe("Unspecified");
     });
   });
 

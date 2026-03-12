@@ -277,7 +277,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_concurrent_operations() {
         let fs = FS::new();
         let location = Path::from("test/concurrent.txt");

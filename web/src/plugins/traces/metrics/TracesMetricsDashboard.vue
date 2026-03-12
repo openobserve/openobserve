@@ -263,11 +263,6 @@ const getBaseFilters = () => {
     }
   });
 
-  // Add error filter if showErrorOnly is enabled
-  if (showErrorOnly.value) {
-    baseFilters.push("span_status = 'ERROR'");
-  }
-
   // Add user-provided filters from query editor, parsing any human-readable
   // duration values (e.g. '1.50ms') back to raw microseconds for SQL.
   if (props.filter?.trim().length) {
@@ -330,11 +325,9 @@ const loadDashboard = async () => {
         // Traces mode: restrict Duration percentiles to root spans only so that
         // each trace contributes exactly one duration value. Root spans are
         // identified by an absent reference_parent_span_id (NULL or empty string).
-        const durationFilters = [
-          ...baseFilters,
-          "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')",
-        ];
-        whereClause = "WHERE " + durationFilters.join(" AND ");
+        const durationFilters = [...baseFilters];
+        if (durationFilters.length)
+          whereClause = "WHERE " + durationFilters.join(" AND ");
       } else {
         // Spans mode Duration, and Rate panel for both modes: apply combined filters
         whereClause = baseFilters.length
@@ -466,6 +459,8 @@ const onDataZoom = ({
       startTime: props.timeRange.startTime,
       endTime: props.timeRange.endTime,
     };
+
+    searchObj.meta.metricsRangeFilters.clear();
 
     // For Rate and Errors panels: use placeholder values to indicate time-based selection
     // Volume/Error analysis will use the time range, not Y-axis values

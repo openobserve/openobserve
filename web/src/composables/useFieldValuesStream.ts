@@ -48,9 +48,12 @@ const useFieldValuesStream = () => {
   const fieldValues: Ref<Record<string, FieldValuesState>> = ref({});
 
   // Internal per-stream values for cross-stream aggregation:
-  // fieldName → streamName → { values }
+  // fieldName → streamName → { values, hasMore }
   const streamFieldValues: Ref<
-    Record<string, Record<string, { values: FieldValueEntry[] }>>
+    Record<
+      string,
+      Record<string, { values: FieldValueEntry[]; hasMore: boolean }>
+    >
   > = ref({});
 
   // Active trace IDs per field (supports multiple concurrent streams per field)
@@ -140,7 +143,10 @@ const useFieldValuesStream = () => {
       if (!streamFieldValues.value[fieldName])
         streamFieldValues.value[fieldName] = {};
       if (!streamFieldValues.value[fieldName][streamName])
-        streamFieldValues.value[fieldName][streamName] = { values: [] };
+        streamFieldValues.value[fieldName][streamName] = {
+          values: [],
+          hasMore: false,
+        };
 
       if (response.content?.results?.hits?.length) {
         const chunkValues: FieldValueEntry[] = [];
@@ -177,10 +183,17 @@ const useFieldValuesStream = () => {
           .map(([key, count]) => ({ key, count }))
           .sort((a, b) => b.count - a.count);
 
+        streamFieldValues.value[fieldName][streamName].hasMore =
+          chunkValues.length >= pageSize;
+
         fieldValues.value[fieldName].values = isAppend
           ? aggregatedArray
           : aggregatedArray.slice(0, pageSize);
-        fieldValues.value[fieldName].hasMore = chunkValues.length >= pageSize;
+        fieldValues.value[fieldName].hasMore = isAppend
+          ? Object.values(streamFieldValues.value[fieldName]).some(
+              (s) => s.hasMore,
+            )
+          : aggregatedArray.length >= pageSize;
       }
 
       fieldValues.value[fieldName].isLoading = false;
