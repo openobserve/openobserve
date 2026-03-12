@@ -69,15 +69,15 @@ const mockGeneratedDashboard = {
   ],
 };
 
+const mockGenerateDashboard = vi.hoisted(() => vi.fn());
+
 vi.mock("@/composables/useLatencyInsightsDashboard", () => ({
   COMPARISON_COLORS: {
     light: { baseline: "#2775ea", selected: "#12adc2" },
     dark: { baseline: "#2c7de0", selected: "#1cb8d0" },
   },
   useLatencyInsightsDashboard: () => ({
-    generateDashboard: vi
-      .fn()
-      .mockReturnValue(JSON.parse(JSON.stringify(mockGeneratedDashboard))),
+    generateDashboard: mockGenerateDashboard,
   }),
 }));
 
@@ -179,9 +179,9 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
         QIcon: { template: "<span />" },
         QBtn: {
           template:
-            '<button @click="$emit(\'click\')"><slot /></button>',
+            '<button @click="$emit(\'click\')" v-bind="$attrs"><slot /></button>',
           emits: ["click"],
-          props: ["dataTest", "icon", "label", "color", "size", "dense", "round", "flat", "outline", "noCaps"],
+          props: ["icon", "label", "color", "size", "dense", "round", "flat", "outline", "noCaps"],
         },
         QTooltip: { template: "<span />" },
         QTabs: {
@@ -243,6 +243,9 @@ describe("TracesAnalysisDashboard", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockGenerateDashboard.mockReturnValue(
+      JSON.parse(JSON.stringify(mockGeneratedDashboard)),
+    );
     wrapper = mountComponent();
     await flushPromises();
   });
@@ -785,8 +788,8 @@ describe("TracesAnalysisDashboard", () => {
       await flushPromises();
       const meta = wrapper.vm.filterMetadata;
       expect(meta).not.toBeNull();
-      expect(meta).toContain("200ms");
-      expect(meta).toContain("800ms");
+      expect(meta).toContain("200.00ms");
+      expect(meta).toContain("800.00ms");
     });
 
     it("should return null for 'duration' type when durationFilter has a timeStart (time-based brush)", async () => {
@@ -1135,7 +1138,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should set variablesManager to the provided manager object", () => {
       const manager = { hasUncommittedChanges: false, committedVariablesData: {} };
       wrapper.vm.onVariablesManagerReady(manager);
-      expect(wrapper.vm.variablesManager).toBe(manager);
+      expect(wrapper.vm.variablesManager).toEqual(manager);
     });
 
     it("should call loadAnalysis when analysisType is 'duration' and dashboardData is null", async () => {

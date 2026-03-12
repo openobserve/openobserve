@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 
 // ---------------------------------------------------------------------------
 // Mocks — must be registered before the component is imported
@@ -25,9 +25,13 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
-vi.mock("vuex", () => ({
-  useStore: () => mockStore,
-}));
+vi.mock("vuex", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as object),
+    useStore: () => mockStore,
+  };
+});
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -49,7 +53,7 @@ const mockValidatePanel = vi.fn((errors: any[]) => {
 const mockRemoveXYFilters = vi.fn();
 
 // A minimal reactive dashboardPanelData object that the component modifies
-const mockDashboardPanelData: any = {
+const mockDashboardPanelData: any = reactive({
   data: {
     id: "",
     title: "",
@@ -70,7 +74,7 @@ const mockDashboardPanelData: any = {
     showQueryBar: false,
     isConfigPanelOpen: false,
   },
-};
+});
 
 vi.mock("../../composables/useDashboardPanel", () => ({
   default: () => ({
@@ -427,10 +431,10 @@ describe("Metrics Index — runQuery method", () => {
     const wrapper = createWrapper();
     await flushPromises();
 
-    const runQuerySpy = vi.spyOn(wrapper.vm, "runQuery");
     await wrapper.find('[data-test="metrics-apply"]').trigger("click");
 
-    expect(runQuerySpy).toHaveBeenCalled();
+    // runQuery calls isValid which calls validatePanel — verify via side effect
+    expect(mockValidatePanel).toHaveBeenCalled();
   });
 });
 
