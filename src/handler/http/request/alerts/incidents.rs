@@ -389,6 +389,7 @@ pub struct TriggerRcaQuery {
 )]
 pub async fn trigger_incident_rca(
     Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
     Query(query): Query<TriggerRcaQuery>,
 ) -> Response {
     use o2_enterprise::enterprise::{
@@ -426,6 +427,9 @@ pub async fn trigger_incident_rca(
             return MetaHttpResponse::bad_request("Analysis already in progress");
         }
     }
+
+    // AI credit deduction is handled inside trigger_rca_for_incident at the service layer
+    // (cloud-only). Do NOT deduct here — it would cause double charging.
 
     // Emit AIAnalysisBegin — all error paths below this point must emit Complete to
     // clear the in-flight guard, otherwise it stays locked until the stale threshold.
@@ -510,12 +514,14 @@ pub async fn trigger_incident_rca(
     if query.reanalysis {
         let org_id_bg = org_id.clone();
         let incident_id_bg = incident_id.clone();
+        let user_email_bg = user_email.user_id.clone();
         tokio::spawn(async move {
             if let Err(e) = crate::service::alerts::incidents::trigger_rca_for_incident(
                 org_id_bg.clone(),
                 incident_id_bg.clone(),
                 true,
                 true,
+                user_email_bg,
             )
             .await
             {
@@ -570,25 +576,6 @@ pub async fn trigger_incident_rca(
             config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
         )
         .await;
-
-        // Usage: only count as reanalysis if explicitly requested; the initial analysis
-        // on a brand-new incident is already counted as NewIncident.
-        if query.reanalysis {
-            crate::service::self_reporting::report_request_usage_stats(
-                config::meta::self_reporting::usage::RequestStats {
-                    records: 1,
-                    request_body: Some(serde_json::json!({"incident_id": incident_id}).to_string()),
-                    ..Default::default()
-                },
-                &org_id,
-                "",
-                config::meta::stream::StreamType::Metadata,
-                config::meta::self_reporting::usage::UsageType::IncidentReAnalysis,
-                0,
-                chrono::Utc::now().timestamp_micros(),
-            )
-            .await;
-        }
 
         MetaHttpResponse::json(RcaResponse { rca_content })
     }

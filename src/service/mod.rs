@@ -50,6 +50,8 @@ pub mod runtime_metrics;
 pub mod schema;
 pub mod search;
 pub mod tantivy;
+#[cfg(feature = "cloud")]
+pub mod trial_quota;
 
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
