@@ -231,6 +231,7 @@ async fn check_all_orgs_ai_quota() {
 
 async fn run_no_ingestion_daily() {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_hours(24));
+    interval.tick().await; // skip first immediate tick
     loop {
         interval.tick().await;
         log::info!("starting daily no ingestion reporting");
@@ -291,6 +292,7 @@ async fn run_org_expiry_daily() {
     use o2_enterprise::enterprise::cloud::billings;
     let hr_micro = hour_micros(24);
     let mut interval = tokio::time::interval(tokio::time::Duration::from_hours(24));
+    interval.tick().await; // skip first immediate tick
     loop {
         interval.tick().await;
         let now = chrono::Utc::now().timestamp_micros();
@@ -316,7 +318,7 @@ async fn run_org_expiry_daily() {
             };
 
             // if org is free, then report how many days for expiry
-            if subscription.is_none() || subscription.unwrap().subscription_type.is_free_sub() {
+            if subscription.map_or(true, |s| s.subscription_type.is_free_sub()) {
                 // org record is also cached in memory for most cases
                 let org_record = match infra::table::organizations::get(&org).await {
                     Ok(v) => v,
