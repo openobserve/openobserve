@@ -1390,14 +1390,17 @@ async fn process_node(
                                 match trial_quota::try_deduct(&org_id, feature).await {
                                     Ok(_) => {
                                         trial_quota::record_free_ai_usage(&org_id, &ctx, feature);
+                                        true
                                     }
                                     Err(_) => {
                                         if trial_quota::org_has_active_subscription(&org_id).await {
                                             trial_quota::record_billable_ai_usage(
                                                 &org_id, &ctx, feature,
                                             );
+                                            true
+                                        } else {
+                                            false // quota exhausted, no subscription
                                         }
-                                        // If no subscription, just skip — don't block the pipeline
                                     }
                                 }
                             })
