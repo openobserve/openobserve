@@ -893,7 +893,7 @@ const handleDrop = (event: DragEvent, dropIndex: number) => {
   }
 
   // Reorder the columnOrder array
-  const newOrder = [...orderedFields.value];
+  const newOrder = [...columnOrder.value];
   const draggedField = newOrder[draggedIndex.value];
   newOrder.splice(draggedIndex.value, 1);
   newOrder.splice(dropIndex, 0, draggedField);
