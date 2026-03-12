@@ -8,6 +8,5 @@ RUN apt-get update && \
     rustup toolchain install nightly-2025-11-11 && \
     rustup default nightly-2025-11-11 && \
     rustup target add x86_64-unknown-linux-gnu && \
-    rustup target add wasm32-wasip1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
