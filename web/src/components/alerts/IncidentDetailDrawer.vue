@@ -2937,6 +2937,8 @@ export default defineComponent({
       copiedField,
       calculateDuration,
       formatRcaContent,
+      checkAnalysisInFlight,
+      updateSeverity: handleSeverityChange,
     };
   },
 });

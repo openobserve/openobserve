@@ -96,7 +96,7 @@ describe('PermissionsTable - level 0 rendering', () => {
 
   it('does NOT render "No Permissions Selected" when rows are present at level 0', async () => {
     const rows = [makeRow('stream', true)];
-    const wrapper = await mountTable({ level: 0, rows });
+    const wrapper = await mountTable({ level: 0, rows, visibleResourceCount: 1 });
     expect(
       wrapper.find('[data-test="edit-role-permissions-table-no-permissions-title"]').exists(),
     ).toBe(false);

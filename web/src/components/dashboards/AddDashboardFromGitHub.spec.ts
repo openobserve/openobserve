@@ -27,7 +27,6 @@ vi.mock("@/components/dashboards/AddFolder.vue", () => ({
 
 // Mock global fetch
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 installQuasar({ plugins: [Notify] });
 
@@ -129,6 +128,7 @@ describe("AddDashboardFromGitHub Component", () => {
   };
 
   beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetch);
     vi.clearAllMocks();
 
     // Setup store state for githubDashboardGallery
@@ -140,13 +140,14 @@ describe("AddDashboardFromGitHub Component", () => {
     };
     store.state.selectedOrganization = {
       identifier: "default",
+      label: "default",
+      id: 0,
+      user_email: "",
+      subscription_type: "",
     };
 
     // Default fetch mock - return empty folders
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue([]),
-    });
+    mockFetch.mockResolvedValue(new Response("[]", { status: 200 }));
 
     vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
       mockFolderList as any
@@ -157,6 +158,7 @@ describe("AddDashboardFromGitHub Component", () => {
     if (wrapper) {
       wrapper.unmount();
     }
+    vi.unstubAllGlobals();
   });
 
   describe("Component Initialization", () => {
@@ -290,7 +292,7 @@ describe("AddDashboardFromGitHub Component", () => {
     it("should add dashboard to selectedDashboards when not selected", () => {
       const dashboard = { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: [] };
       wrapper.vm.toggleDashboard(dashboard);
-      expect(wrapper.vm.selectedDashboards).toContain(dashboard);
+      expect(wrapper.vm.selectedDashboards).toContainEqual(dashboard);
     });
 
     it("should remove dashboard from selectedDashboards when already selected", () => {
@@ -324,10 +326,7 @@ describe("AddDashboardFromGitHub Component", () => {
           new Promise((resolve) =>
             setTimeout(
               () =>
-                resolve({
-                  ok: true,
-                  json: vi.fn().mockResolvedValue([]),
-                }),
+                resolve(new Response("[]", { status: 200 })),
               100
             )
           )
@@ -364,10 +363,9 @@ describe("AddDashboardFromGitHub Component", () => {
         dashboardJsonCache: {},
       };
 
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockGitHubFolders),
-      });
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify(mockGitHubFolders), { status: 200 })
+      );
 
       wrapper = createWrapper({ modelValue: false });
       await wrapper.vm.loadDashboards();
@@ -377,10 +375,9 @@ describe("AddDashboardFromGitHub Component", () => {
     });
 
     it("should filter out dot-prefixed directories", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockGitHubFolders),
-      });
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify(mockGitHubFolders), { status: 200 })
+      );
 
       wrapper = createWrapper({ modelValue: false });
       await wrapper.vm.loadDashboards();
@@ -395,10 +392,9 @@ describe("AddDashboardFromGitHub Component", () => {
         { name: "aws", type: "dir" },
         { name: "README.md", type: "file" },
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(items),
-      });
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify(items), { status: 200 })
+      );
 
       wrapper = createWrapper({ modelValue: false });
       await wrapper.vm.loadDashboards();
@@ -409,10 +405,7 @@ describe("AddDashboardFromGitHub Component", () => {
     });
 
     it("should set error when fetch fails", async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        json: vi.fn().mockResolvedValue({}),
-      });
+      mockFetch.mockResolvedValue(new Response("{}", { status: 404 }));
 
       wrapper = createWrapper({ modelValue: false });
       await wrapper.vm.loadDashboards();
@@ -437,10 +430,9 @@ describe("AddDashboardFromGitHub Component", () => {
         { name: "a_first", type: "dir" },
         { name: "m_middle", type: "dir" },
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(unsortedFolders),
-      });
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify(unsortedFolders), { status: 200 })
+      );
 
       wrapper = createWrapper({ modelValue: false });
       await wrapper.vm.loadDashboards();
@@ -473,10 +465,9 @@ describe("AddDashboardFromGitHub Component", () => {
       const mockJsonFiles = [
         { name: "dashboard.json", type: "file" },
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockJsonFiles),
-      });
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify(mockJsonFiles), { status: 200 })
+      );
 
       wrapper = createWrapper({ modelValue: false });
       wrapper.vm.selectedDashboards = [
@@ -493,10 +484,7 @@ describe("AddDashboardFromGitHub Component", () => {
       vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
         mockFolderList as any
       );
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue([]),
-      });
+      mockFetch.mockResolvedValue(new Response("[]", { status: 200 }));
 
       wrapper = createWrapper({ modelValue: false });
       wrapper.vm.selectedDashboards = [
@@ -545,10 +533,7 @@ describe("AddDashboardFromGitHub Component", () => {
 
   describe("Watch: show", () => {
     it("should call loadDashboards when dialog opens", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue([]),
-      });
+      mockFetch.mockResolvedValue(new Response("[]", { status: 200 }));
       wrapper = createWrapper({ modelValue: false });
 
       await wrapper.setProps({ modelValue: true });

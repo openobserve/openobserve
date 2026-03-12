@@ -15,10 +15,31 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import SearchBar from "./SearchBar.vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import i18n from "@/locales";
+
+// SearchBar.vue uses `defineAsyncComponent` as a free variable (not imported from vue).
+// In JSDOM, globalThis properties are accessible as free variables in module scope,
+// so we inject it via vi.hoisted() which runs before any module is evaluated.
+vi.hoisted(() => {
+  // SearchBar.vue uses defineAsyncComponent as a free variable (not imported from vue).
+  // In JSDOM globalThis properties act as free variables, so inject it here before module eval.
+  // Use the same data-test that the spec's vi.mock("@/components/CodeQueryEditor.vue") provides.
+  (globalThis as any).defineAsyncComponent = (_loader: any) => ({
+    name: "AsyncCodeQueryEditor",
+    template: '<div data-test="code-editor-stub"></div>',
+    props: ["query", "keywords", "functions", "editor-id"],
+    emits: ["update:query", "run-query"],
+    methods: {
+      setValue: () => {},
+      getCursorIndex: () => 0,
+      triggerAutoComplete: () => {},
+    },
+  });
+});
+
+import SearchBar from "./SearchBar.vue";
 
 installQuasar();
 
@@ -116,7 +137,9 @@ describe("SearchBar (logstream/explore)", () => {
     it("should render the date-time component for non-enrichment_tables streams", async () => {
       const wrapper = mountComp({ ...defaultQueryData, streamType: "logs" });
       await flushPromises();
-      expect(wrapper.find('[data-test="datetime-stub"]').exists()).toBe(true);
+      // The outer data-test attribute takes precedence over the mock component's root data-test
+      // (Vue 3 attribute inheritance merges attrs onto the root element, outer wins)
+      expect(wrapper.find('[data-test="logs-search-bar-date-time-dropdown"]').exists()).toBe(true);
     });
 
     it("should hide date-time component for enrichment_tables stream type", async () => {
@@ -245,6 +268,15 @@ describe("SearchBar (logstream/explore)", () => {
 
   describe("jsonToCsv (via downloadLogs)", () => {
     it("should generate CSV from hits and trigger download", async () => {
+      // Mount first so Vue's own createElement calls don't get intercepted
+      const wrapper = mountComp({
+        queryResults: { hits: [{ col1: "val1", col2: "val2" }] },
+        streamType: "logs",
+        query: "",
+      });
+      await flushPromises();
+
+      // Set up DOM mocks AFTER mounting to avoid intercepting Vue's internal createElement calls
       const mockUrl = "blob:mock-url";
       const mockCreateObjectURL = vi.fn(() => mockUrl);
       const mockRevokeObjectURL = vi.fn();
@@ -263,13 +295,6 @@ describe("SearchBar (logstream/explore)", () => {
       vi.spyOn(document, "createElement").mockReturnValueOnce(mockLink as any);
       vi.spyOn(document.body, "appendChild").mockImplementation(mockAppendChild);
       vi.spyOn(document.body, "removeChild").mockImplementation(mockRemoveChild);
-
-      const wrapper = mountComp({
-        queryResults: { hits: [{ col1: "val1", col2: "val2" }] },
-        streamType: "logs",
-        query: "",
-      });
-      await flushPromises();
 
       const vm = wrapper.vm as any;
       vm.downloadLogs();

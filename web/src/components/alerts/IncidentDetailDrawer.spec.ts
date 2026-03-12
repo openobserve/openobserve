@@ -1338,4 +1338,4 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.updating).toBe(false);
     });
   });
-
+});

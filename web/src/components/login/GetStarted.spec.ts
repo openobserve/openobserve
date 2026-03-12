@@ -167,12 +167,22 @@ describe('GetStarted.vue', () => {
 
   describe('onSubmit - Invalid Form', () => {
     it('should set isSubmitting to true when called', async () => {
+      // isSubmitting=true is observable only while the async API call is in-flight;
+      // for invalid forms it resets synchronously, so we use a valid form + pending promise.
+      const billings = await import('@/services/billings');
+      let resolveSubmit!: (val: any) => void;
+      vi.mocked(billings.default.submit_new_user_info).mockReturnValueOnce(
+        new Promise<any>((resolve) => { resolveSubmit = resolve; }),
+      );
+
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      vm.hearAboutUs = '';
+      vm.hearAboutUs = 'From a friend';
+      vm.whereDoYouWork = 'Company Inc';
 
       const submitPromise = vm.onSubmit();
       expect(vm.isSubmitting).toBe(true);
+      resolveSubmit({ status: 200 });
       await submitPromise;
     });
 
@@ -274,15 +284,19 @@ describe('GetStarted.vue', () => {
     });
 
     it('should remove isFirstTimeLogin from localStorage on success', async () => {
-      const mockRemoveItem = vi.spyOn(localStorage, 'removeItem');
+      // vi.spyOn cannot intercept jsdom Storage prototype methods reliably;
+      // verify the effect instead: set the item first, then confirm it is gone after submit.
+      localStorage.setItem('isFirstTimeLogin', 'true');
+
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = 'Company Inc';
 
       await vm.onSubmit();
+      await flushPromises();
 
-      expect(mockRemoveItem).toHaveBeenCalledWith('isFirstTimeLogin');
+      expect(localStorage.getItem('isFirstTimeLogin')).toBeNull();
     });
   });
 

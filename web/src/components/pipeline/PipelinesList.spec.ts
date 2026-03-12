@@ -36,6 +36,7 @@ vi.mock("@/services/pipelines", () => ({
   default: {
     getPipelines: vi.fn(),
     toggleState: vi.fn(),
+    bulkToggleState: vi.fn(),
     createPipeline: vi.fn(),
     deletePipeline: vi.fn(),
   },
@@ -68,6 +69,7 @@ vi.mock("@/plugins/pipelines/useDnD", () => ({
 
 vi.mock("@vue-flow/core", () => ({
   MarkerType: { ArrowClosed: "arrowclosed" },
+  VueFlow: { name: "VueFlow", template: "<div />" },
 }));
 
 // Mock URL and document anchor element for export tests
@@ -644,7 +646,7 @@ describe("PipelinesList", () => {
     it("goToBackfillJobs navigates to backfillJobs", () => {
       wrapper.vm.goToBackfillJobs();
       expect(mockRouter.push).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "backfillJobs" })
+        expect.objectContaining({ name: "pipelineBackfill" })
       );
     });
   });
@@ -822,7 +824,7 @@ describe("PipelinesList", () => {
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Bulk Operations", () => {
     it("bulkTogglePipelines calls togglePipelineState for each selected pipeline (pause)", async () => {
-      (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue(
+      (pipelineService.bulkToggleState as MockedFunction<any>).mockResolvedValue(
         {}
       );
       wrapper.vm.selectedPipelines = [
@@ -830,7 +832,7 @@ describe("PipelinesList", () => {
         { ...mockScheduledPipeline, enabled: true },
       ];
       await wrapper.vm.bulkTogglePipelines("pause");
-      expect(pipelineService.toggleState).toHaveBeenCalledTimes(2);
+      expect(pipelineService.bulkToggleState).toHaveBeenCalledTimes(1);
     });
 
     it("openBulkDeleteDialog sets confirmDialogMeta for bulk delete", () => {

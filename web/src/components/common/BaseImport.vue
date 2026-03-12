@@ -55,8 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             :class="importButtonClass"
             @click="handleImport"
-            :loading="isImporting"
-            :disable="isImporting"
+            :loading="isImporting || $props.isImporting"
+            :disable="isImporting || $props.isImporting"
             :data-test="`${testPrefix}-import-json-btn`"
           />
         </div>

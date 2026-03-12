@@ -162,10 +162,9 @@ describe("FieldValuesPanel.vue", () => {
       });
       // The "No values found" element uses v-show so it stays in the DOM;
       // assert it is hidden rather than checking wrapper.text()
-      const noValuesEl = wrapper
-        .findAll("div")
-        .find((el) => el.text().includes("No values found"));
-      expect(noValuesEl?.isVisible()).toBe(false);
+      const noValuesEl = wrapper.find('[data-test="field-values-panel-no-values-msg"]');
+      expect(noValuesEl.exists()).toBe(true);
+      expect(noValuesEl.isVisible()).toBe(false);
     });
   });
 

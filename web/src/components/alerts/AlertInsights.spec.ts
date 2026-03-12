@@ -41,18 +41,21 @@ vi.mock("@/services/alerts", () => ({
   },
 }));
 
-vi.mock("@/composables/useAlertInsights", () => ({
-  useAlertInsights: () => ({
-    rangeFilters: { value: new Map() },
-    showFailedOnly: { value: false },
-    showSilencedOnly: { value: false },
-    selectedAlertName: { value: null },
-    addRangeFilter: vi.fn(),
-    removeRangeFilter: vi.fn(),
-    clearAllFilters: vi.fn(),
-    getBaseFilters: vi.fn().mockReturnValue([]),
-  }),
-}));
+vi.mock("@/composables/useAlertInsights", async () => {
+  const { ref } = await import("vue");
+  return {
+    useAlertInsights: () => ({
+      rangeFilters: ref(new Map()),
+      showFailedOnly: ref(false),
+      showSilencedOnly: ref(false),
+      selectedAlertName: ref(null),
+      addRangeFilter: vi.fn(),
+      removeRangeFilter: vi.fn(),
+      clearAllFilters: vi.fn(),
+      getBaseFilters: vi.fn().mockReturnValue([]),
+    }),
+  };
+});
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((v) => v),
@@ -229,7 +232,7 @@ describe("AlertInsights - hasActiveFilters", () => {
   it("returns false when no filters active", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).hasActiveFilters).toBe(false);
+    expect((w.vm as any).hasActiveFilters).toBeFalsy();
   });
 });
 

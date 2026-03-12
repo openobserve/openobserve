@@ -250,6 +250,8 @@ describe("OrganizationDeduplicationSettings - watcher", () => {
 });
 
 describe("OrganizationDeduplicationSettings - time_window sanitization", () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it("saves null when time_window_minutes is empty string", async () => {
     const w = await mountComp();
     await flushPromises();

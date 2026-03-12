@@ -39,7 +39,7 @@ vi.mock("@/services/reodotdev_analytics", () => ({
 }));
 
 vi.mock("@/utils/templates/validation", () => ({
-  validateTemplateBody: vi.fn().mockReturnValue(null),
+  validateTemplateBody: vi.fn().mockReturnValue({ valid: true }),
   getTemplateValidationErrorMessage: vi.fn().mockReturnValue(""),
 }));
 
@@ -84,7 +84,7 @@ describe("AddTemplate - rendering (create mode)", () => {
     const w = await mountComp();
     const titleEl = w.find('[data-test="add-template-title"]');
     expect(titleEl.exists()).toBe(true);
-    expect(titleEl.text()).toContain("Add");
+    expect(titleEl.text()).toContain("New template");
   });
 
   it("renders the name input", async () => {

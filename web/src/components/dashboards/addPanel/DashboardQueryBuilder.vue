@@ -1423,6 +1423,7 @@ export default defineComponent({
       currentXLabel,
       currentYLabel,
       isPivotMode,
+      reorderItems,
     };
   },
 });

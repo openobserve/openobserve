@@ -331,7 +331,8 @@ describe("TracesTable", () => {
         },
       });
       const cell = wrapper.find(".oz-table__row div");
-      expect(cell.attributes("style")).toContain("flex: 1 1 0px");
+      // happy-dom expands flex shorthand; check for flex-basis 0px in any form
+      expect(cell.attributes("style")).toMatch(/flex(?:-basis)?[^;]*0px/);
     });
   });
 });

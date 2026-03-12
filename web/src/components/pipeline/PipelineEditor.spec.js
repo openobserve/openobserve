@@ -17,6 +17,7 @@ import PipelineEditor from "./PipelineEditor.vue";
 
 import { flushPromises, mount } from "@vue/test-utils";
 import useDnD from "@/plugins/pipelines/useDnD";
+import pipelineService from "@/services/pipelines";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
@@ -79,7 +80,7 @@ vi.mock("@vue-flow/core", () => ({
 }));
 
 vi.mock("@/composables/contextProviders", () => ({
-  contextRegistry: { register: vi.fn(), unregister: vi.fn() },
+  contextRegistry: { register: vi.fn(), unregister: vi.fn(), setActive: vi.fn() },
   createPipelinesContextProvider: vi.fn(() => ({})),
 }));
 
@@ -281,12 +282,13 @@ describe("PipelineEditor", () => {
 
     it("confirmSaveBasicPipeline closes the basic dialog and calls onSubmitPipeline", async () => {
       wrapper.vm.confirmDialogBasicPipeline = true;
-      wrapper.vm.onSubmitPipeline = vi.fn().mockResolvedValue(undefined);
 
       await wrapper.vm.confirmSaveBasicPipeline();
+      await flushPromises();
 
       expect(wrapper.vm.confirmDialogBasicPipeline).toBe(false);
-      expect(wrapper.vm.onSubmitPipeline).toHaveBeenCalled();
+      // onSubmitPipeline delegates to the pipeline service
+      expect(pipelineService.createPipeline).toHaveBeenCalled();
     });
   });
 

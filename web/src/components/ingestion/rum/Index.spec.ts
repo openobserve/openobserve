@@ -222,6 +222,7 @@ describe("IngestRum Component", () => {
 
     it("should not call router.push for an unrelated route", () => {
       mockRouter.currentRoute.value.name = "someOtherPage";
+      mockRouter.push.mockClear();
       const tw = mount(IngestRum, buildMountOptions());
       expect(mockRouter.push).not.toHaveBeenCalled();
       tw.unmount();

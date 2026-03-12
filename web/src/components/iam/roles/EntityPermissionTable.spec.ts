@@ -99,7 +99,7 @@ describe('EntityPermissionTable - resource.expand watcher', () => {
     const resource = makeResource(false);
     const wrapper = await mountComponent({ resource });
     expect((wrapper.vm as any).rows.length).toBe(0);
-    resource.expand = true;
+    await wrapper.setProps({ resource: { ...resource, expand: true } });
     await flushPromises();
     expect((wrapper.vm as any).rows.length).toBe(3);
   });

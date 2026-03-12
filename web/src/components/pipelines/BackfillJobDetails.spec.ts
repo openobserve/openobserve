@@ -27,11 +27,11 @@ vi.mock("quasar", async (importOriginal) => {
   const actual = await importOriginal<typeof import("quasar")>();
   return {
     ...actual,
-    useQuasar: () => ({
+    useQuasar: vi.fn(() => ({
       notify: vi.fn(),
       dialog: vi.fn(() => ({ onOk: vi.fn(), onCancel: vi.fn() })),
       dark: { isActive: false },
-    }),
+    })),
   };
 });
 
@@ -82,6 +82,11 @@ function createWrapper(props: Record<string, any> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
+        QDialog: {
+          inheritAttrs: false,
+          template: '<div v-bind="$attrs"><slot /></div>',
+          props: ["modelValue"],
+        },
         QTimeline: { template: "<div><slot /></div>" },
         QTimelineEntry: { template: "<div />" },
       },

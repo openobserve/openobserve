@@ -321,14 +321,14 @@ describe('InvitationList - changePagination', () => {
   it('updates selectedPerPage', async () => {
     const wrapper = await mountInvitationList();
     // Provide a mock qTable to avoid setPagination error
-    (wrapper.vm as any).qTable = { value: { setPagination: vi.fn() } };
+    (wrapper.vm as any).qTable = { setPagination: vi.fn() };
     (wrapper.vm as any).changePagination({ label: '50', value: 50 });
     expect((wrapper.vm as any).selectedPerPage).toBe(50);
   });
 
   it('updates pagination.rowsPerPage', async () => {
     const wrapper = await mountInvitationList();
-    (wrapper.vm as any).qTable = { value: { setPagination: vi.fn() } };
+    (wrapper.vm as any).qTable = { setPagination: vi.fn() };
     (wrapper.vm as any).changePagination({ label: '100', value: 100 });
     expect((wrapper.vm as any).pagination.rowsPerPage).toBe(100);
   });

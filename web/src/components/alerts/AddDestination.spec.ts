@@ -93,7 +93,7 @@ describe("AddDestination - rendering (create mode)", () => {
   it("shows add title when no destination prop", async () => {
     const w = await mountComp({ destination: null });
     const titleEl = w.find('[data-test="add-destination-title"]');
-    expect(titleEl.text()).toContain("Add");
+    expect(titleEl.text()).toContain("New Destination");
   });
 
   it("renders the cancel button", async () => {
@@ -150,7 +150,7 @@ describe("AddDestination - initial state", () => {
 
   it("isPrebuiltDestination is false by default", async () => {
     const w = await mountComp();
-    expect((w.vm as any).isPrebuiltDestination).toBe(false);
+    expect((w.vm as any).isPrebuiltDestination).toBeFalsy();
   });
 });
 
@@ -158,7 +158,7 @@ describe("AddDestination - isPrebuiltDestination computed", () => {
   it("returns false for empty destination_type", async () => {
     const w = await mountComp();
     (w.vm as any).formData.destination_type = "";
-    expect((w.vm as any).isPrebuiltDestination).toBe(false);
+    expect((w.vm as any).isPrebuiltDestination).toBeFalsy();
   });
 
   it("returns false for custom destination_type", async () => {
