@@ -78,7 +78,7 @@ def _make_multi_window_panel_with_non_result_array_vrl(panel_id="panel_mw_vrl_si
         "queries": [
             {
                 "query": f'SELECT histogram(_timestamp, \'15 minutes\') as time_s, count(_timestamp) as cnt FROM "{STREAM_NAME}" GROUP BY time_s ORDER BY time_s ASC',
-                "vrlFunctionQuery": ".doubled_cnt = .cnt * 2\n.",
+                "vrlFunctionQuery": ".doubled_cnt, err = .cnt * 2\n.",
                 "customQuery": True,
                 "fields": {
                     "stream": STREAM_NAME,
@@ -486,7 +486,7 @@ class TestSearchMultiStreamVRL:
         end_time = int(time.time() * 1000000)
         start_time = end_time - (60 * 60 * 1000000)
 
-        vrl_code = ".doubled_cnt = .cnt * 2\n."
+        vrl_code = ".doubled_cnt, err = .cnt * 2\n."
         encoded_vrl = _base64_encode(vrl_code)
 
         url = f"{base_url}api/{ORG_ID}/_search"
@@ -533,7 +533,7 @@ class TestSearchMultiStreamVRL:
         start_time = end_time - (60 * 60 * 1000000)
 
         # Per-hit VRL: adds a "doubled_cnt" field to each hit
-        vrl_code = ".doubled_cnt = .cnt * 2\n."
+        vrl_code = ".doubled_cnt, err = .cnt * 2\n."
         encoded_vrl = _base64_encode(vrl_code)
         logger.info(f"Encoded VRL: {encoded_vrl} (decoded: {vrl_code!r})")
 

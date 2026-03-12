@@ -85,7 +85,7 @@ if length(result) >= 2 {
 . = res
 .`;
 
-const NON_RESULT_ARRAY_VRL = '.doubled_cnt = .cnt * 2\n.';
+const NON_RESULT_ARRAY_VRL = '.doubled_cnt, err = .cnt * 2\n.';
 
 // ---------------------------------------------------------------------------
 // Panel builders
