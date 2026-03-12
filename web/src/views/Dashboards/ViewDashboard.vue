@@ -1414,6 +1414,7 @@ export default defineComponent({
         selectedTabId,
       ],
       () => {
+        if (isDashboardLoading.value) return; // skip during cross-dashboard navigation
         generateNewDashboardRunId();
         updateUrlWithCurrentState();
       },
