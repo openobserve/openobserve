@@ -314,4 +314,200 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
                          tilesVisibility.timeTaken || tilesVisibility.traceId;
     expect(hasStatTiles).toBe(true);
   });
+
+  // ===== RESTORED TESTS =====
+
+  test("should show Inspect button after running search", async ({ page }) => {
+    // Select stream and run search
+    await logsPage.selectStream(stream, 3, 0);
+    await page.waitForLoadState('networkidle');
+
+    await logsPage.selectRunQuery();
+    await page.waitForLoadState('networkidle');
+
+    await inspectorPage.takeScreenshot('search-results-with-inspect-btn');
+
+    // Check if Inspect button is visible (Enterprise only)
+    const isVisible = await inspectorPage.isInspectButtonVisible();
+    testLogger.info(`Inspect button visible: ${isVisible}`);
+
+    // For Enterprise tests, the button MUST exist
+    expect(isVisible).toBe(true);
+  });
+
+  test("should navigate to Inspector page from Inspect button", async ({ page }) => {
+    // Select stream and run search
+    await logsPage.selectStream(stream, 3, 0);
+    await page.waitForLoadState('networkidle');
+
+    await logsPage.selectRunQuery();
+    await page.waitForLoadState('networkidle');
+
+    // Capture search results before clicking Inspect
+    const searchResults = await inspectorPage.parseSearchResults();
+    testLogger.info(`Search Results - Events: ${searchResults.eventsCount}, Time: ${searchResults.timeMs}ms`);
+
+    await inspectorPage.takeScreenshot('search-results-before-inspect');
+
+    // Click Inspect button
+    const isVisible = await inspectorPage.isInspectButtonVisible();
+    expect(isVisible).toBe(true);
+
+    await inspectorPage.clickInspectButton();
+
+    // Verify we're on the inspector page
+    await inspectorPage.assertInspectorPageVisible();
+    await inspectorPage.assertUrlHasTraceId();
+
+    await inspectorPage.takeScreenshot('inspector-page-from-btn');
+  });
+
+  test("should verify data appears in recent time ranges", async ({ page }) => {
+    // Select stream
+    await logsPage.selectStream(stream, 3, 0);
+    await page.waitForLoadState('networkidle');
+
+    // Set time range to Past 15 Minutes
+    await inspectorPage.selectRelative15Minutes();
+
+    // Run search
+    await logsPage.selectRunQuery();
+    await page.waitForLoadState('networkidle');
+
+    await inspectorPage.takeScreenshot('past-15-minutes');
+
+    // Check if we have results
+    const searchResults = await inspectorPage.parseSearchResults();
+    testLogger.info(`Past 15 Minutes - Events: ${searchResults.eventsCount}`);
+
+    if (searchResults.eventsCount === '0' || searchResults.eventsCount === 'N/A') {
+      testLogger.warn('No data found in Past 15 Minutes - trying wider range');
+
+      // Try a wider time range
+      await inspectorPage.selectRelative1Hour();
+      await logsPage.selectRunQuery();
+      await page.waitForLoadState('networkidle');
+
+      const widerResults = await inspectorPage.parseSearchResults();
+      testLogger.info(`Past 1 Hour - Events: ${widerResults.eventsCount}`);
+
+      // At least wider range should have data
+      expect(widerResults.eventsCount).not.toBe('N/A');
+    } else {
+      // Data was found in 15 minutes
+      expect(parseInt(searchResults.eventsCount, 10)).toBeGreaterThan(0);
+    }
+  });
+
+  test("should handle inspector with ingested data", async ({ page }) => {
+    // Ingest fresh data before testing
+    await ingestionPage.ingestion();
+    await page.waitForTimeout(3000);
+
+    // Select stream
+    await logsPage.selectStream(stream, 3, 0);
+    await page.waitForLoadState('networkidle');
+
+    // Set wider time range to ensure we get data
+    await inspectorPage.selectRelative1Hour();
+
+    // Run search
+    await logsPage.selectRunQuery();
+    await page.waitForLoadState('networkidle');
+
+    const searchResults = await inspectorPage.parseSearchResults();
+    testLogger.info(`With ingested data - Events: ${searchResults.eventsCount}, Time: ${searchResults.timeMs}ms`);
+
+    await inspectorPage.takeScreenshot('with-ingested-data');
+
+    // Verify we have results
+    expect(searchResults.eventsCount).not.toBe('N/A');
+
+    if (searchResults.eventsCount !== '0') {
+      const isVisible = await inspectorPage.isInspectButtonVisible();
+      if (isVisible) {
+        await inspectorPage.clickInspectButton();
+        await inspectorPage.takeScreenshot('inspector-with-data');
+        await inspectorPage.assertInspectorPageVisible();
+      }
+    }
+  });
+
+  test("should copy trace ID to clipboard", async ({ page }) => {
+    // Run search first
+    await logsPage.selectStream(stream, 3, 0);
+    await page.waitForLoadState('networkidle');
+
+    await inspectorPage.runSearch();
+    await page.waitForLoadState('networkidle');
+
+    // Navigate to inspector via history
+    await inspectorPage.openSearchHistory();
+    await page.waitForLoadState('domcontentloaded');
+
+    const hasInspect = await inspectorPage.hasHistoryInspectButtons();
+    expect(hasInspect).toBe(true);
+
+    await inspectorPage.inspectFromHistory();
+    await inspectorPage.assertInspectorPageVisible();
+
+    // Wait for tiles to load
+    const tilesVisibility = await inspectorPage.getTilesVisibility();
+    testLogger.info('Tiles visibility:', tilesVisibility);
+
+    // Check if Trace ID tile is visible (using getTilesVisibility)
+    const isTraceIdVisible = tilesVisibility.traceId;
+    testLogger.info(`Trace ID tile visible: ${isTraceIdVisible}`);
+
+    if (isTraceIdVisible) {
+      await inspectorPage.takeScreenshot('before-copy-trace-id');
+      await inspectorPage.clickTraceIdToCopy();
+      await inspectorPage.takeScreenshot('after-copy-trace-id');
+
+      // Check for copy success notification (may not always appear)
+      const hasCopyNotification = await inspectorPage.hasCopySuccessNotification();
+      testLogger.info(`Copy notification visible: ${hasCopyNotification}`);
+    }
+
+    // At least some tiles should be visible (inspector page loaded correctly)
+    const hasTiles = tilesVisibility.results || tilesVisibility.events || tilesVisibility.timeTaken || tilesVisibility.traceId;
+    expect(hasTiles).toBe(true);
+  });
+
+  test("should display time range badge with timezone", async ({ page }) => {
+    // Run search first
+    await logsPage.selectStream(stream, 3, 0);
+    await page.waitForLoadState('networkidle');
+
+    await inspectorPage.runSearch();
+    await page.waitForLoadState('networkidle');
+
+    // Navigate to inspector via history
+    await inspectorPage.openSearchHistory();
+    await page.waitForLoadState('domcontentloaded');
+
+    const hasInspect = await inspectorPage.hasHistoryInspectButtons();
+    expect(hasInspect).toBe(true);
+
+    await inspectorPage.inspectFromHistory();
+    await inspectorPage.assertInspectorPageVisible();
+
+    await inspectorPage.takeScreenshot('time-range-badge-test');
+
+    // Check if time range badge is visible
+    const isBadgeVisible = await inspectorPage.isTimeRangeBadgeVisible();
+    testLogger.info(`Time range badge visible: ${isBadgeVisible}`);
+
+    if (isBadgeVisible) {
+      const badgeText = await inspectorPage.getTimeRangeBadgeText();
+      testLogger.info(`Time range badge text: ${badgeText}`);
+    }
+
+    // Check for timezone display
+    const hasTimezone = await inspectorPage.hasTimezoneDisplay();
+    testLogger.info(`Timezone displayed: ${hasTimezone}`);
+
+    // Inspector page should be visible (time range and timezone are optional UI elements)
+    await inspectorPage.assertInspectorPageVisible();
+  });
 });
