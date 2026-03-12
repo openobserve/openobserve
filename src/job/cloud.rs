@@ -231,7 +231,6 @@ async fn check_all_orgs_ai_quota() {
 
 async fn run_no_ingestion_daily() {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_hours(24));
-    interval.tick().await; // skip first immediate tick
     loop {
         interval.tick().await;
         log::info!("starting daily no ingestion reporting");
@@ -292,7 +291,6 @@ async fn run_org_expiry_daily() {
     use o2_enterprise::enterprise::cloud::billings;
     let hr_micro = hour_micros(24);
     let mut interval = tokio::time::interval(tokio::time::Duration::from_hours(24));
-    interval.tick().await; // skip first immediate tick
     loop {
         interval.tick().await;
         let now = chrono::Utc::now().timestamp_micros();
