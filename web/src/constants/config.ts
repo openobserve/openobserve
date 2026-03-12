@@ -25,5 +25,6 @@ export const config = {
 
 export const siteURL = {
   contactSales: "https://openobserve.ai/contactus/",
-  contactSupport: "https://openobserve.ai/contactus/"
+  contactSupport: "https://openobserve.ai/contactus/",
+  pricingJsonUrl: "https://openobserve.ai/pricing.json",
 }
