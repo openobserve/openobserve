@@ -6,7 +6,7 @@ const { ingestTestData: _ingestData } = require('../utils/data-ingestion.js');
 const STREAM_NAME = "e2e_automate";
 
 test.describe("Cross-Linking testcases", () => {
-    test.describe.configure({ mode: 'parallel' });
+    test.describe.configure({ mode: 'serial' });
     let pm;
     let dataIngested = false;
 
@@ -104,8 +104,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -140,8 +139,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -169,8 +167,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -206,8 +203,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -239,8 +235,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -275,8 +270,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -323,8 +317,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -367,8 +360,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -406,8 +398,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -449,77 +440,86 @@ test.describe("Cross-Linking testcases", () => {
         // Intercept window.open to capture the URL instead of opening a new tab
         await page.evaluate(() => {
             window.__capturedCrossLinkUrl = null;
+            window.__originalOpen = window.open;
             window.open = (url) => {
                 window.__capturedCrossLinkUrl = url;
                 return null;
             };
         });
 
-        // Step 4: Find the kubernetes_container_name field row in the expanded JSON preview
-        // and click its action dropdown button
-        const fieldRow = page.locator('.log_json_content').filter({ hasText: 'kubernetes_container_name' }).first();
-        await fieldRow.waitFor({ state: 'visible', timeout: 10000 });
-        const fieldActionBtn = fieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
-        await fieldActionBtn.click();
-        await page.waitForTimeout(1000);
+        try {
+            // Step 4: Find the kubernetes_container_name field row in the expanded JSON preview
+            // and click its action dropdown button
+            const fieldRow = page.locator('.log_json_content').filter({ hasText: 'kubernetes_container_name' }).first();
+            await fieldRow.waitFor({ state: 'visible', timeout: 10000 });
+            const fieldActionBtn = fieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
+            await fieldActionBtn.click();
+            await page.waitForTimeout(1000);
 
-        // Look for the cross-link item in the dropdown menu
-        const crossLinkItem = page.locator('.q-menu .q-item, .q-list .q-item').filter({ hasText: crossLinkName });
-        const crossLinkVisible = await crossLinkItem.isVisible().catch(() => false);
+            // Look for the cross-link item in the dropdown menu
+            const crossLinkItem = page.locator('.q-menu .q-item, .q-list .q-item').filter({ hasText: crossLinkName });
+            const crossLinkVisible = await crossLinkItem.isVisible().catch(() => false);
 
-        // Assert cross-link menu item is visible
-        expect(crossLinkVisible, `Cross-link "${crossLinkName}" should be visible in dropdown menu`).toBe(true);
-        testLogger.info('Cross-link menu item is visible in dropdown');
+            // Assert cross-link menu item is visible
+            expect(crossLinkVisible, `Cross-link "${crossLinkName}" should be visible in dropdown menu`).toBe(true);
+            testLogger.info('Cross-link menu item is visible in dropdown');
 
-        // Click the cross-link
-        await crossLinkItem.click();
-        await page.waitForTimeout(1000);
+            // Click the cross-link
+            await crossLinkItem.click();
+            await page.waitForTimeout(1000);
 
-        // Step 5: Retrieve the captured URL
-        const capturedUrl = await page.evaluate(() => window.__capturedCrossLinkUrl);
+            // Step 5: Retrieve the captured URL
+            const capturedUrl = await page.evaluate(() => window.__capturedCrossLinkUrl);
 
-        expect(capturedUrl, 'Cross-link URL should have been captured via window.open').not.toBeNull();
-        testLogger.info('Cross-link URL captured', { capturedUrl });
+            expect(capturedUrl, 'Cross-link URL should have been captured via window.open').not.toBeNull();
+            testLogger.info('Cross-link URL captured', { capturedUrl });
 
-        // Parse the URL and verify timestamps
-        const url = new URL(capturedUrl);
-        const fromParam = url.searchParams.get('from');
-        const toParam = url.searchParams.get('to');
-        const fieldParam = url.searchParams.get('field');
-        const valueParam = url.searchParams.get('value');
+            // Parse the URL and verify timestamps
+            const url = new URL(capturedUrl);
+            const fromParam = url.searchParams.get('from');
+            const toParam = url.searchParams.get('to');
+            const fieldParam = url.searchParams.get('field');
+            const valueParam = url.searchParams.get('value');
 
-        // Verify start_time and end_time are valid epoch microseconds
-        expect(fromParam, 'URL should contain from (start_time) parameter').not.toBeNull();
-        expect(toParam, 'URL should contain to (end_time) parameter').not.toBeNull();
-        testLogger.info('URL from/to parameters present', { from: fromParam, to: toParam });
+            // Verify start_time and end_time are valid epoch microseconds
+            expect(fromParam, 'URL should contain from (start_time) parameter').not.toBeNull();
+            expect(toParam, 'URL should contain to (end_time) parameter').not.toBeNull();
+            testLogger.info('URL from/to parameters present', { from: fromParam, to: toParam });
 
-        const startTime = Number(fromParam);
-        const endTime = Number(toParam);
+            const startTime = Number(fromParam);
+            const endTime = Number(toParam);
 
-        expect(isNaN(startTime), 'start_time should be a valid number').toBe(false);
-        expect(isNaN(endTime), 'end_time should be a valid number').toBe(false);
+            expect(isNaN(startTime), 'start_time should be a valid number').toBe(false);
+            expect(isNaN(endTime), 'end_time should be a valid number').toBe(false);
 
-        // Timestamps are in microseconds (16 digits for current epoch)
-        const minUs = new Date('2000-01-01').getTime() * 1000;
-        const maxUs = new Date('2100-01-01').getTime() * 1000;
-        expect(startTime, `start_time ${startTime} should be > ${minUs}`).toBeGreaterThan(minUs);
-        expect(startTime, `start_time ${startTime} should be < ${maxUs}`).toBeLessThan(maxUs);
-        expect(endTime, `end_time ${endTime} should be > ${minUs}`).toBeGreaterThan(minUs);
-        expect(endTime, `end_time ${endTime} should be < ${maxUs}`).toBeLessThan(maxUs);
-        testLogger.info('Timestamps are valid epoch microseconds', { startTime, endTime });
+            // Timestamps are in microseconds (16 digits for current epoch)
+            const minUs = new Date('2000-01-01').getTime() * 1000;
+            const maxUs = new Date('2100-01-01').getTime() * 1000;
+            expect(startTime, `start_time ${startTime} should be > ${minUs}`).toBeGreaterThan(minUs);
+            expect(startTime, `start_time ${startTime} should be < ${maxUs}`).toBeLessThan(maxUs);
+            expect(endTime, `end_time ${endTime} should be > ${minUs}`).toBeGreaterThan(minUs);
+            expect(endTime, `end_time ${endTime} should be < ${maxUs}`).toBeLessThan(maxUs);
+            testLogger.info('Timestamps are valid epoch microseconds', { startTime, endTime });
 
-        expect(endTime, 'end_time should be >= start_time').toBeGreaterThanOrEqual(startTime);
-        testLogger.info('end_time >= start_time verified');
+            expect(endTime, 'end_time should be >= start_time').toBeGreaterThanOrEqual(startTime);
+            testLogger.info('end_time >= start_time verified');
 
-        expect(fieldParam, 'field should be kubernetes_container_name').toBe('kubernetes_container_name');
-        expect(valueParam, 'value should be populated').toBeTruthy();
-        testLogger.info('Field and value parameters verified', { field: fieldParam, value: valueParam });
+            expect(fieldParam, 'field should be kubernetes_container_name').toBe('kubernetes_container_name');
+            expect(valueParam, 'value should be populated').toBeTruthy();
+            testLogger.info('Field and value parameters verified', { field: fieldParam, value: valueParam });
 
-        testLogger.info('PASSED: Stream-level logs timestamp verification', {
-            startTime, endTime,
-            startDate: new Date(startTime / 1000).toISOString(),
-            endDate: new Date(endTime / 1000).toISOString(),
-        });
+            testLogger.info('PASSED: Stream-level logs timestamp verification', {
+                startTime, endTime,
+                startDate: new Date(startTime / 1000).toISOString(),
+                endDate: new Date(endTime / 1000).toISOString(),
+            });
+        } finally {
+            await page.evaluate(() => {
+                if (window.__originalOpen) window.open = window.__originalOpen;
+                delete window.__capturedCrossLinkUrl;
+                delete window.__originalOpen;
+            });
+        }
     });
 
     test("should verify cross-link URL contains correct start_time and end_time when clicked from dashboard", {
@@ -535,8 +535,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -580,94 +579,103 @@ test.describe("Cross-Linking testcases", () => {
         // Step 3: Intercept window.open to capture the cross-link URL
         await page.evaluate(() => {
             window.__capturedCrossLinkUrl = null;
+            window.__originalOpen = window.open;
             window.open = (url) => {
                 window.__capturedCrossLinkUrl = url;
                 return null;
             };
         });
 
-        // Step 4: Click on a data row in the table panel to trigger the cross-link drilldown menu
-        // Quasar's q-table may use virtual scrolling where tbody tr elements report as hidden.
-        // Use page.evaluate to find and click the first visible cell with content.
-        await page.waitForTimeout(2000);
-        await page.evaluate(() => {
-            const table = document.querySelector('[data-test="dashboard-panel-table"]');
-            if (!table) return;
-            const cells = table.querySelectorAll('td');
-            for (const cell of cells) {
-                if (cell.offsetParent !== null && cell.textContent.trim()) {
-                    cell.click();
-                    return;
+        try {
+            // Step 4: Click on a data row in the table panel to trigger the cross-link drilldown menu
+            // Quasar's q-table may use virtual scrolling where tbody tr elements report as hidden.
+            // Use page.evaluate to find and click the first visible cell with content.
+            await page.waitForTimeout(2000);
+            await page.evaluate(() => {
+                const table = document.querySelector('[data-test="dashboard-panel-table"]');
+                if (!table) return;
+                const cells = table.querySelectorAll('td');
+                for (const cell of cells) {
+                    if (cell.offsetParent !== null && cell.textContent.trim()) {
+                        cell.click();
+                        return;
+                    }
                 }
-            }
-        });
-        await page.waitForTimeout(1500);
+            });
+            await page.waitForTimeout(1500);
 
-        // Step 5: Look for the crosslink-drilldown-menu popup
-        const drilldownMenu = page.locator('.crosslink-drilldown-menu');
-        const menuVisible = await drilldownMenu.isVisible().catch(() => false);
+            // Step 5: Look for the crosslink-drilldown-menu popup
+            const drilldownMenu = page.locator('.crosslink-drilldown-menu');
+            const menuVisible = await drilldownMenu.isVisible().catch(() => false);
 
-        expect(menuVisible, 'Drilldown menu should appear after clicking table cell').toBe(true);
-        testLogger.info('Drilldown menu is visible');
+            expect(menuVisible, 'Drilldown menu should appear after clicking table cell').toBe(true);
+            testLogger.info('Drilldown menu is visible');
 
-        // Find and click the cross-link menu item
-        const crossLinkMenuItem = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkName });
-        const crossLinkMenuVisible = await crossLinkMenuItem.isVisible().catch(() => false);
+            // Find and click the cross-link menu item
+            const crossLinkMenuItem = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkName });
+            const crossLinkMenuVisible = await crossLinkMenuItem.isVisible().catch(() => false);
 
-        expect(crossLinkMenuVisible, `Cross-link "${crossLinkName}" should be visible in drilldown menu`).toBe(true);
-        testLogger.info('Cross-link menu item is visible in drilldown');
+            expect(crossLinkMenuVisible, `Cross-link "${crossLinkName}" should be visible in drilldown menu`).toBe(true);
+            testLogger.info('Cross-link menu item is visible in drilldown');
 
-        await crossLinkMenuItem.click();
-        await page.waitForTimeout(1000);
+            await crossLinkMenuItem.click();
+            await page.waitForTimeout(1000);
 
-        // Step 6: Retrieve and verify the captured URL
-        const capturedUrl = await page.evaluate(() => window.__capturedCrossLinkUrl);
+            // Step 6: Retrieve and verify the captured URL
+            const capturedUrl = await page.evaluate(() => window.__capturedCrossLinkUrl);
 
-        expect(capturedUrl, 'Cross-link URL should have been captured via window.open').not.toBeNull();
-        testLogger.info('Dashboard cross-link URL captured', { capturedUrl });
+            expect(capturedUrl, 'Cross-link URL should have been captured via window.open').not.toBeNull();
+            testLogger.info('Dashboard cross-link URL captured', { capturedUrl });
 
-        // Parse the URL and verify timestamps
-        const url = new URL(capturedUrl);
-        const fromParam = url.searchParams.get('from');
-        const toParam = url.searchParams.get('to');
-        const fieldParam = url.searchParams.get('field');
-        const valueParam = url.searchParams.get('value');
+            // Parse the URL and verify timestamps
+            const url = new URL(capturedUrl);
+            const fromParam = url.searchParams.get('from');
+            const toParam = url.searchParams.get('to');
+            const fieldParam = url.searchParams.get('field');
+            const valueParam = url.searchParams.get('value');
 
-        expect(fromParam, 'URL should contain from (start_time) parameter').not.toBeNull();
-        expect(toParam, 'URL should contain to (end_time) parameter').not.toBeNull();
-        testLogger.info('URL from/to parameters present', { from: fromParam, to: toParam });
+            expect(fromParam, 'URL should contain from (start_time) parameter').not.toBeNull();
+            expect(toParam, 'URL should contain to (end_time) parameter').not.toBeNull();
+            testLogger.info('URL from/to parameters present', { from: fromParam, to: toParam });
 
-        const startTime = Number(fromParam);
-        const endTime = Number(toParam);
+            const startTime = Number(fromParam);
+            const endTime = Number(toParam);
 
-        expect(isNaN(startTime), 'start_time should be a valid number').toBe(false);
-        expect(isNaN(endTime), 'end_time should be a valid number').toBe(false);
+            expect(isNaN(startTime), 'start_time should be a valid number').toBe(false);
+            expect(isNaN(endTime), 'end_time should be a valid number').toBe(false);
 
-        // Timestamps are in microseconds (16 digits for current epoch)
-        const minUs = new Date('2000-01-01').getTime() * 1000;
-        const maxUs = new Date('2100-01-01').getTime() * 1000;
-        expect(startTime, `start_time ${startTime} should be > ${minUs}`).toBeGreaterThan(minUs);
-        expect(startTime, `start_time ${startTime} should be < ${maxUs}`).toBeLessThan(maxUs);
-        expect(endTime, `end_time ${endTime} should be > ${minUs}`).toBeGreaterThan(minUs);
-        expect(endTime, `end_time ${endTime} should be < ${maxUs}`).toBeLessThan(maxUs);
-        testLogger.info('Timestamps are valid epoch microseconds', { startTime, endTime });
+            // Timestamps are in microseconds (16 digits for current epoch)
+            const minUs = new Date('2000-01-01').getTime() * 1000;
+            const maxUs = new Date('2100-01-01').getTime() * 1000;
+            expect(startTime, `start_time ${startTime} should be > ${minUs}`).toBeGreaterThan(minUs);
+            expect(startTime, `start_time ${startTime} should be < ${maxUs}`).toBeLessThan(maxUs);
+            expect(endTime, `end_time ${endTime} should be > ${minUs}`).toBeGreaterThan(minUs);
+            expect(endTime, `end_time ${endTime} should be < ${maxUs}`).toBeLessThan(maxUs);
+            testLogger.info('Timestamps are valid epoch microseconds', { startTime, endTime });
 
-        expect(endTime, 'end_time should be >= start_time').toBeGreaterThanOrEqual(startTime);
-        testLogger.info('end_time >= start_time verified');
+            expect(endTime, 'end_time should be >= start_time').toBeGreaterThanOrEqual(startTime);
+            testLogger.info('end_time >= start_time verified');
 
-        expect(fieldParam, 'field should be kubernetes_container_name').toBe('kubernetes_container_name');
-        expect(valueParam, 'value should be populated').toBeTruthy();
-        testLogger.info('Field and value parameters verified', { field: fieldParam, value: valueParam });
+            expect(fieldParam, 'field should be kubernetes_container_name').toBe('kubernetes_container_name');
+            expect(valueParam, 'value should be populated').toBeTruthy();
+            testLogger.info('Field and value parameters verified', { field: fieldParam, value: valueParam });
 
-        testLogger.info('PASSED: Stream-level dashboard timestamp verification', {
-            startTime, endTime,
-            startDate: new Date(startTime / 1000).toISOString(),
-            endDate: new Date(endTime / 1000).toISOString(),
-        });
+            testLogger.info('PASSED: Stream-level dashboard timestamp verification', {
+                startTime, endTime,
+                startDate: new Date(startTime / 1000).toISOString(),
+                endDate: new Date(endTime / 1000).toISOString(),
+            });
 
-        // Cleanup: delete the test dashboard
-        await pm.dashboardCreate.backToDashboardList();
-        await page.waitForTimeout(1000);
+            // Cleanup: delete the test dashboard
+            await pm.dashboardCreate.backToDashboardList();
+            await page.waitForTimeout(1000);
+        } finally {
+            await page.evaluate(() => {
+                if (window.__originalOpen) window.open = window.__originalOpen;
+                delete window.__capturedCrossLinkUrl;
+                delete window.__originalOpen;
+            });
+        }
     });
 
     test("should persist cross-links after Update Settings and survive page reload", {
@@ -681,8 +689,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -729,8 +736,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -789,8 +795,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -851,8 +856,7 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking feature not enabled, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
@@ -1136,36 +1140,32 @@ test.describe("Cross-Linking testcases", () => {
 
         const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
         if (!isTabVisible) {
-            testLogger.info('Cross-linking tab not visible, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled');
         }
 
         await pm.crossLinkPage.clickCrossLinkingTab();
 
-        // Clean up stream-level cross-links so only org-level links remain
-        await pm.crossLinkPage.deleteAllCrossLinks();
+        // Clean up only stream-level cross-links (those with visible delete buttons)
+        // Org-level items are read-only and have no delete button
+        let deletableCount = await page.locator('[data-test^="cross-link-delete-"]').count();
+        while (deletableCount > 0) {
+            await pm.crossLinkPage.clickDeleteCrossLink(0);
+            await page.waitForTimeout(500);
+            deletableCount = await page.locator('[data-test^="cross-link-delete-"]').count();
+        }
 
-        // Verify the org cross-link name appears somewhere in the tab content
-        const tabContent = page.locator('.q-tab-panel');
-        const contentText = await tabContent.textContent();
-        expect(contentText).toContain(orgLinkName);
-
-        // Verify the org cross-link item is visible
-        const orgItem = page.locator('[data-test="cross-link-item-0"]');
-        await expect(orgItem).toBeVisible({ timeout: 5000 });
+        // Verify the org cross-link item is visible (rendered by the readonly CrossLinkManager)
+        const orgItem = page.locator('[data-test^="cross-link-item-"]').filter({ hasText: orgLinkName });
+        await expect(orgItem).toBeVisible({ timeout: 10000 });
         const itemText = await orgItem.textContent();
         expect(itemText).toContain(orgLinkName);
         expect(itemText).toContain('org-readonly.example.com');
 
-        // Verify org-level section does NOT have edit/delete buttons (readonly prop hides them)
-        const editBtn = page.locator('[data-test="cross-link-edit-0"]');
-        const deleteBtn = page.locator('[data-test="cross-link-delete-0"]');
-        await expect(editBtn).not.toBeVisible({ timeout: 3000 });
-        await expect(deleteBtn).not.toBeVisible({ timeout: 3000 });
+        // Verify org-level items do NOT have edit/delete buttons (readonly prop hides them)
+        await expect(orgItem.locator('[data-test^="cross-link-edit-"]')).not.toBeVisible({ timeout: 3000 });
+        await expect(orgItem.locator('[data-test^="cross-link-delete-"]')).not.toBeVisible({ timeout: 3000 });
 
         // Verify the stream-level manager still has its add button (editable)
-        // There are two CrossLinkManager instances: stream (editable) and org (readonly)
-        // The stream-level add button should still be present
         const streamAddBtn = page.locator('[data-test="add-cross-link-btn"]');
         await expect(streamAddBtn).toBeVisible({ timeout: 5000 });
 
@@ -1177,6 +1177,35 @@ test.describe("Cross-Linking testcases", () => {
     }, async ({ page }) => {
         testLogger.info('Testing org-level cross-link URL timestamp verification from logs view');
 
+        // Step 0: Clean up any stream-level cross-links first so they don't shadow the org-level ones
+        // (stream links take priority over org links for the same field in the frontend)
+        await pm.crossLinkPage.navigateToStreams();
+        await pm.crossLinkPage.searchStream(STREAM_NAME);
+        await pm.crossLinkPage.openStreamDetail();
+
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
+        if (!isTabVisible) {
+            test.skip(true, 'Cross-linking feature not enabled');
+        }
+
+        await pm.crossLinkPage.clickCrossLinkingTab();
+
+        // Only delete stream-level cross-links (those with visible delete buttons)
+        // Org-level cross-links are read-only and don't have delete buttons
+        const initialDeletableCount = await page.locator('[data-test^="cross-link-delete-"]').count();
+        let deletableCount = initialDeletableCount;
+        while (deletableCount > 0) {
+            await pm.crossLinkPage.clickDeleteCrossLink(0);
+            await page.waitForTimeout(500);
+            deletableCount = await page.locator('[data-test^="cross-link-delete-"]').count();
+        }
+
+        // Only save if we actually deleted something (button is disabled if no changes)
+        if (initialDeletableCount > 0) {
+            await pm.crossLinkPage.clickUpdateSettings();
+            await page.waitForTimeout(2000);
+        }
+
         // Step 1: Create an org-level cross-link with start_time and end_time in URL template
         await pm.crossLinkPage.navigateToOrgSettings();
 
@@ -1185,7 +1214,7 @@ test.describe("Cross-Linking testcases", () => {
             await addBtn.waitFor({ state: 'visible', timeout: 10000 });
         } catch {
             testLogger.info('Cross-linking not available in org settings, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled in org settings');
         }
 
         // Clean up any existing org-level cross-links
@@ -1214,6 +1243,10 @@ test.describe("Cross-Linking testcases", () => {
         await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(2000);
 
+        // Run query again to ensure result_schema picks up the org cross-links
+        await pm.logsPage.runQueryAndWaitForResults();
+        await page.waitForTimeout(2000);
+
         // Step 3: Expand a log row to reveal the inline JSON detail (JsonPreview)
         const expandBtn = page.locator('[data-test="table-row-expand-menu"]').first();
         await expandBtn.waitFor({ state: 'visible', timeout: 15000 });
@@ -1223,93 +1256,129 @@ test.describe("Cross-Linking testcases", () => {
         // Intercept window.open to capture the URL instead of opening a new tab
         await page.evaluate(() => {
             window.__capturedCrossLinkUrl = null;
+            window.__originalOpen = window.open;
             window.open = (url) => {
                 window.__capturedCrossLinkUrl = url;
                 return null;
             };
         });
 
-        // Step 4: Find the kubernetes_container_name field row in the expanded JSON preview
-        // and click its action dropdown button
-        const fieldRow = page.locator('.log_json_content').filter({ hasText: 'kubernetes_container_name' }).first();
-        await fieldRow.waitFor({ state: 'visible', timeout: 10000 });
-        const fieldActionBtn = fieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
-        await fieldActionBtn.click();
-        await page.waitForTimeout(1000);
+        try {
+            // Step 4: Find the kubernetes_container_name field row in the expanded JSON preview
+            // and click its action dropdown button
+            const fieldRow = page.locator('.log_json_content').filter({ hasText: 'kubernetes_container_name' }).first();
+            await fieldRow.waitFor({ state: 'visible', timeout: 10000 });
+            const fieldActionBtn = fieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
+            await fieldActionBtn.click();
+            await page.waitForTimeout(1000);
 
-        // Look for the org-level cross-link item in the dropdown menu
-        const crossLinkItem = page.locator('.q-menu .q-item, .q-list .q-item').filter({ hasText: crossLinkName });
-        const crossLinkVisible = await crossLinkItem.isVisible().catch(() => false);
-        testLogger.info('Org-level cross-link menu item visibility', { crossLinkVisible, crossLinkName });
+            // Look for the org-level cross-link item in the dropdown menu
+            const crossLinkItem = page.locator('.q-menu .q-item, .q-list .q-item').filter({ hasText: crossLinkName });
+            const crossLinkVisible = await crossLinkItem.isVisible().catch(() => false);
+            testLogger.info('Org-level cross-link menu item visibility', { crossLinkVisible, crossLinkName });
 
-        // Assert cross-link menu item is visible
-        expect(crossLinkVisible, `Org-level cross-link "${crossLinkName}" should be visible in dropdown menu`).toBe(true);
+            // Assert cross-link menu item is visible
+            expect(crossLinkVisible, `Org-level cross-link "${crossLinkName}" should be visible in dropdown menu`).toBe(true);
 
-        // Click the cross-link
-        await crossLinkItem.click();
-        testLogger.info('Clicked org-level cross-link menu item');
-        await page.waitForTimeout(1000);
+            // Click the cross-link
+            await crossLinkItem.click();
+            testLogger.info('Clicked org-level cross-link menu item');
+            await page.waitForTimeout(1000);
 
-        // Step 5: Retrieve the captured URL
-        const capturedUrl = await page.evaluate(() => window.__capturedCrossLinkUrl);
-        testLogger.info('Captured org-level cross-link URL', { capturedUrl });
+            // Step 5: Retrieve the captured URL
+            const capturedUrl = await page.evaluate(() => window.__capturedCrossLinkUrl);
+            testLogger.info('Captured org-level cross-link URL', { capturedUrl });
 
-        // Assert URL was captured
-        expect(capturedUrl, 'Cross-link URL should have been captured via window.open').not.toBeNull();
+            // Assert URL was captured
+            expect(capturedUrl, 'Cross-link URL should have been captured via window.open').not.toBeNull();
 
-        // Parse the URL and verify timestamps
-        const url = new URL(capturedUrl);
-        const fromParam = url.searchParams.get('from');
-        const toParam = url.searchParams.get('to');
-        const fieldParam = url.searchParams.get('field');
-        const valueParam = url.searchParams.get('value');
+            // Parse the URL and verify timestamps
+            const url = new URL(capturedUrl);
+            const fromParam = url.searchParams.get('from');
+            const toParam = url.searchParams.get('to');
+            const fieldParam = url.searchParams.get('field');
+            const valueParam = url.searchParams.get('value');
 
-        testLogger.info('Org-level URL parameters', { from: fromParam, to: toParam, field: fieldParam, value: valueParam });
+            testLogger.info('Org-level URL parameters', { from: fromParam, to: toParam, field: fieldParam, value: valueParam });
 
-        // Assert start_time and end_time exist
-        expect(fromParam, 'URL should contain from (start_time) parameter').not.toBeNull();
-        expect(toParam, 'URL should contain to (end_time) parameter').not.toBeNull();
+            // Assert start_time and end_time exist
+            expect(fromParam, 'URL should contain from (start_time) parameter').not.toBeNull();
+            expect(toParam, 'URL should contain to (end_time) parameter').not.toBeNull();
 
-        const startTime = Number(fromParam);
-        const endTime = Number(toParam);
+            const startTime = Number(fromParam);
+            const endTime = Number(toParam);
 
-        // Assert timestamps are valid numbers
-        testLogger.info('Parsed timestamps', { startTime, endTime });
-        expect(isNaN(startTime), 'start_time should be a valid number').toBe(false);
-        expect(isNaN(endTime), 'end_time should be a valid number').toBe(false);
+            // Assert timestamps are valid numbers
+            testLogger.info('Parsed timestamps', { startTime, endTime });
+            expect(isNaN(startTime), 'start_time should be a valid number').toBe(false);
+            expect(isNaN(endTime), 'end_time should be a valid number').toBe(false);
 
-        // Timestamps are in microseconds (16 digits for current epoch)
-        // Valid range: year 2000 to year 2100 in microseconds
-        const minUs = new Date('2000-01-01').getTime() * 1000; // 946684800000000
-        const maxUs = new Date('2100-01-01').getTime() * 1000; // 4102444800000000
-        expect(startTime, `start_time ${startTime} should be > ${minUs} (year 2000 in us)`).toBeGreaterThan(minUs);
-        expect(startTime, `start_time ${startTime} should be < ${maxUs} (year 2100 in us)`).toBeLessThan(maxUs);
-        expect(endTime, `end_time ${endTime} should be > ${minUs} (year 2000 in us)`).toBeGreaterThan(minUs);
-        expect(endTime, `end_time ${endTime} should be < ${maxUs} (year 2100 in us)`).toBeLessThan(maxUs);
-        testLogger.info('Timestamps are valid epoch microseconds', { startTime, endTime });
+            // Timestamps are in microseconds (16 digits for current epoch)
+            // Valid range: year 2000 to year 2100 in microseconds
+            const minUs = new Date('2000-01-01').getTime() * 1000; // 946684800000000
+            const maxUs = new Date('2100-01-01').getTime() * 1000; // 4102444800000000
+            expect(startTime, `start_time ${startTime} should be > ${minUs} (year 2000 in us)`).toBeGreaterThan(minUs);
+            expect(startTime, `start_time ${startTime} should be < ${maxUs} (year 2100 in us)`).toBeLessThan(maxUs);
+            expect(endTime, `end_time ${endTime} should be > ${minUs} (year 2000 in us)`).toBeGreaterThan(minUs);
+            expect(endTime, `end_time ${endTime} should be < ${maxUs} (year 2100 in us)`).toBeLessThan(maxUs);
+            testLogger.info('Timestamps are valid epoch microseconds', { startTime, endTime });
 
-        // end_time should be >= start_time
-        expect(endTime, 'end_time should be >= start_time').toBeGreaterThanOrEqual(startTime);
-        testLogger.info('end_time >= start_time verified');
+            // end_time should be >= start_time
+            expect(endTime, 'end_time should be >= start_time').toBeGreaterThanOrEqual(startTime);
+            testLogger.info('end_time >= start_time verified');
 
-        // Verify field name and value are also populated
-        expect(fieldParam, 'field parameter should be kubernetes_container_name').toBe('kubernetes_container_name');
-        expect(valueParam, 'value parameter should be populated').toBeTruthy();
-        testLogger.info('Field and value parameters verified', { field: fieldParam, value: valueParam });
+            // Verify field name and value are also populated
+            expect(fieldParam, 'field parameter should be kubernetes_container_name').toBe('kubernetes_container_name');
+            expect(valueParam, 'value parameter should be populated').toBeTruthy();
+            testLogger.info('Field and value parameters verified', { field: fieldParam, value: valueParam });
 
-        testLogger.info('PASSED: Org-level logs timestamp verification', {
-            startTime,
-            endTime,
-            startDate: new Date(startTime / 1000).toISOString(),
-            endDate: new Date(endTime / 1000).toISOString(),
-            diffUs: endTime - startTime,
-        });
+            testLogger.info('PASSED: Org-level logs timestamp verification', {
+                startTime,
+                endTime,
+                startDate: new Date(startTime / 1000).toISOString(),
+                endDate: new Date(endTime / 1000).toISOString(),
+                diffUs: endTime - startTime,
+            });
+        } finally {
+            await page.evaluate(() => {
+                if (window.__originalOpen) window.open = window.__originalOpen;
+                delete window.__capturedCrossLinkUrl;
+                delete window.__originalOpen;
+            });
+        }
     });
 
     test("should verify org-level cross-link URL contains correct start_time and end_time when clicked from dashboard", {
         tag: ['@crossLinking', '@functional', '@P1', '@all']
     }, async ({ page }) => {
         testLogger.info('Testing org-level cross-link URL timestamp verification from dashboard panel');
+
+        // Step 0: Clean up any stream-level cross-links first so they don't shadow the org-level ones
+        await pm.crossLinkPage.navigateToStreams();
+        await pm.crossLinkPage.searchStream(STREAM_NAME);
+        await pm.crossLinkPage.openStreamDetail();
+
+        const isTabVisible = await pm.crossLinkPage.isCrossLinkingTabVisible();
+        if (!isTabVisible) {
+            test.skip(true, 'Cross-linking feature not enabled');
+        }
+
+        await pm.crossLinkPage.clickCrossLinkingTab();
+
+        // Only delete stream-level cross-links (those with visible delete buttons)
+        const initialDeletableCount2 = await page.locator('[data-test^="cross-link-delete-"]').count();
+        let deletableCount2 = initialDeletableCount2;
+        while (deletableCount2 > 0) {
+            await pm.crossLinkPage.clickDeleteCrossLink(0);
+            await page.waitForTimeout(500);
+            deletableCount2 = await page.locator('[data-test^="cross-link-delete-"]').count();
+        }
+
+        // Only save if we actually deleted something (button is disabled if no changes)
+        if (initialDeletableCount2 > 0) {
+            await pm.crossLinkPage.clickUpdateSettings();
+            await page.waitForTimeout(2000);
+        }
 
         // Step 1: Create an org-level cross-link with start_time and end_time in URL template
         await pm.crossLinkPage.navigateToOrgSettings();
@@ -1321,7 +1390,7 @@ test.describe("Cross-Linking testcases", () => {
             testLogger.info('Add cross-link button found in org settings');
         } catch {
             testLogger.info('Cross-linking not available in org settings, skipping');
-            return;
+            test.skip(true, 'Cross-linking feature not enabled in org settings');
         }
 
         // Clean up any existing org-level cross-links
@@ -1364,6 +1433,7 @@ test.describe("Cross-Linking testcases", () => {
         // Step 3: Intercept window.open to capture the cross-link URL
         await page.evaluate(() => {
             window.__capturedCrossLinkUrl = null;
+            window.__originalOpen = window.open;
             window.open = (url) => {
                 window.__capturedCrossLinkUrl = url;
                 return null;
@@ -1371,100 +1441,108 @@ test.describe("Cross-Linking testcases", () => {
         });
         testLogger.info('window.open intercepted');
 
-        // Step 4: Click on a data row in the table panel to trigger the cross-link drilldown menu
-        await page.waitForTimeout(2000);
-        await page.evaluate(() => {
-            const table = document.querySelector('[data-test="dashboard-panel-table"]');
-            if (!table) return;
-            const cells = table.querySelectorAll('td');
-            for (const cell of cells) {
-                if (cell.offsetParent !== null && cell.textContent.trim()) {
-                    cell.click();
-                    return;
+        try {
+            // Step 4: Click on a data row in the table panel to trigger the cross-link drilldown menu
+            await page.waitForTimeout(2000);
+            await page.evaluate(() => {
+                const table = document.querySelector('[data-test="dashboard-panel-table"]');
+                if (!table) return;
+                const cells = table.querySelectorAll('td');
+                for (const cell of cells) {
+                    if (cell.offsetParent !== null && cell.textContent.trim()) {
+                        cell.click();
+                        return;
+                    }
                 }
-            }
-        });
-        await page.waitForTimeout(1500);
-        testLogger.info('Clicked on dashboard table cell');
+            });
+            await page.waitForTimeout(1500);
+            testLogger.info('Clicked on dashboard table cell');
 
-        // Step 5: Look for the crosslink-drilldown-menu popup
-        const drilldownMenu = page.locator('.crosslink-drilldown-menu');
-        const menuVisible = await drilldownMenu.isVisible().catch(() => false);
-        testLogger.info('Drilldown menu visibility', { menuVisible });
+            // Step 5: Look for the crosslink-drilldown-menu popup
+            const drilldownMenu = page.locator('.crosslink-drilldown-menu');
+            const menuVisible = await drilldownMenu.isVisible().catch(() => false);
+            testLogger.info('Drilldown menu visibility', { menuVisible });
 
-        // Assert drilldown menu appeared
-        expect(menuVisible, 'Drilldown menu should appear after clicking table cell').toBe(true);
+            // Assert drilldown menu appeared
+            expect(menuVisible, 'Drilldown menu should appear after clicking table cell').toBe(true);
 
-        // Find and click the cross-link menu item
-        const crossLinkMenuItem = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkName });
-        const crossLinkMenuVisible = await crossLinkMenuItem.isVisible().catch(() => false);
-        testLogger.info('Org cross-link menu item visibility', { crossLinkMenuVisible, crossLinkName });
+            // Find and click the cross-link menu item
+            const crossLinkMenuItem = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkName });
+            const crossLinkMenuVisible = await crossLinkMenuItem.isVisible().catch(() => false);
+            testLogger.info('Org cross-link menu item visibility', { crossLinkMenuVisible, crossLinkName });
 
-        // Assert cross-link menu item is visible
-        expect(crossLinkMenuVisible, `Org cross-link "${crossLinkName}" should be visible in drilldown menu`).toBe(true);
+            // Assert cross-link menu item is visible
+            expect(crossLinkMenuVisible, `Org cross-link "${crossLinkName}" should be visible in drilldown menu`).toBe(true);
 
-        await crossLinkMenuItem.click();
-        testLogger.info('Clicked org cross-link menu item');
-        await page.waitForTimeout(1000);
+            await crossLinkMenuItem.click();
+            testLogger.info('Clicked org cross-link menu item');
+            await page.waitForTimeout(1000);
 
-        // Step 6: Retrieve and verify the captured URL
-        const capturedUrl = await page.evaluate(() => window.__capturedCrossLinkUrl);
-        testLogger.info('Captured org-level dashboard cross-link URL', { capturedUrl });
+            // Step 6: Retrieve and verify the captured URL
+            const capturedUrl = await page.evaluate(() => window.__capturedCrossLinkUrl);
+            testLogger.info('Captured org-level dashboard cross-link URL', { capturedUrl });
 
-        // Assert URL was captured
-        expect(capturedUrl, 'Cross-link URL should have been captured via window.open').not.toBeNull();
+            // Assert URL was captured
+            expect(capturedUrl, 'Cross-link URL should have been captured via window.open').not.toBeNull();
 
-        // Parse the URL and verify timestamps
-        const url = new URL(capturedUrl);
-        const fromParam = url.searchParams.get('from');
-        const toParam = url.searchParams.get('to');
-        const fieldParam = url.searchParams.get('field');
-        const valueParam = url.searchParams.get('value');
+            // Parse the URL and verify timestamps
+            const url = new URL(capturedUrl);
+            const fromParam = url.searchParams.get('from');
+            const toParam = url.searchParams.get('to');
+            const fieldParam = url.searchParams.get('field');
+            const valueParam = url.searchParams.get('value');
 
-        testLogger.info('Org dashboard URL parameters', { from: fromParam, to: toParam, field: fieldParam, value: valueParam });
+            testLogger.info('Org dashboard URL parameters', { from: fromParam, to: toParam, field: fieldParam, value: valueParam });
 
-        // Assert start_time and end_time exist
-        expect(fromParam, 'URL should contain from (start_time) parameter').not.toBeNull();
-        expect(toParam, 'URL should contain to (end_time) parameter').not.toBeNull();
+            // Assert start_time and end_time exist
+            expect(fromParam, 'URL should contain from (start_time) parameter').not.toBeNull();
+            expect(toParam, 'URL should contain to (end_time) parameter').not.toBeNull();
 
-        const startTime = Number(fromParam);
-        const endTime = Number(toParam);
+            const startTime = Number(fromParam);
+            const endTime = Number(toParam);
 
-        // Assert timestamps are valid numbers
-        testLogger.info('Parsed dashboard timestamps', { startTime, endTime });
-        expect(isNaN(startTime), 'start_time should be a valid number').toBe(false);
-        expect(isNaN(endTime), 'end_time should be a valid number').toBe(false);
+            // Assert timestamps are valid numbers
+            testLogger.info('Parsed dashboard timestamps', { startTime, endTime });
+            expect(isNaN(startTime), 'start_time should be a valid number').toBe(false);
+            expect(isNaN(endTime), 'end_time should be a valid number').toBe(false);
 
-        // Timestamps are in microseconds (16 digits for current epoch)
-        const minUs = new Date('2000-01-01').getTime() * 1000;
-        const maxUs = new Date('2100-01-01').getTime() * 1000;
-        expect(startTime, `start_time ${startTime} should be > ${minUs} (year 2000 in us)`).toBeGreaterThan(minUs);
-        expect(startTime, `start_time ${startTime} should be < ${maxUs} (year 2100 in us)`).toBeLessThan(maxUs);
-        expect(endTime, `end_time ${endTime} should be > ${minUs} (year 2000 in us)`).toBeGreaterThan(minUs);
-        expect(endTime, `end_time ${endTime} should be < ${maxUs} (year 2100 in us)`).toBeLessThan(maxUs);
-        testLogger.info('Dashboard timestamps are valid epoch microseconds', { startTime, endTime });
+            // Timestamps are in microseconds (16 digits for current epoch)
+            const minUs = new Date('2000-01-01').getTime() * 1000;
+            const maxUs = new Date('2100-01-01').getTime() * 1000;
+            expect(startTime, `start_time ${startTime} should be > ${minUs} (year 2000 in us)`).toBeGreaterThan(minUs);
+            expect(startTime, `start_time ${startTime} should be < ${maxUs} (year 2100 in us)`).toBeLessThan(maxUs);
+            expect(endTime, `end_time ${endTime} should be > ${minUs} (year 2000 in us)`).toBeGreaterThan(minUs);
+            expect(endTime, `end_time ${endTime} should be < ${maxUs} (year 2100 in us)`).toBeLessThan(maxUs);
+            testLogger.info('Dashboard timestamps are valid epoch microseconds', { startTime, endTime });
 
-        // end_time should be >= start_time
-        expect(endTime, 'end_time should be >= start_time').toBeGreaterThanOrEqual(startTime);
-        testLogger.info('end_time >= start_time verified');
+            // end_time should be >= start_time
+            expect(endTime, 'end_time should be >= start_time').toBeGreaterThanOrEqual(startTime);
+            testLogger.info('end_time >= start_time verified');
 
-        // Verify field name and value are populated
-        expect(fieldParam, 'field parameter should be kubernetes_container_name').toBe('kubernetes_container_name');
-        expect(valueParam, 'value parameter should be populated').toBeTruthy();
-        testLogger.info('Field and value parameters verified', { field: fieldParam, value: valueParam });
+            // Verify field name and value are populated
+            expect(fieldParam, 'field parameter should be kubernetes_container_name').toBe('kubernetes_container_name');
+            expect(valueParam, 'value parameter should be populated').toBeTruthy();
+            testLogger.info('Field and value parameters verified', { field: fieldParam, value: valueParam });
 
-        testLogger.info('PASSED: Org-level dashboard timestamp verification', {
-            startTime,
-            endTime,
-            startDate: new Date(startTime / 1000).toISOString(),
-            endDate: new Date(endTime / 1000).toISOString(),
-            diffUs: endTime - startTime,
-        });
+            testLogger.info('PASSED: Org-level dashboard timestamp verification', {
+                startTime,
+                endTime,
+                startDate: new Date(startTime / 1000).toISOString(),
+                endDate: new Date(endTime / 1000).toISOString(),
+                diffUs: endTime - startTime,
+            });
 
-        // Cleanup: delete the test dashboard
-        await pm.dashboardCreate.backToDashboardList();
-        await page.waitForTimeout(1000);
-        testLogger.info('Dashboard cleanup done');
+            // Cleanup: delete the test dashboard
+            await pm.dashboardCreate.backToDashboardList();
+            await page.waitForTimeout(1000);
+            testLogger.info('Dashboard cleanup done');
+        } finally {
+            await page.evaluate(() => {
+                if (window.__originalOpen) window.open = window.__originalOpen;
+                delete window.__capturedCrossLinkUrl;
+                delete window.__originalOpen;
+            });
+        }
     });
 
     // Cleanup: remove org-level cross-links after org tests
