@@ -16,6 +16,7 @@ import { test, expect } from "../baseFixtures.js";
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
+import { getHeaders } from '../../utils/apiUtils.js';
 const testLogger = require('../utils/test-logger.js');
 const path = require('path');
 const crypto = require('crypto');
@@ -31,16 +32,6 @@ test.use({
   }
 });
 
-// Helper: build Basic Auth headers for API calls (Node.js context, no page needed)
-function getApiHeaders() {
-  return {
-    'Authorization': 'Basic ' + Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString('base64'),
-    'Content-Type': 'application/json'
-  };
-}
-
 test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@backfill', '@pipelinesBackfill'] }, () => {
   let pageManager;
 
@@ -51,7 +42,7 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
   test.beforeAll(async () => {
     const orgId = process.env["ORGNAME"];
-    const headers = getApiHeaders();
+    const headers = getHeaders();
     const baseUrl = process.env.ZO_BASE_URL;
 
     try {
@@ -209,7 +200,7 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
   test.afterAll(async () => {
     const orgId = process.env["ORGNAME"];
-    const headers = getApiHeaders();
+    const headers = getHeaders();
     const baseUrl = process.env.ZO_BASE_URL;
 
     try {

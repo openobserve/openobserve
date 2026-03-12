@@ -636,9 +636,7 @@ export class StreamsPage {
      * @returns {Promise<array>} Query results
      */
     async queryStream(streamName, expectedMinCount = null) {
-        const fetch = (await import('node-fetch')).default;
         const orgId = process.env["ORGNAME"];
-        const headers = getHeaders();
 
         testLogger.info('Querying stream via API', { streamName });
 
@@ -657,13 +655,31 @@ export class StreamsPage {
         };
 
         try {
-            const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/_search?type=logs`, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(query)
-            });
+            let data;
 
-            const data = await response.json();
+            if (process.env.IS_CLOUD === 'true') {
+                // Cloud: use browser context (sends OIDC session cookies)
+                const result = await this.page.evaluate(async ({ orgId, query }) => {
+                    const r = await fetch(`/api/${orgId}/_search?type=logs`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(query)
+                    });
+                    return await r.json();
+                }, { orgId, query });
+                data = result;
+            } else {
+                // Self-hosted: use node-fetch with Basic Auth
+                const fetch = (await import('node-fetch')).default;
+                const headers = getHeaders();
+                const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/_search?type=logs`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(query)
+                });
+                data = await response.json();
+            }
+
             const results = data.hits || [];
 
             testLogger.info('Query results', { streamName, recordCount: results.length });
