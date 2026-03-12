@@ -93,18 +93,15 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
     // Open Search Inspect dialog via menu
     await inspectorPage.clickSearchInspectOption();
 
-    // Verify dialog elements are visible
-    const traceIdInput = page.locator(inspectorPage.traceIdInput);
-    await expect(traceIdInput).toBeVisible({ timeout: 5000 });
-
-    const submitBtn = page.locator(inspectorPage.inspectSubmitBtn);
-    await expect(submitBtn).toBeVisible({ timeout: 5000 });
+    // Verify dialog elements are visible using page object methods
+    await inspectorPage.assertTraceIdInputVisible();
+    await inspectorPage.assertInspectSubmitBtnVisible();
 
     await inspectorPage.takeScreenshot('inspect-dialog-open');
 
-    // Fill and submit
-    await traceIdInput.fill('dialog-test-trace-123');
-    await submitBtn.click();
+    // Fill and submit using page object methods
+    await inspectorPage.fillTraceIdInput('dialog-test-trace-123');
+    await inspectorPage.clickInspectSubmitBtn();
     await page.waitForLoadState('domcontentloaded');
 
     // Verify navigation to inspector
@@ -217,7 +214,10 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
     testLogger.info(`SQL content length: ${sqlContent.length}`);
     testLogger.info(`SQL preview: ${sqlContent.substring(0, 100)}`);
 
-    // SQL content should exist (even if empty for no-data cases)
+    // SQL content should exist and contain SQL keywords
+    expect(sqlContent.length).toBeGreaterThan(0);
+    expect(sqlContent.toLowerCase()).toContain('select');
+
     // Close dialog
     await inspectorPage.closeSqlDialog();
   });

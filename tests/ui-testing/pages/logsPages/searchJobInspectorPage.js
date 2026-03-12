@@ -2,6 +2,7 @@
 import { expect } from '@playwright/test';
 
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 /**
  * Page Object Model for Search Job Inspector
@@ -23,7 +24,6 @@ export class SearchJobInspectorPage {
     this.searchHistoryItemBtn = '[data-test="search-history-item-btn"]';
     this.searchInspectBtn = '[data-test="search-inspect-btn"]';
     this.refreshBtn = '[data-test="logs-search-bar-refresh-btn"]';
-    this.showQueryToggleBtn = '[data-test="logs-search-bar-show-query-toggle-btn"]';
 
     // ===== SEARCH INSPECT DIALOG SELECTORS (SearchBar.vue) =====
     this.traceIdInput = '[data-test="search-inspect-trace-id-input"]';
@@ -49,7 +49,7 @@ export class SearchJobInspectorPage {
     this.timeTakenTileText = 'text=Time Taken';
     this.traceIdTileText = 'text=Trace ID';
     this.viewQueryBtnText = 'text=View Query';
-    this.noEventsText = 'text=No events found';
+    this.noEventsText = 'text=No data';
     // Exclude the search bar inspect button (data-test="logs-inspect-button")
     this.inspectBtnText = 'button.q-btn:has-text("Inspect"):not([data-test="logs-inspect-button"])';
 
@@ -134,10 +134,39 @@ export class SearchJobInspectorPage {
    */
   async inspectViaDialog(traceId) {
     await this.clickSearchInspectOption();
-    await expect(this.page.locator(this.traceIdInput)).toBeVisible({ timeout: 5000 });
-    await this.page.locator(this.traceIdInput).fill(traceId);
-    await this.page.locator(this.inspectSubmitBtn).click();
+    await this.assertTraceIdInputVisible();
+    await this.fillTraceIdInput(traceId);
+    await this.clickInspectSubmitBtn();
     await this.waitForInspectorPage();
+  }
+
+  /**
+   * Assert trace ID input is visible in dialog
+   */
+  async assertTraceIdInputVisible() {
+    await expect(this.page.locator(this.traceIdInput)).toBeVisible({ timeout: 5000 });
+  }
+
+  /**
+   * Assert inspect submit button is visible in dialog
+   */
+  async assertInspectSubmitBtnVisible() {
+    await expect(this.page.locator(this.inspectSubmitBtn)).toBeVisible({ timeout: 5000 });
+  }
+
+  /**
+   * Fill the trace ID input field
+   * @param {string} traceId - The trace ID to enter
+   */
+  async fillTraceIdInput(traceId) {
+    await this.page.locator(this.traceIdInput).fill(traceId);
+  }
+
+  /**
+   * Click the inspect submit button in dialog
+   */
+  async clickInspectSubmitBtn() {
+    await this.page.locator(this.inspectSubmitBtn).click();
   }
 
   // ===== SEARCH HISTORY METHODS =====
@@ -188,20 +217,20 @@ export class SearchJobInspectorPage {
 
       // Check if any history rows exist
       const rowCount = await this.page.locator(this.searchHistoryRow).count();
-      console.log(`Search history rows found: ${rowCount}`);
+      testLogger.info(`Search history rows found: ${rowCount}`);
       if (rowCount === 0) {
-        console.log('No search history rows found');
+        testLogger.info('No search history rows found');
         return false;
       }
 
       // Check if Inspect button exists in DOM
       const inspectCount = await this.page.locator(this.inspectBtnText).count();
-      console.log(`Inspect button elements found: ${inspectCount}`);
+      testLogger.info(`Inspect button elements found: ${inspectCount}`);
 
       // If we have rows and inspect buttons exist, the feature is available
       return inspectCount > 0;
     } catch (e) {
-      console.log(`hasHistoryInspectButtons error: ${e.message}`);
+      testLogger.info(`hasHistoryInspectButtons error: ${e.message}`);
       return false;
     }
   }
@@ -290,9 +319,13 @@ export class SearchJobInspectorPage {
    * @returns {Promise<boolean>}
    */
   async isViewQueryVisible() {
-    // Wait a bit for the tile to render after API response
-    await this.page.waitForTimeout(1000);
-    return await this.page.locator(this.viewQueryBtnText).isVisible({ timeout: 10000 }).catch(() => false);
+    // Wait for View Query button to appear (loaded via async API call)
+    try {
+      await this.page.locator(this.viewQueryBtnText).waitFor({ state: 'visible', timeout: 15000 });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -371,8 +404,10 @@ export class SearchJobInspectorPage {
    * @returns {Promise<{results: boolean, events: boolean, timeTaken: boolean, traceId: boolean}>}
    */
   async getTilesVisibility() {
-    // Wait for tiles to render (async API call after page load)
-    await this.page.waitForTimeout(2000);
+    // Wait for page to stabilize after API response
+    await this.page.waitForLoadState('domcontentloaded');
+    // Wait for at least one tile to appear
+    await this.page.locator(this.resultsTileText).waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     return {
       results: await this.page.locator(this.resultsTileText).isVisible({ timeout: 5000 }).catch(() => false),
       events: await this.page.locator(this.eventsTileText).isVisible({ timeout: 5000 }).catch(() => false),
