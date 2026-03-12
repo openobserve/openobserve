@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="dashboardPanelData.data.type == 'custom_chart'" class="tw:pb-8">
-    <div class="tw:max-w-[300px]">
+    <div class="tw:max-w-[300px] tw:mx-3">
       <div class="q-mb-sm tw:font-semibold">
         {{ t("dashboard.description") }}
       </div>
@@ -253,7 +253,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <PromQLChartConfig
-          v-if="promqlMode"
+          v-if="
+            promqlMode &&
+            dashboardPanelData.data.type !== 'geomap' &&
+            dashboardPanelData.data.type !== 'maps'
+          "
           v-show="
             itemVisible(
               ['promql', 'step', 'chart config', 'promql chart'],
@@ -262,6 +266,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :chart-type="dashboardPanelData.data.type"
         />
+      </div>
+    </q-expansion-item>
+
+    <!-- Section: Geographic Configuration -->
+    <q-expansion-item
+      v-if="
+        promqlMode &&
+        (dashboardPanelData.data.type === 'geomap' ||
+          dashboardPanelData.data.type === 'maps')
+      "
+      v-show="sectionVisible(geographicKeywords)"
+      :model-value="isExpanded('geographic', geographicKeywords)"
+      @update:model-value="
+        (v) => {
+          expandedSections.geographic = v;
+        }
+      "
+      label="Geographic Configuration"
+      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      switch-toggle-side
+      expand-icon="chevron_right"
+      expanded-icon="keyboard_arrow_down"
+      expand-icon-class="text-grey-6"
+    >
+      <div class="config-section-body">
+        <PromQLChartConfig :chart-type="dashboardPanelData.data.type" />
       </div>
     </q-expansion-item>
 
@@ -288,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelData.data.config.show_legends"
           :label="t('dashboard.showLegendsLabel')"
           data-test="dashboard-config-show-legend"
-          class="tw:h-[36px] o2-toggle-button-lg"
+          class="tw:h-[30px] o2-toggle-button-lg"
           size="lg"
           :class="
             store.state.theme === 'dark'
@@ -800,7 +830,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchRegex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
           color="input-border"
           bg-color="input-bg"
-          class="showLabelOnTop"
+          class="showLabelOnTop q-mt-sm"
           stack-label
           borderless
           label-slot
@@ -1756,10 +1786,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </q-input>
+      </div>
+    </q-expansion-item>
 
-        <ValueMapping v-show="itemVisible(['value mapping'], 'table')" />
+    <!-- Section: Value Transformations -->
+    <q-expansion-item
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-show="sectionVisible(valueTransformationsKeywords)"
+      :model-value="
+        isExpanded('valueTransformations', valueTransformationsKeywords)
+      "
+      @update:model-value="
+        (v) => {
+          expandedSections.valueTransformations = v;
+        }
+      "
+      label="Value Transformations"
+      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      switch-toggle-side
+      expand-icon="chevron_right"
+      expanded-icon="keyboard_arrow_down"
+      expand-icon-class="text-grey-6"
+    >
+      <div class="config-section-body">
+        <ValueMapping />
+      </div>
+    </q-expansion-item>
+
+    <!-- Section: Field Overrides -->
+    <q-expansion-item
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-show="sectionVisible(fieldOverridesKeywords)"
+      :model-value="isExpanded('fieldOverrides', fieldOverridesKeywords)"
+      @update:model-value="
+        (v) => {
+          expandedSections.fieldOverrides = v;
+        }
+      "
+      label="Field Overrides"
+      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      switch-toggle-side
+      expand-icon="chevron_right"
+      expanded-icon="keyboard_arrow_down"
+      expand-icon-class="text-grey-6"
+    >
+      <div class="config-section-body hide-child-title">
         <OverrideConfig
-          v-show="itemVisible(['override', 'column'], 'table')"
           :dashboardPanelData="dashboardPanelData"
           :panelData="panelData"
         />
@@ -1800,6 +1872,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-map-type"
           hide-bottom-space
         >
+          <template v-slot:label>
+            <div class="row items-center all-pointer-events">
+              {{ t("dashboard.mapsMapType") }}
+              <q-icon class="q-ml-xs" size="20px" name="info" />
+              <q-tooltip class="bg-grey-8" max-width="250px">
+                Map type to display. Default: "world"
+              </q-tooltip>
+            </div>
+          </template>
         </q-select>
 
         <q-select
@@ -3413,8 +3494,6 @@ export default defineComponent({
       "columns",
       "pagination",
       "rows per page",
-      "value mapping",
-      "override",
       "column width",
       "wrap text",
       "row background",
@@ -3423,6 +3502,28 @@ export default defineComponent({
       "wrap table",
       "table transpose",
       "table dynamic",
+    ];
+
+    const valueTransformationsKeywords = [
+      "value transformations",
+      "value transform",
+      "transformations",
+      "mapping",
+      "value mapping",
+      "map values",
+      "data mapping",
+      "transform data",
+    ];
+
+    const fieldOverridesKeywords = [
+      "field overrides",
+      "column overrides",
+      "overrides",
+      "override config",
+      "override",
+      "field config",
+      "column config",
+      "custom field",
     ];
 
     const mapKeywords = [
@@ -3442,6 +3543,22 @@ export default defineComponent({
       "fixed value",
       "minimum",
       "maximum",
+    ];
+
+    const geographicKeywords = [
+      "geographic",
+      "geo",
+      "location",
+      "coordinates",
+      "aggregation",
+      "aggregate",
+      "latitude",
+      "lat",
+      "longitude",
+      "lon",
+      "weight",
+      "name label",
+      "geographic data",
     ];
 
     const gaugeKeywords = [
@@ -3520,12 +3637,15 @@ export default defineComponent({
     const searchQuery = ref("");
     const expandedSections = ref<Record<string, boolean>>({
       general: true,
+      geographic: true,
       legend: true,
       data: true,
       axis: true,
       labels: true,
       lineStyle: true,
       table: true,
+      valueTransformations: true,
+      fieldOverrides: true,
       map: true,
       gauge: true,
       layout: true,
@@ -3849,6 +3969,10 @@ export default defineComponent({
     const anySectionVisible = computed(() => {
       return (
         sectionVisible(generalKeywords) ||
+        (promqlMode.value &&
+          (dashboardPanelData.data.type === "geomap" ||
+            dashboardPanelData.data.type === "maps") &&
+          sectionVisible(geographicKeywords)) ||
         (sectionVisible(legendKeywords) && legendSectionHasContent.value) ||
         (sectionVisible(dataKeywords) && dataSectionHasVisibleContent.value) ||
         (sectionVisible(axisKeywords) && axisSectionHasContent.value) ||
@@ -3857,6 +3981,10 @@ export default defineComponent({
           lineStyleSectionHasContent.value) ||
         (dashboardPanelData.data.type === "table" &&
           sectionVisible(tableKeywords)) ||
+        (dashboardPanelData.data.type === "table" &&
+          sectionVisible(valueTransformationsKeywords)) ||
+        (dashboardPanelData.data.type === "table" &&
+          sectionVisible(fieldOverridesKeywords)) ||
         ((dashboardPanelData.data.type === "geomap" ||
           dashboardPanelData.data.type === "maps") &&
           sectionVisible(mapKeywords)) ||
@@ -3980,7 +4108,10 @@ export default defineComponent({
       labelsKeywords,
       lineStyleKeywords,
       tableKeywords,
+      valueTransformationsKeywords,
+      fieldOverridesKeywords,
       mapKeywords,
+      geographicKeywords,
       gaugeKeywords,
       layoutKeywords,
       colorsKeywords,
