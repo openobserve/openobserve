@@ -1375,6 +1375,35 @@ async fn process_node(
                                     .map_err(|e| anyhow::anyhow!(e.to_string()))
                             })
                         }),
+                        #[cfg(feature = "cloud")]
+                        billing_fn: Some(std::sync::Arc::new(|org_id, trace_id| {
+                            Box::pin(async move {
+                                use crate::service::trial_quota::{
+                                    self, AiUsageContext, TrialQuotaFeature,
+                                };
+                                let ctx = AiUsageContext {
+                                    user_email: "system@openobserve.ai".to_string(),
+                                    trace_id,
+                                    ..Default::default()
+                                };
+                                let feature = TrialQuotaFeature::AiChat;
+                                match trial_quota::try_deduct(&org_id, feature).await {
+                                    Ok(_) => {
+                                        trial_quota::record_free_ai_usage(&org_id, &ctx, feature);
+                                    }
+                                    Err(_) => {
+                                        if trial_quota::org_has_active_subscription(&org_id).await {
+                                            trial_quota::record_billable_ai_usage(
+                                                &org_id, &ctx, feature,
+                                            );
+                                        }
+                                        // If no subscription, just skip — don't block the pipeline
+                                    }
+                                }
+                            })
+                        })),
+                        #[cfg(not(feature = "cloud"))]
+                        billing_fn: None,
                     };
 
                 tokio::spawn(async move {

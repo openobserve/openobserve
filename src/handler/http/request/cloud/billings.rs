@@ -485,7 +485,16 @@ pub async fn handle_stripe_event(headers: HeaderMap, payload: axum::body::Bytes)
     )
 )]
 pub async fn get_ai_usage(Path(org_id): Path<String>) -> Response {
+    log::info!("[AI_USAGE] get_ai_usage called for org={}", org_id);
     let usage = crate::service::trial_quota::get_usage(&org_id).await;
+    log::info!(
+        "[AI_USAGE] org={} response: mode={} used={} limit={} remaining={}",
+        org_id,
+        usage.mode,
+        usage.credits_used,
+        usage.credits_limit,
+        usage.credits_remaining,
+    );
     MetaHttpResponse::json(usage)
 }
 
