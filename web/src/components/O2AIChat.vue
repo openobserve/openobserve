@@ -1050,7 +1050,10 @@ export default defineComponent({
       deleteChatById: dbDeleteChatById,
       clearAllHistory: dbClearAllHistory,
       updateChatTitle: dbUpdateChatTitle,
-    } = useChatHistory();
+    } = useChatHistory(
+      () => store.state.userInfo.email ?? '',
+      () => store.state.selectedOrganization.identifier ?? '',
+    );
 
     const currentChatTimestamp = ref<string | null>(null);
     const saveHistoryLoading = ref(false);
@@ -3755,6 +3758,20 @@ export default defineComponent({
         });
       }
     });
+
+    // Watch for organization switches — reset current chat and reload history
+    // scoped to the new org so users never see cross-org chat history.
+    watch(
+      () => store.state.selectedOrganization?.identifier,
+      (newOrgId, oldOrgId) => {
+        if (newOrgId && newOrgId !== oldOrgId) {
+          addNewChat();
+          if (props.isOpen) {
+            loadHistory();
+          }
+        }
+      },
+    );
 
     // Only fetch initial message if component starts as open
     onMounted(() => {
