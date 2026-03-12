@@ -1,6 +1,6 @@
 export default {
     namespaced: true,
-    state: {
+    state: () => ({
       logs: null,
       metrics: null,
       traces: null,
@@ -9,7 +9,7 @@ export default {
       metadata: null,
       streamsIndexMapping: {},
       areAllStreamsFetched: false,
-    },
+    }),
     getters: {
       getAllStreams(state: any) {
         return {
