@@ -2909,7 +2909,8 @@
     "rateLabel": "Rate:",
     "timeRangeLabel": "Zeitbereich:",
     "analyzeTooltipTraces": "Analysieren Sie die Trace-Dimensionen auf Rate, Latenz und Fehlermuster",
-    "insightsButtonLabel": "Einblicke"
+    "insightsButtonLabel": "Einblicke",
+    "searchInspectionsLabel": "Überprüfen Sie die Ausführungsdetails des Suchauftrags"
   },
   "errorInsights": {
     "title": "Einblicke",

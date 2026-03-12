@@ -2909,7 +2909,8 @@
     "rateLabel": "レート:",
     "timeRangeLabel": "時間範囲:",
     "analyzeTooltipTraces": "レート、レイテンシー、エラーパターンのトレースディメンションを分析",
-    "insightsButtonLabel": "インサイト"
+    "insightsButtonLabel": "インサイト",
+    "searchInspectionsLabel": "検索ジョブの実行詳細を検査する"
   },
   "errorInsights": {
     "title": "インサイト",

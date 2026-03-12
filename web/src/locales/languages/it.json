@@ -2907,7 +2907,8 @@
     "rateLabel": "Tariffa:",
     "timeRangeLabel": "Intervallo di tempo:",
     "analyzeTooltipTraces": "Analizza le dimensioni delle tracce per individuare velocità, latenza e modelli di errore",
-    "insightsButtonLabel": "Approfondimenti"
+    "insightsButtonLabel": "Approfondimenti",
+    "searchInspectionsLabel": "Ispeziona i dettagli di esecuzione del lavoro di ricerca"
   },
   "errorInsights": {
     "title": "Approfondimenti",

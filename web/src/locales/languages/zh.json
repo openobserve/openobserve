@@ -2914,7 +2914,8 @@
     "rateLabel": "频率：",
     "timeRangeLabel": "时间范围：",
     "analyzeTooltipTraces": "分析跟踪维度的速率、延迟和错误模式",
-    "insightsButtonLabel": "见解"
+    "insightsButtonLabel": "见解",
+    "searchInspectionsLabel": "检查搜索任务执行详情"
   },
   "errorInsights": {
     "title": "标题",

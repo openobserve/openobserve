@@ -2909,7 +2909,8 @@
     "rateLabel": "Tarif :",
     "timeRangeLabel": "Plage de temps :",
     "analyzeTooltipTraces": "Analysez les dimensions des traces pour déterminer le taux, la latence et les modèles d'erreur",
-    "insightsButtonLabel": "Perspectives"
+    "insightsButtonLabel": "Perspectives",
+    "searchInspectionsLabel": "Inspectez les détails de l'exécution des tâches de recherche"
   },
   "errorInsights": {
     "title": "Perspectives",
