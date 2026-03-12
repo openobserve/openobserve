@@ -975,7 +975,7 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(searchObjInstance.data.stream.addToFilter).toBe("");
-      expect(searchObjInstance.data.query).toContain("field='val'");
+      expect(searchObjInstance.data.editorValue).toContain("field='val'");
     });
 
     it('should transform "field=\'null\'" to "field is null" in the filter', async () => {
@@ -990,7 +990,7 @@ describe("SearchBar", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      expect(searchObjInstance.data.query).toContain("field is null");
+      expect(searchObjInstance.data.editorValue).toContain("field is null");
     });
 
     it("should use the filter as the full query when there is no existing query and no pipe", async () => {
@@ -1005,7 +1005,7 @@ describe("SearchBar", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      expect(searchObjInstance.data.query).toBe("service_name='svc-a'");
+      expect(searchObjInstance.data.editorValue).toBe("service_name='svc-a'");
     });
   });
 

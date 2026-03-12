@@ -23,6 +23,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
 const { ingestTestData } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // ============================================================================
 // Utility Functions
@@ -77,7 +78,7 @@ test.describe("Logs Query Builder - P0 Critical Tests", () => {
         await ingestTestData(page);
         await page.waitForLoadState('domcontentloaded');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await pm.logsPage.selectStream("e2e_automate");
         await applyQueryButton(pm);
 
@@ -172,7 +173,7 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
         await ingestTestData(page);
         await page.waitForLoadState('domcontentloaded');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await pm.logsPage.selectStream("e2e_automate");
         await applyQueryButton(pm);
 
@@ -272,7 +273,7 @@ test.describe("Logs Query Builder - Chart Type on Tab Switch", () => {
         await ingestTestData(page);
         await page.waitForLoadState('domcontentloaded');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await pm.logsPage.selectStream("e2e_automate");
         await applyQueryButton(pm);
 

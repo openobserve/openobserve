@@ -18,6 +18,7 @@ const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const patternsTestData = require("../../../test-data/patterns_test_data.json");
 const { ingestCustomData, enableLogPatternsExtraction, waitForStreamData } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Dedicated stream for pattern tests with proper configuration
 const PATTERNS_STREAM = "e2e_http_patterns";
@@ -42,7 +43,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         try {
             // Navigate to establish session
-            await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+            await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
             await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
             // Ingest pattern-rich data with fresh timestamps
@@ -105,7 +106,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should display Patterns toggle button in Enterprise edition @P0 @smoke", async ({ page }) => {
         testLogger.info('Test: Verify Patterns toggle is visible (Enterprise)');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // STRONG ASSERTION: Patterns toggle must be visible in Enterprise edition
@@ -117,7 +118,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should switch to Patterns view when toggle is clicked @P0 @smoke", async ({ page }) => {
         testLogger.info('Test: Verify patterns view activates on toggle click');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Select stream and set time range
@@ -155,7 +156,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should display pattern statistics or empty state after loading @P0 @functional", async ({ page }) => {
         testLogger.info('Test: Verify pattern view shows valid state');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
@@ -207,7 +208,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should display pattern cards with template, frequency and percentage when patterns exist @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify pattern cards display correct information');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
@@ -259,7 +260,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should open pattern details dialog when clicking pattern card @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify pattern details dialog opens on card click');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
@@ -308,7 +309,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should navigate between patterns using Previous/Next buttons @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify Previous/Next navigation in pattern details');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
@@ -374,7 +375,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should add pattern to search using Include button @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify Include button functionality');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
@@ -420,7 +421,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should add pattern to search using Exclude button @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify Exclude button functionality');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
@@ -470,7 +471,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should handle empty state gracefully @P2 @edgeCase", async ({ page }) => {
         testLogger.info('Test: Verify empty state handling');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Use a short time range that's likely to have no patterns
@@ -505,7 +506,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should open details dialog via details icon @P2 @functional", async ({ page }) => {
         testLogger.info('Test: Verify details icon opens pattern details dialog');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
