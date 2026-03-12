@@ -16,9 +16,8 @@
 //! Super-cluster queue processor for semantic groups synchronization.
 //!
 //! Synchronizes organization-level alert deduplication configuration including:
-//! - Semantic field groups (field name equivalences)
+//! - Field aliases (field name equivalences)
 //! - Alert fingerprinting rules
-//! - FQN priority dimensions
 //!
 //! Changes propagate to all regions for consistent deduplication behavior.
 

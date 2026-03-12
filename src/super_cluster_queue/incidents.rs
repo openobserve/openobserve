@@ -36,29 +36,20 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
     match msg {
         IncidentMessage::Create {
             org_id,
-            correlation_key,
+            correlation_key: key_type,
             severity,
-            stable_dimensions,
+            stable_dimensions: group_values,
             first_alert_at,
             title,
         } => {
-            if alert_incidents::find_open_by_correlation_key(&org_id, &correlation_key)
-                .await?
-                .is_some()
-            {
-                log::debug!(
-                    "[SUPER_CLUSTER:incidents] Incident already exists org={org_id} key={correlation_key}"
-                );
-                return Ok(());
-            }
             log::debug!(
-                "[SUPER_CLUSTER:incidents] Create incident org={org_id}  key={correlation_key}"
+                "[SUPER_CLUSTER:incidents] Create incident org={org_id} key_type={key_type}"
             );
             alert_incidents::create(
                 &org_id,
-                &correlation_key,
                 &severity,
-                stable_dimensions,
+                group_values,
+                &key_type,
                 first_alert_at,
                 title,
             )
