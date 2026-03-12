@@ -241,7 +241,9 @@ function flattenRoutes(routes: any[]): any[] {
 }
 
 describe("router/routes (singleton)", () => {
-  const allRoutes = flattenRoutes(routerInstance.getRoutes());
+  // getRoutes() already returns a flat list of all route records including nested ones;
+  // calling flattenRoutes on top of it would double-count children.
+  const allRoutes = routerInstance.getRoutes();
 
   // -------------------------------------------------------------------------
   // Router instance sanity checks

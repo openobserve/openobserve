@@ -197,27 +197,20 @@ describe("router/index (factory)", () => {
     });
 
     it("should redirect to /login when navigating to a protected route without a session", async () => {
-      // Simulate unauthenticated access to /logs
-      const nextMock = vi.fn();
-      let capturedGuard: any;
-
-      router.beforeEach((to: any, from: any, next: any) => {
-        capturedGuard = { to, from, next };
-      });
-
+      // Simulate unauthenticated access to /logs; the guard should redirect to /login
       await router.push("/logs").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/login");
     });
 
     it("should store the current URL in sessionStorage when redirecting to login", async () => {
-      const sessionSetItemSpy = vi.spyOn(window.sessionStorage, "setItem");
+      window.sessionStorage.clear();
       vi.mocked(getDecodedUserInfo).mockReturnValue(null);
       store = buildStore(false);
       router = createAppRouter(store);
 
       await router.push({ path: "/logs" }).catch(() => {});
-      // If the guard ran, sessionStorage.setItem should have been called
-      // (not asserting exact value because jsdom location differs from real browser)
-      expect(sessionSetItemSpy).toHaveBeenCalled();
+      // The guard stores the current URL under 'redirectURI' before redirecting to /login
+      expect(window.sessionStorage.getItem("redirectURI")).not.toBeNull();
     });
 
     it("should store short_url query param when present", async () => {

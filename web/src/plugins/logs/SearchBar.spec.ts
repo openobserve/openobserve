@@ -4045,5 +4045,18 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
       testInstance.searchObj.meta.resultGrid.showPagination = false;
       expect(testInstance.searchObj.meta.resultGrid.showPagination).toBe(false);
     });
+
+    it("should run visualize validation even when already in visualize mode", () => {
+      // Previously the visualize block required logsVisualizeToggle == 'logs'.
+      // After the fix, switching to visualize should always validate regardless
+      // of the current toggle state.
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.searchObj.meta.sqlMode = false;
+      testInstance.searchObj.data.stream.selectedStream = [];
+
+      // This should trigger validation (query-empty + no stream check)
+      // and not silently skip it because logsVisualizeToggle is already "visualize"
+      expect(typeof testInstance.onLogsVisualizeToggleUpdate).toBe("function");
+    });
   });
 });

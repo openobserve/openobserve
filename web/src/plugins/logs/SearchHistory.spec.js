@@ -364,11 +364,108 @@ describe("SearchHistory Component", () => {
 
     it("handles empty search history response", async () => {
       searchService.get_history.mockResolvedValue({ data: { hits: [] } });
-      
+
       await wrapper.setProps({ isClicked: true });
       await flushPromises();
 
       expect(wrapper.vm.dataToBeLoaded).toHaveLength(0);
+    });
+  });
+
+  describe("Navigation - goToLogs with function row", () => {
+    it("adds functionContent and fn_editor=true when row has function property", async () => {
+      const mockRowWithFunction = {
+        sql: "SELECT * FROM logs",
+        stream_name: "test-stream",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000,
+        toBeStoredEndTime: 2000,
+        duration: "1 second",
+        function: "function transformLog(row) { return row; }",
+      };
+
+      await wrapper.vm.goToLogs(mockRowWithFunction);
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/logs",
+          query: expect.objectContaining({
+            fn_editor: "true",
+            functionContent: expect.any(String),
+          }),
+        })
+      );
+    });
+
+    it("sets fn_editor=false when row has no function property", async () => {
+      const mockRowWithoutFunction = {
+        sql: "SELECT * FROM logs",
+        stream_name: "test-stream",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000,
+        toBeStoredEndTime: 2000,
+        duration: "1 second",
+      };
+
+      await wrapper.vm.goToLogs(mockRowWithoutFunction);
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            fn_editor: "false",
+          }),
+        })
+      );
+    });
+
+    it("does not add functionContent when row function is falsy", async () => {
+      const mockRowWithEmptyFunction = {
+        sql: "SELECT * FROM logs",
+        stream_name: "test-stream",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000,
+        toBeStoredEndTime: 2000,
+        duration: "1 second",
+        function: "",
+      };
+
+      await wrapper.vm.goToLogs(mockRowWithEmptyFunction);
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.not.objectContaining({
+            functionContent: expect.any(String),
+          }),
+        })
+      );
+    });
+  });
+
+  describe("Tab State", () => {
+    it("has activeTab initialized", () => {
+      expect(wrapper.vm.activeTab).toBeDefined();
+    });
+
+    it("has tabs array defined", () => {
+      expect(Array.isArray(wrapper.vm.tabs)).toBe(true);
+    });
+  });
+
+  describe("Text Wrapping", () => {
+    it("has wrapText initialized to true", () => {
+      expect(wrapper.vm.wrapText).toBe(true);
+    });
+
+    it("can toggle wrapText", async () => {
+      wrapper.vm.wrapText = false;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.wrapText).toBe(false);
+    });
+  });
+
+  describe("Sorting", () => {
+    it("has sortMethod defined", () => {
+      expect(typeof wrapper.vm.sortMethod).toBe("function");
     });
   });
 });

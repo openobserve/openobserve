@@ -15,23 +15,37 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest"
 
-// Mock RudderAnalytics before importing the module under test
-const mockLoad = vi.fn()
-const mockReady = vi.fn()
-const mockIdentify = vi.fn()
-const mockTrack = vi.fn()
-const mockPage = vi.fn()
-const mockReset = vi.fn()
-
-vi.mock("@rudderstack/analytics-js", () => ({
-  RudderAnalytics: vi.fn().mockImplementation(() => ({
+// Use vi.hoisted so these spies are available when the vi.mock factory runs
+// (vi.mock calls are hoisted before the rest of the module, so top-level
+// const declarations wouldn't be initialised yet without vi.hoisted).
+const {
+  mockLoad,
+  mockReady,
+  mockIdentify,
+  mockTrack,
+  mockPage,
+  mockReset,
+  MockRudderAnalytics,
+} = vi.hoisted(() => {
+  const mockLoad = vi.fn()
+  const mockReady = vi.fn()
+  const mockIdentify = vi.fn()
+  const mockTrack = vi.fn()
+  const mockPage = vi.fn()
+  const mockReset = vi.fn()
+  const MockRudderAnalytics = vi.fn().mockImplementation(() => ({
     load: mockLoad,
     ready: mockReady,
     identify: mockIdentify,
     track: mockTrack,
     page: mockPage,
     reset: mockReset,
-  })),
+  }))
+  return { mockLoad, mockReady, mockIdentify, mockTrack, mockPage, mockReset, MockRudderAnalytics }
+})
+
+vi.mock("@rudderstack/analytics-js", () => ({
+  RudderAnalytics: MockRudderAnalytics,
 }))
 
 // Mock aws-exports config
@@ -44,6 +58,7 @@ vi.mock("../aws-exports", () => ({
 describe("segment_analytics service", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.resetModules()
   })
 
   describe("module export", () => {
@@ -105,22 +120,22 @@ describe("segment_analytics service", () => {
   })
 
   describe("when analytics is disabled", () => {
-    it("does not call rudderanalytics.load when enableAnalytics is false", () => {
-      // The module-level code runs at import time with analytics disabled
-      // (mocked config has enableAnalytics: "false"), so load should not be called
+    it("does not call rudderanalytics.load when enableAnalytics is false", async () => {
+      await import("@/services/segment_analytics")
       expect(mockLoad).not.toHaveBeenCalled()
     })
 
-    it("does not call rudderanalytics.ready when enableAnalytics is false", () => {
+    it("does not call rudderanalytics.ready when enableAnalytics is false", async () => {
+      await import("@/services/segment_analytics")
       expect(mockReady).not.toHaveBeenCalled()
     })
   })
 
   describe("RudderAnalytics instantiation", () => {
     it("creates a RudderAnalytics instance", async () => {
-      const { RudderAnalytics } = await import("@rudderstack/analytics-js")
-      // The constructor was called during module initialisation
-      expect(RudderAnalytics).toHaveBeenCalled()
+      // Importing the module triggers the module-level `new RudderAnalytics()`
+      await import("@/services/segment_analytics")
+      expect(MockRudderAnalytics).toHaveBeenCalled()
     })
   })
 
