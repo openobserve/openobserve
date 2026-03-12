@@ -320,7 +320,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
   });
 
   test.afterEach(async ({ page }) => {
-    // Clean up: navigate back and delete dashboard
+    // Clean up: navigate back and delete dashboard.
     try {
       await pm.dashboardCreate.backToDashboardList();
       await page.waitForURL(/\/dashboards/, { timeout: 10000 }).catch(() => {});
