@@ -40,22 +40,21 @@ export function useTracesTableColumns(
           header: "TIMESTAMP",
           size: 160,
           meta: { sortable: true },
+          sortable: true,
         },
         {
           id: "service",
           header: "SERVICE",
+          size: 160,
           meta: {
-            grow: true,
-            width: 160,
             cellClass: "tw:text-[var(--o2-text-1)]",
           },
         },
         {
           id: "operation_name",
           header: "OPERATION NAME",
+          size: 200,
           meta: {
-            grow: true,
-            width: 200,
             cellClass: "tw:text-[var(--o2-text-1)]",
           },
         },
@@ -64,6 +63,7 @@ export function useTracesTableColumns(
           header: "DURATION",
           size: 120,
           meta: { sortable: true },
+          sortable: true,
         },
         {
           id: "status",
@@ -96,18 +96,16 @@ export function useTracesTableColumns(
       {
         id: "service",
         header: "SERVICE",
+        size: 180,
         meta: {
-          grow: true,
-          width: 180,
           cellClass: "tw:text-[var(--o2-text-1)]",
         },
       },
       {
         id: "operation_name",
         header: "OPERATION NAME",
+        size: 200,
         meta: {
-          grow: true,
-          width: 200,
           cellClass: "tw:text-[var(--o2-text-1)]",
         },
       },
@@ -136,13 +134,13 @@ export function useTracesTableColumns(
           {
             id: "input_tokens",
             header: "INPUT TOKENS",
-            size: 110,
+            size: 160,
             meta: { align: "right" },
           },
           {
             id: "output_tokens",
             header: "OUTPUT TOKENS",
-            size: 110,
+            size: 160,
             meta: { align: "right" },
           },
           {
