@@ -82,7 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-if="
               searchObj.data?.queryResults?.hits?.length > 0 &&
-              searchObj.data.lastSearchTraceId
+              searchObj.data.lastSearchTraceId &&
+              config.isEnterprise == 'true' &&
+              config.isCloud == 'false'
             "
             outline
             no-caps
@@ -90,13 +92,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             icon="troubleshoot"
             label="Inspect"
-            class="q-ml-sm"
+            class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
             size="sm"
             @click="openSearchJobInspector"
             data-test="logs-inspect-button"
           >
             <q-tooltip>
-              Inspect search job execution details
+              {{ t("volumeInsights.searchInspectionsLabel") }}
             </q-tooltip>
           </q-btn>
           <!-- Volume Analysis Button -->
@@ -111,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             icon="timeline"
             :label="t('volumeInsights.insightsButtonLabel')"
-            class=" analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
+            class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
             size="sm"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
@@ -500,6 +502,7 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "SearchResult",
@@ -1522,6 +1525,7 @@ export default defineComponent({
     return {
       t,
       store,
+      config,
       plotChart,
       searchObj,
       patternsState,

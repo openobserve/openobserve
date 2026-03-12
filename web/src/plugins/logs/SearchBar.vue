@@ -721,7 +721,7 @@ class="q-pr-sm q-pt-xs" />
               </q-item>
               <q-separator v-if="config.isEnterprise == 'true'" />
               <q-item
-                v-if="config.isEnterprise == 'true'"
+                v-if="config.isEnterprise == 'true' && config.isCloud == 'false'"
                 data-test="search-inspect-btn"
                 class="q-pa-sm saved-view-item"
                 clickable
