@@ -54,6 +54,10 @@ pub enum TriggerDataType {
     DerivedStream,
     #[serde(rename = "backfill")]
     Backfill,
+    #[serde(rename = "anomaly_detection")]
+    AnomalyDetection,
+    #[serde(rename = "anomaly_detection_training")]
+    AnomalyDetectionTraining,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

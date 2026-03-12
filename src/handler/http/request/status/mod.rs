@@ -188,6 +188,7 @@ struct ConfigResponse<'a> {
     service_graph_enabled: bool,
     incidents_enabled: bool,
     service_streams_enabled: bool,
+    anomaly_detection_enabled: bool,
     /// Available FQN priority dimensions from O2_FQN_PRIORITY_DIMENSIONS env var
     /// Used by UI to populate the FQN priority dimension selector
     fqn_priority_dimensions: Vec<String>,
@@ -326,6 +327,8 @@ pub async fn zo_config() -> impl IntoResponse {
     let service_graph_enabled = enterprise_value!(false, o2cfg.service_graph.enabled);
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
+    // Anomaly detection is always on when the enterprise feature is compiled in — no runtime flag.
+    let anomaly_detection_enabled = enterprise_value!(false, true);
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
@@ -425,6 +428,7 @@ pub async fn zo_config() -> impl IntoResponse {
         service_graph_enabled,
         incidents_enabled,
         service_streams_enabled,
+        anomaly_detection_enabled,
         fqn_priority_dimensions: enterprise_value!(
             vec![],
             o2_enterprise::enterprise::common::config::get_config()

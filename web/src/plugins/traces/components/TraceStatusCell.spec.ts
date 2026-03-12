@@ -54,17 +54,16 @@ describe("TraceStatusCell", () => {
       expect(wrapper.text().toUpperCase()).toContain("SUCCESS");
     });
 
-    it("applies green background for success", () => {
+    it("applies the success CSS class on the pill", () => {
       wrapper = mount_({ errors: 0 });
       const pill = wrapper.find('[data-test="trace-row-status-pill"]');
-      expect(pill.attributes("style")).toContain("rgba(76, 175, 80, 0.12)");
+      expect(pill.classes()).toContain("o2-status-pill--success");
     });
 
-    it("applies green text colour for success", () => {
+    it("does not apply the error CSS class on the pill", () => {
       wrapper = mount_({ errors: 0 });
       const pill = wrapper.find('[data-test="trace-row-status-pill"]');
-      // pillColor uses var(--q-positive, #388e3c)
-      expect(pill.attributes("style")).toContain("color:");
+      expect(pill.classes()).not.toContain("o2-status-pill--error");
     });
   });
 
@@ -83,16 +82,16 @@ describe("TraceStatusCell", () => {
       expect(text).toContain("ERRORS");
     });
 
-    it("applies red background for errors", () => {
+    it("applies the error CSS class on the pill", () => {
       wrapper = mount_({ errors: 2 });
       const pill = wrapper.find('[data-test="trace-row-status-pill"]');
-      expect(pill.attributes("style")).toContain("rgba(244, 67, 54, 0.12)");
+      expect(pill.classes()).toContain("o2-status-pill--error");
     });
 
-    it("applies red text colour for errors", () => {
+    it("does not apply the success CSS class on the pill", () => {
       wrapper = mount_({ errors: 2 });
       const pill = wrapper.find('[data-test="trace-row-status-pill"]');
-      expect(pill.attributes("style")).toContain("color:");
+      expect(pill.classes()).not.toContain("o2-status-pill--success");
     });
   });
 
