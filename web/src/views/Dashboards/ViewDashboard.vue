@@ -1076,12 +1076,18 @@ export default defineComponent({
     watch(
       () => route.query.dashboard,
       async (newDashboardId, oldDashboardId) => {
+        // Skip initial mount call (oldDashboardId is undefined on first run);
+        // loadDashboard() is already called during onMounted setup.
+        if (!oldDashboardId) return;
         if (newDashboardId && newDashboardId !== oldDashboardId) {
           isDashboardLoading.value = true;
-          await loadDashboard();
-          isDashboardLoading.value = false;
+          try {
+            await loadDashboard();
+          } finally {
+            isDashboardLoading.value = false;
+          }
         }
-      },
+      }
     );
 
     const getPanelFromTab = (tabId: string, panelId: string) => {
