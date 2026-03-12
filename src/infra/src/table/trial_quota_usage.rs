@@ -15,7 +15,7 @@
 
 use sea_orm::{
     ColumnTrait, EntityTrait, QueryFilter, QuerySelect,
-    sea_query::{Expr, OnConflict},
+    sea_query::{Expr, Func, OnConflict},
 };
 
 use crate::{
@@ -69,12 +69,19 @@ pub async fn load_all() -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr>
 }
 
 /// Get total usage across all features for an org (sum of usage_count).
+/// Note: PostgreSQL SUM(bigint) returns NUMERIC, so we cast to BIGINT for Rust i64 compat.
 pub async fn get_total_usage_for_org(org_id: &str) -> Result<i64, sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let result: Option<Option<i64>> = trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .select_only()
-        .column_as(trial_quota_usage::Column::UsageCount.sum(), "total_usage")
+        .column_as(
+            Expr::expr(Func::cast_as(
+                trial_quota_usage::Column::UsageCount.sum(),
+                sea_orm::sea_query::Alias::new("BIGINT"),
+            )),
+            "total_usage",
+        )
         .into_tuple()
         .one(db)
         .await?;
