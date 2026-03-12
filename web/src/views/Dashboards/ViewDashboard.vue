@@ -696,6 +696,10 @@ export default defineComponent({
                   `;
     };
 
+    // Guard flag: true while a cross-dashboard load is in progress.
+    // Prevents updateUrlWithCurrentState() from overwriting the incoming tab ID.
+    const isDashboardLoading = ref(false);
+
     const loadDashboard = async (onlyIfRequired = false) => {
       // check if drilldown or soft-refresh request
       if (onlyIfRequired) {
@@ -1065,7 +1069,19 @@ export default defineComponent({
         if (newTabId && newTabId !== selectedTabId.value) {
           selectedTabId.value = newTabId;
         }
-      }
+      },
+    );
+
+    // Watch for cross-dashboard navigation (e.g. drilldown to a different dashboard)
+    watch(
+      () => route.query.dashboard,
+      async (newDashboardId, oldDashboardId) => {
+        if (newDashboardId && newDashboardId !== oldDashboardId) {
+          isDashboardLoading.value = true;
+          await loadDashboard();
+          isDashboardLoading.value = false;
+        }
+      },
     );
 
     const getPanelFromTab = (tabId: string, panelId: string) => {
