@@ -263,8 +263,7 @@ export function useChatHistory(
         request.onsuccess = () => {
           const record = request.result as ChatHistoryEntry | undefined;
           // Verify ownership — reject records belonging to another user+org
-          // Use strict inequality so pre-v2 records (userOrgKey === undefined) are also isolated
-          if (!record || record.userOrgKey !== userOrgKey) {
+          if (!record || (record.userOrgKey && record.userOrgKey !== userOrgKey)) {
             resolve(null);
             return;
           }
@@ -298,8 +297,7 @@ export function useChatHistory(
         const getRequest = store.get(chatId);
         getRequest.onsuccess = () => {
           const record = getRequest.result as ChatHistoryEntry | undefined;
-          // Use strict inequality so pre-v2 records (userOrgKey === undefined) are also isolated
-          if (!record || record.userOrgKey !== userOrgKey) {
+          if (!record || (record.userOrgKey && record.userOrgKey !== userOrgKey)) {
             resolve(false);
             return;
           }
@@ -378,8 +376,7 @@ export function useChatHistory(
         const getRequest = store.get(chatId);
         getRequest.onsuccess = () => {
           const chat = getRequest.result as ChatHistoryEntry | undefined;
-          // Use strict inequality so pre-v2 records (userOrgKey === undefined) are also isolated
-          if (!chat || chat.userOrgKey !== userOrgKey) {
+          if (!chat || (chat.userOrgKey && chat.userOrgKey !== userOrgKey)) {
             resolve(false);
             return;
           }
