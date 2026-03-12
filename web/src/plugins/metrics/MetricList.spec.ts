@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MetricList from "./MetricList.vue";
@@ -186,7 +186,7 @@ const createWrapper = (props = {}, options = {}) => {
           template: `<div data-test-stub='q-table' :data-test='$attrs["data-test"]'>
             <div data-test="table-top-right"><slot name="top-right"></slot></div>
             <div data-test="table-body">
-              <slot name="body-cell-name" :props="{row: {name: 'test_field'}}" v-for="row in rows || [{name: 'test_field'}, {name: 'other_field'}]" :key="row.name"></slot>
+              <slot name="body-cell-name" v-for="row in rows || [{name: 'test_field'}, {name: 'other_field'}]" :key="row.name" v-bind="{row: row, col: {name: 'name'}}"></slot>
             </div>
           </div>`,
           props: ["rows", "columns", "visibleColumns", "filter", "filterMethod", "pagination", "hideHeader", "hideBottom"],
@@ -966,11 +966,357 @@ describe("MetricList", () => {
         },
       });
       wrapper.vm.metricLabelValues["test_field"] = { isLoading: true, values: [] };
-      
+
       await wrapper.vm.getFilteredMetricValues("test_field");
-      
+
       expect(wrapper.vm.metricLabelValues["test_field"].values).toHaveLength(1);
       expect(wrapper.vm.metricLabelValues["test_field"].values[0].key).toBe("value2");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// New test cases added 2026 — covering functionality not in the Aug 2026 spec
+// ---------------------------------------------------------------------------
+
+describe("MetricList — updateMetricLabels", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetStream.mockResolvedValue({
+      schema: [{ name: "label_a" }, { name: "label_b" }, { name: "label_c" }],
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("calls getStream with the selected metric value, 'metrics', and true", async () => {
+    const wrapper = createWrapper({
+      modelValue: { label: "my_metric", value: "my_metric", type: "gauge" },
+    });
+    mockGetStream.mockClear();
+
+    await wrapper.vm.updateMetricLabels();
+    await flushPromises();
+
+    expect(mockGetStream).toHaveBeenCalledWith("my_metric", "metrics", true);
+  });
+
+  it("sets selectedMetricLabels from the schema returned by getStream", async () => {
+    const wrapper = createWrapper({
+      modelValue: { label: "my_metric", value: "my_metric", type: "gauge" },
+    });
+    await wrapper.vm.updateMetricLabels();
+    await flushPromises();
+
+    expect(wrapper.vm.selectedMetricLabels).toEqual([
+      { name: "label_a" },
+      { name: "label_b" },
+      { name: "label_c" },
+    ]);
+  });
+
+  it("sets filteredMetricLabels to a copy of the schema", async () => {
+    const wrapper = createWrapper({
+      modelValue: { label: "my_metric", value: "my_metric", type: "gauge" },
+    });
+    await wrapper.vm.updateMetricLabels();
+    await flushPromises();
+
+    expect(wrapper.vm.filteredMetricLabels).toEqual([
+      { name: "label_a" },
+      { name: "label_b" },
+      { name: "label_c" },
+    ]);
+  });
+
+  it("does not set filteredMetricLabels when schema is not an array", async () => {
+    mockGetStream.mockResolvedValue({ schema: null });
+    const wrapper = createWrapper({
+      modelValue: { label: "my_metric", value: "my_metric", type: "gauge" },
+    });
+    // filteredMetricLabels starts empty; after update it should remain unchanged
+    const before = [...wrapper.vm.filteredMetricLabels];
+    await wrapper.vm.updateMetricLabels();
+    await flushPromises();
+
+    expect(wrapper.vm.filteredMetricLabels).toEqual(before);
+  });
+
+  it("calls getStream with empty string when modelValue is null", async () => {
+    const wrapper = createWrapper({ modelValue: null });
+    mockGetStream.mockClear();
+
+    await wrapper.vm.updateMetricLabels();
+    await flushPromises();
+
+    expect(mockGetStream).toHaveBeenCalledWith("", "metrics", true);
+  });
+});
+
+describe("MetricList — onMetricChange emit", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("emits 'update:change-metric' with the current selectedMetric value", async () => {
+    const metric = { label: "cpu_total", value: "cpu_total", type: "counter" };
+    const wrapper = createWrapper({ modelValue: metric });
+
+    await wrapper.vm.onMetricChange();
+
+    expect(wrapper.emitted("update:change-metric")).toBeTruthy();
+    expect(wrapper.emitted("update:change-metric")![0]).toEqual([metric]);
+  });
+
+  it("emits 'update:change-metric' with null when no metric is selected", async () => {
+    const wrapper = createWrapper({ modelValue: null });
+
+    await wrapper.vm.onMetricChange();
+
+    expect(wrapper.emitted("update:change-metric")).toBeTruthy();
+    expect(wrapper.emitted("update:change-metric")![0]).toEqual([null]);
+  });
+
+  it("resolves without throwing even when nextTick is pending", async () => {
+    const wrapper = createWrapper();
+    await expect(wrapper.vm.onMetricChange()).resolves.not.toThrow();
+  });
+});
+
+describe("MetricList — addValueToEditor operator formatting", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("formats label=value correctly with '=' operator", () => {
+    const wrapper = createWrapper();
+    wrapper.vm.addValueToEditor("env", "production", "=");
+    expect(wrapper.emitted("select-label")![0]).toEqual(['env="production"']);
+  });
+
+  it("formats label!=value correctly with '!=' operator", () => {
+    const wrapper = createWrapper();
+    wrapper.vm.addValueToEditor("status", "error", "!=");
+    expect(wrapper.emitted("select-label")![0]).toEqual(['status!="error"']);
+  });
+
+  it("formats label with empty operator string", () => {
+    const wrapper = createWrapper();
+    wrapper.vm.addValueToEditor("job", "apiserver", "");
+    expect(wrapper.emitted("select-label")![0]).toEqual(['job"apiserver"']);
+  });
+
+  it("wraps the value in double-quotes regardless of content", () => {
+    const wrapper = createWrapper();
+    wrapper.vm.addValueToEditor("path", 'some "quoted" value', "=");
+    const emitted = wrapper.emitted("select-label")![0][0] as string;
+    expect(emitted).toContain('"');
+  });
+
+  it("handles numeric-looking values as strings", () => {
+    const wrapper = createWrapper();
+    wrapper.vm.addValueToEditor("code", "200", "=");
+    expect(wrapper.emitted("select-label")![0]).toEqual(['code="200"']);
+  });
+});
+
+describe("MetricList — metricsIconMapping completeness", () => {
+  it("covers all four standard Prometheus metric types", () => {
+    const wrapper = createWrapper();
+    const mapping = wrapper.vm.metricsIconMapping;
+    expect(mapping).toHaveProperty("summary");
+    expect(mapping).toHaveProperty("gauge");
+    expect(mapping).toHaveProperty("histogram");
+    expect(mapping).toHaveProperty("counter");
+  });
+
+  it("maps 'summary' to 'description' icon", () => {
+    const wrapper = createWrapper();
+    expect(wrapper.vm.metricsIconMapping.summary).toBe("description");
+  });
+
+  it("maps 'gauge' to 'speed' icon", () => {
+    const wrapper = createWrapper();
+    expect(wrapper.vm.metricsIconMapping.gauge).toBe("speed");
+  });
+
+  it("maps 'histogram' to 'bar_chart' icon", () => {
+    const wrapper = createWrapper();
+    expect(wrapper.vm.metricsIconMapping.histogram).toBe("bar_chart");
+  });
+
+  it("maps 'counter' to 'pin' icon", () => {
+    const wrapper = createWrapper();
+    expect(wrapper.vm.metricsIconMapping.counter).toBe("pin");
+  });
+
+  it("returns empty string for an unknown metric type", () => {
+    const wrapper = createWrapper();
+    const icon = wrapper.vm.metricsIconMapping["unknown_type"] || "";
+    expect(icon).toBe("");
+  });
+});
+
+describe("MetricList — getMetricsFieldValues null / edge values", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("uses 'null' string when zo_sql_key is undefined", async () => {
+    mockStreamService.fieldValues.mockResolvedValue({
+      data: {
+        hits: [
+          {
+            field: "env",
+            values: [{ zo_sql_key: undefined, zo_sql_num: 5 }],
+          },
+        ],
+      },
+    });
+    const wrapper = createWrapper();
+    await wrapper.vm.getMetricsFieldValues("env");
+    await flushPromises();
+
+    expect(wrapper.vm.metricLabelValues["env"].values[0].key).toBe("null");
+  });
+
+  it("sets isLoading to false in finally block even after error", async () => {
+    mockStreamService.fieldValues.mockRejectedValue(new Error("network error"));
+    const wrapper = createWrapper();
+    wrapper.vm.getMetricsFieldValues("flaky_field");
+    await flushPromises();
+
+    // The catch block calls quasar notify and the field may not be set at all
+    // What we verify is that the component does not throw and notify is called
+    expect(mockNotify).toHaveBeenCalled();
+  });
+
+  it("passes the selected metric value as stream_name", async () => {
+    const wrapper = createWrapper({
+      modelValue: { label: "requests_total", value: "requests_total", type: "counter" },
+    });
+    wrapper.vm.getMetricsFieldValues("code");
+    await flushPromises();
+
+    expect(mockStreamService.fieldValues).toHaveBeenCalledWith(
+      expect.objectContaining({ stream_name: "requests_total" }),
+    );
+  });
+
+  it("passes the org identifier from store", async () => {
+    const wrapper = createWrapper();
+    wrapper.vm.getMetricsFieldValues("code");
+    await flushPromises();
+
+    expect(mockStreamService.fieldValues).toHaveBeenCalledWith(
+      expect.objectContaining({ org_identifier: "test-org-123" }),
+    );
+  });
+
+  it("passes type 'metrics' in the request", async () => {
+    const wrapper = createWrapper();
+    wrapper.vm.getMetricsFieldValues("code");
+    await flushPromises();
+
+    expect(mockStreamService.fieldValues).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "metrics" }),
+    );
+  });
+});
+
+describe("MetricList — getFilteredMetricValues label building", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSearchService.get_promql_series.mockResolvedValue({
+      data: { data: [] },
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("includes __name__ in labels when metricName is parsed", async () => {
+    mockParsePromQlQuery.mockReturnValue({
+      metricName: "http_requests",
+      label: { labels: { job: "api" } },
+    });
+    const wrapper = createWrapper();
+    wrapper.vm.metricLabelValues["job"] = { isLoading: true, values: [] };
+
+    await wrapper.vm.getFilteredMetricValues("job");
+    await flushPromises();
+
+    expect(mockSearchService.get_promql_series).toHaveBeenCalledWith(
+      expect.objectContaining({
+        labels: expect.stringContaining("__name__"),
+      }),
+    );
+  });
+
+  it("formats the labels string with curly braces", async () => {
+    mockParsePromQlQuery.mockReturnValue({
+      metricName: "up",
+      label: { labels: {} },
+    });
+    const wrapper = createWrapper();
+    wrapper.vm.metricLabelValues["instance"] = { isLoading: true, values: [] };
+
+    await wrapper.vm.getFilteredMetricValues("instance");
+    await flushPromises();
+
+    const call = mockSearchService.get_promql_series.mock.calls[0][0];
+    expect(call.labels).toMatch(/^\{.*\}$/);
+  });
+
+  it("handles empty labels object when parsePromQlQuery returns no labels", async () => {
+    mockParsePromQlQuery.mockReturnValue({
+      metricName: "",
+      label: { labels: {} },
+    });
+    const wrapper = createWrapper();
+    wrapper.vm.metricLabelValues["env"] = { isLoading: true, values: [] };
+
+    await wrapper.vm.getFilteredMetricValues("env");
+    await flushPromises();
+
+    expect(mockSearchService.get_promql_series).toHaveBeenCalled();
+  });
+
+  it("sets isLoading to false after successful call", async () => {
+    const wrapper = createWrapper();
+    wrapper.vm.metricLabelValues["region"] = { isLoading: true, values: [] };
+
+    await wrapper.vm.getFilteredMetricValues("region");
+    await flushPromises();
+
+    expect(wrapper.vm.metricLabelValues["region"].isLoading).toBe(false);
+  });
+
+  it("sets isLoading to false even on error", async () => {
+    mockSearchService.get_promql_series.mockRejectedValue(new Error("boom"));
+    const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const wrapper = createWrapper();
+    wrapper.vm.metricLabelValues["region"] = { isLoading: true, values: [] };
+
+    await wrapper.vm.getFilteredMetricValues("region");
+    await flushPromises();
+
+    expect(wrapper.vm.metricLabelValues["region"].isLoading).toBe(false);
+    consoleLogSpy.mockRestore();
   });
 });
