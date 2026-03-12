@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::ops::Range;
+#[cfg(unix)]
+use std::os::unix::fs::FileExt;
+use std::{ops::Range, path::PathBuf};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -29,6 +31,7 @@ use crate::storage::{CONCURRENT_REQUESTS, format_key};
 
 pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
+    root_dir: PathBuf,
     with_prefix: bool,
 }
 
@@ -36,8 +39,18 @@ impl Local {
     pub fn new(root_dir: &str, with_prefix: bool) -> Self {
         Self {
             client: LimitStore::new(init_client(root_dir), CONCURRENT_REQUESTS),
+            root_dir: PathBuf::from(root_dir),
             with_prefix,
         }
+    }
+
+    /// Resolve an object-store Path to a filesystem path.
+    /// For local storage format_key is a no-op, so the file lives at
+    /// `root_dir / key`.
+    #[inline]
+    fn full_path(&self, location: &Path) -> PathBuf {
+        self.root_dir
+            .join(format_key(location.as_ref(), self.with_prefix))
     }
 }
 
@@ -183,6 +196,7 @@ impl ObjectStore for Local {
         Ok(result)
     }
 
+    #[cfg(not(unix))]
     async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
         let start = std::time::Instant::now();
         let file = location.to_string();
@@ -214,6 +228,102 @@ impl ObjectStore for Local {
         }
 
         Ok(data)
+    }
+
+    /// Read a byte range using `pread` (positioned read) via `block_in_place`.
+    ///
+    /// Compared to the default `LocalFileSystem` implementation this avoids:
+    /// - An extra `lseek` syscall (pread combines seek + read in one syscall)
+    /// - A buffer copy before handing work to the blocking thread pool
+    /// - Thread-spawn / synchronisation overhead of `spawn_blocking`
+    #[cfg(unix)]
+    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
+        let start = std::time::Instant::now();
+        let file = location.to_string();
+        let full_path = self.full_path(location);
+        let offset = range.start;
+        let len = (range.end - range.start) as usize;
+
+        let data = tokio::task::block_in_place(|| -> std::io::Result<Bytes> {
+            let f = std::fs::File::open(&full_path)?;
+            let mut buf = vec![0u8; len];
+            f.read_exact_at(&mut buf, offset)?;
+            Ok(Bytes::from(buf))
+        })
+        .map_err(|e| {
+            log::error!("[STORAGE] get_range local file: {file}, range: {range:?}, error: {e:?}");
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Error::NotFound {
+                    path: file.clone(),
+                    source: Box::new(e),
+                }
+            } else {
+                Error::Generic {
+                    store: "LocalFileSystem",
+                    source: Box::new(e),
+                }
+            }
+        })?;
+
+        // metrics
+        let data_len = data.len() as u64;
+        let columns = file.split('/').collect::<Vec<&str>>();
+        if columns[0] == "files" {
+            metrics::STORAGE_READ_BYTES
+                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
+                .inc_by(data_len);
+            metrics::STORAGE_READ_REQUESTS
+                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
+                .inc();
+            let time = start.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
+                .inc_by(time);
+        }
+
+        Ok(data)
+    }
+
+    /// Read multiple byte ranges using a single file open and N `pread` calls,
+    /// all inside one `block_in_place`.
+    ///
+    /// This is the hot path for Parquet column-chunk reads (DataFusion issues
+    /// multiple ranges per row-group). Opening the file once and batching all
+    /// reads in a single blocking section avoids per-range thread scheduling
+    /// overhead and repeated file-open cost.
+    #[cfg(unix)]
+    async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
+        let file = location.to_string();
+        let full_path = self.full_path(location);
+        let ranges_owned: Vec<Range<u64>> = ranges.to_vec();
+
+        let results = tokio::task::block_in_place(|| -> std::io::Result<Vec<Bytes>> {
+            let f = std::fs::File::open(&full_path)?;
+            let mut out = Vec::with_capacity(ranges_owned.len());
+            for range in &ranges_owned {
+                let len = (range.end - range.start) as usize;
+                let mut buf = vec![0u8; len];
+                f.read_exact_at(&mut buf, range.start)?;
+                out.push(Bytes::from(buf));
+            }
+            Ok(out)
+        })
+        .map_err(|e| {
+            log::error!("[STORAGE] get_ranges local file: {file}, error: {e:?}");
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Error::NotFound {
+                    path: file.clone(),
+                    source: Box::new(e),
+                }
+            } else {
+                Error::Generic {
+                    store: "LocalFileSystem",
+                    source: Box::new(e),
+                }
+            }
+        })?;
+
+        Ok(results)
     }
 
     async fn head(&self, _location: &Path) -> Result<ObjectMeta> {
