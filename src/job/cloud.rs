@@ -316,7 +316,7 @@ async fn run_org_expiry_daily() {
             };
 
             // if org is free, then report how many days for expiry
-            if subscription.is_none() || subscription.unwrap().subscription_type.is_free_sub() {
+            if subscription.map_or(true, |s| s.subscription_type.is_free_sub()) {
                 // org record is also cached in memory for most cases
                 let org_record = match infra::table::organizations::get(&org).await {
                     Ok(v) => v,
