@@ -479,6 +479,52 @@ class TestSearchMultiStreamVRL:
 
         logger.info("Multi-stream search (no VRL) returned 2 hit arrays as expected")
 
+    def test_search_single_stream_vrl_baseline(self, create_session, base_url):
+        """Baseline: verify VRL works on the regular _search endpoint before testing multi-stream."""
+        session = create_session
+
+        end_time = int(time.time() * 1000000)
+        start_time = end_time - (60 * 60 * 1000000)
+
+        vrl_code = ".doubled_cnt = .cnt * 2\n."
+        encoded_vrl = _base64_encode(vrl_code)
+
+        url = f"{base_url}api/{ORG_ID}/_search"
+        params = {"type": "logs"}
+        payload = {
+            "query": {
+                "sql": f'SELECT count(_timestamp) as cnt FROM "{STREAM_NAME}"',
+                "start_time": start_time,
+                "end_time": end_time,
+                "from": 0,
+                "size": -1,
+                "quick_mode": False,
+                "query_fn": encoded_vrl,
+                "uses_zo_fn": True,
+            },
+        }
+
+        resp = session.post(url, params=params, json=payload)
+
+        if resp.status_code == 400 and "not found" in resp.text.lower():
+            pytest.skip(f"Stream '{STREAM_NAME}' not found — skipping")
+
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+
+        body = resp.json()
+        function_error = body.get("function_error", [])
+        if function_error:
+            logger.warning(f"_search VRL function_error: {function_error}")
+
+        hits = body.get("hits", [])
+        if hits:
+            logger.info(f"_search baseline hit keys: {list(hits[0].keys())}, values: {hits[0]}")
+            assert "doubled_cnt" in hits[0], (
+                f"VRL should add 'doubled_cnt' on _search. Got: {hits[0]}. function_error: {function_error}"
+            )
+        else:
+            logger.info("_search returned no hits — VRL baseline check skipped")
+
     def test_search_multi_stream_non_result_array_vrl(self, create_session, base_url):
         """Multi-stream search with a per-hit VRL (non-ResultArray) — VRL applied per query."""
         session = create_session
@@ -489,6 +535,7 @@ class TestSearchMultiStreamVRL:
         # Per-hit VRL: adds a "doubled_cnt" field to each hit
         vrl_code = ".doubled_cnt = .cnt * 2\n."
         encoded_vrl = _base64_encode(vrl_code)
+        logger.info(f"Encoded VRL: {encoded_vrl} (decoded: {vrl_code!r})")
 
         url = f"{base_url}api/{ORG_ID}/_search_multi_stream"
         params = {
@@ -532,18 +579,36 @@ class TestSearchMultiStreamVRL:
         assert "[[DONE]]" in content, "SSE response should contain [[DONE]] marker"
 
         events = _parse_sse_events(content)
+
+        # Log metadata events for diagnostics (check for function_error)
+        meta_events = [e for e in events if e[0] == "search_response_metadata"]
+        for i, (_, meta) in enumerate(meta_events):
+            fn_err = meta.get("function_error", [])
+            if fn_err:
+                logger.warning(f"Metadata event {i} function_error: {fn_err}")
+            else:
+                logger.info(f"Metadata event {i}: no function_error, keys={list(meta.keys())}")
+
         hits_events = [e for e in events if e[0] == "search_response_hits"]
 
         # Should still get 2 hit arrays (one per query)
         assert len(hits_events) == 2, (
-            f"Expected 2 search_response_hits events, got {len(hits_events)}"
+            f"Expected 2 search_response_hits events, got {len(hits_events)}. "
+            f"Full SSE (first 2000 chars): {content[:2000]}"
         )
 
         # If first query returned data, check VRL was applied (doubled_cnt field)
         first_hits = hits_events[0][1].get("hits", [])
         if first_hits:
+            # Collect all function_errors from metadata for diagnostics
+            all_fn_errors = []
+            for _, meta in meta_events:
+                all_fn_errors.extend(meta.get("function_error", []))
+
             assert "doubled_cnt" in first_hits[0], (
-                f"Per-hit VRL should add 'doubled_cnt' field. Got keys: {list(first_hits[0].keys())}"
+                f"Per-hit VRL should add 'doubled_cnt' field. Got: {first_hits[0]}. "
+                f"function_errors: {all_fn_errors}. "
+                f"Full SSE (first 2000 chars): {content[:2000]}"
             )
             logger.info("Non-ResultArray VRL correctly added 'doubled_cnt' field to hits")
         else:

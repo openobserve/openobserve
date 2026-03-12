@@ -408,6 +408,56 @@ test.describe('Search Multi-Stream VRL API tests', () => {
     testLogger.info('Test completed');
   });
 
+  test('POST /_search - baseline VRL test on single search', {
+    tag: ['@api', '@search', '@vrl', '@P0']
+  }, async ({ page }) => {
+    testLogger.info('Baseline: verifying VRL works on regular _search endpoint');
+
+    const endTime = Date.now() * 1000;
+    const startTime = endTime - (60 * 60 * 1000000);
+    const encodedVrl = base64Encode(NON_RESULT_ARRAY_VRL);
+
+    const resp = await page.request.post(
+      `${baseUrl}/api/${orgId}/_search?type=logs`,
+      {
+        headers,
+        data: {
+          query: {
+            sql: `SELECT count(_timestamp) as cnt FROM "${STREAM_NAME}"`,
+            start_time: startTime,
+            end_time: endTime,
+            from: 0, size: -1,
+            quick_mode: false,
+            query_fn: encodedVrl,
+            uses_zo_fn: true
+          }
+        }
+      }
+    );
+
+    if (resp.status() === 400) {
+      const text = await resp.text();
+      if (text.toLowerCase().includes('not found')) { test.skip(); return; }
+    }
+
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    const fnError = body.function_error || [];
+    if (fnError.length > 0) {
+      testLogger.warn(`_search VRL function_error: ${JSON.stringify(fnError)}`);
+    }
+
+    const hits = body.hits || [];
+    if (hits.length > 0) {
+      testLogger.info(`_search baseline hit keys: ${Object.keys(hits[0])}, values: ${JSON.stringify(hits[0])}`);
+      expect(hits[0]).toHaveProperty('doubled_cnt');
+    } else {
+      testLogger.info('_search returned no hits — VRL baseline check skipped');
+    }
+
+    testLogger.info('Test completed');
+  });
+
   test('POST /_search_multi_stream - non-ResultArray VRL adds field per hit', {
     tag: ['@api', '@search', '@multiStream', '@vrl', '@P0']
   }, async ({ page }) => {
@@ -448,12 +498,24 @@ test.describe('Search Multi-Stream VRL API tests', () => {
 
     const events = parseSSEEvents(content);
     const hitsEvents = events.filter(e => e.event === 'search_response_hits');
+    const metaEvents = events.filter(e => e.event === 'search_response_metadata');
     expect(hitsEvents).toHaveLength(2);
+
+    // Log metadata function_error for diagnostics
+    for (let i = 0; i < metaEvents.length; i++) {
+      const fnErr = metaEvents[i].data.function_error || [];
+      if (fnErr.length > 0) {
+        testLogger.warn(`Metadata event ${i} function_error: ${JSON.stringify(fnErr)}`);
+      }
+    }
 
     // If first query has data, verify VRL field was added
     const firstHits = hitsEvents[0].data.hits;
     if (firstHits.length > 0) {
-      expect(firstHits[0]).toHaveProperty('doubled_cnt');
+      const allFnErrors = metaEvents.flatMap(e => e.data.function_error || []);
+      expect(firstHits[0]).toHaveProperty('doubled_cnt',
+        `Per-hit VRL should add doubled_cnt. Got: ${JSON.stringify(firstHits[0])}. function_errors: ${JSON.stringify(allFnErrors)}. SSE (first 2000): ${content.slice(0, 2000)}`
+      );
       testLogger.info('Non-ResultArray VRL correctly added doubled_cnt field');
     } else {
       testLogger.info('No hits in first query — VRL field check skipped');
