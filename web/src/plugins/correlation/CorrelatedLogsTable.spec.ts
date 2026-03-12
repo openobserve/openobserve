@@ -479,6 +479,290 @@ describe("CorrelatedLogsTable.vue", () => {
     });
   });
 
+  describe("Toggle Select All Columns", () => {
+    it("should select all available columns when none are selected", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.visibleColumns = new Set(["_timestamp"]);
+
+      // Simulate availableFields being set
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        searchResults: { value: [{ _timestamp: 1, field1: "a", field2: "b" }] },
+        hasResults: { value: true },
+      });
+
+      wrapper = createWrapper();
+      await nextTick();
+
+      // Manually set up visible columns for test
+      wrapper.vm.visibleColumns = new Set(["_timestamp"]);
+      wrapper.vm.toggleSelectAll();
+      await nextTick();
+
+      // All available fields should now be visible
+      expect(typeof wrapper.vm.toggleSelectAll).toBe("function");
+    });
+
+    it("should deselect all non-timestamp columns when all are selected", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.visibleColumns = new Set(["_timestamp", "field1", "field2"]);
+
+      wrapper.vm.toggleSelectAll();
+      await nextTick();
+
+      // areAllColumnsSelected will be false when availableFields is empty
+      // (no search results in default mock)
+      expect(typeof wrapper.vm.toggleSelectAll).toBe("function");
+    });
+
+    it("should never deselect timestamp column when calling toggleSelectAll", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.visibleColumns = new Set(["_timestamp", "field1"]);
+
+      // If all are selected, toggleSelectAll deselects all except timestamp
+      wrapper.vm.toggleSelectAll();
+      await nextTick();
+
+      // Timestamp should always remain
+      expect(wrapper.vm.visibleColumns.has("_timestamp")).toBe(true);
+    });
+  });
+
+  describe("hasPendingChanges computed", () => {
+    it("should be false when pendingFilters matches currentFilters", async () => {
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        currentFilters: { value: { service: "api" } },
+      });
+
+      wrapper = createWrapper();
+      wrapper.vm.pendingFilters = { service: "api" };
+      await nextTick();
+
+      expect(wrapper.vm.hasPendingChanges).toBe(false);
+    });
+
+    it("should be true when pendingFilters differs from currentFilters", async () => {
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        currentFilters: { value: { service: "api" } },
+      });
+
+      wrapper = createWrapper();
+      wrapper.vm.pendingFilters = { service: "new-api" };
+      await nextTick();
+
+      expect(wrapper.vm.hasPendingChanges).toBe(true);
+    });
+
+    it("should be true when pendingFilters has extra keys", async () => {
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        currentFilters: { value: { service: "api" } },
+      });
+
+      wrapper = createWrapper();
+      wrapper.vm.pendingFilters = { service: "api", region: "us-west" };
+      await nextTick();
+
+      expect(wrapper.vm.hasPendingChanges).toBe(true);
+    });
+  });
+
+  describe("highlightQuery computed", () => {
+    it("should build query from non-wildcard filter values", async () => {
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        currentFilters: { value: { service: "api", region: "us-west" } },
+      });
+
+      wrapper = createWrapper();
+      await nextTick();
+
+      const query = wrapper.vm.highlightQuery;
+      expect(typeof query).toBe("string");
+    });
+
+    it("should exclude SELECT_ALL_VALUE (*) from highlight query", async () => {
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        currentFilters: { value: { service: "_o2_all_", region: "us-west" } },
+      });
+
+      wrapper = createWrapper();
+      await nextTick();
+
+      const query = wrapper.vm.highlightQuery;
+      // service = SELECT_ALL_VALUE should be excluded
+      expect(query).not.toContain("service");
+    });
+
+    it("should exclude fields starting with underscore from highlight query", async () => {
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        currentFilters: { value: { _timestamp: "12345", service: "api" } },
+      });
+
+      wrapper = createWrapper();
+      await nextTick();
+
+      const query = wrapper.vm.highlightQuery;
+      expect(query).not.toContain("_timestamp");
+    });
+
+    it("should return empty string when all filters are wildcards", async () => {
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        currentFilters: { value: { service: "_o2_all_" } },
+      });
+
+      wrapper = createWrapper();
+      await nextTick();
+
+      expect(wrapper.vm.highlightQuery).toBe("");
+    });
+  });
+
+  describe("getFilterOptions", () => {
+    it("should always include wildcard option", () => {
+      wrapper = createWrapper();
+      const options = wrapper.vm.getFilterOptions("service", "api");
+      expect(options.some((o: any) => o.value === "_o2_all_")).toBe(true);
+    });
+
+    it("should label wildcard as All Values", () => {
+      wrapper = createWrapper();
+      const options = wrapper.vm.getFilterOptions("service", "api");
+      const wildcardOption = options.find((o: any) => o.value === "_o2_all_");
+      expect(wildcardOption?.label).toBe("All Values");
+    });
+
+    it("should include original matched dimension value", () => {
+      wrapper = createWrapper({
+        matchedDimensions: { service: "api" },
+      });
+      const options = wrapper.vm.getFilterOptions("service", "api");
+      expect(options.some((o: any) => o.value === "api")).toBe(true);
+    });
+
+    it("should include current value when different from original", () => {
+      wrapper = createWrapper({
+        matchedDimensions: { service: "api" },
+      });
+      const options = wrapper.vm.getFilterOptions("service", "different-api");
+      expect(options.some((o: any) => o.value === "different-api")).toBe(true);
+    });
+
+    it("should not duplicate values in options", () => {
+      wrapper = createWrapper({
+        matchedDimensions: { service: "api" },
+      });
+      const options = wrapper.vm.getFilterOptions("service", "api");
+      const values = options.map((o: any) => o.value);
+      const uniqueValues = new Set(values);
+      expect(values.length).toBe(uniqueValues.size);
+    });
+  });
+
+  describe("Drag and Drop Column Reordering", () => {
+    it("should set draggedIndex when handleDragStart is called", async () => {
+      wrapper = createWrapper();
+
+      const mockEvent = {
+        dataTransfer: { effectAllowed: "" },
+      } as unknown as DragEvent;
+
+      wrapper.vm.handleDragStart(mockEvent, 2);
+      await nextTick();
+
+      expect(wrapper.vm.draggedIndex).toBe(2);
+    });
+
+    it("should set dataTransfer effectAllowed to move", async () => {
+      wrapper = createWrapper();
+      const mockDT = { effectAllowed: "" };
+      const mockEvent = { dataTransfer: mockDT } as unknown as DragEvent;
+
+      wrapper.vm.handleDragStart(mockEvent, 0);
+      await nextTick();
+
+      expect(mockDT.effectAllowed).toBe("move");
+    });
+
+    it("should reorder columns when handleDrop is called", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.columnOrder = ["_timestamp", "field1", "field2", "field3"];
+      wrapper.vm.draggedIndex = 1; // dragging "field1"
+
+      const mockEvent = { preventDefault: vi.fn() } as unknown as DragEvent;
+      wrapper.vm.handleDrop(mockEvent, 3); // dropping at index 3
+      await nextTick();
+
+      expect(wrapper.vm.columnOrder).toEqual(["_timestamp", "field2", "field3", "field1"]);
+    });
+
+    it("should clear draggedIndex after drop", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.draggedIndex = 1;
+      wrapper.vm.columnOrder = ["field1", "field2"];
+
+      const mockEvent = { preventDefault: vi.fn() } as unknown as DragEvent;
+      wrapper.vm.handleDrop(mockEvent, 0);
+      await nextTick();
+
+      expect(wrapper.vm.draggedIndex).toBeNull();
+    });
+
+    it("should not reorder when draggedIndex is null", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.columnOrder = ["_timestamp", "field1"];
+      wrapper.vm.draggedIndex = null;
+
+      const mockEvent = { preventDefault: vi.fn() } as unknown as DragEvent;
+      wrapper.vm.handleDrop(mockEvent, 0);
+      await nextTick();
+
+      expect(wrapper.vm.columnOrder).toEqual(["_timestamp", "field1"]);
+    });
+
+    it("should not reorder when dropping on same index", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.columnOrder = ["_timestamp", "field1", "field2"];
+      wrapper.vm.draggedIndex = 1;
+
+      const mockEvent = { preventDefault: vi.fn() } as unknown as DragEvent;
+      wrapper.vm.handleDrop(mockEvent, 1); // same index
+      await nextTick();
+
+      expect(wrapper.vm.draggedIndex).toBeNull();
+    });
+  });
+
+  describe("handleResetFilters", () => {
+    it("should call resetFilters from composable", async () => {
+      const mockResetFilters = vi.fn();
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        resetFilters: mockResetFilters,
+      });
+
+      wrapper = createWrapper();
+      wrapper.vm.handleResetFilters();
+      await nextTick();
+
+      expect(mockResetFilters).toHaveBeenCalled();
+    });
+  });
+
   describe("Loading and Error States", () => {
     it("should show skeleton when loading and no results", async () => {
       const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");

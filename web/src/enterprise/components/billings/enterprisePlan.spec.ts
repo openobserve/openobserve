@@ -23,6 +23,15 @@ import store from '@/test/unit/helpers/store';
 // Install Quasar
 installQuasar();
 
+const mockEnterpriseFeatures = [
+  { name: "Everything in Pay as you go plan, plus:", price: "", is_parent: true },
+  { name: "Premium support", price: "", is_parent: true },
+  { name: "Deployment flexibility (Public Cloud, or Bring Your Own Cloud)", price: "", is_parent: true },
+  { name: "Architecture reviews", price: "", is_parent: true },
+  { name: "Volume discounts", price: "", is_parent: true },
+  ...Array.from({ length: 14 }, () => ({ name: "", price: "", is_parent: false })),
+];
+
 // Mock window.open
 const mockWindowOpen = vi.fn();
 Object.defineProperty(window, 'open', {
@@ -43,6 +52,7 @@ describe('enterprisePlan.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     wrapper = mount(enterprisePlan, {
+      props: { features: mockEnterpriseFeatures },
       global: {
         plugins: [i18n],
         provide: {
@@ -76,11 +86,6 @@ describe('enterprisePlan.vue', () => {
   // Test 2: Component name is correct
   it('should have correct component name', () => {
     expect(wrapper.vm.$options.name).toBe('enterprisePlan');
-  });
-
-  // Test 3: planName is correctly initialized
-  it('should initialize planName as "enterprise"', () => {
-    expect(wrapper.vm.planName).toBe('enterprise');
   });
 
   // Test 4: features array is properly initialized
@@ -229,7 +234,6 @@ describe('enterprisePlan.vue', () => {
     expect(wrapper.vm.t).toBeDefined();
     expect(wrapper.vm.features).toBeDefined();
     expect(wrapper.vm.contactSales).toBeDefined();
-    expect(wrapper.vm.planName).toBeDefined();
   });
 
   // Test 25: Features array structure is immutable during component lifecycle
@@ -239,11 +243,11 @@ describe('enterprisePlan.vue', () => {
     expect(wrapper.vm.features).toEqual(initialFeatures);
   });
 
-  // Test 26: planName remains constant
-  it('should keep planName constant throughout lifecycle', async () => {
-    const initialPlanName = wrapper.vm.planName;
+  // Test 26: contactSales remains available throughout lifecycle
+  it('should keep contactSales function available throughout lifecycle', async () => {
+    expect(typeof wrapper.vm.contactSales).toBe('function');
     await wrapper.vm.$nextTick();
-    expect(wrapper.vm.planName).toBe(initialPlanName);
+    expect(typeof wrapper.vm.contactSales).toBe('function');
   });
 
   // Test 27: Component has correct Vue composition API setup

@@ -164,4 +164,78 @@ describe("TraceTimestampCell", () => {
       expect(wrapper.exists()).toBe(true);
     });
   });
+
+  // --- Tests for spans mode (added in Mar 10 commit ae988c7) ---
+
+  describe("searchMode='spans' — start_time in nanoseconds", () => {
+    // start_time is ns → divide by 1_000_000 for ms
+    const NANOS_TODAY = FIXED_NOW_MS * 1_000_000 - 3600 * 1e9; // 1 h ago → "Today"
+    const NANOS_YESTERDAY = FIXED_NOW_MS * 1_000_000 - 25 * 3600 * 1e9; // 25 h ago → "Yesterday"
+
+    const mountSpans = (start_time: number, timezone = "UTC") =>
+      mount(TraceTimestampCell, {
+        props: { item: { start_time }, searchMode: "spans" },
+        global: { plugins: [makeStore(timezone), i18n] },
+      });
+
+    it("mounts without error when given start_time and searchMode='spans'", async () => {
+      wrapper = mountSpans(NANOS_TODAY);
+      await flushPromises();
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("shows 'Today' when start_time is within last 24 hours", async () => {
+      wrapper = mountSpans(NANOS_TODAY);
+      await flushPromises();
+      expect(wrapper.text()).toContain("Today");
+    });
+
+    it("shows 'Yesterday' when start_time is 24-48 hours ago", async () => {
+      wrapper = mountSpans(NANOS_YESTERDAY);
+      await flushPromises();
+      expect(wrapper.text()).toContain("Yesterday");
+    });
+
+    it("falls through to start_time when trace_start_time is null", async () => {
+      // trace_start_time not provided → component uses start_time (ns path)
+      wrapper = mount(TraceTimestampCell, {
+        props: { item: { start_time: NANOS_TODAY }, searchMode: "spans" },
+        global: { plugins: [makeStore(), i18n] },
+      });
+      await flushPromises();
+      expect(wrapper.text()).toContain("Today");
+    });
+
+    it("prefers trace_start_time over start_time when both are present", async () => {
+      // trace_start_time != null → component divides by 1000 (µs path)
+      const trace_start_time = FIXED_NOW_MS * 1000 - 3600 * 1e6; // µs, 1 h ago
+      wrapper = mount(TraceTimestampCell, {
+        props: {
+          item: { trace_start_time, start_time: 0 },
+          searchMode: "spans",
+        },
+        global: { plugins: [makeStore(), i18n] },
+      });
+      await flushPromises();
+      expect(wrapper.text()).toContain("Today");
+    });
+  });
+
+  describe("reactivity — start_time changes in spans mode", () => {
+    const NANOS_TODAY = FIXED_NOW_MS * 1_000_000 - 3600 * 1e9;
+    const NANOS_YESTERDAY = FIXED_NOW_MS * 1_000_000 - 25 * 3600 * 1e9;
+
+    it("updates when start_time prop changes", async () => {
+      wrapper = mount(TraceTimestampCell, {
+        props: { item: { start_time: NANOS_TODAY }, searchMode: "spans" },
+        global: { plugins: [makeStore(), i18n] },
+      });
+      await flushPromises();
+      expect(wrapper.text()).toContain("Today");
+
+      await wrapper.setProps({ item: { start_time: NANOS_YESTERDAY } });
+      await flushPromises();
+      expect(wrapper.text()).toContain("Yesterday");
+    });
+  });
 });

@@ -42,6 +42,16 @@ vi.mock("./TraceLatencyCell.vue", () => ({
 vi.mock("./TraceStatusCell.vue", () => ({
   default: { name: "TraceStatusCell", props: ["item"], template: "<span />" },
 }));
+vi.mock("./SpanStatusPill.vue", () => ({
+  default: { name: "SpanStatusPill", props: ["status"], template: "<span />" },
+}));
+vi.mock("./SpanStatusCodeBadge.vue", () => ({
+  default: {
+    name: "SpanStatusCodeBadge",
+    props: ["code", "grpcCode"],
+    template: "<span />",
+  },
+}));
 
 import TracesSearchResultList from "./TracesSearchResultList.vue";
 
@@ -221,6 +231,97 @@ describe("TracesSearchResultList", () => {
       const table = wrapper.findComponent({ name: "TracesTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeHit("t1", 0))).toBe("");
+    });
+  });
+
+  // --- Tests for spans mode (added in Mar 10 commit ae988c7) ---
+
+  describe("searchMode='spans' — section title and badge", () => {
+    const hits = [makeHit("t1")];
+
+    it("shows 'SPANS' title when searchMode='spans'", () => {
+      wrapper = mount_({ hits, loading: false, searchMode: "spans" });
+      const title = wrapper.find('[data-test="traces-section-title"]');
+      expect(title.text().toUpperCase()).toContain("SPANS");
+    });
+
+    it("does not show 'TRACES' in title when searchMode='spans'", () => {
+      wrapper = mount_({ hits, loading: false, searchMode: "spans" });
+      const title = wrapper.find('[data-test="traces-section-title"]');
+      expect(title.text().toUpperCase()).not.toContain("TRACES");
+    });
+
+    it("shows 'TRACES' title by default (no searchMode prop)", () => {
+      wrapper = mount_({ hits, loading: false });
+      const title = wrapper.find('[data-test="traces-section-title"]');
+      expect(title.text().toUpperCase()).toContain("TRACES");
+    });
+
+    it("shows 'Spans Found' text in badge when searchMode='spans'", () => {
+      wrapper = mount_({ hits, loading: false, searchMode: "spans" });
+      const badge = wrapper.find('[data-test="traces-count-badge"]');
+      // badge label contains "spans found" (case-insensitive from i18n key)
+      expect(badge.text().toLowerCase()).toContain("span");
+    });
+  });
+
+  describe("row error class — spans mode", () => {
+    const makeSpanHit = (id: string, span_status = "OK") => ({
+      trace_id: id,
+      service_name: "frontend",
+      operation_name: "GET /",
+      duration: 120000,
+      spans: 1,
+      span_status,
+      services: {},
+      start_time: Date.now() * 1_000_000,
+    });
+
+    it("uses span_status='ERROR' for error class in spans mode", () => {
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
+      const table = wrapper.findComponent({ name: "TracesTable" });
+      const rowClassFn = table.props("rowClass") as (row: any) => string;
+      expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe("oz-table__row--error");
+    });
+
+    it("returns empty string for non-error span_status in spans mode", () => {
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
+      const table = wrapper.findComponent({ name: "TracesTable" });
+      const rowClassFn = table.props("rowClass") as (row: any) => string;
+      expect(rowClassFn(makeSpanHit("s1", "OK"))).toBe("");
+    });
+
+    it("uses errors count (not span_status) for error class in traces mode", () => {
+      wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false, searchMode: "traces" });
+      const table = wrapper.findComponent({ name: "TracesTable" });
+      const rowClassFn = table.props("rowClass") as (row: any) => string;
+      // traces mode: errors > 0 triggers error class
+      expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe("oz-table__row--error");
+    });
+  });
+
+  describe("error count badge", () => {
+    const hits = [makeHit("t1")];
+
+    it("shows error count badge when errorCount > 0", () => {
+      wrapper = mount_({ hits, loading: false, errorCount: 5 });
+      expect(wrapper.find('[data-test="traces-error-count-badge"]').exists()).toBe(true);
+    });
+
+    it("shows correct error count number in the badge", () => {
+      wrapper = mount_({ hits, loading: false, errorCount: 7 });
+      const badge = wrapper.find('[data-test="traces-error-count-badge"]');
+      expect(badge.text()).toContain("7");
+    });
+
+    it("hides error count badge when errorCount is 0", () => {
+      wrapper = mount_({ hits, loading: false, errorCount: 0 });
+      expect(wrapper.find('[data-test="traces-error-count-badge"]').exists()).toBe(false);
+    });
+
+    it("hides error count badge when errorCount is undefined", () => {
+      wrapper = mount_({ hits, loading: false });
+      expect(wrapper.find('[data-test="traces-error-count-badge"]').exists()).toBe(false);
     });
   });
 });

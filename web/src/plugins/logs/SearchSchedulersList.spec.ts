@@ -25,15 +25,14 @@ vi.mock("@/aws-exports", () => ({
   }
 }));
 
-vi.mock("@/composables/useLogs", () => ({
-  default: () => ({
+vi.mock("@/composables/useLogs/searchState", () => ({
+  searchState: () => ({
     searchObj: {
       meta: { jobId: null },
       data: {
         datetime: { type: 'relative' }
       }
-    },
-    extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 })
+    }
   })
 }));
 
@@ -804,9 +803,64 @@ describe("SearchSchedulersList Component", () => {
       };
 
       await wrapper.vm.goToLogs(mockRow);
-      
+
       const callArgs = mockRouter.push.mock.calls[0][0];
       expect(callArgs.query.functionContent).toBeDefined();
+    });
+
+    it("should set fn_editor=true when row has function content", async () => {
+      const mockRow = {
+        sql: "SELECT * FROM logs",
+        stream_names: '["test-stream"]',
+        stream_type: "logs",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000000,
+        toBeStoredEndTime: 2000000,
+        duration: "1 second",
+        function: "function transform(row) { return row; }"
+      };
+
+      await wrapper.vm.goToLogs(mockRow);
+
+      const callArgs = mockRouter.push.mock.calls[0][0];
+      expect(callArgs.query.fn_editor).toBe("true");
+      expect(callArgs.query.functionContent).toBeDefined();
+    });
+
+    it("should set fn_editor=false when row has no function", async () => {
+      const mockRow = {
+        sql: "SELECT * FROM logs",
+        stream_names: '["test-stream"]',
+        stream_type: "logs",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000000,
+        toBeStoredEndTime: 2000000,
+        duration: "1 second"
+      };
+
+      await wrapper.vm.goToLogs(mockRow);
+
+      const callArgs = mockRouter.push.mock.calls[0][0];
+      expect(callArgs.query.fn_editor).toBe("false");
+      expect(callArgs.query.functionContent).toBeUndefined();
+    });
+
+    it("should set fn_editor=false when row has empty function string", async () => {
+      const mockRow = {
+        sql: "SELECT * FROM logs",
+        stream_names: '["test-stream"]',
+        stream_type: "logs",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000000,
+        toBeStoredEndTime: 2000000,
+        duration: "1 second",
+        function: ""
+      };
+
+      await wrapper.vm.goToLogs(mockRow);
+
+      const callArgs = mockRouter.push.mock.calls[0][0];
+      expect(callArgs.query.fn_editor).toBe("false");
     });
 
     it("should set job ID correctly in fetchSearchResults", () => {
