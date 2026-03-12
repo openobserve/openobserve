@@ -73,7 +73,7 @@ const mockSpan = {
   operation_name: "service:alerts:evaluate_scheduled",
   service_name: "alertmanager",
   span_status: "UNSET",
-  span_kind: 2, // Client
+  span_kind: 2, // Server
   parent_id: "6702b0494b2b6e57",
   events: "",
   links: "",

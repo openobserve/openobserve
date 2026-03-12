@@ -22,6 +22,7 @@ const PageManager = require('../../pages/page-manager.js');
 const { MetricsQueryEditorPage } = require('../../pages/metricsPages/metricsQueryEditorPage.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
+
 test.describe('Metrics PromQL Query Persistence Tests', () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
