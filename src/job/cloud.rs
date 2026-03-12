@@ -16,8 +16,7 @@
 use std::collections::HashMap;
 
 use config::{
-    meta::destinations::Email,
-    meta::self_reporting::usage::USAGE_STREAM,
+    meta::{destinations::Email, self_reporting::usage::USAGE_STREAM},
     utils::{
         json,
         time::{hour_micros, now_micros},
