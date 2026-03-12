@@ -636,14 +636,6 @@ export class SearchJobInspectorPage {
   }
 
   /**
-   * Check if close button is visible
-   * @returns {Promise<boolean>}
-   */
-  async isCloseBtnVisible() {
-    return await this.page.locator(this.inspectorCloseBtn).isVisible({ timeout: 5000 }).catch(() => false);
-  }
-
-  /**
    * Click close button
    */
   async clickCloseBtn() {
