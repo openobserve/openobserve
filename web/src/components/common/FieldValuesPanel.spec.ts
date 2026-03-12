@@ -160,11 +160,7 @@ describe("FieldValuesPanel.vue", () => {
       wrapper = createWrapper({
         fieldValues: buildFieldValues(2),
       });
-      // The "No values found" element uses v-show so it stays in the DOM;
-      // assert it is hidden rather than checking wrapper.text()
-      const noValuesEl = wrapper.find('[data-test="field-values-panel-no-values-msg"]');
-      expect(noValuesEl.exists()).toBe(true);
-      expect(noValuesEl.isVisible()).toBe(false);
+      expect(wrapper.text()).not.toContain("No values found");
     });
   });
 
