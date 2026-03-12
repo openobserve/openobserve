@@ -20,6 +20,11 @@ use axum::{
 };
 use config::meta::model_pricing::ModelPricingDefinition;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "enterprise")]
+use {
+    crate::common::utils::auth::{UserEmail, check_permissions},
+    crate::handler::http::extractors::Headers,
+};
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::model_pricing};
 
@@ -117,7 +122,23 @@ pub async fn list(Path(org_id): Path<String>) -> Response {
         (status = 404, description = "Not found"),
     ),
 )]
-pub async fn get(Path((org_id, model_id)): Path<(String, String)>) -> Response {
+pub async fn get(
+    Path((org_id, model_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &model_id,
+        &org_id,
+        &user_email.user_id,
+        "settings",
+        "GET",
+        None,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     match model_pricing::get_by_id(&model_id).await {
         Ok(Some(item)) if item.org_id == org_id => MetaHttpResponse::json(item),
         Ok(Some(_)) | Ok(None) => MetaHttpResponse::not_found("Model pricing definition not found"),
@@ -187,8 +208,22 @@ pub async fn create(
 )]
 pub async fn update(
     Path((org_id, model_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(mut item): Json<ModelPricingDefinition>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &model_id,
+        &org_id,
+        &user_email.user_id,
+        "settings",
+        "PUT",
+        None,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     // Verify the model exists and belongs to this org
     match model_pricing::get_by_id(&model_id).await {
         Ok(Some(existing)) if existing.org_id == org_id => {
@@ -234,7 +269,23 @@ pub async fn update(
         (status = 404, description = "Not found"),
     ),
 )]
-pub async fn delete(Path((org_id, model_id)): Path<(String, String)>) -> Response {
+pub async fn delete(
+    Path((org_id, model_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &model_id,
+        &org_id,
+        &user_email.user_id,
+        "settings",
+        "DELETE",
+        None,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     match model_pricing::get_by_id(&model_id).await {
         Ok(Some(item)) if item.org_id == org_id => {}
         Ok(Some(_)) | Ok(None) => {
