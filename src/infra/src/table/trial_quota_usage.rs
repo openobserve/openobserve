@@ -47,12 +47,10 @@ pub async fn batch_increment(records: Vec<(String, String, i64)>) -> Result<(), 
                 ])
                 .value(
                     trial_quota_usage::Column::UsageCount,
-                    Expr::col(trial_quota_usage::Column::UsageCount).add(delta),
+                    Expr::col((trial_quota_usage::Entity, trial_quota_usage::Column::UsageCount))
+                        .add(delta),
                 )
-                .value(
-                    trial_quota_usage::Column::UpdatedAt,
-                    Expr::value(now),
-                )
+                .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
                 .to_owned(),
             )
             .exec(db)
