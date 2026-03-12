@@ -189,6 +189,33 @@ describe("BasicValuesFilter — buildSql()", () => {
     expect(raw.length).toBeGreaterThan(0);
     expect(() => b64DecodeUnicode(raw)).not.toThrow();
   });
+
+  it("should exclude a parenthesized multi-value group for the expanded field from the SQL", async () => {
+    // When the editor has (operation_name='x' or operation_name='y') and the
+    // user expands operation_name, buildSql() must strip that group so the
+    // value fetch query is unbiased and returns all possible values.
+    wrapper = mountComponent("operation_name");
+    await flushPromises();
+    mockSearchObj.data.editorValue =
+      "(operation_name='router frontend egress' or operation_name='grpc.oteldemo.ProductCatalogService/GetProduct')";
+
+    const sql = getSql();
+
+    expect(sql).not.toContain("operation_name");
+    expect(sql.toUpperCase()).not.toContain("WHERE");
+  });
+
+  it("should keep other field filters when excluding a multi-value group for the expanded field", async () => {
+    wrapper = mountComponent("operation_name");
+    await flushPromises();
+    mockSearchObj.data.editorValue =
+      "span_status='ERROR' AND (operation_name='router frontend egress' or operation_name='grpc.oteldemo.ProductCatalogService/GetProduct')";
+
+    const sql = getSql();
+
+    expect(sql).not.toContain("operation_name");
+    expect(sql).toContain("span_status");
+  });
 });
 
 // ─── openFilterCreator ────────────────────────────────────────────────────────

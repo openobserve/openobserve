@@ -448,9 +448,9 @@ describe("TraceDetails", () => {
     });
 
     it("should get span kind correctly", () => {
-      expect(wrapper.vm.getSpanKind("1")).toBe("Client");
+      expect(wrapper.vm.getSpanKind("1")).toBe("Internal");
       expect(wrapper.vm.getSpanKind("2")).toBe("Server");
-      expect(wrapper.vm.getSpanKind("3")).toBe("Producer");
+      expect(wrapper.vm.getSpanKind("3")).toBe("Client");
     });
 
     it("should adjust opacity correctly", () => {

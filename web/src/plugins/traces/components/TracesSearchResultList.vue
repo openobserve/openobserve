@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-badge
           data-test="traces-count-badge"
           rounded
-          :label="`${props.total != null ? props.total : hits.length} ${props.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}`"
+          :label="`${formatLargeNumber(props.total != null ? props.total : hits.length)} ${props.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}`"
           class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
         />
         <div
@@ -64,7 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <span class="tw:text-[0.75rem] tw:tracking-[0.03em] tw:font-bold">
-            {{ props.errorCount }} {{ t("traces.errorsFound") }}
+            {{ formatLargeNumber(props.errorCount!) }}
+            {{ t("traces.errorsFound") }}
           </span>
         </div>
 
@@ -261,7 +262,10 @@ import {
   formatCost,
   formatTokens,
 } from "../../../utils/llmUtils";
-import { formatTimeWithSuffix } from "../../../utils/zincutils";
+import {
+  formatTimeWithSuffix,
+  formatLargeNumber,
+} from "../../../utils/zincutils";
 
 interface Props {
   hits: any[];
