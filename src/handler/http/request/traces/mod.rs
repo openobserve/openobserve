@@ -463,7 +463,8 @@ pub async fn get_latest_traces(
             start_time = trace_start_time / 1000;
         }
         if trace_end_time / 1000 > end_time {
-            end_time = trace_end_time / 1000;
+            // becuase we search with < end_time, so we need to add 1 to the end_time
+            end_time = trace_end_time / 1000 + 1;
         }
         traces_data.insert(
             trace_id.clone(),
@@ -587,10 +588,14 @@ pub async fn get_latest_traces(
             if trace.end_time < trace_end_time {
                 trace.end_time = trace_end_time;
             }
+            // update the duration if the duration is not correct
+            if trace.end_time - trace.start_time > trace.duration * 1000 {
+                trace.duration = (trace.end_time - trace.start_time) / 1000;
+            }
             let service_name_map = traces_service_name.entry(trace_id.clone()).or_default();
             let entry = service_name_map.entry(service_name.clone()).or_default();
             entry.0 += 1;
-            entry.1 += duration;
+            entry.1 = entry.1.max(duration);
         }
         if resp_size < req.query.size {
             break;
@@ -1026,7 +1031,7 @@ async fn process_latest_traces_stream(
 
     // Get time partitions
     let partition_req = SearchPartitionRequest {
-        sql: query_sql.clone(),
+        sql: format!("SELECT * FROM \"{stream_name}\""),
         start_time,
         end_time,
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -1228,7 +1233,8 @@ async fn process_latest_traces_stream(
                 p_start_actual = trace_start_time / 1000;
             }
             if trace_end_time > 0 && trace_end_time / 1000 > p_end_actual {
-                p_end_actual = trace_end_time / 1000;
+                // becuase we search with < end_time, so we need to add 1 to the end_time
+                p_end_actual = trace_end_time / 1000 + 1;
             }
             traces_data.insert(
                 tid.clone(),
@@ -1348,10 +1354,14 @@ async fn process_latest_traces_stream(
                     if trace.end_time < trace_end_time {
                         trace.end_time = trace_end_time;
                     }
+                    // update the duration if the duration is not correct
+                    if trace.end_time - trace.start_time > trace.duration * 1000 {
+                        trace.duration = (trace.end_time - trace.start_time) / 1000;
+                    }
                     let svc_map = traces_service_name.entry(tid).or_default();
                     let entry = svc_map.entry(service_name).or_default();
                     entry.0 += 1;
-                    entry.1 += duration;
+                    entry.1 = entry.1.max(duration);
                 }
             }
 

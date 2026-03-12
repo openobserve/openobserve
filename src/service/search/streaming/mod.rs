@@ -37,6 +37,7 @@ use o2_enterprise::enterprise::common::{
 };
 use tokio::sync::mpsc;
 use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
@@ -81,6 +82,10 @@ pub async fn process_search_stream_request(
     is_multi_stream_search: bool,
     extract_patterns: bool,
 ) {
+    let root_span = tracing::info_span!("service::search::search_stream_h2");
+    let _ = root_span.set_parent(search_span.context());
+    let _guard = root_span.enter();
+
     log::info!(
         "[HTTP2_STREAM trace_id {trace_id}] Received HTTP/2 stream request for org_id: {org_id}",
     );
@@ -729,6 +734,10 @@ pub async fn process_search_stream_request_multi(
     search_type: Option<SearchEventType>,
     search_event_context: Option<config::meta::search::SearchEventContext>,
 ) {
+    let root_span = tracing::info_span!("service::search::search_multi_stream_h2");
+    let _ = root_span.set_parent(search_span.context());
+    let _guard = root_span.enter();
+
     log::debug!(
         "[HTTP2_STREAM_MULTI trace_id {trace_id}] Processing multi-stream request with {} queries for org_id: {org_id}",
         queries.len()
