@@ -22,7 +22,6 @@
 }
 
 .container {
-  height: calc(100vh - 294px);
   overflow: auto;
   border-radius: 0.5rem;
 }
@@ -88,6 +87,13 @@ td {
       display: block !important;
     }
   }
+}
+
+// Error variant — apply via rowClass prop:
+//   rowClass: (row) => row.errors > 0 ? 'oz-table__row--error' : ''
+.oz-table__row--error {
+  // border-left: 0.1875rem solid var(--q-negative) !important;
+  // padding-left: 0.3125rem;
 }
 
 .table-row-hover {
