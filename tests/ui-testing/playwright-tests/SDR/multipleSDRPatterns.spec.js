@@ -1,18 +1,12 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Helper function to ingest a SINGLE log entry with retry logic
 async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetries = 5) {
-  const orgId = process.env["ORGNAME"];
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
+  const orgId = getOrgIdentifier();
+  const headers = getAuthHeaders();
 
   const logEntry = {
     level: "info",
@@ -67,29 +61,6 @@ async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetri
   }
 }
 
-// Helper: fetch with retry for transient 502/proxy errors in beforeAll/afterAll
-async function fetchWithRetry(url, options, label, maxRetries = 3) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const res = await fetch(url, options);
-      if (res.status >= 502 && res.status <= 504 && attempt < maxRetries) {
-        const body = await res.text();
-        testLogger.warn(`${label}: ${res.status} on attempt ${attempt}/${maxRetries}: ${body.substring(0, 100)}`);
-        await new Promise(r => setTimeout(r, attempt * 3000));
-        continue;
-      }
-      return res;
-    } catch (err) {
-      if (attempt < maxRetries) {
-        testLogger.warn(`${label}: network error on attempt ${attempt}/${maxRetries}: ${err.message}`);
-        await new Promise(r => setTimeout(r, attempt * 3000));
-        continue;
-      }
-      throw err;
-    }
-  }
-}
-
 test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
@@ -110,45 +81,42 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     { name: `date_dd_mm_yyyy_${testRunId}`, description: 'Date in DD/MM/YYYY format', pattern: '^\\d{2}/\\d{2}/\\d{4}$', value: '25/12/2024', action: 'redact', timeType: 'ingestion', scenario: 'ingestion_redact' }
   ];
 
-  // All patterns for this test run (for cleanup)
-  const allTestPatterns = [...queryTimePatterns.map(p => p.name), ...ingestionTimePatterns.map(p => p.name)];
-
   const fieldName = "multi_data"; // Single field for all patterns
   // Use unique stream name to avoid "stream being deleted" conflicts
   const testStreamName = `sdr_poc_multi_${testRunId}`;
 
-  // API helper for setup/cleanup — no browser context needed
-  function getApiConfig() {
-    const baseUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080';
-    const org = process.env.ORGNAME || 'default';
-    const authHeader = 'Basic ' + Buffer.from(
-      `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
-    ).toString('base64');
-    return { baseUrl, org, headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' } };
-  }
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+    pm = new PageManager(page);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    testLogger.info('Import POC test setup completed');
+  });
 
-  // Setup: Create patterns via API before tests run.
-  // Uses beforeAll so it always executes even during -g filtered reruns.
-  test.beforeAll(async () => {
-    testLogger.info(`=== SETUP (beforeAll): Creating 4 patterns via API, testRunId: ${testRunId} ===`);
-    const { baseUrl, org, headers } = getApiConfig();
+  // Setup: Create patterns via browser-context API (sends cookies for cloud auth)
+  test('setup: create patterns', {
+    tag: ['@sdr', '@cleanup', '@sdrMultiPattern']
+  }, async ({ page }) => {
+    testLogger.info(`=== SETUP: Creating 4 patterns via page.request, testRunId: ${testRunId} ===`);
+    const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, '');
+    const org = getOrgIdentifier();
+    const headers = getAuthHeaders();
     const allPatternsToCreate = [...queryTimePatterns, ...ingestionTimePatterns];
 
     for (const patternDef of allPatternsToCreate) {
-      const res = await fetchWithRetry(
-        `${baseUrl}/api/${org}/re_patterns`,
-        { method: 'POST', headers, body: JSON.stringify({ name: patternDef.name, description: patternDef.description, pattern: patternDef.pattern }) },
-        `Create pattern ${patternDef.name}`
-      );
-      if (!res.ok) {
+      const res = await page.request.post(`${baseUrl}/api/${org}/re_patterns`, {
+        headers,
+        data: { name: patternDef.name, description: patternDef.description, pattern: patternDef.pattern }
+      });
+      if (!res.ok()) {
         const body = await res.text();
-        throw new Error(`Failed to create pattern ${patternDef.name}: ${res.status} ${body}`);
+        throw new Error(`Failed to create pattern ${patternDef.name}: ${res.status()} ${body}`);
       }
       testLogger.info(`Pattern ${patternDef.name} created via API`);
     }
 
     // Verify all patterns exist
-    const listRes = await fetchWithRetry(`${baseUrl}/api/${org}/re_patterns`, { headers }, 'List patterns');
+    const listRes = await page.request.get(`${baseUrl}/api/${org}/re_patterns`, { headers });
     const listData = await listRes.json();
     const existingNames = new Set((listData.patterns || []).map(p => p.name));
     for (const p of allPatternsToCreate) {
@@ -157,97 +125,6 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
       }
     }
     testLogger.info('=== SETUP COMPLETE: All 4 patterns created via API ===');
-  });
-
-  // Cleanup: Unlink patterns from stream + delete patterns via API.
-  // Uses afterAll so it always executes even during -g filtered reruns.
-  // NOTE: The stream settings PUT uses a DELTA format { add: [], remove: [] },
-  // NOT a replacement format. Sending { pattern_associations: [] } is a no-op.
-  test.afterAll(async () => {
-    testLogger.info(`=== CLEANUP (afterAll): API cleanup for testRunId: ${testRunId} ===`);
-    const { baseUrl, org, headers } = getApiConfig();
-
-    // Step 1: List patterns to get their IDs (needed for both unlink and delete)
-    let patternMap = {}; // name -> { id, description, pattern }
-    try {
-      const listRes = await fetchWithRetry(`${baseUrl}/api/${org}/re_patterns`, { headers }, 'List patterns');
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        const testPatternNames = new Set(allTestPatterns);
-        for (const p of (listData.patterns || [])) {
-          if (testPatternNames.has(p.name)) {
-            patternMap[p.name] = { id: p.id, description: p.description || '', pattern: p.pattern || '' };
-          }
-        }
-        testLogger.info(`Found ${Object.keys(patternMap).length} test patterns to clean up`);
-      }
-    } catch (listError) {
-      testLogger.warn(`Could not list patterns: ${listError.message}`);
-    }
-
-    // Step 2: Unlink patterns using delta format { remove: [...associations] }
-    // The backend expects PatternAssociation objects with field, pattern_name, pattern_id, policy, apply_at
-    const allPatternDefs = [...queryTimePatterns, ...ingestionTimePatterns];
-    const removeAssociations = [];
-    for (const pDef of allPatternDefs) {
-      const info = patternMap[pDef.name];
-      if (info) {
-        removeAssociations.push({
-          field: fieldName,
-          pattern_name: pDef.name,
-          pattern_id: info.id,
-          description: info.description,
-          pattern: info.pattern,
-          policy: pDef.action,
-          apply_at: pDef.timeType
-        });
-      }
-    }
-
-    if (removeAssociations.length > 0) {
-      try {
-        const updateRes = await fetchWithRetry(`${baseUrl}/api/${org}/streams/${testStreamName}/settings?type=logs`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({ pattern_associations: { add: [], remove: removeAssociations } })
-        }, 'Unlink patterns');
-        if (updateRes.ok) {
-          testLogger.info(`Unlinked ${removeAssociations.length} patterns from stream via API`);
-        } else {
-          const updateBody = await updateRes.text();
-          testLogger.warn(`Stream settings update returned ${updateRes.status}: ${updateBody}`);
-        }
-      } catch (unlinkError) {
-        testLogger.warn(`Could not unlink patterns: ${unlinkError.message}`);
-      }
-    }
-
-    // Step 3: Delete patterns by ID (now that they're unlinked)
-    for (const [name, info] of Object.entries(patternMap)) {
-      try {
-        const delRes = await fetchWithRetry(`${baseUrl}/api/${org}/re_patterns/${info.id}`, {
-          method: 'DELETE', headers
-        }, `Delete pattern ${name}`);
-        if (delRes.ok) {
-          testLogger.info(`Pattern ${name} deleted via API`);
-        } else {
-          const delBody = await delRes.text();
-          testLogger.warn(`Pattern ${name} delete returned ${delRes.status}: ${delBody}`);
-        }
-      } catch (delError) {
-        testLogger.warn(`Pattern ${name} delete failed: ${delError.message}`);
-      }
-    }
-
-    testLogger.info('=== CLEANUP COMPLETE ===');
-  });
-
-  test.beforeEach(async ({ page }, testInfo) => {
-    testLogger.testStart(testInfo.title, testInfo.file);
-    await navigateToBase(page);
-    pm = new PageManager(page);
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    testLogger.info('Import POC test setup completed');
   });
 
   // Multiple patterns on ONE field (SEQUENTIAL FLOW)
