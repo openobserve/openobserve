@@ -72,9 +72,8 @@ use crate::{
             build_search_request_per_field, error_utils::map_error_to_http_response,
         },
     },
-    service::{
-        search::{streaming::process_search_stream_request, utils::is_permissable_function_error},
-        setup_tracing_with_trace_id,
+    service::search::{
+        streaming::process_search_stream_request, utils::is_permissable_function_error,
     },
 };
 
@@ -516,16 +515,6 @@ pub async fn search_http2_stream(
 
     let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
 
-    // Create search_span as a child of http_span by entering http_span first
-    let search_span = {
-        let _guard = http_span.enter();
-        setup_tracing_with_trace_id(
-            &trace_id,
-            tracing::info_span!("service::search::search_stream_h2"),
-        )
-        .await
-    };
-
     if req.search_type.is_none() {
         req.search_type = Some(SearchEventType::Other);
     }
@@ -557,7 +546,7 @@ pub async fn search_http2_stream(
         stream_type,
         stream_names,
         req_order_by,
-        search_span.clone(),
+        http_span,
         tx,
         None,
         fallback_order_by_col,
@@ -904,16 +893,6 @@ pub async fn values_http2_stream(
         }
     }
 
-    // Create search_span as a child of http_span by entering http_span first
-    let search_span = {
-        let _guard = http_span.enter();
-        setup_tracing_with_trace_id(
-            &trace_id,
-            tracing::info_span!("service::search::values_stream_h2"),
-        )
-        .await
-    };
-
     // Create a channel for streaming results
     let (tx, rx) =
         mpsc::channel::<Result<config::meta::search::StreamResponses, infra::errors::Error>>(100);
@@ -950,7 +929,7 @@ pub async fn values_http2_stream(
         stream_type,
         stream_names,
         OrderBy::default(),
-        search_span.clone(),
+        http_span,
         tx,
         Some(values_event_context),
         None,
