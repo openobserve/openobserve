@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -469,9 +469,9 @@ impl Writer {
             let _ = std::mem::take(&mut entry.data);
         }
 
-        let _start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
-        if _start_preprocess_batch_duration.as_millis() > 100 {
-            log::warn!("_start_preprocess_batch: {_start_preprocess_batch_duration:?}");
+        let start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
+        if start_preprocess_batch_duration.as_millis() > 100 {
+            log::warn!("start_preprocess_batch_duration: {start_preprocess_batch_duration:?}");
         }
         Ok(crate::ProcessedBatch {
             entries,
@@ -507,9 +507,9 @@ impl Writer {
             tokio::task::coop::consume_budget().await;
         }
         drop(wal);
-        let _start_wal_processed_duration = _start_wal_processed.elapsed();
-        if _start_wal_processed_duration.as_millis() > 50 {
-            log::warn!("_start_wal_processed_duration: {_start_wal_processed_duration:?}");
+        let start_wal_processed_duration = _start_wal_processed.elapsed();
+        if start_wal_processed_duration.as_millis() > 100 {
+            log::warn!("start_wal_processed_duration: {start_wal_processed_duration:?}");
         }
 
         // Write into Memtable - pure IO, no CPU-intensive processing
@@ -528,9 +528,9 @@ impl Writer {
             tokio::task::coop::consume_budget().await;
         }
         drop(mem);
-        let _start_mem_processed_duration = _start_mem_processed.elapsed();
-        if _start_mem_processed_duration.as_millis() > 50 {
-            log::warn!("_start_mem_processed_duration: {_start_mem_processed_duration:?}");
+        let start_mem_processed_duration = _start_mem_processed.elapsed();
+        if start_mem_processed_duration.as_millis() > 100 {
+            log::warn!("start_mem_processed_duration: {start_mem_processed_duration:?}");
         }
 
         // Check fsync
@@ -540,9 +540,9 @@ impl Writer {
             drop(wal);
         }
 
-        let _start_consume_processed_duration = _start_consume_processed.elapsed();
-        if _start_consume_processed_duration.as_millis() > 500 {
-            log::warn!("_start_consume_processed_duration: {_start_consume_processed_duration:?}");
+        let start_consume_processed_duration = _start_consume_processed.elapsed();
+        if start_consume_processed_duration.as_millis() > 500 {
+            log::warn!("start_consume_processed_duration: {start_consume_processed_duration:?}");
         }
 
         Ok(())
