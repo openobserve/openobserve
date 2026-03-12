@@ -16,9 +16,8 @@
 //! Super-cluster queue processor for service discovery synchronization.
 //!
 //! Synchronizes discovered services and their telemetry streams across regions:
-//! - Service metadata (dimensions, correlation keys)
+//! - Service metadata (service name, disambiguation fields)
 //! - Associated log/metric/trace streams
-//! - Service topology information
 //!
 //! Enables complete service discovery view across all regions.
 
@@ -36,12 +35,12 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
     match msg {
         ServiceStreamsMessage::Put { record } => {
             log::debug!(
-                "[SUPER_CLUSTER:service_streams] Put service org={} key={}",
+                "[SUPER_CLUSTER:service_streams] Put service org={} name={}",
                 record.org_id,
-                record.service_key
+                record.service_name
             );
             let org_id = record.org_id.clone();
-            service_streams::put(record).await?;
+            service_streams::put(&org_id, record).await?;
             infra::coordinator::service_streams::emit_put_event(&org_id).await?;
         }
         ServiceStreamsMessage::Delete {
@@ -53,7 +52,7 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
                 org_id,
                 service_key
             );
-            service_streams::delete(&org_id, &service_key).await?;
+            service_streams::delete_all(&org_id).await?;
             infra::coordinator::service_streams::emit_delete_event(&org_id, &service_key).await?;
         }
     }

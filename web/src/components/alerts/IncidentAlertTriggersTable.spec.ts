@@ -75,12 +75,12 @@ function createMockI18n() {
         alerts: {
           incidents: {
             correlationServiceDiscovery: "Service Discovery",
-            correlationScopeMatch: "Scope Match",
-            correlationWorkloadMatch: "Workload Match",
+            correlationPrimaryMatch: "Environment Match",
+            correlationSecondaryMatch: "Service Match",
             correlationAlertId: "Alert ID",
             correlationServiceDiscoveryTooltip: "Correlated using pre-computed service identity from service discovery",
-            correlationScopeMatchTooltip: "Correlated by matching environment scope (cluster, region, namespace)",
-            correlationWorkloadMatchTooltip: "Correlated by matching workload identity (service, deployment)",
+            correlationPrimaryMatchTooltip: "Correlated by matching environment scope (cluster, region, namespace)",
+            correlationSecondaryMatchTooltip: "Correlated by matching service identity (service name, deployment)",
             correlationAlertIdTooltip: "No matching dimensions found — isolated by alert ID",
           },
         },
@@ -269,15 +269,15 @@ describe("IncidentAlertTriggersTable", () => {
       expect(badge.text()).toBe("Service Discovery");
     });
 
-    it("should display scope_match badge with correct color", () => {
+    it("should display primary_match badge with correct color", () => {
       const mockAlert = createMockAlert({
-        correlation_reason: "scope_match",
+        correlation_reason: "primary_match",
       });
       wrapper = mountComponent({ triggers: [mockAlert] });
 
       const badge = findByTestId(wrapper, "correlation-reason-badge");
       expect(badge.exists()).toBe(true);
-      expect(badge.text()).toContain("Scope Match");
+      expect(badge.text()).toContain("Primary Match");
     });
 
     it("should handle unknown correlation reason", () => {

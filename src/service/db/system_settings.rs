@@ -390,10 +390,7 @@ pub async fn get_fqn_priority_dimensions(org_id: &str) -> Vec<String> {
 pub fn get_default_fqn_priority_dimensions() -> Vec<String> {
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-        get_o2_config()
-            .service_streams
-            .get_fqn_priority_dimensions()
+        vec![]
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -408,16 +405,12 @@ pub fn get_default_fqn_priority_dimensions() -> Vec<String> {
 /// 2. Fall back to enterprise defaults from JSON file
 ///
 /// Returns empty vec for OSS builds.
-pub async fn get_semantic_field_groups(
-    org_id: &str,
-) -> Vec<config::meta::correlation::SemanticFieldGroup> {
-    use config::meta::{
-        correlation::SemanticFieldGroup, system_settings::keys::SEMANTIC_FIELD_GROUPS,
-    };
+pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correlation::FieldAlias> {
+    use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
 
     // Try to get from settings v2 (org level)
     if let Ok(Some(setting)) = get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await
-        && let Ok(groups) = serde_json::from_value::<Vec<SemanticFieldGroup>>(setting.setting_value)
+        && let Ok(groups) = serde_json::from_value::<Vec<FieldAlias>>(setting.setting_value)
         && !groups.is_empty()
     {
         return groups;
@@ -431,7 +424,7 @@ pub async fn get_semantic_field_groups(
 ///
 /// For enterprise builds, loads from enterprise JSON file.
 /// For OSS builds, returns empty vec.
-pub fn get_default_semantic_field_groups() -> Vec<config::meta::correlation::SemanticFieldGroup> {
+pub fn get_default_semantic_field_groups() -> Vec<config::meta::correlation::FieldAlias> {
     #[cfg(feature = "enterprise")]
     {
         o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file()

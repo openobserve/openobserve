@@ -99,6 +99,11 @@ mod m20260227_000001_add_alert_creates_incident;
 mod m20260305_000001_create_trial_quota_usage_table;
 mod m20260310_000001_create_anomaly_detection_config_table;
 mod m20260310_000002_create_anomaly_detection_models_table;
+mod m20260312_000001_recreate_service_streams_schema;
+mod m20260312_000002_drop_service_streams_dimensions;
+mod m20260312_000003_alter_alert_incidents_schema;
+mod m20260316_000001_add_set_id_to_service_streams;
+mod m20260316_000002_add_all_dimensions_to_service_streams;
 
 pub struct Migrator;
 
@@ -187,6 +192,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20260310_000001_create_anomaly_detection_config_table::Migration),
             Box::new(m20260310_000002_create_anomaly_detection_models_table::Migration),
             Box::new(m20260305_000001_create_trial_quota_usage_table::Migration),
+            Box::new(m20260312_000001_recreate_service_streams_schema::Migration),
+            Box::new(m20260312_000002_drop_service_streams_dimensions::Migration),
+            Box::new(m20260312_000003_alter_alert_incidents_schema::Migration),
+            Box::new(m20260316_000001_add_set_id_to_service_streams::Migration),
+            Box::new(m20260316_000002_add_all_dimensions_to_service_streams::Migration),
         ]
     }
 }

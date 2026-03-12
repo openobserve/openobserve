@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-expansion-item>
 
-      <!-- FQN Formula Preview -->
+      <!-- Service Identity Formula Preview -->
       <div
         class="tw:mb-4 tw:p-4 tw:rounded-lg tw:border tw:border-solid"
         :class="
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-icon>
         </div>
 
-        <!-- Environment-grouped FQN patterns -->
+        <!-- Environment-grouped Service Identity patterns -->
         <div class="fqn-formula-box tw:p-3 tw:rounded tw:overflow-x-auto">
           <div v-if="fqnFormula.envPatterns.length > 0" class="tw:space-y-2">
             <div
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- FQN Priority Dimensions - Collapsible Section -->
+      <!-- Disambiguation Fields - Collapsible Section -->
       <q-expansion-item
         v-model="fqnSectionExpanded"
         icon="reorder"
@@ -550,7 +550,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         default-opened
       >
         <div class="tw:p-4">
-          <SemanticFieldGroupsConfig
+          <FieldAliassConfig
             v-model:semantic-field-groups="localSemanticGroups"
             @update:semantic-field-groups="handleSemanticGroupsUpdate"
           />
@@ -581,7 +581,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
-import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
+import FieldAliassConfig from "@/components/alerts/FieldAliassConfig.vue";
 import GroupHeader from "@/components/common/GroupHeader.vue";
 import alertsService from "@/services/alerts";
 import settingsService from "@/services/settings";
@@ -590,7 +590,7 @@ const store = useStore();
 const $q = useQuasar();
 const { t } = useI18n();
 
-interface SemanticFieldGroup {
+interface FieldAlias {
   id: string;
   display: string;
   group?: string;
@@ -617,7 +617,7 @@ const savingSemanticMappings = ref(false);
 const fqnSectionExpanded = ref(true);
 const semanticSectionExpanded = ref(true);
 const localFqnPriority = ref<string[]>([]);
-const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
+const localSemanticGroups = ref<FieldAlias[]>([]);
 const selectedSemanticGroup = ref<string | null>(null);
 
 // Dual-list selector state
@@ -628,14 +628,14 @@ const selectedPriorityDimensions = ref<string[]>([]);
 const draggedIndex = ref<number | null>(null);
 
 // Reserved IDs that should not be used as semantic groups
-// service-fqn is the OUTPUT of correlation, not an input dimension
+// service-fqn is the computed SERVICE NAME output of correlation, not an input dimension
 const RESERVED_GROUP_IDS = ["service-fqn", "servicefqn", "fqn"];
 
 // Computed: Get semantic groups not already in the priority list
 const availableSemanticGroups = computed(() => {
   return localSemanticGroups.value
     .filter((group) => {
-      // Exclude reserved/computed fields like service-fqn (it's the output, not an input)
+      // Exclude reserved/computed fields like service-fqn (it's the service name output, not an input)
       if (RESERVED_GROUP_IDS.includes(group.id?.toLowerCase())) {
         return false;
       }
@@ -676,18 +676,18 @@ const filteredAvailableGroups = computed(() => {
   );
 });
 
-// Environment pattern type for FQN formula display
+// Environment pattern type for Service Identity formula display
 interface EnvironmentPattern {
   name: string;
   scopeDims: string[];
   workloadDims: string[];
 }
 
-// Computed: Derive FQN formula grouped by environment/semantic group
+// Computed: Derive Service Identity formula grouped by environment/semantic group
 // Shows patterns like: K8s: cluster/deployment, AWS: region/ecs-cluster/task
 const fqnFormula = computed(() => {
   // Build a lookup map for semantic groups
-  const groupLookup = new Map<string, SemanticFieldGroup>();
+  const groupLookup = new Map<string, FieldAlias>();
   localSemanticGroups.value.forEach((g) => groupLookup.set(g.id, g));
 
   // Group dimensions by their semantic group category
@@ -837,17 +837,17 @@ const getDimensionDisplay = (dimId: string): string => {
     .join(" ");
 };
 
-const handleSemanticGroupsUpdate = (groups: SemanticFieldGroup[]) => {
-  // Filter out reserved IDs like service-fqn (it's the output, not an input)
+const handleSemanticGroupsUpdate = (groups: FieldAlias[]) => {
+  // Filter out reserved IDs like service-fqn (it's the service name output, not an input)
   const filteredGroups = groups.filter(
     (g) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()),
   );
   localSemanticGroups.value = filteredGroups;
 };
 
-// Sort FQN priority dimensions: scope dimensions always come before workload dimensions
+// Sort disambiguation fields: scope dimensions always come before workload dimensions
 const sortFqnPriorityByScopeFirst = () => {
-  const groupLookup = new Map<string, SemanticFieldGroup>();
+  const groupLookup = new Map<string, FieldAlias>();
   localSemanticGroups.value.forEach((g) => groupLookup.set(g.id, g));
 
   const scopeDims: string[] = [];
@@ -868,7 +868,7 @@ const sortFqnPriorityByScopeFirst = () => {
   localFqnPriority.value = [...scopeDims, ...workloadDims];
 };
 
-// FQN Priority dimension management
+// Disambiguation field management
 const moveFqnDimensionUp = (index: number) => {
   if (index === 0) return;
   const dims = [...localFqnPriority.value];
@@ -902,7 +902,7 @@ const addFqnDimension = () => {
 };
 
 const resetFqnPriority = () => {
-  // Reset to backend defaults from O2_FQN_PRIORITY_DIMENSIONS
+  // Reset to backend defaults from O2_SERVICE_DISAMBIGUATION_FIELDS (fqn_priority_dimensions)
   const backendDefaults = store.state.zoConfig?.fqn_priority_dimensions || [];
   localFqnPriority.value = [...backendDefaults];
   sortFqnPriorityByScopeFirst();
@@ -911,13 +911,13 @@ const resetFqnPriority = () => {
 const saveFqnPriority = async () => {
   savingFqn.value = true;
   try {
-    // Save FQN priority dimensions using settings v2 API (org-level setting)
+    // Save disambiguation fields using settings v2 API (org-level setting)
     await settingsService.setOrgSetting(
       props.orgId,
       "fqn_priority_dimensions",
       localFqnPriority.value,
       "correlation",
-      "FQN priority dimensions for service correlation",
+      "Disambiguation fields for service correlation",
     );
 
     $q.notify({
@@ -928,7 +928,7 @@ const saveFqnPriority = async () => {
 
     emit("saved");
   } catch (error: any) {
-    console.error("Error saving FQN priority settings:", error);
+    console.error("Error saving disambiguation fields settings:", error);
     $q.notify({
       type: "negative",
       message: error?.message || t("settings.correlation.configSaveFailed"),
@@ -1061,11 +1061,11 @@ const saveSemanticMappings = async () => {
 // Fetch config on mount
 const loadConfig = async () => {
   loading.value = true;
-  // Get backend defaults for FQN priority dimensions
+  // Get backend defaults for disambiguation fields
   const backendDefaults = store.state.zoConfig?.fqn_priority_dimensions || [];
 
   try {
-    // Load FQN priority from settings v2 API
+    // Load disambiguation fields from settings v2 API
     let fqnPriorityFromSettings: string[] | null = null;
     try {
       const settingResponse = await settingsService.getSetting(
@@ -1085,7 +1085,7 @@ const loadConfig = async () => {
     }
 
     // Load semantic field groups from settings v2 API
-    let semanticGroupsFromSettings: SemanticFieldGroup[] | null = null;
+    let semanticGroupsFromSettings: FieldAlias[] | null = null;
     try {
       const semanticSettingResponse = await settingsService.getSetting(
         props.orgId,
@@ -1103,11 +1103,11 @@ const loadConfig = async () => {
       // Error loading setting, will use defaults
     }
 
-    // Use settings v2 FQN priority if available, otherwise use backend defaults
+    // Use settings v2 disambiguation fields if available, otherwise use backend defaults
     const fqnPriority = fqnPriorityFromSettings ?? [...backendDefaults];
 
     // Use settings v2 semantic groups if available, otherwise load defaults from backend
-    let semanticGroups: SemanticFieldGroup[] = [];
+    let semanticGroups: FieldAlias[] = [];
     if (semanticGroupsFromSettings) {
       semanticGroups = semanticGroupsFromSettings;
     } else {
@@ -1122,9 +1122,9 @@ const loadConfig = async () => {
       }
     }
 
-    // Filter out reserved IDs like service-fqn (it's the output, not an input)
+    // Filter out reserved IDs like service-fqn (it's the service name output, not an input)
     const filteredSemanticGroups = semanticGroups.filter(
-      (g: SemanticFieldGroup) =>
+      (g: FieldAlias) =>
         !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()),
     );
 
@@ -1194,7 +1194,7 @@ body.body--dark {
   }
 }
 
-// FQN Formula Box styles
+// Service Identity Formula Box styles
 .service-identity-config {
   .fqn-formula-box {
     background-color: #f5f5f5;

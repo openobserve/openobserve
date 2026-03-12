@@ -128,6 +128,10 @@ pub struct CorrelationResponse {
     /// 3. Pass streams between components (type info is preserved)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub all_streams: Vec<StreamInfo>,
+    /// The identity set that was selected for this correlation (by best-coverage resolution).
+    /// `None` if the feature is not enabled or the set was not determined.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched_set_id: Option<String>,
 }
 
 impl CorrelationResponse {
@@ -175,6 +179,7 @@ impl CorrelationResponse {
             additional_dimensions,
             related_streams,
             all_streams: Vec::new(),
+            matched_set_id: None,
         };
         response.build_all_streams();
         response
@@ -205,11 +210,35 @@ pub struct DimensionAnalyticsSummary {
     /// (sorted by cardinality, lowest first)
     pub recommended_priority_dimensions: Vec<String>,
 
-    /// All dimension analytics
+    /// All dimension analytics (dimensions with ingested data)
     pub dimensions: Vec<DimensionAnalytics>,
+
+    /// All alias groups found in the org's stream schemas
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub available_groups: Vec<FoundGroup>,
 
     /// When this summary was generated
     pub generated_at: i64,
+}
+
+/// A semantic alias group found in the org's stream schemas.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct FoundGroup {
+    /// Semantic group ID, e.g., "k8s-cluster"
+    pub group_id: String,
+    /// Human-readable display name, e.g., "K8s Cluster"
+    pub display: String,
+    /// Which stream types contain a field from this group (e.g., ["logs", "traces"])
+    pub stream_types: Vec<String>,
+    /// Actual field name found per stream type, e.g., {"logs": "k8s_cluster_name"}
+    pub aliases: HashMap<String, String>,
+    /// True if this group appears in 2+ stream types AND has acceptable cardinality
+    /// (Deprecated: logic moving to UI)
+    pub recommended: bool,
+    /// Number of unique values seen in actual data (None if no data collected yet)
+    pub unique_values: Option<usize>,
+    /// Cardinality class derived from unique_values (None if no data yet)
+    pub cardinality_class: Option<CardinalityClass>,
 }
 
 /// Dimension analytics tracking
@@ -233,9 +262,21 @@ pub struct DimensionAnalytics {
     /// When this dimension was last updated
     pub last_updated: i64,
 
-    /// Sample values (limited to 10 for inspection)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub sample_values: Vec<String>,
+    /// Sample values mapped by stream type, then stream name (limited to 10 for inspection)
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub sample_values: HashMap<String, HashMap<String, Vec<String>>>,
+
+    /// For each unique value of this dimension, the co-occurring values of other dimensions.
+    /// Example: { "common-dev": { "k8s-namespace": ["introspection", "ziox", "dev"] } }
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub value_children: HashMap<String, HashMap<String, Vec<String>>>,
+
+    /// Number of services that carry each specific value of this dimension.
+    /// Example: { "staging": 42, "prod-us-east": 18, "prod-us-west": 11 }
+    /// Used for per-value coverage: value_counts[v] / service_count = fraction of
+    /// env services in that specific group value.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub value_counts: HashMap<String, usize>,
 }
 
 impl DimensionAnalytics {
@@ -249,19 +290,42 @@ impl DimensionAnalytics {
             service_count: 0,
             first_seen: now,
             last_updated: now,
-            sample_values: Vec::new(),
+            sample_values: HashMap::new(),
+            value_children: HashMap::new(),
+            value_counts: HashMap::new(),
         }
     }
 
     /// Update analytics with new data
-    pub fn update(&mut self, cardinality: usize, service_count: usize, sample_values: Vec<String>) {
+    pub fn update(
+        &mut self,
+        cardinality: usize,
+        service_count: usize,
+        sample_values: HashMap<String, HashMap<String, Vec<String>>>,
+        value_children: HashMap<String, HashMap<String, Vec<String>>>,
+        value_counts: HashMap<String, usize>,
+    ) {
         self.cardinality = cardinality;
         self.cardinality_class = CardinalityClass::from_cardinality(cardinality);
         self.service_count = service_count;
         self.last_updated = chrono::Utc::now().timestamp_micros();
 
-        // Keep only first 10 sample values
-        self.sample_values = sample_values.into_iter().take(10).collect();
+        // Keep only first 10 sample values per stream within each stream type
+        self.sample_values = sample_values
+            .into_iter()
+            .map(|(stream_type, streams)| {
+                (
+                    stream_type,
+                    streams
+                        .into_iter()
+                        .map(|(k, v)| (k, v.into_iter().take(10).collect()))
+                        .collect(),
+                )
+            })
+            .collect();
+
+        self.value_children = value_children;
+        self.value_counts = value_counts;
     }
 
     /// Check if this dimension is suitable for correlation
@@ -297,49 +361,6 @@ pub enum CardinalityClass {
     VeryHigh,
 }
 
-/// Response for grouped services API
-/// Groups services by their FQN (Fully Qualified Name) for correlation visualization
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct GroupedServicesResponse {
-    /// Services grouped by FQN
-    pub groups: Vec<ServiceFqnGroup>,
-
-    /// Total number of unique FQNs
-    pub total_fqns: usize,
-
-    /// Total number of services (across all FQNs)
-    pub total_services: usize,
-}
-
-/// A group of services sharing the same FQN
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ServiceFqnGroup {
-    /// The Fully Qualified Name (e.g., "o2-openobserve-querier")
-    pub fqn: String,
-
-    /// Services that share this FQN
-    pub services: Vec<ServiceInGroup>,
-
-    /// Summary of streams in this group
-    pub stream_summary: StreamSummary,
-}
-
-/// A service within an FQN group
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ServiceInGroup {
-    /// Service name (e.g., "openobserve", "querier")
-    pub service_name: String,
-
-    /// How the FQN was derived (e.g., "k8s-statefulset", "k8s-deployment", "service")
-    pub derived_from: String,
-
-    /// Streams by type
-    pub streams: ServiceStreams,
-
-    /// Key dimensions for this service
-    pub dimensions: HashMap<String, String>,
-}
-
 /// Streams organized by type
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 pub struct ServiceStreams {
@@ -356,7 +377,6 @@ pub struct ServiceStreams {
     pub metrics: Vec<String>,
 }
 
-/// Summary of streams in an FQN group
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 pub struct StreamSummary {
     /// Number of log streams

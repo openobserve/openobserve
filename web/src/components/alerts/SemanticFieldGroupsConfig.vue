@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <SemanticGroupItem
         v-for="(group, index) in filteredGroups"
         :key="`${group.id}-${index}`"
+        :data-group-id="group.id"
         :group="group"
         @update="updateGroupByFilter(index, $event)"
         @delete="removeGroupByFilter(index)"
@@ -195,25 +196,24 @@ interface SemanticGroup {
   display: string;
   group?: string;
   fields: string[];
-  normalize: boolean;
-  is_stable?: boolean;
-  is_scope?: boolean;
 }
 
 // Reserved IDs that should not be used as semantic groups
-// service-fqn is the OUTPUT of correlation, not an input dimension
+// service-fqn is the computed SERVICE NAME output of correlation, not an input dimension
 const RESERVED_GROUP_IDS = ["service-fqn", "servicefqn", "fqn"];
 
 interface Props {
   semanticFieldGroups?: SemanticGroup[];
   fingerprintFields?: string[];
   showFingerprintFields?: boolean;
+  scrollToGroupId?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   semanticFieldGroups: () => [],
   fingerprintFields: () => [],
   showFingerprintFields: false,
+  scrollToGroupId: undefined,
 });
 
 const emit = defineEmits<{
@@ -221,7 +221,7 @@ const emit = defineEmits<{
   (e: "update:fingerprintFields", fields: string[]): void;
 }>();
 
-// Filter out reserved IDs like service-fqn (it's the output, not an input)
+// Filter out reserved IDs like service-fqn (it's the service name output, not an input)
 const localGroups = ref<SemanticGroup[]>(
   props.semanticFieldGroups.filter(
     (g) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()),
@@ -235,7 +235,7 @@ const showImportDrawer = ref(false);
 watch(
   () => props.semanticFieldGroups,
   (newGroups) => {
-    // Filter out reserved IDs like service-fqn (it's the output, not an input)
+    // Filter out reserved IDs like service-fqn (it's the service name output, not an input)
     localGroups.value = newGroups.filter(
       (g) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()),
     );
@@ -312,9 +312,6 @@ const addGroup = () => {
     display: "",
     group: selectedCategory.value || "Other",
     fields: [],
-    normalize: true,
-    is_stable: false,
-    is_scope: false,
   };
   localGroups.value.unshift(newGroup);
   emitUpdate();
@@ -390,13 +387,33 @@ const emitUpdate = () => {
   emit("update:fingerprintFields", [...localFingerprintFields.value]);
 };
 
-// Auto-select first category on mount
-onMounted(() => {
-  nextTick(() => {
-    if (categoryOptions.value.length > 0 && !selectedCategory.value) {
-      selectedCategory.value = categoryOptions.value[0].value;
+// Auto-select first category on mount, or navigate to a specific group
+onMounted(async () => {
+  await nextTick();
+
+  if (props.scrollToGroupId) {
+    // Find and switch to the category that contains the requested group
+    const targetGroup = localGroups.value.find((g) => g.id === props.scrollToGroupId);
+    if (targetGroup) {
+      selectedCategory.value = targetGroup.group || "Other";
+      await nextTick(); // wait for filteredGroups to re-render
     }
-  });
+  } else if (categoryOptions.value.length > 0 && !selectedCategory.value) {
+    selectedCategory.value = categoryOptions.value[0].value;
+  }
+
+  if (props.scrollToGroupId) {
+    await nextTick();
+    const el = document.querySelector(
+      `[data-group-id="${props.scrollToGroupId}"]`
+    ) as HTMLElement | null;
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Blink the border to draw attention
+      el.classList.add("group-highlight");
+      setTimeout(() => el.classList.remove("group-highlight"), 2000);
+    }
+  }
 });
 </script>
 
@@ -413,6 +430,16 @@ onMounted(() => {
 .groups-list {
   width: 100%;
   overflow-x: hidden;
+}
+
+// Applied via JS to the target group item; :deep ensures it reaches child components
+:deep(.group-highlight) {
+  animation: group-border-blink 0.4s ease-in-out 3;
+}
+
+@keyframes group-border-blink {
+  0%, 100% { outline: 2px solid transparent; }
+  50%       { outline: 2px solid var(--q-primary); border-radius: 4px; }
 }
 
 .fingerprint-section {

@@ -179,7 +179,7 @@ const store = useStore();
 const $q = useQuasar();
 const { t } = useI18n();
 
-interface SemanticFieldGroup {
+interface FieldAlias {
   id: string;
   display: string;
   group?: string;
@@ -220,7 +220,7 @@ const localConfig = ref<OrganizationDeduplicationConfig>({
   fqn_priority_dimensions: props.config?.fqn_priority_dimensions,
 });
 
-const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
+const localSemanticGroups = ref<FieldAlias[]>([]);
 
 const toggleFingerprintGroup = (groupId: string, checked: boolean) => {
   if (!localConfig.value.alert_fingerprint_groups) {

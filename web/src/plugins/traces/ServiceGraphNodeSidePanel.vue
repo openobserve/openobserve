@@ -278,7 +278,7 @@ import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useQuasar } from 'quasar';
 import searchService from '@/services/search';
-import { getGroupedServices, correlate as correlateStreams } from '@/services/service_streams';
+import { correlate as correlateStreams } from '@/services/service_streams';
 import { escapeSingleQuotes } from '@/utils/zincutils';
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
@@ -349,29 +349,11 @@ export default defineComponent({
           || props.selectedNode.label
           || props.selectedNode.id;
 
-        // Step 1: Find the service's FQN from _grouped
-        const groupedResponse = await getGroupedServices(org);
-        const groups = groupedResponse.data?.groups || [];
-
-        let fqn = '';
-        for (const group of groups) {
-          if (group.services.some((s: any) => s.service_name === serviceName)) {
-            fqn = group.fqn;
-            break;
-          }
-        }
-
-        if (!fqn) {
-          correlationError.value = 'Service not found in service registry.';
-          correlationData.value = null;
-          return;
-        }
-
-        // Step 2: Send FQN to _correlate — it resolves field names per stream
+        // Send service name directly to _correlate (v2: no FQN lookup needed)
         const correlateResponse = await correlateStreams(org, {
           source_stream: props.streamFilter || 'default',
           source_type: 'traces',
-          available_dimensions: { 'service-fqn': fqn },
+          available_dimensions: { 'service': serviceName },
         });
 
         const data = correlateResponse.data;
