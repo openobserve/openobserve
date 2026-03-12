@@ -72,7 +72,7 @@ describe("ShowLegendsPopup Component", () => {
           },
           "q-btn": {
             template:
-              '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :icon="$attrs.icon"><slot /></button>',
+              '<button @click="$emit(\'click\', $event)" :data-test="$attrs[\'data-test\']" :icon="$attrs.icon"><slot /></button>',
             emits: ["click"],
           },
           "q-tooltip": {
@@ -112,7 +112,7 @@ describe("ShowLegendsPopup Component", () => {
 
     it("should initialize with empty copiedLegendIndices", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.copiedLegendIndices.size).toBe(0);
+      expect(wrapper.vm.isLegendCopied(0)).toBe(false);
     });
 
     it("should initialize with isAllCopied as false", () => {
@@ -247,9 +247,10 @@ describe("ShowLegendsPopup Component", () => {
       expect(wrapper.vm.isLegendCopied(0)).toBe(false);
     });
 
-    it("should return true for index in copiedLegendIndices", () => {
+    it("should return true for index in copiedLegendIndices", async () => {
       wrapper = createWrapper();
-      wrapper.vm.copiedLegendIndices.add(2);
+      await wrapper.vm.copyLegend("Some Legend", 2);
+      await flushPromises();
       expect(wrapper.vm.isLegendCopied(2)).toBe(true);
     });
   });
@@ -267,18 +268,18 @@ describe("ShowLegendsPopup Component", () => {
       wrapper = createWrapper({ panelData: simplePanelData });
       await wrapper.vm.copyLegend("Series A", 0);
       await flushPromises();
-      expect(wrapper.vm.copiedLegendIndices.has(0)).toBe(true);
+      expect(wrapper.vm.isLegendCopied(0)).toBe(true);
     });
 
     it("should remove index from copiedLegendIndices after 3 seconds", async () => {
       wrapper = createWrapper({ panelData: simplePanelData });
       await wrapper.vm.copyLegend("Series A", 0);
       await flushPromises();
-      expect(wrapper.vm.copiedLegendIndices.has(0)).toBe(true);
+      expect(wrapper.vm.isLegendCopied(0)).toBe(true);
 
       vi.advanceTimersByTime(3000);
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.copiedLegendIndices.has(0)).toBe(false);
+      expect(wrapper.vm.isLegendCopied(0)).toBe(false);
     });
   });
 

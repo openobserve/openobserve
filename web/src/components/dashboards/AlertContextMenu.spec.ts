@@ -19,6 +19,11 @@ describe("AlertContextMenu Component", () => {
     return mount(AlertContextMenu, {
       props: { ...defaultProps, ...props },
       attachTo: document.body,
+      global: {
+        stubs: {
+          teleport: { template: '<slot />' },
+        },
+      },
     });
   };
 

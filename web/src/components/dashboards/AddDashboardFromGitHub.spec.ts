@@ -597,13 +597,18 @@ describe("AddDashboardFromGitHub Component", () => {
   });
 
   describe("loadFolders Function", () => {
+    // loadFolders is triggered internally by handleNext(); pre-populate selectedDashboards
+    // with jsonFiles so the fetch loop is skipped and loadFolders is called immediately.
+    const preloadedDashboard = { name: "nginx", folderPath: "nginx", jsonFiles: ["nginx.json"] };
+
     it("should populate folderOptions from dashboards service", async () => {
       vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
         mockFolderList as any
       );
 
       wrapper = createWrapper({ modelValue: false });
-      await wrapper.vm.loadFolders();
+      wrapper.vm.selectedDashboards = [preloadedDashboard];
+      await wrapper.vm.handleNext();
       await flushPromises();
 
       expect(wrapper.vm.folderOptions.length).toBeGreaterThan(0);
@@ -620,7 +625,8 @@ describe("AddDashboardFromGitHub Component", () => {
       } as any);
 
       wrapper = createWrapper({ modelValue: false });
-      await wrapper.vm.loadFolders();
+      wrapper.vm.selectedDashboards = [preloadedDashboard];
+      await wrapper.vm.handleNext();
       await flushPromises();
 
       expect(wrapper.vm.folderOptions[0].value).toBe("default");
@@ -632,8 +638,9 @@ describe("AddDashboardFromGitHub Component", () => {
       );
 
       wrapper = createWrapper({ modelValue: false });
+      wrapper.vm.selectedDashboards = [preloadedDashboard];
       wrapper.vm.selectedFolderObj = { label: "Old Folder", value: "old" };
-      await wrapper.vm.loadFolders();
+      await wrapper.vm.handleNext();
       await flushPromises();
 
       expect(wrapper.vm.selectedFolderObj).toBeNull();
