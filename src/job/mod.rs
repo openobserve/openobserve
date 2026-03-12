@@ -563,16 +563,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         });
     }
 
-    // Initialize AI credits from DB and start quota jobs (cloud only)
+    // Initialize AI credits from DB, start quota jobs, and other cloud tasks
     #[cfg(feature = "cloud")]
     {
         crate::service::trial_quota::init_from_db().await;
         cloud::start_trial_quota_jobs();
-    }
 
-    // additional for cloud
-    #[cfg(feature = "cloud")]
-    {
         // OpenFGA migration
         o2_enterprise::enterprise::cloud::ofga_migrate()
             .await

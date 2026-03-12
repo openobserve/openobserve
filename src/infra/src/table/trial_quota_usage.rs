@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect};
+use sea_orm::{
+    ColumnTrait, EntityTrait, QueryFilter, QuerySelect,
+    sea_query::{Expr, OnConflict},
+};
 
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
@@ -22,47 +25,38 @@ use crate::{
 
 /// Batch increment quota records by delta. Each tuple is (org_id, feature, delta).
 /// Upserts: if the row exists, adds delta to usage_count; otherwise inserts with
-/// usage_count = delta. Uses INSERT ... ON CONFLICT to be atomic and safe for
-/// concurrent flushes from multiple nodes.
+/// usage_count = delta. Uses sea_orm's on_conflict for atomic upserts.
 pub async fn batch_increment(records: Vec<(String, String, i64)>) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let backend = db.get_database_backend();
     let now = config::utils::time::now_micros();
 
     for (org_id, feature, delta) in records {
-        let (sql, backend_type) = match backend {
-            sea_orm::DatabaseBackend::Postgres => (
-                r#"INSERT INTO trial_quota_usage (org_id, feature, usage_count, updated_at, notified_checkpoint)
-                   VALUES ($1, $2, $3, $4, 0)
-                   ON CONFLICT (org_id, feature)
-                   DO UPDATE SET usage_count = trial_quota_usage.usage_count + $3, updated_at = $4"#,
-                sea_orm::DatabaseBackend::Postgres,
-            ),
-            _ => (
-                r#"INSERT INTO trial_quota_usage (org_id, feature, usage_count, updated_at, notified_checkpoint)
-                   VALUES (?, ?, ?, ?, 0)
-                   ON CONFLICT (org_id, feature)
-                   DO UPDATE SET usage_count = trial_quota_usage.usage_count + ?, updated_at = ?"#,
-                sea_orm::DatabaseBackend::Sqlite,
-            ),
+        let active_model = trial_quota_usage::ActiveModel {
+            org_id: sea_orm::ActiveValue::Set(org_id),
+            feature: sea_orm::ActiveValue::Set(feature),
+            usage_count: sea_orm::ActiveValue::Set(delta),
+            updated_at: sea_orm::ActiveValue::Set(now),
+            notified_checkpoint: sea_orm::ActiveValue::Set(0),
         };
 
-        let values: Vec<sea_orm::Value> = match backend {
-            sea_orm::DatabaseBackend::Postgres => {
-                vec![org_id.into(), feature.into(), delta.into(), now.into()]
-            }
-            _ => vec![
-                org_id.into(),
-                feature.into(),
-                delta.into(),
-                now.into(),
-                delta.into(),
-                now.into(),
-            ],
-        };
-
-        let stmt = sea_orm::Statement::from_sql_and_values(backend_type, sql, values);
-        db.execute(stmt).await?;
+        trial_quota_usage::Entity::insert(active_model)
+            .on_conflict(
+                OnConflict::columns([
+                    trial_quota_usage::Column::OrgId,
+                    trial_quota_usage::Column::Feature,
+                ])
+                .value(
+                    trial_quota_usage::Column::UsageCount,
+                    Expr::col(trial_quota_usage::Column::UsageCount).add(delta),
+                )
+                .value(
+                    trial_quota_usage::Column::UpdatedAt,
+                    Expr::value(now),
+                )
+                .to_owned(),
+            )
+            .exec(db)
+            .await?;
     }
     Ok(())
 }
@@ -89,7 +83,7 @@ pub async fn get_total_usage_for_org(org_id: &str) -> Result<i64, sea_orm::DbErr
 
 /// Get quota record for a specific org and feature.
 /// Used by the usage API endpoint.
-pub async fn get_for_org(
+pub async fn get_for_org_feature(
     org_id: &str,
     feature: &str,
 ) -> Result<Option<trial_quota_usage::Model>, sea_orm::DbErr> {

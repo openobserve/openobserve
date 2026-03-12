@@ -182,6 +182,8 @@ fn ensure_org_counter(org_id: &str) {
             return;
         }
     }
+    // Use entry() instead of direct insert because another thread may have
+    // inserted between us dropping the read lock above and acquiring this write lock.
     let mut map = ORG_USAGE.write().unwrap();
     map.entry(org_id.to_string())
         .or_insert_with(|| AtomicU64::new(0));
@@ -211,19 +213,11 @@ pub struct TrialQuotaHaMsg {
 
 /// Check if the org has an active Stripe subscription (valid subscription_id + customer_id).
 pub async fn org_has_active_subscription(org_id: &str) -> bool {
-    #[cfg(feature = "cloud")]
+    if let Ok(Some(sub)) =
+        o2_enterprise::enterprise::cloud::billings::get_billing_by_org_id(org_id).await
     {
-        if let Ok(Some(sub)) =
-            o2_enterprise::enterprise::cloud::billings::get_billing_by_org_id(org_id).await
-        {
-            !sub.subscription_type.is_free_sub()
-        } else {
-            false
-        }
-    }
-    #[cfg(not(feature = "cloud"))]
-    {
-        let _ = org_id;
+        !sub.subscription_type.is_free_sub()
+    } else {
         false
     }
 }
@@ -653,18 +647,31 @@ pub struct AiUsageResponse {
 /// - `"exhausted"`: credits exhausted + no subscription
 pub async fn get_usage(org_id: &str) -> AiUsageResponse {
     let limit = get_pool_limit();
+    let in_memory_used = get_org_total_used(org_id);
 
     // Read from DB for accuracy
-    let used = match infra::table::trial_quota_usage::get_total_usage_for_org(org_id).await {
-        Ok(total) => total as u64,
+    let db_used = match infra::table::trial_quota_usage::get_total_usage_for_org(org_id).await {
+        Ok(total) => {
+            log::info!(
+                "[TRIAL_QUOTA] get_usage: org={} db_total={} in_memory_total={} pool_limit={}",
+                org_id,
+                total,
+                in_memory_used,
+                limit,
+            );
+            total as u64
+        }
         Err(e) => {
             log::warn!(
-                "[TRIAL_QUOTA] Failed to read usage from DB for org={}, falling back to cache: {e}",
-                org_id
+                "[TRIAL_QUOTA] get_usage: org={} DB read failed (falling back to cache={}): {e}",
+                org_id,
+                in_memory_used,
             );
-            get_org_total_used(org_id)
+            in_memory_used
         }
     };
+
+    let used = db_used;
     let remaining = limit.saturating_sub(used);
 
     let mode = if remaining > 0 {

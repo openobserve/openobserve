@@ -330,7 +330,7 @@ pub async fn correlate_alert_to_incident(
                     );
                 } else {
                     log::info!(
-                        "[INCIDENTS] Skipping incident for org {}: {e}",
+                        "[INCIDENTS] Skipping incident for org {} because no free quota left: {e}",
                         alert.org_id
                     );
                     return Ok(None);
