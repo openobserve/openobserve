@@ -28,7 +28,7 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
 }));
 
-const mockDiffData = {
+const mockDiffData = vi.hoisted(() => ({
   additions: [
     { id: "add-1", display: "New Group 1", fields: ["host"], normalize: false },
     { id: "add-2", display: "New Group 2", fields: ["service"], normalize: true },
@@ -40,7 +40,7 @@ const mockDiffData = {
     },
   ],
   unchanged: [{ id: "unch-1", display: "Stable Group", fields: ["level"], normalize: false }],
-};
+}));
 
 vi.mock("@/services/alerts", () => ({
   default: {

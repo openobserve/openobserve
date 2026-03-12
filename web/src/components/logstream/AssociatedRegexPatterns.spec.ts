@@ -109,6 +109,11 @@ describe('AssociatedRegexPatterns.vue', () => {
           },
           stubs: {
             FullViewContainer: true,
+            ConfirmDialog: true,
+            'q-expansion-item': {
+              template: '<div><slot /><slot name="default" /></div>',
+              methods: { toggle: vi.fn() },
+            },
           },
           config: {
             warnHandler: () => {}, // Suppress Vue warnings in tests
@@ -142,6 +147,7 @@ describe('AssociatedRegexPatterns.vue', () => {
           isPatternValid: false,
           appliedPatternsMap: new Map([['pattern-1', mockProps.data[0]]]),
           userClickedPattern: null,
+          showWarningDialogToRemovePattern: false,
           // Methods
           checkIfPatternIsApplied: vi.fn((patternId: string) => patternId === 'pattern-1'),
           handlePatternClick: vi.fn(),
@@ -157,6 +163,16 @@ describe('AssociatedRegexPatterns.vue', () => {
           testStringOutput: vi.fn(),
           resetInputValues: vi.fn(),
           checkIfPatternIsAppliedAndUpdate: vi.fn(),
+          showWarningToRemovePattern: vi.fn(() => {
+            (wrapper.vm as any).showWarningDialogToRemovePattern = true;
+          }),
+          handleCancelRemovePattern: vi.fn(async () => {
+            (wrapper.vm as any).showWarningDialogToRemovePattern = false;
+          }),
+          transformApplyAtValue: vi.fn((value: string) => {
+            if (value === 'Both') return ['AtIngestion', 'AtSearch'];
+            return [value];
+          }),
         },
         props: () => mockProps,
         exists: () => true,

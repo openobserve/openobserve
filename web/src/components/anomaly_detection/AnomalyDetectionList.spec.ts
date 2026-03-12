@@ -22,7 +22,7 @@ import store from "@/test/unit/helpers/store";
 
 installQuasar({ plugins: [Dialog, Notify] });
 
-const mockConfigs = [
+const mockConfigs = vi.hoisted(() => [
   {
     anomaly_id: "id-1",
     name: "Config A",
@@ -68,7 +68,7 @@ const mockConfigs = [
     training_completed_at: null,
     last_error: "Model training failed: insufficient data",
   },
-];
+]);
 
 vi.mock("@/services/anomaly_detection", () => ({
   default: {

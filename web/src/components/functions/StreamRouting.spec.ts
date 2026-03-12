@@ -27,6 +27,10 @@ vi.mock("@/utils/zincutils", () => ({
   getUUID: vi.fn(() => "test-uuid-123"),
 }));
 
+vi.mock("../alerts/RealTimeAlert.vue", () => ({
+  default: { template: "<div>RealTimeAlert</div>" },
+}));
+
 describe("StreamRouting", () => {
   let store: any;
   let router: any;
@@ -314,14 +318,16 @@ describe("StreamRouting", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      // Add an extra field first
-      vm.addField();
+      // Manually push a second condition with a distinct id to avoid UUID collision
+      const keepField = { id: "keep-id-456", column: "col", operator: "=", value: "v" };
+      const removeField = { id: "remove-id-789", column: "x", operator: "=", value: "y" };
+      vm.streamRoute.conditions.push(keepField);
+      vm.streamRoute.conditions.push(removeField);
       const totalBefore = vm.streamRoute.conditions.length;
-      const fieldToRemove = vm.streamRoute.conditions[0];
 
-      vm.removeField(fieldToRemove);
+      vm.removeField(removeField);
       expect(vm.streamRoute.conditions.length).toBe(totalBefore - 1);
-      expect(vm.streamRoute.conditions.find((c: any) => c.id === fieldToRemove.id)).toBeUndefined();
+      expect(vm.streamRoute.conditions.find((c: any) => c.id === removeField.id)).toBeUndefined();
     });
 
     it("should keep other conditions intact after removal", async () => {
@@ -332,18 +338,18 @@ describe("StreamRouting", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.addField();
+      // Manually add conditions with distinct IDs
+      const field1 = { id: "keep-id-1", column: "a", operator: "=", value: "1" };
+      const field2 = { id: "remove-id-2", column: "b", operator: "=", value: "2" };
+      vm.streamRoute.conditions.push(field1);
+      vm.streamRoute.conditions.push(field2);
 
-      const fieldIds = vm.streamRoute.conditions.map((c: any) => c.id);
-      const fieldToRemove = vm.streamRoute.conditions[0];
+      vm.removeField(field2);
 
-      vm.removeField(fieldToRemove);
-
-      // All other fields should still be present
+      // field1 should still be present
       const remainingIds = vm.streamRoute.conditions.map((c: any) => c.id);
-      fieldIds.slice(1).forEach((id: string) => {
-        expect(remainingIds).toContain(id);
-      });
+      expect(remainingIds).toContain(field1.id);
+      expect(remainingIds).not.toContain(field2.id);
     });
   });
 
