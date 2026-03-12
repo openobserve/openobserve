@@ -25,6 +25,9 @@ import {
   formatUnitValue,
   getUnitValue,
 } from "./convertDataIntoUnitValue";
+import { toZonedTime } from "date-fns-tz";
+import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
+import { getDataValue } from "./aliasUtils";
 
 // ---------------------------------------------------------------------------
 // Value-mapping helpers
@@ -83,6 +86,93 @@ export const lookupValueMapping = (
   }
 
   return null;
+};
+
+// ---------------------------------------------------------------------------
+// Timestamp formatting
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a potential timestamp value and return a timezone-aware formatted string.
+ * Handles 16-digit microseconds, ISO strings, and standard milliseconds.
+ */
+export const parseTimestampValue = (
+  value: any,
+  timezone: string,
+): string | null => {
+  if (value === undefined || value === null || value === "") return null;
+
+  let timestamp: number;
+
+  // Handle 16-digit microseconds (string or number)
+  if (
+    (typeof value === "number" || typeof value === "string") &&
+    /^\d{16}$/.test(value.toString())
+  ) {
+    timestamp = parseInt(value.toString()) / 1000;
+  } else if (typeof value === "string") {
+    // Already formatted "YYYY-MM-DD HH:mm:ss" — return as-is
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(value)) {
+      return value;
+    }
+
+    // ISO string with 'T' — treat as UTC if no offset
+    const iso8601WithT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value);
+    const hasOffsetOrZ =
+      /[+-]\d{2}(:?\d{2})?$/.test(value) || value.endsWith("Z");
+
+    const isoString =
+      iso8601WithT && !hasOffsetOrZ ? `${value}Z` : value;
+    timestamp = new Date(isoString).getTime();
+
+    if (isNaN(timestamp)) {
+      timestamp = new Date(value).getTime();
+    }
+  } else if (typeof value === "number") {
+    timestamp = value;
+  } else if (value instanceof Date) {
+    timestamp = value.getTime();
+  } else {
+    timestamp = new Date(value)?.getTime();
+  }
+
+  if (isNaN(timestamp)) return null;
+
+  return formatDate(toZonedTime(timestamp, timezone));
+};
+
+/**
+ * Detect which fields in `fields` are timestamp/time-series columns by
+ * checking `functionName` and sampling actual row values.
+ *
+ * Returns a Set of field aliases that should be formatted as timestamps.
+ * Used by both convertTableData and convertPivotTableData.
+ */
+export const detectTimestampFields = (
+  fields: any[],
+  tableRows: any[],
+): Set<string> => {
+  const result = new Set<string>();
+
+  for (const field of fields) {
+    if (field?.functionName === "histogram") {
+      if (!field.treatAsNonTimestamp) {
+        result.add(field.alias);
+      }
+    } else {
+      const sample = tableRows
+        ?.slice(0, Math.min(20, tableRows.length))
+        ?.map((it: any) => getDataValue(it, field.alias));
+      const isTimeSeriesData = isTimeSeries(sample);
+      const isTimeStampData = isTimeStamp(sample, field.treatAsNonTimestamp);
+
+      if (isTimeSeriesData || isTimeStampData) {
+        result.add(field.alias);
+      }
+    }
+  }
+
+  return result;
 };
 
 // ---------------------------------------------------------------------------

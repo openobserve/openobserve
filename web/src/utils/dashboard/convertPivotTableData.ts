@@ -25,6 +25,8 @@ import {
   buildValueMappingCache,
   parseOverrideConfigs,
   formatNumericValue,
+  parseTimestampValue,
+  detectTimestampFields,
 } from "./tableConfigUtils";
 
 /**
@@ -376,6 +378,9 @@ export const convertPivotTableData = (
     breakdownAliases.length > 1 || yAliases.length > 1;
 
   // Row field columns (x-axis) — marked with _isRowField for header rendering
+  const timezone = store.state.timezone;
+  const timestampFieldAliases = detectTimestampFields(xFields, tableRows);
+
   for (const xField of xFields) {
     const col: any = {
       name: xField.alias,
@@ -385,6 +390,9 @@ export const convertPivotTableData = (
       sortable: true,
       _isRowField: true,
     };
+    if (timestampFieldAliases.has(xField.alias)) {
+      col.format = (val: any) => parseTimestampValue(val, timezone) || val;
+    }
     if (colorConfigMap[xField.alias.toLowerCase()]?.autoColor) {
       col.colorMode = "auto";
     }

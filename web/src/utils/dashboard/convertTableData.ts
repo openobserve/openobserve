@@ -13,75 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { toZonedTime } from "date-fns-tz";
 import {
   formatUnitValue,
   getUnitValue,
 } from "./convertDataIntoUnitValue";
-import {
-  formatDate,
-  isTimeSeries,
-  isTimeStamp,
-} from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
 import {
   buildValueMappingCache,
   lookupValueMapping,
   parseOverrideConfigs,
+  parseTimestampValue,
+  detectTimestampFields,
 } from "./tableConfigUtils";
-
-/**
- * Parses a potential timestamp value (string, number, or Date) and returns a formatted string.
- * This handles 16-digit microseconds (string or number), ISO strings, and standard milliseconds.
- * 
- * @param value - The value to parse
- * @param timezone - The target timezone for conversion
- * @returns Formatted timestamp string or null
- */
-const parseTimestampValue = (value: any, timezone: string) => {
-  if (value === undefined || value === null || value === "") return null;
-
-  let timestamp: number;
-
-  // Handle 16-digit microseconds (string or number)
-  // This is the key fix for the "year 50002" issue where numeric micros were treated as millis
-  if (
-    (typeof value === "number" || typeof value === "string") &&
-    /^\d{16}$/.test(value.toString())
-  ) {
-    timestamp = parseInt(value.toString()) / 1000;
-  } else if (typeof value === "string") {
-    // If the string is already a formatted date (no 'T', looks like "YYYY-MM-DD HH:mm:ss")
-    // return it as-is to avoid double timezone conversion
-    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(value)) {
-      return value;
-    }
-
-    // Regular ISO string - treat as UTC timestamp
-    // Only append 'Z' if it looks like an ISO string with 'T' and lacks an offset/timezone indicator
-    const iso8601WithT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value);
-    const hasOffsetOrZ = /[+-]\d{2}(:?\d{2})?$/.test(value) || value.endsWith("Z");
-
-    const isoString = (iso8601WithT && !hasOffsetOrZ) ? `${value}Z` : value;
-    timestamp = new Date(isoString).getTime();
-
-    // Fallback if the 'Z' trick failed (already has an offset or is invalid)
-    if (isNaN(timestamp)) {
-      timestamp = new Date(value).getTime();
-    }
-  } else if (typeof value === "number") {
-    // Numeric timestamp - assume it's already in milliseconds
-    timestamp = value;
-  } else if (value instanceof Date) {
-    timestamp = value.getTime();
-  } else {
-    timestamp = new Date(value)?.getTime();
-  }
-
-  if (isNaN(timestamp)) return null;
-
-  return formatDate(toZonedTime(timestamp, timezone));
-};
 
 /**
  * Converts table data based on the panel schema and search query data.
@@ -167,41 +110,9 @@ export const convertTableData = (
     columnData = [...columnData, ...responseKeys];
   }
 
-  // identify histogram fields for auto and custom sql
-  if (panelSchema?.queries[0]?.customQuery === false) {
-    for (const field of columnData) {
-      if (field?.functionName === "histogram") {
-        histogramFields.push(field.alias);
-      } else {
-        const sample = tableRows
-          ?.slice(0, Math.min(20, tableRows.length))
-          ?.map((it: any) => getDataValue(it, field.alias));
-        const isTimeSeriesData = isTimeSeries(sample);
-        const isTimeStampData = isTimeStamp(sample, field.treatAsNonTimestamp);
-
-        if (isTimeSeriesData || isTimeStampData) {
-          histogramFields.push(field.alias);
-        }
-      }
-    }
-  } else {
-    // need sampling to identify timeseries data
-    for (const field of columnData) {
-      if (field?.functionName === "histogram") {
-        histogramFields.push(field.alias);
-      } else {
-        const sample = tableRows
-          ?.slice(0, Math.min(20, tableRows.length))
-          ?.map((it: any) => getDataValue(it, field.alias));
-        const isTimeSeriesData = isTimeSeries(sample);
-        const isTimeStampData = isTimeStamp(sample, field.treatAsNonTimestamp);
-
-        if (isTimeSeriesData || isTimeStampData) {
-          histogramFields.push(field.alias);
-        }
-      }
-    }
-  }
+  // identify histogram / timestamp fields (shared logic with pivot converter)
+  const detectedTimestampAliases = detectTimestampFields(columnData, tableRows);
+  detectedTimestampAliases.forEach((alias) => histogramFields.push(alias));
 
   const isTransposeEnabled = panelSchema.config.table_transpose;
   const transposeColumn = columnData[0]?.alias || "";
