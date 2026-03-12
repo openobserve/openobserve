@@ -941,6 +941,7 @@ import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import {
   isLLMTrace,
@@ -1293,15 +1294,9 @@ export default defineComponent({
       else expandedEvents.value[index.toString()] = true;
     };
 
-    const getSpanKind = (id: number) => {
-      const spanKindMapping: { [key: number]: string } = {
-        1: "Server",
-        2: "Client",
-        3: "Producer",
-        4: "Consumer",
-        5: "Internal",
-      };
-      return spanKindMapping[id] || id;
+    const getSpanKind = (id: number | string | null | undefined): string => {
+      if (id === null || id === undefined || id === "") return "Unspecified";
+      return SPAN_KIND_MAP[String(id)] || String(id);
     };
 
     const getFormattedSpanDetails = () => {
@@ -1322,6 +1317,17 @@ export default defineComponent({
           ),
           "MMM DD, YYYY HH:mm:ss.SSS Z",
         );
+
+      spanDetails.attrs["start_time"] = date.formatDate(
+        Math.floor(spanDetails.attrs["start_time"] / 1000000),
+        "MMM DD, YYYY HH:mm:ss.SSS Z",
+      );
+
+      spanDetails.attrs["end_time"] = date.formatDate(
+        Math.floor(spanDetails.attrs["end_time"] / 1000000),
+        "MMM DD, YYYY HH:mm:ss.SSS Z",
+      );
+
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       try {
@@ -1356,7 +1362,10 @@ export default defineComponent({
         processes.value = {};
         Object.keys(props.span).forEach((key: string) => {
           if (!span_details.has(key)) {
-            tags.value[key] = props.span[key];
+            tags.value[key] =
+              key === "span_kind"
+                ? getSpanKind(props.span[key])
+                : props.span[key];
           }
         });
 

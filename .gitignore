@@ -61,3 +61,4 @@ tests/ui-testing/playwright-poc.config.js
 tests/ui-testing/seed-mcp.spec.js
 tests/ui-testing/docs/test_generator/audit-reports/cloud-compatibility-audit-2026-03-05.md
 tests/ui-testing/scripts/check-topology.js
+v0.70.0_release_gap_report.pdf
