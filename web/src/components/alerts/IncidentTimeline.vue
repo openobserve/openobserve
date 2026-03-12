@@ -638,7 +638,9 @@ onMounted(async () => {
 
 // Expose fetchEvents method so parent component can call it
 defineExpose({
-  fetchEvents
+  fetchEvents,
+  commentText,
+  submitting,
 });
 </script>
 

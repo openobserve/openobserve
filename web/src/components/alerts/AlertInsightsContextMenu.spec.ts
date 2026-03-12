@@ -48,20 +48,26 @@ afterEach(() => {
 });
 
 describe("AlertInsightsContextMenu - rendering", () => {
+  let w: Awaited<ReturnType<typeof mountComp>>;
+
+  afterEach(() => {
+    w?.unmount();
+  });
+
   it("renders the context menu wrapper", async () => {
-    const w = await mountComp();
+    w = await mountComp();
     expect(w.find('[data-test="alert-insights-context-menu"]').exists()).toBe(true);
   });
 
   it("positions via x and y props (inline style)", async () => {
-    const w = await mountComp({ x: 150, y: 300 });
+    w = await mountComp({ x: 150, y: 300 });
     const style = w.find('[data-test="alert-insights-context-menu"]').attributes("style");
     expect(style).toContain("top: 300px");
     expect(style).toContain("left: 150px");
   });
 
   it("shows alert-specific menu items when isAlertNameContext=true", async () => {
-    const w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
+    w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
     expect(w.find('[data-test="context-menu-configure-dedup"]').exists()).toBe(true);
     expect(w.find('[data-test="context-menu-edit-alert"]').exists()).toBe(true);
     expect(w.find('[data-test="context-menu-view-history"]').exists()).toBe(true);
@@ -69,46 +75,58 @@ describe("AlertInsightsContextMenu - rendering", () => {
   });
 
   it("shows panel title in header when not alert name context", async () => {
-    const w = await mountComp({ value: 42, panelId: nonAlertPanelId });
+    w = await mountComp({ value: 42, panelId: nonAlertPanelId });
     expect(w.text()).toContain("Alert Frequency");
   });
 
   it("shows value in header when isAlertNameContext=true", async () => {
-    const w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
+    w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
     expect(w.text()).toContain("my-alert");
   });
 });
 
 describe("AlertInsightsContextMenu - isAlertNameContext computed", () => {
+  let w: Awaited<ReturnType<typeof mountComp>>;
+
+  afterEach(() => {
+    w?.unmount();
+  });
+
   it("returns true for Panel_Alert_Frequency with string value", async () => {
-    const w = await mountComp({ value: "alert-a", panelId: "Panel_Alert_Frequency" });
+    w = await mountComp({ value: "alert-a", panelId: "Panel_Alert_Frequency" });
     expect((w.vm as any).isAlertNameContext).toBe(true);
   });
 
   it("returns true for Panel_Dedup_Impact with string value", async () => {
-    const w = await mountComp({ value: "alert-b", panelId: "Panel_Dedup_Impact" });
+    w = await mountComp({ value: "alert-b", panelId: "Panel_Dedup_Impact" });
     expect((w.vm as any).isAlertNameContext).toBe(true);
   });
 
   it("returns true for Panel_Alert_Correlation with string value", async () => {
-    const w = await mountComp({ value: "alert-c", panelId: "Panel_Alert_Correlation" });
+    w = await mountComp({ value: "alert-c", panelId: "Panel_Alert_Correlation" });
     expect((w.vm as any).isAlertNameContext).toBe(true);
   });
 
   it("returns false for numeric value (even with alert panel id)", async () => {
-    const w = await mountComp({ value: 123, panelId: alertNamePanelId });
+    w = await mountComp({ value: 123, panelId: alertNamePanelId });
     expect((w.vm as any).isAlertNameContext).toBe(false);
   });
 
   it("returns false for non-alert panel id with string value", async () => {
-    const w = await mountComp({ value: "my-alert", panelId: nonAlertPanelId });
+    w = await mountComp({ value: "my-alert", panelId: nonAlertPanelId });
     expect((w.vm as any).isAlertNameContext).toBe(false);
   });
 });
 
 describe("AlertInsightsContextMenu - action clicks", () => {
+  let w: Awaited<ReturnType<typeof mountComp>>;
+
+  afterEach(() => {
+    w?.unmount();
+  });
+
   it("clicking configure-dedup emits configure-dedup and close", async () => {
-    const w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
+    w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
     await w.find('[data-test="context-menu-configure-dedup"]').trigger("click");
     expect(w.emitted("configure-dedup")).toBeTruthy();
     expect(w.emitted("configure-dedup")![0]).toEqual(["my-alert"]);
@@ -116,7 +134,7 @@ describe("AlertInsightsContextMenu - action clicks", () => {
   });
 
   it("clicking edit-alert emits edit-alert and close", async () => {
-    const w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
+    w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
     await w.find('[data-test="context-menu-edit-alert"]').trigger("click");
     expect(w.emitted("edit-alert")).toBeTruthy();
     expect(w.emitted("edit-alert")![0]).toEqual(["my-alert"]);
@@ -124,7 +142,7 @@ describe("AlertInsightsContextMenu - action clicks", () => {
   });
 
   it("clicking view-history emits view-history and close", async () => {
-    const w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
+    w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
     await w.find('[data-test="context-menu-view-history"]').trigger("click");
     expect(w.emitted("view-history")).toBeTruthy();
     expect(w.emitted("view-history")![0]).toEqual(["my-alert"]);
@@ -132,7 +150,7 @@ describe("AlertInsightsContextMenu - action clicks", () => {
   });
 
   it("clicking cancel emits close", async () => {
-    const w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
+    w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
     await w.find('[data-test="context-menu-cancel"]').trigger("click");
     expect(w.emitted("close")).toBeTruthy();
   });
