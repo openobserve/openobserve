@@ -3768,6 +3768,9 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           queryResults: {
             hits: [],
           },
+          stream: {
+            selectedStream: [],
+          },
         },
         meta: {
           logsVisualizeToggle: "logs",
@@ -3783,6 +3786,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           type: "table",
         },
       },
+      onLogsVisualizeToggleUpdate: vi.fn(),
     };
   });
 

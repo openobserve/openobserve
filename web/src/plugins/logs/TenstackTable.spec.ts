@@ -17,6 +17,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ref } from "vue";
 import TenstackTable from "./TenstackTable.vue";
 
+// Mock CSS.supports which is not available in jsdom
+Object.defineProperty(globalThis, "CSS", {
+  value: { supports: vi.fn(() => false) },
+  writable: true,
+});
+
 // ── Mock vue-i18n ──────────────────────────────────────────────────────────────
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),

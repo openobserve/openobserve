@@ -72,6 +72,8 @@ describe("SearchResult Component", () => {
           ChartRenderer: true,
           SanitizedHtmlRenderer: true,
           TenstackTable: true,
+          PatternDetailsDialog: true,
+          TracesAnalysisDashboard: true,
         },
       },
       props: {

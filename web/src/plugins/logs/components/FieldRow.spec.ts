@@ -120,7 +120,7 @@ describe("FieldRow", () => {
     });
 
     it("displays field name in the label", () => {
-      const wrapper = createWrapper();
+      const wrapper = createWrapper({ field: { ...defaultField, ftsKey: true } });
       const label = wrapper.find(
         `[data-test="logs-field-list-item-${defaultField.name}"]`
       );
@@ -129,7 +129,7 @@ describe("FieldRow", () => {
     });
 
     it("sets title on the field container", () => {
-      const wrapper = createWrapper();
+      const wrapper = createWrapper({ field: { ...defaultField, ftsKey: true } });
       const container = wrapper.find(".field-container");
       expect(container.attributes("title")).toBe(defaultField.name);
     });
@@ -384,8 +384,9 @@ describe("FieldRow", () => {
 
   describe("Emits: toggle-field", () => {
     it("emits toggle-field with field when add icon is clicked", async () => {
+      const fieldWithFts = { ...defaultField, ftsKey: true };
       const wrapper = createWrapper({
-        field: { ...defaultField, ftsKey: true },
+        field: fieldWithFts,
         selectedFields: [],
       });
       const addIcon = wrapper.find(
@@ -393,12 +394,13 @@ describe("FieldRow", () => {
       );
       await addIcon.trigger("click");
       expect(wrapper.emitted("toggle-field")).toBeTruthy();
-      expect(wrapper.emitted("toggle-field")![0]).toEqual([defaultField]);
+      expect(wrapper.emitted("toggle-field")![0]).toEqual([fieldWithFts]);
     });
 
     it("emits toggle-field with field when remove icon is clicked", async () => {
+      const fieldWithFts = { ...defaultField, ftsKey: true };
       const wrapper = createWrapper({
-        field: { ...defaultField, ftsKey: true },
+        field: fieldWithFts,
         selectedFields: [defaultField.name],
       });
       const removeIcon = wrapper.find(
@@ -406,7 +408,7 @@ describe("FieldRow", () => {
       );
       await removeIcon.trigger("click");
       expect(wrapper.emitted("toggle-field")).toBeTruthy();
-      expect(wrapper.emitted("toggle-field")![0]).toEqual([defaultField]);
+      expect(wrapper.emitted("toggle-field")![0]).toEqual([fieldWithFts]);
     });
   });
 

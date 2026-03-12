@@ -33,14 +33,14 @@ const {
   const mockTrack = vi.fn()
   const mockPage = vi.fn()
   const mockReset = vi.fn()
-  const MockRudderAnalytics = vi.fn().mockImplementation(() => ({
-    load: mockLoad,
-    ready: mockReady,
-    identify: mockIdentify,
-    track: mockTrack,
-    page: mockPage,
-    reset: mockReset,
-  }))
+  const MockRudderAnalytics = vi.fn(function(this: any) {
+    this.load = mockLoad
+    this.ready = mockReady
+    this.identify = mockIdentify
+    this.track = mockTrack
+    this.page = mockPage
+    this.reset = mockReset
+  })
   return { mockLoad, mockReady, mockIdentify, mockTrack, mockPage, mockReset, MockRudderAnalytics }
 })
 

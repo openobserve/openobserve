@@ -36,6 +36,7 @@ const globalStubs = {
   EqualIcon: { template: "<svg />" },
   NotEqualIcon: { template: "<svg />" },
   O2AIContextAddBtn: {
+    name: "O2AIContextAddBtn",
     template: '<div @click="$emit(\'send-to-ai-chat\', \'test\')" />',
     emits: ["send-to-ai-chat"],
   },

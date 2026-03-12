@@ -592,14 +592,14 @@ describe("CorrelatedLogsTable.vue", () => {
       const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
-        currentFilters: { value: { service: "*", region: "us-west" } },
+        currentFilters: { value: { service: "_o2_all_", region: "us-west" } },
       });
 
       wrapper = createWrapper();
       await nextTick();
 
       const query = wrapper.vm.highlightQuery;
-      // service = '*' should be excluded
+      // service = SELECT_ALL_VALUE should be excluded
       expect(query).not.toContain("service");
     });
 
@@ -621,7 +621,7 @@ describe("CorrelatedLogsTable.vue", () => {
       const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
-        currentFilters: { value: { service: "*" } },
+        currentFilters: { value: { service: "_o2_all_" } },
       });
 
       wrapper = createWrapper();
@@ -635,13 +635,13 @@ describe("CorrelatedLogsTable.vue", () => {
     it("should always include wildcard option", () => {
       wrapper = createWrapper();
       const options = wrapper.vm.getFilterOptions("service", "api");
-      expect(options.some((o: any) => o.value === "*")).toBe(true);
+      expect(options.some((o: any) => o.value === "_o2_all_")).toBe(true);
     });
 
     it("should label wildcard as All Values", () => {
       wrapper = createWrapper();
       const options = wrapper.vm.getFilterOptions("service", "api");
-      const wildcardOption = options.find((o: any) => o.value === "*");
+      const wildcardOption = options.find((o: any) => o.value === "_o2_all_");
       expect(wildcardOption?.label).toBe("All Values");
     });
 

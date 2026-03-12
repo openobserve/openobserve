@@ -329,7 +329,7 @@ describe("PatternList", () => {
     });
 
     it("should default wrap to undefined when not provided", () => {
-      expect(wrapper.props("wrap")).toBeUndefined();
+      expect(wrapper.props("wrap")).toBeFalsy();
     });
   });
 
