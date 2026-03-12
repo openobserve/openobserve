@@ -172,7 +172,7 @@ describe("incidents service", () => {
     it("should call correlate API with incident stable dimensions", async () => {
       const mockIncident = {
         id: "incident-123",
-        stable_dimensions: {
+        group_values: {
           service: "api-gateway",
           namespace: "production",
         },
@@ -200,7 +200,7 @@ describe("incidents service", () => {
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "api-gateway",
         source_type: "logs",
-        available_dimensions: mockIncident.stable_dimensions,
+        available_dimensions: mockIncident.group_values,
       });
 
       expect(result.serviceName).toBe("api-gateway");
@@ -212,7 +212,7 @@ describe("incidents service", () => {
     it("should fallback to default when service dimension missing", async () => {
       const mockIncident = {
         id: "incident-123",
-        stable_dimensions: {
+        group_values: {
           namespace: "production",
         },
       } as any;
@@ -233,14 +233,14 @@ describe("incidents service", () => {
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "default",
         source_type: "logs",
-        available_dimensions: mockIncident.stable_dimensions,
+        available_dimensions: mockIncident.group_values,
       });
     });
 
     it("should check multiple service dimension variations", async () => {
       const mockIncident = {
         id: "incident-123",
-        stable_dimensions: {
+        group_values: {
           serviceName: "api-gateway",
         },
       } as any;
@@ -261,7 +261,7 @@ describe("incidents service", () => {
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "api-gateway",
         source_type: "logs",
-        available_dimensions: mockIncident.stable_dimensions,
+        available_dimensions: mockIncident.group_values,
       });
     });
   });
