@@ -9,16 +9,14 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub org_id: String,
-    /// blake3 hash of stable dimensions (64 chars)
-    pub correlation_key: String,
 
     /// open, acknowledged, resolved
     pub status: String,
     /// P1, P2, P3, P4
     pub severity: String,
 
-    /// JSON: {service, namespace, cluster, environment}
-    pub stable_dimensions: Json,
+    pub group_values: Json,
+    pub key_type: String,
     /// JSON: {service, upstream_services, downstream_services, ...}
     pub topology_context: Option<Json>,
 

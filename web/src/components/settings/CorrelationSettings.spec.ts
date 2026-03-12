@@ -13,14 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { describe, expect, it, afterEach, vi } from "vitest";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import CorrelationSettings from "./CorrelationSettings.vue";
 
 installQuasar();
+
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ params: {}, query: {} }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
+
+vi.mock("@/services/service_streams", () => ({
+  default: {
+    getSemanticGroups: vi.fn().mockResolvedValue({ data: [] }),
+    updateSemanticGroups: vi.fn().mockResolvedValue({}),
+  },
+}));
 
 vi.mock("@/components/alerts/OrganizationDeduplicationSettings.vue", () => ({
   default: {
@@ -35,15 +47,25 @@ vi.mock("@/components/settings/DiscoveredServices.vue", () => ({
   default: {
     name: "DiscoveredServices",
     template: '<div data-test="discovered-services" />',
+    emits: ["navigate-to-configuration"],
   },
 }));
 
-vi.mock("@/components/settings/ServiceIdentityConfig.vue", () => ({
+vi.mock("@/components/settings/ServiceIdentitySetup.vue", () => ({
   default: {
-    name: "ServiceIdentityConfig",
-    template: '<div data-test="service-identity-config" />',
-    props: ["orgId", "config"],
-    emits: ["saved"],
+    name: "ServiceIdentitySetup",
+    template: '<div data-test="service-identity-setup" />',
+    props: ["orgIdentifier", "semanticGroups"],
+    emits: ["navigate-to-aliases", "navigate-to-services", "update-service-fields"],
+  },
+}));
+
+vi.mock("@/components/alerts/SemanticFieldGroupsConfig.vue", () => ({
+  default: {
+    name: "SemanticFieldGroupsConfig",
+    template: '<div data-test="semantic-field-groups-config" />',
+    props: ["semanticFieldGroups", "scrollToGroupId"],
+    emits: ["update:semanticFieldGroups"],
   },
 }));
 
@@ -72,9 +94,10 @@ const mockI18n = createI18n({
         correlation: {
           title: "Correlation Settings",
           subtitle: "Configure service correlation",
-          serviceIdentityTab: "Service Identity",
           discoveredServicesTab: "Discovered Services",
+          serviceDiscoveryTab: "Service Discovery",
           alertCorrelationTab: "Alert Correlation",
+          fieldAliasesTab: "Field Aliases",
         },
       },
     },
@@ -113,52 +136,48 @@ describe("CorrelationSettings", () => {
       expect(wrapper.text()).toContain("Correlation Settings");
     });
 
-    it("should display the subtitle", () => {
+    it("should default to services tab", () => {
       wrapper = mountComponent();
-      expect(wrapper.text()).toContain("Configure service correlation");
-    });
-
-    it("should default to identity tab", () => {
-      wrapper = mountComponent();
-      expect(wrapper.vm.activeTab).toBe("identity");
+      expect(wrapper.vm.activeTab).toBe("services");
     });
   });
 
   describe("tab rendering", () => {
-    it("should render Service Identity tab", () => {
-      wrapper = mountComponent();
-      const tab = wrapper.find('[data-name="identity"]');
-      expect(tab.exists()).toBe(true);
-    });
-
     it("should render Discovered Services tab", () => {
       wrapper = mountComponent();
-      const tab = wrapper.find('[data-name="services"]');
-      expect(tab.exists()).toBe(true);
+      expect(wrapper.find('[data-name="services"]').exists()).toBe(true);
+    });
+
+    it("should render Service Discovery tab", () => {
+      wrapper = mountComponent();
+      expect(wrapper.find('[data-name="discovery"]').exists()).toBe(true);
     });
 
     it("should render Alert Correlation tab", () => {
       wrapper = mountComponent();
-      const tab = wrapper.find('[data-name="alert-correlation"]');
-      expect(tab.exists()).toBe(true);
+      expect(wrapper.find('[data-name="alert-correlation"]').exists()).toBe(true);
+    });
+
+    it("should render Field Aliases tab", () => {
+      wrapper = mountComponent();
+      expect(wrapper.find('[data-name="field-aliases"]').exists()).toBe(true);
     });
   });
 
   describe("tab content switching", () => {
-    it("should show ServiceIdentityConfig when activeTab=identity", () => {
-      wrapper = mountComponent();
-      wrapper.vm.activeTab = "identity";
-      expect(wrapper.find('[data-test="service-identity-config"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="discovered-services"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="org-deduplication-settings"]').exists()).toBe(false);
-    });
-
     it("should show DiscoveredServices when activeTab=services", async () => {
       wrapper = mountComponent();
-      wrapper.vm.activeTab = "services";
-      await wrapper.vm.$nextTick();
+      await flushPromises();
       expect(wrapper.find('[data-test="discovered-services"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-identity-config"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="service-identity-setup"]').exists()).toBe(false);
+    });
+
+    it("should show ServiceIdentitySetup when activeTab=discovery", async () => {
+      wrapper = mountComponent();
+      wrapper.vm.activeTab = "discovery";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="service-identity-setup"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="discovered-services"]').exists()).toBe(false);
     });
 
     it("should show OrganizationDeduplicationSettings when activeTab=alert-correlation", async () => {
@@ -166,15 +185,21 @@ describe("CorrelationSettings", () => {
       wrapper.vm.activeTab = "alert-correlation";
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="org-deduplication-settings"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-identity-config"]').exists()).toBe(false);
+    });
+
+    it("should show SemanticFieldGroupsConfig when activeTab=field-aliases", async () => {
+      wrapper = mountComponent();
+      wrapper.vm.activeTab = "field-aliases";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="semantic-field-groups-config"]').exists()).toBe(true);
     });
   });
 
   describe("onTabChange", () => {
     it("should update activeTab when tab changes", () => {
       wrapper = mountComponent();
-      wrapper.vm.onTabChange("services");
-      expect(wrapper.vm.activeTab).toBe("services");
+      wrapper.vm.onTabChange("discovery");
+      expect(wrapper.vm.activeTab).toBe("discovery");
     });
 
     it("should switch to alert-correlation tab", () => {
@@ -183,11 +208,11 @@ describe("CorrelationSettings", () => {
       expect(wrapper.vm.activeTab).toBe("alert-correlation");
     });
 
-    it("should switch back to identity tab", () => {
+    it("should switch back to services tab", () => {
       wrapper = mountComponent();
+      wrapper.vm.onTabChange("discovery");
       wrapper.vm.onTabChange("services");
-      wrapper.vm.onTabChange("identity");
-      expect(wrapper.vm.activeTab).toBe("identity");
+      expect(wrapper.vm.activeTab).toBe("services");
     });
   });
 
@@ -199,23 +224,26 @@ describe("CorrelationSettings", () => {
   });
 
   describe("tabs computed", () => {
-    it("should have 3 tab entries", () => {
+    it("should have 4 tab entries", () => {
       wrapper = mountComponent();
-      expect(wrapper.vm.tabs).toHaveLength(3);
+      expect(wrapper.vm.tabs).toHaveLength(4);
     });
 
     it("should have correct tab values", () => {
       wrapper = mountComponent();
       const values = wrapper.vm.tabs.map((t: any) => t.value);
-      expect(values).toContain("identity");
       expect(values).toContain("services");
+      expect(values).toContain("discovery");
       expect(values).toContain("alert-correlation");
+      expect(values).toContain("field-aliases");
     });
   });
 
   describe("store integration", () => {
-    it("should pass orgId from store to ServiceIdentityConfig", () => {
+    it("should pass orgId from store to ServiceIdentitySetup", async () => {
       wrapper = mountComponent();
+      wrapper.vm.activeTab = "discovery";
+      await wrapper.vm.$nextTick();
       expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe("test-org");
     });
   });
