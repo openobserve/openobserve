@@ -1830,7 +1830,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expanded-icon="keyboard_arrow_down"
       expand-icon-class="text-grey-6"
     >
-      <div class="config-section-body hide-child-title">
+      <div class="config-section-body">
         <OverrideConfig
           :dashboardPanelData="dashboardPanelData"
           :panelData="panelData"
