@@ -134,8 +134,7 @@ export default defineComponent({
         .catch(() => {
           // AI usage not available
         });
-  },
-  methods: {
+    },
     async fetchPricingData() {
       try {
         const response = await fetch(siteURL.pricingJsonUrl);
