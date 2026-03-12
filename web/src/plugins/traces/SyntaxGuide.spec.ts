@@ -277,4 +277,153 @@ describe("SyntaxGuide", () => {
       expect(button.classes()).toContain("normal-mode");
     });
   });
+
+  // ─── New tests covering functionality added after Dec 29 2025 ───────────────
+
+  describe("Menu theme class", () => {
+    afterEach(() => {
+      store.state.theme = "dark"; // restore shared store default
+      const menus = document.querySelectorAll(".q-menu");
+      menus.forEach((m) => m.remove());
+    });
+
+    it("should apply theme-light class to menu when store theme is light", async () => {
+      store.state.theme = "light";
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const menu = document.querySelector('[data-test="syntax-guide-menu"]');
+      expect(menu?.classList.contains("theme-light")).toBe(true);
+    });
+
+    it("should apply theme-dark class to menu when store theme is dark", async () => {
+      const { createStore } = await import("vuex");
+      const darkStore = createStore({ state: { theme: "dark" } });
+
+      const darkWrapper = mount(SyntaxGuide, {
+        attachTo: "#app",
+        props: { sqlmode: false },
+        global: {
+          provide: { store: darkStore },
+          plugins: [i18n],
+        },
+      });
+
+      await flushPromises();
+      const button = darkWrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const menu = document.querySelector('[data-test="syntax-guide-menu"]');
+      expect(menu?.classList.contains("theme-dark")).toBe(true);
+
+      darkWrapper.unmount();
+    });
+  });
+
+  describe("str_match_ignore_case only in normal mode", () => {
+    it("should contain str_match_ignore_case example only in normal mode", async () => {
+      await wrapper.setProps({ sqlmode: false });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const text = document.body.textContent || "";
+      expect(text).toContain("str_match_ignore_case");
+    });
+
+    it("should NOT contain str_match_ignore_case in SQL mode", async () => {
+      await wrapper.setProps({ sqlmode: true });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const text = document.body.textContent || "";
+      expect(text).not.toContain("str_match_ignore_case");
+    });
+  });
+
+  describe("extract_ip query function example only in SQL mode", () => {
+    afterEach(() => {
+      const menus = document.querySelectorAll(".q-menu");
+      menus.forEach((m) => m.remove());
+    });
+
+    it("should contain extract_ip example in SQL mode", async () => {
+      await wrapper.setProps({ sqlmode: true });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const text = document.body.textContent || "";
+      expect(text).toContain("extract_ip");
+    });
+
+    it("should NOT contain extract_ip example in normal mode", async () => {
+      await wrapper.setProps({ sqlmode: false });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const text = document.body.textContent || "";
+      expect(text).not.toContain("extract_ip");
+    });
+  });
+
+  describe("sqlmode prop toggle between modes", () => {
+    afterEach(() => {
+      const menus = document.querySelectorAll(".q-menu");
+      menus.forEach((m) => m.remove());
+    });
+
+    it("should switch button class from normal-mode to sql-mode dynamically", async () => {
+      await wrapper.setProps({ sqlmode: false });
+      let button = wrapper.find('[data-cy="syntax-guide-button"]');
+      expect(button.classes()).toContain("normal-mode");
+
+      await wrapper.setProps({ sqlmode: true });
+      button = wrapper.find('[data-cy="syntax-guide-button"]');
+      expect(button.classes()).toContain("sql-mode");
+    });
+
+    it("should switch button class from sql-mode back to normal-mode dynamically", async () => {
+      await wrapper.setProps({ sqlmode: true });
+      await wrapper.setProps({ sqlmode: false });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      expect(button.classes()).toContain("normal-mode");
+      expect(button.classes()).not.toContain("sql-mode");
+    });
+  });
+
+  describe("Documentation link present in both modes", () => {
+    afterEach(() => {
+      const menus = document.querySelectorAll(".q-menu");
+      menus.forEach((m) => m.remove());
+    });
+
+    it("normal mode: docs link opens in new tab", async () => {
+      await wrapper.setProps({ sqlmode: false });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const link = document.querySelector(
+        'a[href="https://openobserve.ai/docs/example-queries/"]',
+      );
+      expect(link?.getAttribute("target")).toBe("_blank");
+    });
+
+    it("sql mode: docs link opens in new tab", async () => {
+      await wrapper.setProps({ sqlmode: true });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const link = document.querySelector(
+        'a[href="https://openobserve.ai/docs/example-queries/"]',
+      );
+      expect(link?.getAttribute("target")).toBe("_blank");
+    });
+  });
 });
