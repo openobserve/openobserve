@@ -24,14 +24,11 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use config::meta::model_pricing::ModelPricingDefinition;
+use config::meta::model_pricing::{META_ORG, ModelPricingDefinition};
 use dashmap::DashMap;
 use infra::table;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
-
-/// The meta org whose model pricing definitions are inherited by all other orgs.
-const META_ORG: &str = "_meta";
 
 const WATCHER_PREFIX: &str = "/model_pricing/";
 
@@ -122,6 +119,13 @@ pub fn get_org_pricing_entries(org_id: &str) -> Arc<Vec<CachedModelPricing>> {
             let mut merged = Vec::with_capacity(org.len() + meta.len());
             merged.extend_from_slice(&org);
             merged.extend_from_slice(&meta);
+            // Re-sort so entries from both sets respect sort_order globally.
+            merged.sort_by(|a, b| {
+                a.definition
+                    .sort_order
+                    .cmp(&b.definition.sort_order)
+                    .then_with(|| a.definition.name.cmp(&b.definition.name))
+            });
             Arc::new(merged)
         }
         (None, None) => Arc::default(),
@@ -319,10 +323,10 @@ pub async fn set(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
 }
 
 /// Delete a model pricing definition by ID.
-/// `org_id` is required for the coordinator event key (cache invalidation), not for the DB query.
-/// The caller (HTTP handler) must verify ownership before calling this.
+/// `org_id` is used both for the DB query (defence-in-depth org scoping) and the coordinator
+/// event key (cache invalidation).
 pub async fn delete_by_id(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
-    table::model_pricing::delete_by_id(id).await?;
+    table::model_pricing::delete_by_id(org_id, id).await?;
     let event_key = format!("{WATCHER_PREFIX}{org_id}/{id}");
     if let Err(e) = infra::coordinator::model_pricing::emit_delete_event(&event_key).await {
         log::error!("[model_pricing] failed to emit delete event: {e}");

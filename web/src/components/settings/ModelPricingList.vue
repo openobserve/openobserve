@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             v-model="editingModel.match_pattern"
             label="Match Pattern (Regex) *"
+            hint="Uses Rust regex syntax. Pattern is validated server-side on save."
             dense
             outlined
             :rules="[
@@ -589,16 +590,20 @@ watch(
       patternPreview.value = false;
       return;
     }
+    // Rust regex syntax differs from JS (e.g. (?i), (?P<name>...), \p{...}).
+    // We only do a basic sanity check here; the server validates the full pattern.
     try {
-      // Strip inline flags like (?i), (?m), (?s), (?ims) etc.
-      // These are valid in Rust regex but not in JS RegExp.
-      const jsPattern = pattern.replace(/\(\?[imsx]+\)/g, "");
+      // Strip Rust-only inline flags before testing with JS RegExp.
+      const jsPattern = pattern
+        .replace(/\(\?[imsx]+\)/g, "")
+        .replace(/\(\?P<\w+>/g, "(");
       new RegExp(jsPattern);
       patternError.value = "";
       patternPreview.value = true;
-    } catch (e: any) {
-      patternError.value = e.message;
-      patternPreview.value = false;
+    } catch {
+      // Don't show a hard error — the pattern may still be valid Rust regex.
+      patternError.value = "";
+      patternPreview.value = true;
     }
   }
 );

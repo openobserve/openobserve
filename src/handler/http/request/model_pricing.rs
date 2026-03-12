@@ -18,7 +18,7 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
-use config::meta::model_pricing::ModelPricingDefinition;
+use config::meta::model_pricing::{META_ORG, ModelPricingDefinition};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use {
@@ -27,9 +27,6 @@ use {
 };
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::model_pricing};
-
-/// The meta org whose model pricing definitions are inherited by all other orgs.
-const META_ORG: &str = "_meta";
 
 /// A model pricing definition enriched with an `inherited` flag for the API response.
 /// When `inherited` is true, this definition comes from the `_meta` org and applies
@@ -62,7 +59,23 @@ struct ModelPricingResponse {
         (status = 500, description = "Internal server error"),
     ),
 )]
-pub async fn list(Path(org_id): Path<String>) -> Response {
+pub async fn list(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &org_id,
+        &org_id,
+        &user_email.user_id,
+        "settings",
+        "LIST",
+        None,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     // Fetch org-specific entries
     let org_items = match model_pricing::list(&org_id).await {
         Ok(items) => items,
@@ -169,8 +182,22 @@ pub async fn get(
 )]
 pub async fn create(
     Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(mut item): Json<ModelPricingDefinition>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &org_id,
+        &org_id,
+        &user_email.user_id,
+        "settings",
+        "PUT",
+        None,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     item.org_id = org_id;
     item.id = None; // Force new ID generation
 
@@ -416,6 +443,12 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     }
     for tier in &item.tiers {
         for (key, &price) in &tier.prices {
+            if price.is_nan() || price.is_infinite() {
+                return Err(format!(
+                    "Price for '{}' in tier '{}' must be a finite number, got {}",
+                    key, tier.name, price
+                ));
+            }
             if price < 0.0 {
                 return Err(format!(
                     "Price for '{}' in tier '{}' must be >= 0, got {}",

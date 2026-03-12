@@ -27,6 +27,9 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// The meta org whose model pricing definitions are inherited by all other orgs.
+pub const META_ORG: &str = "_meta";
+
 /// A user-defined model pricing definition that maps model names (via regex) to pricing tiers.
 /// These definitions take priority over the built-in pricing in `pricing.rs`.
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]

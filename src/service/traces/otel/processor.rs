@@ -158,7 +158,7 @@ impl OtelIngestionProcessor {
         // need to guarantee have the field USAGE_DETAILS and COST_DETAILS
         if input.is_some() || output.is_some() {
             // Convert span start time from nanoseconds to microseconds for valid_from comparison.
-            let span_ts_micros = (span_start_nanos / 1_000) as i64;
+            let span_ts_micros = i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX);
             let matched_pricing = model_name.as_ref().and_then(|mn| {
                 crate::service::db::model_pricing::find_pricing_sync_at(
                     org_pricing_entries,
@@ -245,12 +245,17 @@ impl OtelIngestionProcessor {
                 }
             }
 
-            // Ensure cost has a total if it has any data
+            // Ensure cost has a total if it has any data — sum all component costs
+            // (not just input+output) so cache token costs are included.
             if !cost.contains_key("total") {
-                let input = cost.get("input").cloned().unwrap_or_default();
-                let output = cost.get("output").cloned().unwrap_or_default();
-                let total = input + output;
-                cost.insert("total".to_string(), total);
+                let total: f64 = cost
+                    .iter()
+                    .filter(|(k, _)| k.as_str() != "total")
+                    .map(|(_, &v)| v)
+                    .sum();
+                if total > 0.0 {
+                    cost.insert("total".to_string(), total);
+                }
             }
         }
 

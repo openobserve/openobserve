@@ -150,10 +150,14 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
     Ok(())
 }
 
-pub async fn delete_by_id(id: &str) -> Result<(), Error> {
+pub async fn delete_by_id(org_id: &str, id: &str) -> Result<(), Error> {
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    if let Some(model) = Entity::find_by_id(id).one(client).await? {
+    if let Some(model) = Entity::find_by_id(id)
+        .filter(Column::Org.eq(org_id))
+        .one(client)
+        .await?
+    {
         model.delete(client).await?;
     }
     Ok(())
