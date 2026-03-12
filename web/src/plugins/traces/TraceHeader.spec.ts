@@ -616,4 +616,108 @@ describe("TraceHeader", () => {
       expect(resizeBtn.exists()).toBe(true);
     });
   });
+
+  // ─── New tests covering functionality added after Dec 29 2025 ───────────────
+
+  describe("isSidebarOpen prop", () => {
+    it("should default isSidebarOpen to false", () => {
+      expect(wrapper.props("isSidebarOpen")).toBe(false);
+    });
+
+    it("should hide tics section when isSidebarOpen is true", async () => {
+      await wrapper.setProps({ isSidebarOpen: true });
+      await flushPromises();
+
+      const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
+      expect(ticsSection.exists()).toBe(false);
+    });
+
+    it("should show tics section when isSidebarOpen is false", async () => {
+      await wrapper.setProps({ isSidebarOpen: false });
+      await flushPromises();
+
+      const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
+      expect(ticsSection.exists()).toBe(true);
+    });
+
+    it("should apply inline width style on container when isSidebarOpen is true", async () => {
+      await wrapper.setProps({ isSidebarOpen: true, splitterWidth: 350 });
+      await flushPromises();
+
+      const container = wrapper.find('[data-test="trace-header"]');
+      expect(container.attributes("style")).toContain("width: 350px");
+    });
+
+    it("should NOT apply inline width style on container when isSidebarOpen is false", async () => {
+      await wrapper.setProps({ isSidebarOpen: false, splitterWidth: 350 });
+      await flushPromises();
+
+      const container = wrapper.find('[data-test="trace-header"]');
+      // When isSidebarOpen is false the binding resolves to undefined/false → no inline width
+      expect(container.attributes("style") ?? "").not.toContain("width: 350px");
+    });
+
+    it("should update container width when splitterWidth changes while sidebar is open", async () => {
+      await wrapper.setProps({ isSidebarOpen: true, splitterWidth: 300 });
+      await flushPromises();
+
+      let container = wrapper.find('[data-test="trace-header"]');
+      expect(container.attributes("style")).toContain("width: 300px");
+
+      await wrapper.setProps({ splitterWidth: 450 });
+      await flushPromises();
+
+      container = wrapper.find('[data-test="trace-header"]');
+      expect(container.attributes("style")).toContain("width: 450px");
+    });
+
+    it("should still render resize button when isSidebarOpen is true", async () => {
+      await wrapper.setProps({ isSidebarOpen: true });
+      await flushPromises();
+
+      const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
+      expect(resizeBtn.exists()).toBe(true);
+    });
+
+    it("should still render operation name section when isSidebarOpen is true", async () => {
+      await wrapper.setProps({ isSidebarOpen: true });
+      await flushPromises();
+
+      const opName = wrapper.find('[data-test="trace-header-operation-name"]');
+      expect(opName.exists()).toBe(true);
+      expect(opName.text()).toContain("Operation Name");
+    });
+  });
+
+  describe("Tics section visibility based on baseTracePosition", () => {
+    it("should not render tics section when baseTracePosition is null", async () => {
+      await wrapper.setProps({ baseTracePosition: null, isSidebarOpen: false });
+      await flushPromises();
+
+      const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
+      expect(ticsSection.exists()).toBe(false);
+    });
+
+    it("should not render tics section when baseTracePosition has empty tics array", async () => {
+      await wrapper.setProps({
+        baseTracePosition: { durationMs: 100, startTimeMs: 0, tics: [] },
+        isSidebarOpen: false,
+      });
+      await flushPromises();
+
+      const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
+      expect(ticsSection.exists()).toBe(false);
+    });
+
+    it("should render tics section when baseTracePosition has tics and sidebar is closed", async () => {
+      await wrapper.setProps({
+        baseTracePosition: mockBaseTracePosition,
+        isSidebarOpen: false,
+      });
+      await flushPromises();
+
+      const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
+      expect(ticsSection.exists()).toBe(true);
+    });
+  });
 });
