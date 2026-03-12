@@ -150,27 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </q-input>
-
-      <q-select
-        v-model="mapsMapType"
-        :options="['world']"
-        :label="t('dashboard.mapsMapType')"
-        borderless
-        dense
-        class="q-py-sm showLabelOnTop"
-        stack-label
-        data-test="dashboard-config-maps-type"
-      >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw:mb-[-5px]">
-            {{ t("dashboard.mapsMapType") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Map type to display. Default: "world"
-            </q-tooltip>
-          </div>
-        </template>
-      </q-select>
     </div>
 
     <!-- Table Configuration -->
