@@ -1021,21 +1021,106 @@ describe("ViewPanel", () => {
     it("should handle dark theme", async () => {
       mockStore.state.theme = "dark";
       wrapper = createWrapper();
-      
+
       expect(wrapper.vm.store.state.theme).toBe("dark");
     });
 
     it("should handle light theme", async () => {
       mockStore.state.theme = "light";
       wrapper = createWrapper();
-      
+
       expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
     it("should use minimum refresh interval from config", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.vm.store.state.zoConfig.min_auto_refresh_interval).toBe(5);
+    });
+  });
+
+  describe("showLegendsDialog", () => {
+    it("should initialize showLegendsDialog as false", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.showLegendsDialog).toBe(false);
+    });
+
+    it("should set showLegendsDialog to true when triggered", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.showLegendsDialog = true;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.showLegendsDialog).toBe(true);
+    });
+
+    it("should reset showLegendsDialog to false", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.showLegendsDialog = true;
+      await wrapper.vm.$nextTick();
+      wrapper.vm.showLegendsDialog = false;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.showLegendsDialog).toBe(false);
+    });
+  });
+
+  describe("handleIsPartialDataUpdate", () => {
+    it("should update isPartialData to true", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.handleIsPartialDataUpdate(true);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.isPartialData).toBe(true);
+    });
+
+    it("should update isPartialData to false", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.handleIsPartialDataUpdate(true);
+      await wrapper.vm.$nextTick();
+      wrapper.vm.handleIsPartialDataUpdate(false);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.isPartialData).toBe(false);
+    });
+  });
+
+  describe("handleLoadingStateChange", () => {
+    it("should update isPanelLoading to true", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.handleLoadingStateChange(true);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.isPanelLoading).toBe(true);
+    });
+
+    it("should update isPanelLoading to false", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.handleLoadingStateChange(true);
+      await wrapper.vm.$nextTick();
+      wrapper.vm.handleLoadingStateChange(false);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.isPanelLoading).toBe(false);
+    });
+  });
+
+  describe("handleIsCachedDataDifferWithCurrentTimeRangeUpdate", () => {
+    it("should update isCachedDataDifferWithCurrentTimeRange to true", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.handleIsCachedDataDifferWithCurrentTimeRangeUpdate(true);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.isCachedDataDifferWithCurrentTimeRange).toBe(true);
+    });
+
+    it("should update isCachedDataDifferWithCurrentTimeRange to false", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.handleIsCachedDataDifferWithCurrentTimeRangeUpdate(true);
+      await wrapper.vm.$nextTick();
+      wrapper.vm.handleIsCachedDataDifferWithCurrentTimeRangeUpdate(false);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.isCachedDataDifferWithCurrentTimeRange).toBe(false);
+    });
+  });
+
+  describe("currentPanelData", () => {
+    it("should return object with config property", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.currentPanelData).toBeDefined();
+      expect(typeof wrapper.vm.currentPanelData).toBe("object");
     });
   });
 });

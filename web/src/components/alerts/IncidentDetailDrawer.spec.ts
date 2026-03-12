@@ -28,6 +28,8 @@ vi.mock("@/services/incidents", () => ({
     updateStatus: vi.fn(),
     triggerRca: vi.fn(),
     getCorrelatedStreams: vi.fn(),
+    getEvents: vi.fn(),
+    updateIncident: vi.fn(),
   },
 }));
 
@@ -156,6 +158,14 @@ describe("IncidentDetailDrawer.vue", () => {
 
     (incidentsService.triggerRca as any).mockResolvedValue({
       data: { rca_content: "## Root Cause Analysis\n\nThe issue is related to high CPU usage." },
+    });
+
+    (incidentsService.getEvents as any).mockResolvedValue({
+      data: { events: [] },
+    });
+
+    (incidentsService.updateIncident as any).mockResolvedValue({
+      data: { severity: "P2" },
     });
   });
 
@@ -1202,5 +1212,130 @@ describe("IncidentDetailDrawer.vue", () => {
   // Note: Loading State Centering tests removed
   // Testing loading state UI presentation is better handled through visual regression tests
   // Component logic tests should focus on loading state management, not CSS/layout
-});
+
+  describe("analysisInFlight - checkAnalysisInFlight", () => {
+    beforeEach(async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+    });
+
+    it("should initialize analysisInFlight as false", () => {
+      expect(wrapper.vm.analysisInFlight).toBe(false);
+    });
+
+    it("sets analysisInFlight true when lastBegin > lastComplete", async () => {
+      (incidentsService.getEvents as any).mockResolvedValue({
+        data: {
+          events: [
+            { type: "ai_analysis_begin", timestamp: 200 },
+            { type: "ai_analysis_complete", timestamp: 100 },
+          ],
+        },
+      });
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+      expect(wrapper.vm.analysisInFlight).toBe(true);
+    });
+
+    it("sets analysisInFlight false when lastComplete >= lastBegin", async () => {
+      (incidentsService.getEvents as any).mockResolvedValue({
+        data: {
+          events: [
+            { type: "ai_analysis_begin", timestamp: 100 },
+            { type: "ai_analysis_complete", timestamp: 200 },
+          ],
+        },
+      });
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+      expect(wrapper.vm.analysisInFlight).toBe(false);
+    });
+
+    it("sets analysisInFlight false when events are empty", async () => {
+      (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+      expect(wrapper.vm.analysisInFlight).toBe(false);
+    });
+
+    it("handles API error gracefully and sets analysisInFlight to false", async () => {
+      (incidentsService.getEvents as any).mockRejectedValue(new Error("fetch failed"));
+      wrapper.vm.analysisInFlight = true; // set to true first
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+      expect(wrapper.vm.analysisInFlight).toBe(false);
+    });
+
+    it("calls getEvents with correct org and incidentId", async () => {
+      await wrapper.vm.checkAnalysisInFlight("incident-xyz");
+      await flushPromises();
+      expect(incidentsService.getEvents).toHaveBeenCalledWith("default", "incident-xyz");
+    });
+  });
+
+  describe("updateSeverity - reanalysis prompt", () => {
+    beforeEach(async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+    });
+
+    it("calls updateIncident with correct org, id and severity", async () => {
+      await wrapper.vm.updateSeverity("P3");
+      await flushPromises();
+      expect(incidentsService.updateIncident).toHaveBeenCalledWith("default", "1", { severity: "P3" });
+    });
+
+    it("updates local severity after successful save", async () => {
+      (incidentsService.updateIncident as any).mockResolvedValue({ data: { severity: "P3" } });
+      await wrapper.vm.updateSeverity("P3");
+      await flushPromises();
+      expect(wrapper.vm.incidentDetails.severity).toBe("P3");
+      expect(wrapper.vm.editableSeverity).toBe("P3");
+    });
+
+    it("shows info notification when analysis_in_flight=true in response", async () => {
+      const mockNotify = vi.fn();
+      wrapper.vm.$q.notify = mockNotify;
+      (incidentsService.updateIncident as any).mockResolvedValue({
+        data: { severity: "P2", analysis_in_flight: true },
+      });
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+      const infoCall = mockNotify.mock.calls.find((c: any[]) => c[0].type === "info");
+      expect(infoCall).toBeTruthy();
+      expect(infoCall[0].message).toContain("already running");
+    });
+
+    it("sets analysisInFlight=true when response has analysis_in_flight=true", async () => {
+      (incidentsService.updateIncident as any).mockResolvedValue({
+        data: { severity: "P2", analysis_in_flight: true },
+      });
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+      expect(wrapper.vm.analysisInFlight).toBe(true);
+    });
+
+    it("does not call updateIncident when no incidentDetails", async () => {
+      wrapper.vm.incidentDetails = null;
+      await wrapper.vm.updateSeverity("P3");
+      expect(incidentsService.updateIncident).not.toHaveBeenCalled();
+    });
+
+    it("sets updating=false after completion", async () => {
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+      expect(wrapper.vm.updating).toBe(false);
+    });
+
+    it("handles API error and sets updating=false", async () => {
+      const mockNotify = vi.fn();
+      wrapper.vm.$q.notify = mockNotify;
+      (incidentsService.updateIncident as any).mockRejectedValue(new Error("API error"));
+      await wrapper.vm.updateSeverity("P3");
+      await flushPromises();
+      expect(wrapper.vm.updating).toBe(false);
+    });
+  });
 

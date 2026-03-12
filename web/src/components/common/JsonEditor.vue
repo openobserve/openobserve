@@ -294,6 +294,8 @@ export default defineComponent({
       toggleAIChat,
       isHovered,
       getBtnLogo,
+      protectedFields,
+      storedFields,
     };
   },
 });

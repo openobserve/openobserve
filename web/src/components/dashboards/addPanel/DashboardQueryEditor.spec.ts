@@ -61,11 +61,21 @@ vi.mock("@/composables/useFunctions", () => ({
 
 // Mock CodeQueryEditor to prevent document access errors
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
-  default: { 
-    name: "CodeQueryEditor", 
+  default: {
+    name: "CodeQueryEditor",
     template: '<div data-test="code-query-editor">CodeQueryEditor Mock</div>',
     props: ['query', 'editorId', 'keywords', 'suggestions', 'autoComplete', 'readOnly', 'language'],
     emits: ['update:query', 'updateQuery', 'runQuery', 'focus', 'blur']
+  }
+}));
+
+// Mock UnifiedQueryEditor (QueryEditor.vue) used since Mar 2025
+vi.mock("@/components/QueryEditor.vue", () => ({
+  default: {
+    name: "UnifiedQueryEditor",
+    template: '<div data-test="unified-query-editor">UnifiedQueryEditor Mock</div>',
+    props: ['query', 'language', 'editorId', 'keywords', 'suggestions', 'autoComplete', 'readOnly'],
+    emits: ['update:query', 'language-change', 'ask-ai', 'run-query', 'generation-start', 'generation-end', 'generation-success']
   }
 }));
 
@@ -99,7 +109,8 @@ const createMockDashboardPanelData = () => {
     layout: {
       currentQueryIndex: 0,
       vrlFunctionToggle: false,
-      showQueryBar: true
+      showQueryBar: true,
+      hiddenQueries: []
     },
     meta: {
       errors: {
@@ -182,7 +193,8 @@ const mockDashboardPanelData = {
   layout: {
     currentQueryIndex: 0,
     vrlFunctionToggle: false,
-    showQueryBar: true
+    showQueryBar: true,
+    hiddenQueries: []
   },
   meta: {
     errors: {
@@ -627,11 +639,11 @@ describe("DashboardQueryEditor", () => {
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       wrapper = createWrapper({ dashboardPanelData: malformedData });
 
       expect(wrapper.exists()).toBe(true);
-      
+
       consoleWarnSpy.mockRestore();
       consoleLogSpy.mockRestore();
       consoleErrorSpy.mockRestore();
@@ -640,14 +652,293 @@ describe("DashboardQueryEditor", () => {
     it("should handle component unmounting gracefully", () => {
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(() => wrapper.unmount()).not.toThrow();
-      
+
       consoleLogSpy.mockRestore();
       consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe("toggleQueryVisibility", () => {
+    it("should add index to hiddenQueries when query is visible", () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.layout.hiddenQueries = [];
+
+      wrapper.vm.toggleQueryVisibility(0);
+
+      expect(wrapper.vm.dashboardPanelData.layout.hiddenQueries).toContain(0);
+    });
+
+    it("should remove index from hiddenQueries when query is already hidden", () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.layout.hiddenQueries = [0];
+
+      wrapper.vm.toggleQueryVisibility(0);
+
+      expect(wrapper.vm.dashboardPanelData.layout.hiddenQueries).not.toContain(0);
+    });
+
+    it("should only remove the toggled index and leave others intact", () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.layout.hiddenQueries = [0, 1, 2];
+
+      wrapper.vm.toggleQueryVisibility(1);
+
+      expect(wrapper.vm.dashboardPanelData.layout.hiddenQueries).toContain(0);
+      expect(wrapper.vm.dashboardPanelData.layout.hiddenQueries).not.toContain(1);
+      expect(wrapper.vm.dashboardPanelData.layout.hiddenQueries).toContain(2);
+    });
+
+    it("should handle toggling multiple different indices", () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.layout.hiddenQueries = [];
+
+      wrapper.vm.toggleQueryVisibility(0);
+      wrapper.vm.toggleQueryVisibility(2);
+
+      expect(wrapper.vm.dashboardPanelData.layout.hiddenQueries).toContain(0);
+      expect(wrapper.vm.dashboardPanelData.layout.hiddenQueries).toContain(2);
+    });
+
+    it("should be idempotent: toggle on then off returns to empty", () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.layout.hiddenQueries = [];
+
+      wrapper.vm.toggleQueryVisibility(0);
+      expect(wrapper.vm.dashboardPanelData.layout.hiddenQueries).toContain(0);
+
+      wrapper.vm.toggleQueryVisibility(0);
+      expect(wrapper.vm.dashboardPanelData.layout.hiddenQueries).not.toContain(0);
+      expect(wrapper.vm.dashboardPanelData.layout.hiddenQueries).toHaveLength(0);
+    });
+  });
+
+  describe("handleQueryUpdate", () => {
+    it("should update the query at currentQueryIndex", () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 0;
+
+      wrapper.vm.handleQueryUpdate("SELECT count(*) FROM logs");
+
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toBe("SELECT count(*) FROM logs");
+    });
+
+    it("should update query at the correct index when not 0", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.addTab();
+      await wrapper.vm.$nextTick();
+      wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 1;
+
+      wrapper.vm.handleQueryUpdate("SELECT * FROM events");
+
+      expect(wrapper.vm.dashboardPanelData.data.queries[1].query).toBe("SELECT * FROM events");
+      // Original query should be unchanged
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toBe("SELECT * FROM test_stream");
+    });
+
+    it("should handle empty string query update", () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.handleQueryUpdate("");
+
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toBe("");
+    });
+  });
+
+  describe("handleLanguageChange", () => {
+    it("should update queryType to sql", () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      wrapper.vm.handleLanguageChange("sql");
+
+      expect(wrapper.vm.dashboardPanelData.data.queryType).toBe("sql");
+      consoleLogSpy.mockRestore();
+    });
+
+    it("should update queryType to promql", () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      wrapper.vm.handleLanguageChange("promql");
+
+      expect(wrapper.vm.dashboardPanelData.data.queryType).toBe("promql");
+      consoleLogSpy.mockRestore();
+    });
+
+    it("should log the language change", () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      wrapper.vm.handleLanguageChange("sql");
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Language changed to:"),
+        "sql"
+      );
+      consoleLogSpy.mockRestore();
+    });
+  });
+
+  describe("handleAskAI", () => {
+    it("should be callable without throwing", async () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      await expect(wrapper.vm.handleAskAI("show me errors from last hour", "sql")).resolves.not.toThrow();
+      consoleLogSpy.mockRestore();
+    });
+
+    it("should log the AI request", async () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      await wrapper.vm.handleAskAI("show errors", "promql");
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Ask AI for language:"),
+        "promql",
+        expect.any(String),
+        "show errors"
+      );
+      consoleLogSpy.mockRestore();
+    });
+  });
+
+  describe("handleRunQuery", () => {
+    it("should log a warning when no injected runQuery is available", () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      wrapper.vm.handleRunQuery();
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("No injected runQuery found")
+      );
+      consoleWarnSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    });
+
+    it("should be callable without throwing", () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      expect(() => wrapper.vm.handleRunQuery()).not.toThrow();
+      consoleWarnSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    });
+  });
+
+  describe("handleVrlFunctionUpdate", () => {
+    it("should update vrlFunctionQuery at currentQueryIndex", () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 0;
+
+      wrapper.vm.handleVrlFunctionUpdate(".foo = .bar");
+
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].vrlFunctionQuery).toBe(".foo = .bar");
+    });
+
+    it("should handle empty vrl function string", () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.data.queries[0].vrlFunctionQuery = ".existing = .fn";
+
+      wrapper.vm.handleVrlFunctionUpdate("");
+
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].vrlFunctionQuery).toBe("");
+    });
+
+    it("should update vrlFunctionQuery at the correct index", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.addTab();
+      await wrapper.vm.$nextTick();
+      wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 1;
+
+      wrapper.vm.handleVrlFunctionUpdate(".level = \"error\"");
+
+      expect(wrapper.vm.dashboardPanelData.data.queries[1].vrlFunctionQuery).toBe(".level = \"error\"");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].vrlFunctionQuery).toBe("");
+    });
+  });
+
+  describe("VRL AI Generation Handlers", () => {
+    it("handleVrlGenerationStart should be callable without throwing", () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      expect(() => wrapper.vm.handleVrlGenerationStart()).not.toThrow();
+      consoleLogSpy.mockRestore();
+    });
+
+    it("handleVrlGenerationEnd should be callable without throwing", () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      expect(() => wrapper.vm.handleVrlGenerationEnd()).not.toThrow();
+      consoleLogSpy.mockRestore();
+    });
+
+    it("handleVrlGenerationSuccess should be callable without throwing", () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      expect(() => wrapper.vm.handleVrlGenerationSuccess({ type: "vrl", message: "success" })).not.toThrow();
+      consoleLogSpy.mockRestore();
+    });
+
+    it("handleVrlGenerationStart should log generation started", () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      wrapper.vm.handleVrlGenerationStart();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("VRL AI generation started")
+      );
+      consoleLogSpy.mockRestore();
+    });
+
+    it("handleVrlGenerationEnd should log generation ended", () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      wrapper.vm.handleVrlGenerationEnd();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("VRL AI generation ended")
+      );
+      consoleLogSpy.mockRestore();
+    });
+
+    it("handleVrlGenerationSuccess should log success with payload type", () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      wrapper = createWrapper();
+
+      wrapper.vm.handleVrlGenerationSuccess({ type: "sql", message: "Query generated" });
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("VRL AI generation success:"),
+        "sql"
+      );
+      consoleLogSpy.mockRestore();
+    });
+  });
+
+  describe("hiddenQueries Layout Property", () => {
+    it("should initialize with hiddenQueries in layout", () => {
+      wrapper = createWrapper();
+      expect(Array.isArray(wrapper.vm.dashboardPanelData.layout.hiddenQueries)).toBe(true);
+    });
+
+    it("should start with empty hiddenQueries", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.dashboardPanelData.layout.hiddenQueries).toHaveLength(0);
     });
   });
 });

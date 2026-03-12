@@ -13,141 +13,220 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
+import { describe, expect, it, beforeEach, vi } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import DestinationService from "@/services/alert_destination";
-// @ts-ignore
-import { rest } from "msw";
-import { AddDestination } from "@/components/alerts";
-import router from "@/test/unit/helpers/router";
 
-installQuasar({
-  plugins: [Dialog, Notify],
+installQuasar({ plugins: [Dialog, Notify] });
+
+vi.mock("vue-router", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useRoute: () => ({ params: {}, query: {} }),
+}));
+
+vi.mock("@/services/alert_destination", () => ({
+  default: {
+    create: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+    update: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+    test: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+    getPrebuiltTypes: vi.fn().mockResolvedValue({ data: [] }),
+  },
+}));
+
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({ track: vi.fn() }),
+}));
+
+import AddDestination from "@/components/alerts/AddDestination.vue";
+import destinationService from "@/services/alert_destination";
+
+async function mountComp(props: Record<string, any> = {}) {
+  return mount(AddDestination, {
+    props: {
+      templates: [],
+      destination: null,
+      isAlerts: true,
+      ...props,
+    },
+    global: {
+      plugins: [i18n, store],
+      stubs: {
+        PrebuiltDestinationSelector: {
+          template: '<div data-test="prebuilt-destination-selector-stub"></div>',
+          props: ["modelValue", "searchQuery"],
+          emits: ["update:modelValue", "select", "update:searchQuery"],
+        },
+        PrebuiltDestinationForm: {
+          template: '<div data-test="prebuilt-form-stub"></div>',
+          props: ["modelValue", "destinationType", "hideActions"],
+          emits: ["update:modelValue"],
+        },
+        DestinationTestResult: {
+          template: '<div data-test="destination-test-result-stub"></div>',
+          props: ["result"],
+        },
+        DestinationPreview: {
+          template: '<div data-test="destination-preview-stub"></div>',
+          props: ["destination"],
+        },
+      },
+    },
+  });
+}
+
+describe("AddDestination - rendering (create mode)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("renders without errors", async () => {
+    const w = await mountComp();
+    expect(w.exists()).toBe(true);
+  });
+
+  it("renders the title element", async () => {
+    const w = await mountComp();
+    expect(w.find('[data-test="add-destination-title"]').exists()).toBe(true);
+  });
+
+  it("shows add title when no destination prop", async () => {
+    const w = await mountComp({ destination: null });
+    const titleEl = w.find('[data-test="add-destination-title"]');
+    expect(titleEl.text()).toContain("Add");
+  });
+
+  it("renders the cancel button", async () => {
+    const w = await mountComp();
+    // Set to custom mode to show url/method/cancel/submit
+    (w.vm as any).formData.destination_type = "custom";
+    await w.vm.$nextTick();
+    expect(w.find('[data-test="add-destination-cancel-btn"]').exists()).toBe(true);
+  });
+
+  it("renders the url input in custom mode", async () => {
+    const w = await mountComp();
+    (w.vm as any).formData.destination_type = "custom";
+    await w.vm.$nextTick();
+    expect(w.find('[data-test="add-destination-url-input"]').exists()).toBe(true);
+  });
+
+  it("renders the method select in custom mode", async () => {
+    const w = await mountComp();
+    (w.vm as any).formData.destination_type = "custom";
+    await w.vm.$nextTick();
+    expect(w.find('[data-test="add-destination-method-select"]').exists()).toBe(true);
+  });
 });
 
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-document.body.appendChild(node);
+describe("AddDestination - rendering (update mode)", () => {
+  const existingDest = {
+    name: "my-dest",
+    url: "https://hooks.slack.com/test",
+    method: "post",
+    headers: {},
+    template: "tmpl1",
+    destination_type: "custom",
+  };
 
-describe.skip("Alert List", async () => {
-  let wrapper: any;
-  beforeEach(async () => {
-    
-    // wrapper = mount(AddDestination, {
-    //   attachTo: "#app",
-    //   props: {
-    //     templates: [],
-    //     destination: null,
-    //   },
-    //   global: {
-    //     provide: {
-    //       store: store,
-    //     },
-    //     plugins: [i18n, router],
-    //   },
-    // });
+  it("shows update title when destination prop provided", async () => {
+    const w = await mountComp({ destination: existingDest });
     await flushPromises();
+    const titleEl = w.find('[data-test="add-destination-title"]');
+    expect(titleEl.text()).toContain("Update");
+  });
+});
+
+describe("AddDestination - initial state", () => {
+  it("formData.name is empty by default", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).formData.name).toBe("");
   });
 
-  afterEach(() => {
-    wrapper.unmount();
+  it("formData.method defaults to post", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).formData.method).toBe("post");
   });
 
-  it("Should render add destination title", () => {
-    expect(wrapper.find('[data-test="add-destination-title"]').text()).toBe(
-      "Add Destination"
-    );
+  it("isPrebuiltDestination is false by default", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).isPrebuiltDestination).toBe(false);
+  });
+});
+
+describe("AddDestination - isPrebuiltDestination computed", () => {
+  it("returns false for empty destination_type", async () => {
+    const w = await mountComp();
+    (w.vm as any).formData.destination_type = "";
+    expect((w.vm as any).isPrebuiltDestination).toBe(false);
   });
 
-  it("Should render name input", () => {
-    expect(
-      wrapper.find('[data-test="add-destination-name-input"]').exists()
-    ).toBeTruthy();
+  it("returns false for custom destination_type", async () => {
+    const w = await mountComp();
+    (w.vm as any).formData.destination_type = "custom";
+    expect((w.vm as any).isPrebuiltDestination).toBe(false);
   });
 
-  it("Should render template select", () => {
-    expect(
-      wrapper.find('[data-test="add-destination-template-select"]').exists()
-    ).toBeTruthy();
+  it("returns true for prebuilt destination_type (e.g. slack)", async () => {
+    const w = await mountComp();
+    (w.vm as any).formData.destination_type = "slack";
+    expect((w.vm as any).isPrebuiltDestination).toBe(true);
+  });
+});
+
+describe("AddDestination - getDestinationTypeIcon", () => {
+  it("returns a string for known type", async () => {
+    const w = await mountComp();
+    const icon = (w.vm as any).getDestinationTypeIcon("slack");
+    expect(typeof icon).toBe("string");
   });
 
-  it("Should render url input", () => {
-    expect(
-      wrapper.find('[data-test="add-destination-url-input"]').exists()
-    ).toBeTruthy();
+  it("returns a fallback string for unknown type", async () => {
+    const w = await mountComp();
+    const icon = (w.vm as any).getDestinationTypeIcon("unknown-type");
+    expect(typeof icon).toBe("string");
+  });
+});
+
+describe("AddDestination - getDestinationTypeName", () => {
+  it("returns typeId when no matching type found", async () => {
+    const w = await mountComp();
+    (w.vm as any).availableTypes = [];
+    const name = (w.vm as any).getDestinationTypeName("my-type");
+    expect(name).toBe("my-type");
   });
 
-  it("Should reder method select input", () => {
-    expect(
-      wrapper.find('[data-test="add-destination-method-select"]').exists()
-    ).toBeTruthy();
+  it("returns type name when matching type found", async () => {
+    const w = await mountComp();
+    (w.vm as any).availableTypes = [{ id: "slack", name: "Slack" }];
+    const name = (w.vm as any).getDestinationTypeName("slack");
+    expect(name).toBe("Slack");
   });
+});
 
-  it("Should reder add headers inputs", () => {
-    const headerKey = "";
-    const headerValue = "";
-    expect(
-      wrapper
-        .find(`[data-test="add-destination-header-${headerKey}-key-input"]`)
-        .exists()
-    ).toBeTruthy();
-    expect(
-      wrapper
-        .find(`[data-test="add-destination-header-${headerValue}-value-input"]`)
-        .exists()
-    ).toBeTruthy();
+describe("AddDestination - cancel button", () => {
+  it("clicking cancel emits cancel:hideform", async () => {
+    const w = await mountComp();
+    (w.vm as any).formData.destination_type = "custom";
+    await w.vm.$nextTick();
+    await w.find('[data-test="add-destination-cancel-btn"]').trigger("click");
+    expect(w.emitted("cancel:hideform")).toBeTruthy();
   });
+});
 
-  describe("When user fills form and clicks submit", () => {
-    const submitBtn = vi.spyOn(DestinationService, "create");
-    const template_name = "template1";
-    const dest_name = "dest1";
-    afterEach(() => {
-      vi.clearAllMocks();
-    });
-    beforeEach(async () => {
-      global.server.use(
-        rest.post(
-          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/destinations/${dest_name}`,
-          (req: any, res: any, ctx: any) => {
-            return res(ctx.status(200), ctx.json({ code: 200 }));
-          }
-        )
-      );
-      await wrapper
-        .find('[data-test="add-destination-name-input"]')
-        .setValue(dest_name);
-      wrapper.vm.formData.template = template_name;
-      await wrapper
-        .find('[data-test="add-destination-url-input"]')
-        .setValue("abc");
-      wrapper.vm.formData.method = "post";
-      await wrapper
-        .find('[data-test="add-destination-header--key-input"]')
-        .setValue("key");
-      await wrapper
-        .find('[data-test="add-destination-header-key-value-input"]')
-        .setValue("value");
-    });
+describe("AddDestination - saveDestination", () => {
+  beforeEach(() => vi.clearAllMocks());
 
-    it("Should create alert on clicking Submit", async () => {
-      await wrapper
-        .find('[data-test="add-destination-submit-btn"]')
-        .trigger("click");
-      await flushPromises();
-      expect(submitBtn).toHaveBeenCalledTimes(1);
-      expect(wrapper.emitted()["get:destinations"]).toHaveLength(1);
-    });
-
-    it("Should create alert on clicking Submit", async () => {
-      await wrapper
-        .find('[data-test="add-destination-cancel-btn"]')
-        .trigger("click");
-      expect(wrapper.emitted()["cancel:hideform"]).toHaveLength(1);
-    });
+  it("calls destinationService.create in create mode when form is filled", async () => {
+    const w = await mountComp({ destination: null, isAlerts: false });
+    await flushPromises();
+    (w.vm as any).formData.name = "dest1";
+    (w.vm as any).formData.url = "https://example.com/webhook";
+    (w.vm as any).formData.method = "post";
+    (w.vm as any).formData.template = "tmpl1";
+    (w.vm as any).formData.destination_type = "custom";
+    await (w.vm as any).saveDestination();
+    await flushPromises();
+    expect(destinationService.create).toHaveBeenCalled();
   });
 });

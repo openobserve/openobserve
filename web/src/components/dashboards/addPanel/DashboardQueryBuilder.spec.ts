@@ -1212,4 +1212,106 @@ describe("DashboardQueryBuilder", () => {
       expect(field.args[0].value).toBe("15m");
     });
   });
+
+  describe("reorderItems", () => {
+    beforeEach(() => {
+      wrapper = createWrapper();
+    });
+
+    it("should reorder items within x-axis", () => {
+      const fields = wrapper.vm.dashboardPanelData.data.queries[0].fields.x;
+      const originalFirst = fields[0];
+
+      // Add a second field to x-axis for reordering
+      fields.push({ type: "build", label: "Field X2", functionName: "sum" });
+      wrapper.vm.reorderItems("x", 0, 1);
+
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x[1]).toBe(originalFirst);
+    });
+
+    it("should reorder items within y-axis", () => {
+      const fields = wrapper.vm.dashboardPanelData.data.queries[0].fields.y;
+      const originalFirst = fields[0];
+
+      fields.push({ type: "build", label: "Field Y2", functionName: "count" });
+      wrapper.vm.reorderItems("y", 0, 1);
+
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.y[1]).toBe(originalFirst);
+    });
+
+    it("should do nothing when fieldList is missing", () => {
+      // Pass an axis that doesn't exist
+      expect(() => wrapper.vm.reorderItems("nonexistent", 0, 1)).not.toThrow();
+    });
+
+    it("should do nothing when draggedItem is missing (out-of-bounds index)", () => {
+      expect(() => wrapper.vm.reorderItems("x", 99, 0)).not.toThrow();
+    });
+
+    it("should move item from higher to lower index", () => {
+      const fields = wrapper.vm.dashboardPanelData.data.queries[0].fields.y;
+      const item1 = { type: "build", label: "Y Item 1" };
+      const item2 = { type: "build", label: "Y Item 2" };
+      fields.splice(0, fields.length, item1, item2);
+
+      wrapper.vm.reorderItems("y", 1, 0);
+
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0]).toBe(item2);
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.y[1]).toBe(item1);
+    });
+  });
+
+  describe("promqlBuilderMode Computed", () => {
+    it("should return false when queryType is sql", () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.data.queryType = "sql";
+
+      expect(wrapper.vm.promqlBuilderMode).toBe(false);
+    });
+
+    it("should return false when queryType is promql but customQuery is true", () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.data.queryType = "promql";
+      wrapper.vm.dashboardPanelData.data.queries[0].customQuery = true;
+
+      expect(wrapper.vm.promqlBuilderMode).toBe(false);
+    });
+
+    it("should return true when queryType is promql and customQuery is false", () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.data.queryType = "promql";
+      wrapper.vm.dashboardPanelData.data.queries[0].customQuery = false;
+
+      expect(wrapper.vm.promqlBuilderMode).toBe(true);
+    });
+  });
+
+  describe("promqlBuilderQuery Reactive State", () => {
+    it("should initialize with empty metric, labels, operations", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.promqlBuilderQuery.metric).toBe("");
+      expect(wrapper.vm.promqlBuilderQuery.labels).toEqual([]);
+      expect(wrapper.vm.promqlBuilderQuery.operations).toEqual([]);
+    });
+
+    it("should allow updating metric", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.promqlBuilderQuery.metric = "http_requests_total";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.promqlBuilderQuery.metric).toBe("http_requests_total");
+    });
+
+    it("should allow adding labels", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.promqlBuilderQuery.labels.push({ label: "status", op: "=", value: "200" });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.promqlBuilderQuery.labels).toHaveLength(1);
+      expect(wrapper.vm.promqlBuilderQuery.labels[0].label).toBe("status");
+    });
+  });
 });

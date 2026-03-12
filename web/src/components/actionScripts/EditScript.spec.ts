@@ -951,7 +951,7 @@ describe("EditScript", () => {
       let result: string[] = [];
       const update = (fn: Function) => { fn(); };
 
-      result = wrapper.vm.filterColumns(options, "apple", update);
+      result = wrapper.vm.filterColumns(options, "app", update);
       expect(result).toHaveLength(2);
     });
 
@@ -1168,7 +1168,9 @@ describe("EditScript", () => {
 
   describe("openCancelDialog function", () => {
     it("should navigate directly when no changes have been made", () => {
-      const routerReplaceSpy = vi.spyOn(router, "replace");
+      const routerReplaceSpy = vi
+        .spyOn(router, "replace")
+        .mockResolvedValue(undefined as any);
 
       // Set originalActionScriptData to match current formData
       wrapper.vm.originalActionScriptData = JSON.stringify(wrapper.vm.formData);
