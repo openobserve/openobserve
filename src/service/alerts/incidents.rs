@@ -1488,7 +1488,7 @@ pub async fn trigger_rca_for_incident(
     begin_already_emitted: bool,
     // Email of the user who triggered the analysis, used for AI usage tracking.
     // For automated/system-initiated calls, use "system@openobserve.ai".
-    user_email: String,
+    _user_email: String,
 ) -> Result<(), anyhow::Error> {
     use config::{get_config, meta::alerts::incidents::IncidentTopology};
     use o2_enterprise::enterprise::{
@@ -1567,7 +1567,7 @@ pub async fn trigger_rca_for_incident(
         .await;
 
         let usage_ctx = crate::service::trial_quota::AiUsageContext {
-            user_email: user_email.clone(),
+            user_email: _user_email.clone(),
             incident_id: Some(incident_id.clone()),
             ..Default::default()
         };
