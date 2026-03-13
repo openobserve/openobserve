@@ -1955,6 +1955,11 @@
     "anomalyDetectionConfig": "Detection Config",
     "alerting": "Alerting",
     "saveAndTrain": "Save & Train",
+    "anomalyStepCaptions": {
+      "alertSetup": "Name your detector and select a stream to monitor",
+      "detectionConfig": "Configure the query and detection parameters",
+      "alerting": "Set up notifications when anomalies are detected"
+    },
     "detectionInterval": "Detection Interval",
     "trainingWindow": "Training Window",
     "sensitivity": "Sensitivity",

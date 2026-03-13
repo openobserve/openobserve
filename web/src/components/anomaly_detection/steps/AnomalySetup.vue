@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -22,110 +22,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="step-content card-container tw:px-3 tw:py-4">
       <q-form ref="formRef" @submit.prevent>
         <!-- Name -->
-        <div class="flex items-start alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.name") }} <span class="text-negative tw:ml-1">*</span>
-          </div>
-          <div style="width: calc(100% - 190px)">
-            <q-input
-              v-model="config.name"
-              :readonly="isEdit"
-              :disable="isEdit"
-              dense
-              borderless
-              placeholder="e.g. K8s CPU Spike"
-              :rules="[(v) => !!v || 'Name is required']"
-              data-test="anomaly-setup-name"
-              style="background: none"
-            />
-            <div
-              v-if="isEdit"
-              class="text-caption tw:mt-1"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              Name cannot be changed after creation.
-            </div>
-          </div>
+        <div class="form-field tw:mb-4">
+          <q-input
+            v-model="config.name"
+            :label="t('alerts.name') + ' *'"
+            class="showLabelOnTop"
+            stack-label
+            dense
+            borderless
+            :readonly="isEdit"
+            :disable="isEdit"
+            placeholder="e.g. K8s CPU Spike"
+            :rules="[(v: any) => !!v || t('common.nameRequired')]"
+            hide-bottom-space
+            data-test="anomaly-setup-name"
+          />
+        </div>
+
+        <!-- Folder Selection -->
+        <div class="form-field tw:mb-4">
+          <SelectFolderDropDown
+            :disableDropdown="isEdit"
+            :type="'alerts'"
+            :style="'height: 36px;'"
+            @folder-selected="onFolderSelected"
+            :activeFolderId="activeFolderId"
+          />
         </div>
 
         <!-- Stream Type + Stream Name (2-col grid) -->
-        <div class="flex items-start alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            Stream <span class="text-negative tw:ml-1">*</span>
+        <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4 tw:mb-4">
+          <!-- Stream Type -->
+          <div class="form-field">
+            <q-select
+              v-model="config.stream_type"
+              :options="streamTypes"
+              :label="t('alerts.streamType') + ' *'"
+              :popup-content-style="{ textTransform: 'lowercase' }"
+              class="showLabelOnTop no-case"
+              stack-label
+              borderless
+              dense
+              hide-bottom-space
+              :readonly="isEdit"
+              :disable="isEdit"
+              :rules="[(v: any) => !!v || 'Field is required!']"
+              data-test="anomaly-setup-stream-type"
+              @update:model-value="onStreamTypeChange"
+            />
           </div>
-          <div style="width: calc(100% - 190px)">
-            <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
-              <!-- Stream Type -->
-              <div>
-                <div
-                  class="text-caption tw:mb-1"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-                >
-                  Stream Type
-                </div>
-                <q-select
-                  v-model="config.stream_type"
-                  :options="streamTypes"
-                  :readonly="isEdit"
-                  :disable="isEdit"
-                  dense
-                  borderless
-                  :rules="[(v) => !!v || 'Stream type is required']"
-                  data-test="anomaly-setup-stream-type"
-                  @update:model-value="onStreamTypeChange"
-                />
-              </div>
-              <!-- Stream Name -->
-              <div>
-                <div
-                  class="text-caption tw:mb-1"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-                >
-                  Stream Name
-                </div>
-                <q-select
-                  v-model="config.stream_name"
-                  :options="filteredStreams"
-                  :readonly="isEdit"
-                  :disable="isEdit"
-                  dense
-                  borderless
-                  use-input
-                  input-debounce="300"
-                  :loading="loadingStreams"
-                  placeholder="Select stream"
-                  :rules="[(v) => !!v || 'Stream name is required']"
-                  data-test="anomaly-setup-stream-name"
-                  @filter="filterStreams"
-                >
-                  <template #no-option>
-                    <q-item>
-                      <q-item-section class="text-grey">
-                        {{ config.stream_type ? "No streams found" : "Select a stream type first" }}
-                      </q-item-section>
-                    </q-item>
-                  </template>
-                </q-select>
-              </div>
-            </div>
+
+          <!-- Stream Name -->
+          <div class="form-field">
+            <q-select
+              v-model="config.stream_name"
+              :options="filteredStreams"
+              :label="t('alerts.stream_name') + ' *'"
+              class="showLabelOnTop no-case"
+              stack-label
+              dense
+              use-input
+              borderless
+              hide-selected
+              hide-bottom-space
+              fill-input
+              :input-debounce="400"
+              :loading="loadingStreams"
+              :readonly="isEdit"
+              :disable="isEdit"
+              :rules="[(v: any) => !!v || 'Field is required!']"
+              data-test="anomaly-setup-stream-name"
+              @filter="filterStreams"
+            >
+              <template #no-option>
+                <q-item>
+                  <q-item-section class="text-grey">
+                    {{ config.stream_type ? "No streams found" : "Select a stream type first" }}
+                  </q-item-section>
+                </q-item>
+              </template>
+            </q-select>
           </div>
         </div>
 
         <!-- Description -->
-        <div class="flex items-start alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            Description
-          </div>
-          <div style="width: calc(100% - 190px)">
+        <div class="form-field tw:mb-4">
+          <div class="manual-field-label">{{ t('alerts.description') }}</div>
+          <div class="description-wrapper">
             <q-input
               v-model="config.description"
-              dense
-              borderless
               type="textarea"
-              rows="3"
+              rows="5"
+              borderless
+              dense
               placeholder="Optional description"
+              hide-bottom-space
+              :input-style="{ padding: '0.5rem 0.75rem' }"
               data-test="anomaly-setup-description"
-              style="background: none"
             />
           </div>
         </div>
@@ -139,9 +132,14 @@ import { defineComponent, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import streamService from "@/services/stream";
+import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 
 export default defineComponent({
   name: "AnomalySetup",
+
+  components: {
+    SelectFolderDropDown,
+  },
 
   props: {
     config: {
@@ -152,9 +150,15 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    activeFolderId: {
+      type: String,
+      default: "default",
+    },
   },
 
-  setup(props) {
+  emits: ["update:active-folder-id"],
+
+  setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
     const formRef = ref<any>(null);
@@ -194,13 +198,19 @@ export default defineComponent({
       });
     };
 
+    const onFolderSelected = (folder: any) => {
+      emit("update:active-folder-id", folder);
+    };
+
     const validate = async (): Promise<boolean> => {
       return formRef.value ? formRef.value.validate() : true;
     };
 
     watch(
       () => props.config.stream_type,
-      (val) => { if (val) loadStreams(); },
+      (val) => {
+        if (val) loadStreams();
+      },
       { immediate: true },
     );
 
@@ -213,6 +223,7 @@ export default defineComponent({
       loadingStreams,
       onStreamTypeChange,
       filterStreams,
+      onFolderSelected,
       validate,
     };
   },
@@ -221,6 +232,8 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .step-anomaly-setup {
+  height: 100%;
+
   .step-content {
     border-radius: 8px;
     height: 100%;
@@ -242,8 +255,16 @@ export default defineComponent({
   }
 }
 
-.alert-settings-row {
-  margin-bottom: 24px !important;
-  padding-bottom: 0 !important;
+.manual-field-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 0.25rem;
+  opacity: 0.7;
+}
+
+.description-wrapper {
+  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.12));
+  border-radius: 0.25rem;
 }
 </style>

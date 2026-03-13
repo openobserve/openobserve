@@ -15,22 +15,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="anomaly-wizard" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div class="anomaly-wizard full-width q-mx-lg q-pt-xs" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <!-- Header -->
     <div class="row items-center no-wrap card-container tw:mx-[0.625rem] tw:mb-[0.625rem]">
       <div class="flex items-center justify-between tw:w-full card-container tw:h-[68px] tw:px-2 tw:py-3">
-        <div class="flex items-center tw:gap-2">
-          <q-btn flat round dense icon="arrow_back" @click="goBack" />
-          <div>
-            <div class="text-h6 tw:font-semibold">
-              {{ isEdit ? t("alerts.editAnomalyDetection") : t("alerts.newAnomalyDetection") }}
-            </div>
-            <div
-              class="text-caption"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              {{ t("alerts.anomalyDetectionSubtitle") }}
-            </div>
+        <div class="flex items-center">
+          <div
+            class="flex justify-center items-center q-mr-md cursor-pointer"
+            style="
+              border: 1.5px solid;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+            "
+            title="Go Back"
+            @click="goBack"
+          >
+            <q-icon name="arrow_back_ios_new" size="14px" />
+          </div>
+          <div class="text-h6">
+            {{ isEdit ? t("alerts.editAnomalyDetection") : t("alerts.newAnomalyDetection") }}
           </div>
         </div>
 
@@ -71,23 +75,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Wizard body -->
     <div
       class="wizard-view-container tw:mb-2"
-      :style="{ maxHeight: 'calc(100vh - 194px)', overflowY: 'auto' }"
+      style="
+        max-height: calc(100vh - 194px);
+        overflow-y: auto;
+        scroll-behavior: smooth;
+      "
     >
       <div class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2" style="position: relative">
         <q-stepper
           v-model="step"
+          ref="wizardStepper"
+          color="primary"
           flat
           header-nav
-          animated
-          class="anomaly-wizard-stepper"
+          keep-alive
+          class="anomaly-wizard-stepper alert-wizard-stepper"
         >
+          <!-- Step caption (appears below active step header) -->
+          <template v-slot:message>
+            <div
+              v-if="currentStepCaption"
+              class="persistent-step-caption tw:px-3 tw:py-1 tw:mb-1 tw:mt-2"
+              :class="store.state.theme === 'dark' ? 'dark-mode-caption' : 'light-mode-caption'"
+            >
+              {{ currentStepCaption }}
+            </div>
+          </template>
+
           <!-- Step 1: Setup -->
           <q-step :name="1" :title="t('alerts.steps.alertSetup')" icon="settings" :done="step > 1">
-            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px)">
-              <div style="flex: 0 0 62%; overflow-y: auto">
-                <AnomalySetup ref="step1Ref" :config="config" :is-edit="isEdit" />
+            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
+              <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+                <div style="flex: 1; overflow: auto;">
+                  <AnomalySetup
+                    ref="step1Ref"
+                    :config="config"
+                    :is-edit="isEdit"
+                    :active-folder-id="activeFolderId"
+                    @update:active-folder-id="updateActiveFolderId"
+                  />
+                </div>
               </div>
-              <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
+              <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
             </div>
           </q-step>
 
@@ -98,82 +127,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="manage_search"
             :done="step > 2"
           >
-            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px)">
-              <div style="flex: 0 0 62%; overflow-y: auto">
-                <AnomalyDetectionConfig ref="step2Ref" :config="config" />
+            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
+              <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+                <div style="flex: 1; overflow: auto;">
+                  <AnomalyDetectionConfig ref="step2Ref" :config="config" />
+                </div>
               </div>
-              <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
+              <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
             </div>
           </q-step>
 
           <!-- Step 3: Alerting -->
           <q-step :name="3" :title="t('alerts.alerting')" icon="notifications">
-            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px)">
-              <div style="flex: 0 0 62%; overflow-y: auto">
-                <AnomalyAlerting
-                  :config="config"
-                  :destinations="destinations"
-                  @refresh:destinations="$emit('refresh:destinations')"
-                />
+            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
+              <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+                <div style="flex: 1; overflow: auto;">
+                  <AnomalyAlerting
+                    :config="config"
+                    :destinations="destinations"
+                    @refresh:destinations="$emit('refresh:destinations')"
+                  />
+                </div>
               </div>
-              <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
+              <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
             </div>
           </q-step>
         </q-stepper>
 
         <!-- Right panel (persistent, overlaid) -->
         <div
+          class="anomaly-right-column"
           style="
             position: absolute;
             top: 86px;
             right: 4px;
             width: calc(39% - 1.5rem);
             height: calc(100vh - 302px);
-            overflow-y: auto;
             pointer-events: auto;
             z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            overflow: hidden;
           "
         >
           <!-- SQL Preview -->
-          <div class="collapsible-panel tw:mb-2">
-            <div
-              class="panel-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:cursor-pointer"
-              @click="showSqlPreview = !showSqlPreview"
-            >
-              <span class="tw:font-semibold text-caption">{{ t("alerts.sqlPreview") }}</span>
-              <q-btn
-                flat
-                round
-                dense
-                size="xs"
-                :icon="showSqlPreview ? 'expand_less' : 'expand_more'"
-              />
+          <div class="preview-box" style="flex: 1; min-height: 150px;">
+            <div class="preview-header tw:flex tw:items-center tw:px-3 tw:py-2">
+              <span class="preview-title">{{ config.query_mode === 'custom_sql' ? t("alerts.sqlPreview") : t("alerts.sqlPreview") }}</span>
             </div>
-            <div v-show="showSqlPreview" class="tw:px-3 tw:pb-3">
-              <pre
-                class="tw:text-xs tw:whitespace-pre-wrap tw:break-all tw:m-0 tw:rounded tw:p-2"
-                :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-200' : 'tw:bg-gray-100 tw:text-gray-800'"
-              >{{ previewSql }}</pre>
+            <div class="preview-content tw:px-3 tw:py-2">
+              <pre class="preview-code">{{ previewSql }}</pre>
             </div>
           </div>
 
           <!-- Summary -->
-          <div class="collapsible-panel">
+          <div class="collapsible-section" :style="summarySectionStyle">
             <div
-              class="panel-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:cursor-pointer"
+              class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
               @click="showSummary = !showSummary"
             >
-              <span class="tw:font-semibold text-caption">{{ t("alerts.configSummary") }}</span>
+              <span class="tw:text-sm tw:font-semibold">{{ t("alerts.configSummary") }}</span>
               <q-btn
                 flat
-                round
                 dense
+                round
                 size="xs"
                 :icon="showSummary ? 'expand_less' : 'expand_more'"
+                class="expand-toggle-btn"
+                @click.stop
               />
             </div>
-            <div v-show="showSummary" class="tw:px-3 tw:pb-3">
-              <div class="tw:flex tw:flex-col tw:gap-2">
+            <div v-show="showSummary" class="summary-section-content tw:px-4 tw:pb-3">
+              <div class="tw:flex tw:flex-col tw:gap-3 tw:pt-1">
                 <div v-if="config.stream_name" class="summary-row">
                   <span class="summary-label">Stream</span>
                   <span>
@@ -231,45 +257,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Footer navigation -->
-    <div
-      class="flex q-px-md full-width tw:py-3 card-container tw:justify-end tw:mx-[0.625rem]"
-      style="position: sticky; bottom: 0; width: calc(100% - 1.25rem)"
-    >
-      <q-btn
-        flat
-        no-caps
-        :label="t('alerts.cancel')"
-        class="o2-secondary-button q-mr-sm"
-        @click="goBack"
-      />
-      <q-btn
-        v-if="step > 1"
-        flat
-        no-caps
-        :label="t('alerts.back') || 'Back'"
-        class="o2-secondary-button q-mr-sm"
-        @click="step--"
-      />
-      <q-separator v-if="step > 1" vertical spaced />
-      <q-btn
-        v-if="step < 3"
-        no-caps
-        color="primary"
-        :label="t('alerts.continue') || 'Continue'"
-        :loading="saving"
-        unelevated
-        @click="goNext"
-      />
-      <q-btn
-        v-else
-        no-caps
-        color="primary"
-        :label="isEdit ? (t('common.save') || 'Save') : t('alerts.saveAndTrain')"
-        :loading="saving"
-        unelevated
-        @click="save"
-      />
+    <div class="tw:mx-2">
+      <div
+        class="flex q-px-md full-width tw:py-3 card-container tw:justify-end"
+        style="position: sticky; bottom: 0px; z-index: 2"
+      >
+        <div class="tw:flex tw:items-center tw:gap-2">
+          <q-btn
+            flat
+            :label="t('alerts.back')"
+            class="o2-secondary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :disable="step === 1"
+            no-caps
+            @click="step--"
+          />
+          <q-btn
+            flat
+            :label="t('alerts.continue')"
+            class="o2-secondary-button tw:h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :disable="step === 3"
+            no-caps
+            @click="goNext"
+          />
+          <q-separator vertical class="tw:mx-2" style="height: 36px;" />
+          <q-btn
+            flat
+            class="o2-secondary-button tw:h-[36px]"
+            :label="t('alerts.cancel')"
+            no-caps
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            @click="goBack"
+          />
+          <q-btn
+            flat
+            class="o2-primary-button no-border tw:h-[36px]"
+            :label="isEdit ? (t('common.save') || 'Save') : t('alerts.saveAndTrain')"
+            no-caps
+            :loading="saving"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            @click="save"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -284,6 +315,7 @@ import AnomalySetup from "./steps/AnomalySetup.vue";
 import AnomalyDetectionConfig from "./steps/AnomalyDetectionConfig.vue";
 import AnomalyAlerting from "./steps/AnomalyAlerting.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
+import { getFoldersListByType } from "@/utils/commons";
 
 const defaultConfig = () => ({
   name: "",
@@ -308,6 +340,7 @@ const defaultConfig = () => ({
   threshold: 97,
   alert_enabled: true,
   alert_destination_id: undefined as string | undefined,
+  folder_id: "default",
   // read-only state fields
   status: undefined as string | undefined,
   is_trained: false,
@@ -346,8 +379,10 @@ export default defineComponent({
     const saving = ref(false);
     const retraining = ref(false);
     const config = ref(defaultConfig());
-    const showSqlPreview = ref(true);
     const showSummary = ref(true);
+    const activeFolderId = ref(
+      (router.currentRoute.value.query.folder as string) || "default",
+    );
 
     const step1Ref = ref<any>(null);
     const step2Ref = ref<any>(null);
@@ -361,6 +396,25 @@ export default defineComponent({
         case "failed":   return "negative";
         default:         return "grey";
       }
+    });
+
+    const updateActiveFolderId = (folder: any) => {
+      activeFolderId.value = folder.value;
+      config.value.folder_id = folder.value;
+    };
+
+    const summarySectionStyle = computed(() => {
+      if (!showSummary.value) return { flex: "0 0 auto" };
+      return { flex: "1", minHeight: "150px" };
+    });
+
+    const currentStepCaption = computed(() => {
+      const captions: Record<number, string> = {
+        1: t("alerts.anomalyStepCaptions.alertSetup"),
+        2: t("alerts.anomalyStepCaptions.detectionConfig"),
+        3: t("alerts.anomalyStepCaptions.alerting"),
+      };
+      return captions[step.value] || "";
     });
 
     const formatTs = (ts: number) =>
@@ -464,6 +518,7 @@ export default defineComponent({
           alert_destination_id: config.value.alert_enabled
             ? config.value.alert_destination_id
             : undefined,
+          folder_id: activeFolderId.value || "default",
         };
 
         if (isEdit.value) {
@@ -566,6 +621,9 @@ export default defineComponent({
           detection_window_value: win.value,
           detection_window_unit: win.unit,
         };
+        if (data.folder_id) {
+          activeFolderId.value = data.folder_id;
+        }
       } catch {
         $q.notify({ type: "negative", message: "Failed to load config." });
         goBack();
@@ -573,6 +631,7 @@ export default defineComponent({
     };
 
     onMounted(async () => {
+      await getFoldersListByType(store, "alerts");
       if (isEdit.value) {
         await loadConfig();
       } else {
@@ -587,13 +646,16 @@ export default defineComponent({
       step1Ref,
       step2Ref,
       config,
+      activeFolderId,
+      updateActiveFolderId,
       saving,
       retraining,
       isEdit,
       statusColor,
       previewSql,
-      showSqlPreview,
       showSummary,
+      summarySectionStyle,
+      currentStepCaption,
       formatTs,
       goBack,
       goNext,
@@ -606,15 +668,6 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .anomaly-wizard {
-  .collapsible-panel {
-    border-radius: 8px;
-  }
-
-  .panel-header {
-    border-radius: 8px;
-    user-select: none;
-  }
-
   .summary-row {
     display: flex;
     align-items: flex-start;
@@ -626,32 +679,87 @@ export default defineComponent({
     min-width: 80px;
     font-size: 12px;
     line-height: 20px;
+    color: var(--o2-text-secondary, #757575);
+  }
+}
+
+.collapsible-section {
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
+
+  .section-header {
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
+    border-radius: 0.375rem 0.375rem 0 0;
+    user-select: none;
+    transition: background 0.2s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    &:active {
+      background: rgba(0, 0, 0, 0.06);
+    }
   }
 
-  &.dark-mode {
-    .collapsible-panel {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-    .panel-header:hover {
-      background-color: #2a2a2a;
-    }
-    .summary-label {
-      color: #9e9e9e;
-    }
+  .section-content {
+    flex: 1;
+    overflow-y: auto;
   }
 
-  &.light-mode {
-    .collapsible-panel {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
+  .summary-section-content {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .expand-toggle-btn {
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+
+    &:hover {
+      opacity: 1;
     }
-    .panel-header:hover {
-      background-color: #f9f9f9;
-    }
-    .summary-label {
-      color: #5c5c5c;
-    }
+  }
+}
+
+.preview-box {
+  border-radius: 0.375rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
+  background-color: var(--o2-primary-background, #f5f5f5);
+
+  .preview-header {
+    border-bottom: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
+    flex-shrink: 0;
+    background-color: var(--o2-card-bg, #ffffff);
+  }
+
+  .preview-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  .preview-content {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+  }
+
+  .preview-code {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.75rem;
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: var(--o2-text-primary);
   }
 }
 
@@ -660,7 +768,60 @@ export default defineComponent({
     padding: 0;
   }
   :deep(.q-stepper__tab) {
-    padding: 8px 16px 8px 8px;
+    padding: 12px 16px;
+    min-height: 60px;
   }
+
+  // Hide captions for inactive steps
+  :deep(.q-stepper__tab) {
+    .q-stepper__caption {
+      display: none !important;
+    }
+  }
+
+  // Show caption only on active step
+  :deep(.q-stepper__tab--active) {
+    .q-stepper__caption {
+      display: block !important;
+      opacity: 0.7;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+  }
+
+  :deep(.q-stepper__tab--active) {
+    color: #1976d2;
+    font-weight: 600;
+  }
+
+  :deep(.q-stepper__tab--done) {
+    color: #4caf50;
+    cursor: pointer;
+  }
+}
+
+// Persistent step caption styles
+.persistent-step-caption {
+  font-size: 12px;
+  line-height: 1.6;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  font-weight: 400;
+  margin-left: 0.375rem;
+  letter-spacing: 0.01em;
+}
+
+.dark-mode-caption {
+  background-color: transparent;
+  color: #9e9e9e;
+  border-left: 3px solid #5a5a5a;
+  padding-left: 12px !important;
+}
+
+.light-mode-caption {
+  background-color: transparent;
+  color: #757575;
+  border-left: 3px solid #e0e0e0;
+  padding-left: 12px !important;
 }
 </style>

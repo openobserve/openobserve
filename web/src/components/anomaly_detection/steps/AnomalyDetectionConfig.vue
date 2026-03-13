@@ -571,6 +571,8 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .step-anomaly-config {
+  height: 100%;
+
   .step-content {
     border-radius: 8px;
     height: 100%;
