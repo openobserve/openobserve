@@ -169,6 +169,16 @@ impl HttpResponse {
             .into_response()
     }
 
+    /// Send a PaymentRequired (402) response in json format and associate the
+    /// provided error as `error` field.
+    pub fn payment_required(error: impl ToString) -> Response {
+        (
+            StatusCode::PAYMENT_REQUIRED,
+            Json(Self::error(StatusCode::PAYMENT_REQUIRED, error.to_string())),
+        )
+            .into_response()
+    }
+
     /// Send a Forbidden response in json format and associate the
     /// provided error as `error` field.
     pub fn conflict(error: impl ToString) -> Response {
@@ -229,6 +239,7 @@ impl IntoResponse for HttpResponse {
             200 => StatusCode::OK,
             400 => StatusCode::BAD_REQUEST,
             401 => StatusCode::UNAUTHORIZED,
+            402 => StatusCode::PAYMENT_REQUIRED,
             403 => StatusCode::FORBIDDEN,
             404 => StatusCode::NOT_FOUND,
             409 => StatusCode::CONFLICT,

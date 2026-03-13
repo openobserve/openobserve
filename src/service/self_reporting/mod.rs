@@ -221,6 +221,13 @@ pub async fn report_request_usage_stats(
     }
 }
 
+/// Public entry point for publishing usage data from other services
+/// (e.g. AI credits billing). Enqueues UsageData records for background
+/// ingestion into the _usage stream.
+pub fn report_usage(usages: Vec<UsageData>) {
+    tokio::spawn(publish_usage(usages));
+}
+
 async fn publish_usage(usages: Vec<UsageData>) {
     #[cfg(not(feature = "enterprise"))]
     {

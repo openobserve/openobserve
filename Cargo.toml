@@ -87,7 +87,6 @@ clap = { version = "4.5", default-features = false, features = [
     "suggestions",
     "cargo",
 ] }
-cloudevents-sdk = { version = "0.9", features = ["axum"] }
 cron.workspace = true
 csv = "1.3"
 dashmap.workspace = true

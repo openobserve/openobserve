@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,9 @@
 
 use std::collections::HashMap;
 
+use axum::http::{HeaderMap, Method};
 use config::meta::ratelimit::{RatelimitRule, RatelimitRuleType, get_resource_from_params};
 use futures_util::future::BoxFuture;
-use http::Method;
 use o2_ratelimit::{
     dataresource::{
         db::RATELIMIT_RULES_CACHE,
@@ -26,14 +26,17 @@ use o2_ratelimit::{
             DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER, find_group_by_openapi,
         },
     },
-    middleware::{ExtractorRule, ExtractorRuleResult, handle_rules},
+    middleware::{ExtractorRule, ExtractorRuleResult},
 };
 use regex::Regex;
 use utoipa::OpenApi;
 
-use crate::handler::http::{
-    auth::validator::get_user_email_from_auth_str, request::ratelimit::QUOTA_PAGE_GLOBAL_RULES_ORG,
-    router::openapi::ApiDoc,
+use crate::{
+    common::utils::auth::extract_auth_str_from_headers,
+    handler::http::{
+        auth::validator::get_user_email_from_auth_str,
+        request::ratelimit::QUOTA_PAGE_GLOBAL_RULES_ORG, router::openapi::ApiDoc,
+    },
 };
 
 fn extract_org_id(path: &str) -> String {
@@ -55,17 +58,8 @@ fn extract_org_id(path: &str) -> String {
     }
 }
 
-pub async fn ws_extractor(
-    trace_id: &str,
-    auth_str: String,
-    local_path: String,
-    method: &Method,
-) -> anyhow::Result<()> {
-    handle_rules(trace_id, rule_extractor(auth_str, local_path, method).await)
-}
-
 fn rule_extractor(
-    auth_str: String,
+    headers: HeaderMap,
     local_path: String,
     method: &Method,
 ) -> BoxFuture<'_, ExtractorRuleResult> {
@@ -79,6 +73,7 @@ fn rule_extractor(
     let (path, org_id) = (path.to_string(), extract_org_id(path));
     let openapi_path = extract_openapi_path(&local_path, method);
     Box::pin(async move {
+        let auth_str = extract_auth_str_from_headers(&headers).await;
         let user_email = get_user_email_from_auth_str(&auth_str)
             .await
             .unwrap_or_default();
@@ -137,18 +132,10 @@ fn rule_extractor(
 // Commented out: This function uses actix-web types and is not currently used
 /// Default extractor for axum Request
 pub fn default_extractor(req: &axum::extract::Request) -> BoxFuture<'_, ExtractorRuleResult> {
-    let auth_str = extract_basic_auth_str_axum(req);
+    // Extract headers manually to avoid conflict with body extraction
+    let headers = req.headers().clone();
     let local_path = req.uri().path().to_string();
-    rule_extractor(auth_str, local_path, req.method())
-}
-
-/// Extract basic auth string from axum Request
-fn extract_basic_auth_str_axum(req: &axum::extract::Request) -> String {
-    req.headers()
-        .get(http::header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default()
-        .to_string()
+    rule_extractor(headers, local_path, req.method())
 }
 
 async fn find_default_and_custom_rules(

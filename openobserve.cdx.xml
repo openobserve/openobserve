@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:1fb630dd-fede-4b5f-87bf-7491b94fd3b0" version="1">
+<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:b4f1c6dd-1c4e-4255-9f71-fb115cbf3bcb" version="1">
   <metadata>
-    <timestamp>2026-03-10T08:04:34.283653000Z</timestamp>
+    <timestamp>2026-03-11T07:47:27.774670000Z</timestamp>
     <tools>
       <tool>
         <vendor>CycloneDX</vendor>
@@ -9,7 +9,7 @@
         <version>0.5.7</version>
       </tool>
     </tools>
-    <component type="application" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve#0.80.0">
+    <component type="application" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve#0.80.0">
       <name>openobserve</name>
       <version>0.80.0</version>
       <description>OpenObserve is an observability platform that allows you to capture, search, and analyze your logs, metrics, and traces.</description>
@@ -27,12 +27,12 @@
         </reference>
       </externalReferences>
       <components>
-        <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve#0.80.0 bin-target-0">
+        <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve#0.80.0 bin-target-0">
           <name>openobserve</name>
           <version>0.80.0</version>
           <purl>pkg:cargo/openobserve@0.80.0?download_url=file://.#src/lib.rs</purl>
         </component>
-        <component type="application" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve#0.80.0 bin-target-1">
+        <component type="application" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve#0.80.0 bin-target-1">
           <name>openobserve</name>
           <version>0.80.0</version>
           <purl>pkg:cargo/openobserve@0.80.0?download_url=file://.#src/main.rs</purl>
@@ -162,7 +162,7 @@
       <scope>required</scope>
       <purl>pkg:cargo/enrichment@0.1.0?vcs_url=git%2Bhttps://github.com/openobserve/vector%3Fbranch=v0.51%4044c8f1cfd64bdedb924034c946f639d09890fc53</purl>
     </component>
-    <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/config#0.1.0">
+    <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/config#0.1.0">
       <name>config</name>
       <version>0.1.0</version>
       <scope>required</scope>
@@ -171,7 +171,7 @@
       </licenses>
       <purl>pkg:cargo/config@0.1.0?download_url=file://src/config</purl>
     </component>
-    <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/flight#0.1.0">
+    <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/flight#0.1.0">
       <name>flight</name>
       <version>0.1.0</version>
       <scope>required</scope>
@@ -180,7 +180,7 @@
       </licenses>
       <purl>pkg:cargo/flight@0.1.0?download_url=file://src/flight</purl>
     </component>
-    <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/infra#0.1.0">
+    <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/infra#0.1.0">
       <name>infra</name>
       <version>0.1.0</version>
       <scope>required</scope>
@@ -189,7 +189,7 @@
       </licenses>
       <purl>pkg:cargo/infra@0.1.0?download_url=file://src/infra</purl>
     </component>
-    <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/ingester#0.1.0">
+    <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/ingester#0.1.0">
       <name>ingester</name>
       <version>0.1.0</version>
       <scope>required</scope>
@@ -198,7 +198,7 @@
       </licenses>
       <purl>pkg:cargo/ingester@0.1.0?download_url=file://src/ingester</purl>
     </component>
-    <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/proto#0.1.0">
+    <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/proto#0.1.0">
       <name>proto</name>
       <version>0.1.0</version>
       <scope>required</scope>
@@ -207,7 +207,7 @@
       </licenses>
       <purl>pkg:cargo/proto@0.1.0?download_url=file://src/proto</purl>
     </component>
-    <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/report_server#0.1.0">
+    <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/report_server#0.1.0">
       <name>report_server</name>
       <version>0.1.0</version>
       <scope>required</scope>
@@ -216,7 +216,7 @@
       </licenses>
       <purl>pkg:cargo/report_server@0.1.0?download_url=file://src/report_server</purl>
     </component>
-    <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/tantivy_utils#0.1.0">
+    <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/tantivy_utils#0.1.0">
       <name>tantivy_utils</name>
       <version>0.1.0</version>
       <scope>required</scope>
@@ -225,7 +225,7 @@
       </licenses>
       <purl>pkg:cargo/tantivy_utils@0.1.0?download_url=file://src/tantivy_utils</purl>
     </component>
-    <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/wal#0.1.0">
+    <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/wal#0.1.0">
       <name>wal</name>
       <version>0.1.0</version>
       <scope>required</scope>
@@ -3458,31 +3458,6 @@
         </reference>
       </externalReferences>
     </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#cloudevents-sdk@0.9.0">
-      <author>Francesco Guardiani &lt;francescoguard@gmail.com&gt;</author>
-      <name>cloudevents-sdk</name>
-      <version>0.9.0</version>
-      <description>CloudEvents official Rust SDK</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">47598c8e3f47e1cfb787750e1bef5de56cb288d757b7b753ace8b5f5b6a1c7f8</hash>
-      </hashes>
-      <licenses>
-        <license>
-          <name>Unknown</name>
-          <text encoding="base64">CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIEFwYWNoZSBMaWNlbnNlCiAgICAgICAgICAgICAgICAgICAgICAgICAgIFZlcnNpb24gMi4wLCBKYW51YXJ5IDIwMDQKICAgICAgICAgICAgICAgICAgICAgICAgaHR0cDovL3d3dy5hcGFjaGUub3JnL2xpY2Vuc2VzLwoKICAgVEVSTVMgQU5EIENPTkRJVElPTlMgRk9SIFVTRSwgUkVQUk9EVUNUSU9OLCBBTkQgRElTVFJJQlVUSU9OCgogICAxLiBEZWZpbml0aW9ucy4KCiAgICAgICJMaWNlbnNlIiBzaGFsbCBtZWFuIHRoZSB0ZXJtcyBhbmQgY29uZGl0aW9ucyBmb3IgdXNlLCByZXByb2R1Y3Rpb24sCiAgICAgIGFuZCBkaXN0cmlidXRpb24gYXMgZGVmaW5lZCBieSBTZWN0aW9ucyAxIHRocm91Z2ggOSBvZiB0aGlzIGRvY3VtZW50LgoKICAgICAgIkxpY2Vuc29yIiBzaGFsbCBtZWFuIHRoZSBjb3B5cmlnaHQgb3duZXIgb3IgZW50aXR5IGF1dGhvcml6ZWQgYnkKICAgICAgdGhlIGNvcHlyaWdodCBvd25lciB0aGF0IGlzIGdyYW50aW5nIHRoZSBMaWNlbnNlLgoKICAgICAgIkxlZ2FsIEVudGl0eSIgc2hhbGwgbWVhbiB0aGUgdW5pb24gb2YgdGhlIGFjdGluZyBlbnRpdHkgYW5kIGFsbAogICAgICBvdGhlciBlbnRpdGllcyB0aGF0IGNvbnRyb2wsIGFyZSBjb250cm9sbGVkIGJ5LCBvciBhcmUgdW5kZXIgY29tbW9uCiAgICAgIGNvbnRyb2wgd2l0aCB0aGF0IGVudGl0eS4gRm9yIHRoZSBwdXJwb3NlcyBvZiB0aGlzIGRlZmluaXRpb24sCiAgICAgICJjb250cm9sIiBtZWFucyAoaSkgdGhlIHBvd2VyLCBkaXJlY3Qgb3IgaW5kaXJlY3QsIHRvIGNhdXNlIHRoZQogICAgICBkaXJlY3Rpb24gb3IgbWFuYWdlbWVudCBvZiBzdWNoIGVudGl0eSwgd2hldGhlciBieSBjb250cmFjdCBvcgogICAgICBvdGhlcndpc2UsIG9yIChpaSkgb3duZXJzaGlwIG9mIGZpZnR5IHBlcmNlbnQgKDUwJSkgb3IgbW9yZSBvZiB0aGUKICAgICAgb3V0c3RhbmRpbmcgc2hhcmVzLCBvciAoaWlpKSBiZW5lZmljaWFsIG93bmVyc2hpcCBvZiBzdWNoIGVudGl0eS4KCiAgICAgICJZb3UiIChvciAiWW91ciIpIHNoYWxsIG1lYW4gYW4gaW5kaXZpZHVhbCBvciBMZWdhbCBFbnRpdHkKICAgICAgZXhlcmNpc2luZyBwZXJtaXNzaW9ucyBncmFudGVkIGJ5IHRoaXMgTGljZW5zZS4KCiAgICAgICJTb3VyY2UiIGZvcm0gc2hhbGwgbWVhbiB0aGUgcHJlZmVycmVkIGZvcm0gZm9yIG1ha2luZyBtb2RpZmljYXRpb25zLAogICAgICBpbmNsdWRpbmcgYnV0IG5vdCBsaW1pdGVkIHRvIHNvZnR3YXJlIHNvdXJjZSBjb2RlLCBkb2N1bWVudGF0aW9uCiAgICAgIHNvdXJjZSwgYW5kIGNvbmZpZ3VyYXRpb24gZmlsZXMuCgogICAgICAiT2JqZWN0IiBmb3JtIHNoYWxsIG1lYW4gYW55IGZvcm0gcmVzdWx0aW5nIGZyb20gbWVjaGFuaWNhbAogICAgICB0cmFuc2Zvcm1hdGlvbiBvciB0cmFuc2xhdGlvbiBvZiBhIFNvdXJjZSBmb3JtLCBpbmNsdWRpbmcgYnV0CiAgICAgIG5vdCBsaW1pdGVkIHRvIGNvbXBpbGVkIG9iamVjdCBjb2RlLCBnZW5lcmF0ZWQgZG9jdW1lbnRhdGlvbiwKICAgICAgYW5kIGNvbnZlcnNpb25zIHRvIG90aGVyIG1lZGlhIHR5cGVzLgoKICAgICAgIldvcmsiIHNoYWxsIG1lYW4gdGhlIHdvcmsgb2YgYXV0aG9yc2hpcCwgd2hldGhlciBpbiBTb3VyY2Ugb3IKICAgICAgT2JqZWN0IGZvcm0sIG1hZGUgYXZhaWxhYmxlIHVuZGVyIHRoZSBMaWNlbnNlLCBhcyBpbmRpY2F0ZWQgYnkgYQogICAgICBjb3B5cmlnaHQgbm90aWNlIHRoYXQgaXMgaW5jbHVkZWQgaW4gb3IgYXR0YWNoZWQgdG8gdGhlIHdvcmsKICAgICAgKGFuIGV4YW1wbGUgaXMgcHJvdmlkZWQgaW4gdGhlIEFwcGVuZGl4IGJlbG93KS4KCiAgICAgICJEZXJpdmF0aXZlIFdvcmtzIiBzaGFsbCBtZWFuIGFueSB3b3JrLCB3aGV0aGVyIGluIFNvdXJjZSBvciBPYmplY3QKICAgICAgZm9ybSwgdGhhdCBpcyBiYXNlZCBvbiAob3IgZGVyaXZlZCBmcm9tKSB0aGUgV29yayBhbmQgZm9yIHdoaWNoIHRoZQogICAgICBlZGl0b3JpYWwgcmV2aXNpb25zLCBhbm5vdGF0aW9ucywgZWxhYm9yYXRpb25zLCBvciBvdGhlciBtb2RpZmljYXRpb25zCiAgICAgIHJlcHJlc2VudCwgYXMgYSB3aG9sZSwgYW4gb3JpZ2luYWwgd29yayBvZiBhdXRob3JzaGlwLiBGb3IgdGhlIHB1cnBvc2VzCiAgICAgIG9mIHRoaXMgTGljZW5zZSwgRGVyaXZhdGl2ZSBXb3JrcyBzaGFsbCBub3QgaW5jbHVkZSB3b3JrcyB0aGF0IHJlbWFpbgogICAgICBzZXBhcmFibGUgZnJvbSwgb3IgbWVyZWx5IGxpbmsgKG9yIGJpbmQgYnkgbmFtZSkgdG8gdGhlIGludGVyZmFjZXMgb2YsCiAgICAgIHRoZSBXb3JrIGFuZCBEZXJpdmF0aXZlIFdvcmtzIHRoZXJlb2YuCgogICAgICAiQ29udHJpYnV0aW9uIiBzaGFsbCBtZWFuIGFueSB3b3JrIG9mIGF1dGhvcnNoaXAsIGluY2x1ZGluZwogICAgICB0aGUgb3JpZ2luYWwgdmVyc2lvbiBvZiB0aGUgV29yayBhbmQgYW55IG1vZGlmaWNhdGlvbnMgb3IgYWRkaXRpb25zCiAgICAgIHRvIHRoYXQgV29yayBvciBEZXJpdmF0aXZlIFdvcmtzIHRoZXJlb2YsIHRoYXQgaXMgaW50ZW50aW9uYWxseQogICAgICBzdWJtaXR0ZWQgdG8gTGljZW5zb3IgZm9yIGluY2x1c2lvbiBpbiB0aGUgV29yayBieSB0aGUgY29weXJpZ2h0IG93bmVyCiAgICAgIG9yIGJ5IGFuIGluZGl2aWR1YWwgb3IgTGVnYWwgRW50aXR5IGF1dGhvcml6ZWQgdG8gc3VibWl0IG9uIGJlaGFsZiBvZgogICAgICB0aGUgY29weXJpZ2h0IG93bmVyLiBGb3IgdGhlIHB1cnBvc2VzIG9mIHRoaXMgZGVmaW5pdGlvbiwgInN1Ym1pdHRlZCIKICAgICAgbWVhbnMgYW55IGZvcm0gb2YgZWxlY3Ryb25pYywgdmVyYmFsLCBvciB3cml0dGVuIGNvbW11bmljYXRpb24gc2VudAogICAgICB0byB0aGUgTGljZW5zb3Igb3IgaXRzIHJlcHJlc2VudGF0aXZlcywgaW5jbHVkaW5nIGJ1dCBub3QgbGltaXRlZCB0bwogICAgICBjb21tdW5pY2F0aW9uIG9uIGVsZWN0cm9uaWMgbWFpbGluZyBsaXN0cywgc291cmNlIGNvZGUgY29udHJvbCBzeXN0ZW1zLAogICAgICBhbmQgaXNzdWUgdHJhY2tpbmcgc3lzdGVtcyB0aGF0IGFyZSBtYW5hZ2VkIGJ5LCBvciBvbiBiZWhhbGYgb2YsIHRoZQogICAgICBMaWNlbnNvciBmb3IgdGhlIHB1cnBvc2Ugb2YgZGlzY3Vzc2luZyBhbmQgaW1wcm92aW5nIHRoZSBXb3JrLCBidXQKICAgICAgZXhjbHVkaW5nIGNvbW11bmljYXRpb24gdGhhdCBpcyBjb25zcGljdW91c2x5IG1hcmtlZCBvciBvdGhlcndpc2UKICAgICAgZGVzaWduYXRlZCBpbiB3cml0aW5nIGJ5IHRoZSBjb3B5cmlnaHQgb3duZXIgYXMgIk5vdCBhIENvbnRyaWJ1dGlvbi4iCgogICAgICAiQ29udHJpYnV0b3IiIHNoYWxsIG1lYW4gTGljZW5zb3IgYW5kIGFueSBpbmRpdmlkdWFsIG9yIExlZ2FsIEVudGl0eQogICAgICBvbiBiZWhhbGYgb2Ygd2hvbSBhIENvbnRyaWJ1dGlvbiBoYXMgYmVlbiByZWNlaXZlZCBieSBMaWNlbnNvciBhbmQKICAgICAgc3Vic2VxdWVudGx5IGluY29ycG9yYXRlZCB3aXRoaW4gdGhlIFdvcmsuCgogICAyLiBHcmFudCBvZiBDb3B5cmlnaHQgTGljZW5zZS4gU3ViamVjdCB0byB0aGUgdGVybXMgYW5kIGNvbmRpdGlvbnMgb2YKICAgICAgdGhpcyBMaWNlbnNlLCBlYWNoIENvbnRyaWJ1dG9yIGhlcmVieSBncmFudHMgdG8gWW91IGEgcGVycGV0dWFsLAogICAgICB3b3JsZHdpZGUsIG5vbi1leGNsdXNpdmUsIG5vLWNoYXJnZSwgcm95YWx0eS1mcmVlLCBpcnJldm9jYWJsZQogICAgICBjb3B5cmlnaHQgbGljZW5zZSB0byByZXByb2R1Y2UsIHByZXBhcmUgRGVyaXZhdGl2ZSBXb3JrcyBvZiwKICAgICAgcHVibGljbHkgZGlzcGxheSwgcHVibGljbHkgcGVyZm9ybSwgc3VibGljZW5zZSwgYW5kIGRpc3RyaWJ1dGUgdGhlCiAgICAgIFdvcmsgYW5kIHN1Y2ggRGVyaXZhdGl2ZSBXb3JrcyBpbiBTb3VyY2Ugb3IgT2JqZWN0IGZvcm0uCgogICAzLiBHcmFudCBvZiBQYXRlbnQgTGljZW5zZS4gU3ViamVjdCB0byB0aGUgdGVybXMgYW5kIGNvbmRpdGlvbnMgb2YKICAgICAgdGhpcyBMaWNlbnNlLCBlYWNoIENvbnRyaWJ1dG9yIGhlcmVieSBncmFudHMgdG8gWW91IGEgcGVycGV0dWFsLAogICAgICB3b3JsZHdpZGUsIG5vbi1leGNsdXNpdmUsIG5vLWNoYXJnZSwgcm95YWx0eS1mcmVlLCBpcnJldm9jYWJsZQogICAgICAoZXhjZXB0IGFzIHN0YXRlZCBpbiB0aGlzIHNlY3Rpb24pIHBhdGVudCBsaWNlbnNlIHRvIG1ha2UsIGhhdmUgbWFkZSwKICAgICAgdXNlLCBvZmZlciB0byBzZWxsLCBzZWxsLCBpbXBvcnQsIGFuZCBvdGhlcndpc2UgdHJhbnNmZXIgdGhlIFdvcmssCiAgICAgIHdoZXJlIHN1Y2ggbGljZW5zZSBhcHBsaWVzIG9ubHkgdG8gdGhvc2UgcGF0ZW50IGNsYWltcyBsaWNlbnNhYmxlCiAgICAgIGJ5IHN1Y2ggQ29udHJpYnV0b3IgdGhhdCBhcmUgbmVjZXNzYXJpbHkgaW5mcmluZ2VkIGJ5IHRoZWlyCiAgICAgIENvbnRyaWJ1dGlvbihzKSBhbG9uZSBvciBieSBjb21iaW5hdGlvbiBvZiB0aGVpciBDb250cmlidXRpb24ocykKICAgICAgd2l0aCB0aGUgV29yayB0byB3aGljaCBzdWNoIENvbnRyaWJ1dGlvbihzKSB3YXMgc3VibWl0dGVkLiBJZiBZb3UKICAgICAgaW5zdGl0dXRlIHBhdGVudCBsaXRpZ2F0aW9uIGFnYWluc3QgYW55IGVudGl0eSAoaW5jbHVkaW5nIGEKICAgICAgY3Jvc3MtY2xhaW0gb3IgY291bnRlcmNsYWltIGluIGEgbGF3c3VpdCkgYWxsZWdpbmcgdGhhdCB0aGUgV29yawogICAgICBvciBhIENvbnRyaWJ1dGlvbiBpbmNvcnBvcmF0ZWQgd2l0aGluIHRoZSBXb3JrIGNvbnN0aXR1dGVzIGRpcmVjdAogICAgICBvciBjb250cmlidXRvcnkgcGF0ZW50IGluZnJpbmdlbWVudCwgdGhlbiBhbnkgcGF0ZW50IGxpY2Vuc2VzCiAgICAgIGdyYW50ZWQgdG8gWW91IHVuZGVyIHRoaXMgTGljZW5zZSBmb3IgdGhhdCBXb3JrIHNoYWxsIHRlcm1pbmF0ZQogICAgICBhcyBvZiB0aGUgZGF0ZSBzdWNoIGxpdGlnYXRpb24gaXMgZmlsZWQuCgogICA0LiBSZWRpc3RyaWJ1dGlvbi4gWW91IG1heSByZXByb2R1Y2UgYW5kIGRpc3RyaWJ1dGUgY29waWVzIG9mIHRoZQogICAgICBXb3JrIG9yIERlcml2YXRpdmUgV29ya3MgdGhlcmVvZiBpbiBhbnkgbWVkaXVtLCB3aXRoIG9yIHdpdGhvdXQKICAgICAgbW9kaWZpY2F0aW9ucywgYW5kIGluIFNvdXJjZSBvciBPYmplY3QgZm9ybSwgcHJvdmlkZWQgdGhhdCBZb3UKICAgICAgbWVldCB0aGUgZm9sbG93aW5nIGNvbmRpdGlvbnM6CgogICAgICAoYSkgWW91IG11c3QgZ2l2ZSBhbnkgb3RoZXIgcmVjaXBpZW50cyBvZiB0aGUgV29yayBvcgogICAgICAgICAgRGVyaXZhdGl2ZSBXb3JrcyBhIGNvcHkgb2YgdGhpcyBMaWNlbnNlOyBhbmQKCiAgICAgIChiKSBZb3UgbXVzdCBjYXVzZSBhbnkgbW9kaWZpZWQgZmlsZXMgdG8gY2FycnkgcHJvbWluZW50IG5vdGljZXMKICAgICAgICAgIHN0YXRpbmcgdGhhdCBZb3UgY2hhbmdlZCB0aGUgZmlsZXM7IGFuZAoKICAgICAgKGMpIFlvdSBtdXN0IHJldGFpbiwgaW4gdGhlIFNvdXJjZSBmb3JtIG9mIGFueSBEZXJpdmF0aXZlIFdvcmtzCiAgICAgICAgICB0aGF0IFlvdSBkaXN0cmlidXRlLCBhbGwgY29weXJpZ2h0LCBwYXRlbnQsIHRyYWRlbWFyaywgYW5kCiAgICAgICAgICBhdHRyaWJ1dGlvbiBub3RpY2VzIGZyb20gdGhlIFNvdXJjZSBmb3JtIG9mIHRoZSBXb3JrLAogICAgICAgICAgZXhjbHVkaW5nIHRob3NlIG5vdGljZXMgdGhhdCBkbyBub3QgcGVydGFpbiB0byBhbnkgcGFydCBvZgogICAgICAgICAgdGhlIERlcml2YXRpdmUgV29ya3M7IGFuZAoKICAgICAgKGQpIElmIHRoZSBXb3JrIGluY2x1ZGVzIGEgIk5PVElDRSIgdGV4dCBmaWxlIGFzIHBhcnQgb2YgaXRzCiAgICAgICAgICBkaXN0cmlidXRpb24sIHRoZW4gYW55IERlcml2YXRpdmUgV29ya3MgdGhhdCBZb3UgZGlzdHJpYnV0ZSBtdXN0CiAgICAgICAgICBpbmNsdWRlIGEgcmVhZGFibGUgY29weSBvZiB0aGUgYXR0cmlidXRpb24gbm90aWNlcyBjb250YWluZWQKICAgICAgICAgIHdpdGhpbiBzdWNoIE5PVElDRSBmaWxlLCBleGNsdWRpbmcgdGhvc2Ugbm90aWNlcyB0aGF0IGRvIG5vdAogICAgICAgICAgcGVydGFpbiB0byBhbnkgcGFydCBvZiB0aGUgRGVyaXZhdGl2ZSBXb3JrcywgaW4gYXQgbGVhc3Qgb25lCiAgICAgICAgICBvZiB0aGUgZm9sbG93aW5nIHBsYWNlczogd2l0aGluIGEgTk9USUNFIHRleHQgZmlsZSBkaXN0cmlidXRlZAogICAgICAgICAgYXMgcGFydCBvZiB0aGUgRGVyaXZhdGl2ZSBXb3Jrczsgd2l0aGluIHRoZSBTb3VyY2UgZm9ybSBvcgogICAgICAgICAgZG9jdW1lbnRhdGlvbiwgaWYgcHJvdmlkZWQgYWxvbmcgd2l0aCB0aGUgRGVyaXZhdGl2ZSBXb3Jrczsgb3IsCiAgICAgICAgICB3aXRoaW4gYSBkaXNwbGF5IGdlbmVyYXRlZCBieSB0aGUgRGVyaXZhdGl2ZSBXb3JrcywgaWYgYW5kCiAgICAgICAgICB3aGVyZXZlciBzdWNoIHRoaXJkLXBhcnR5IG5vdGljZXMgbm9ybWFsbHkgYXBwZWFyLiBUaGUgY29udGVudHMKICAgICAgICAgIG9mIHRoZSBOT1RJQ0UgZmlsZSBhcmUgZm9yIGluZm9ybWF0aW9uYWwgcHVycG9zZXMgb25seSBhbmQKICAgICAgICAgIGRvIG5vdCBtb2RpZnkgdGhlIExpY2Vuc2UuIFlvdSBtYXkgYWRkIFlvdXIgb3duIGF0dHJpYnV0aW9uCiAgICAgICAgICBub3RpY2VzIHdpdGhpbiBEZXJpdmF0aXZlIFdvcmtzIHRoYXQgWW91IGRpc3RyaWJ1dGUsIGFsb25nc2lkZQogICAgICAgICAgb3IgYXMgYW4gYWRkZW5kdW0gdG8gdGhlIE5PVElDRSB0ZXh0IGZyb20gdGhlIFdvcmssIHByb3ZpZGVkCiAgICAgICAgICB0aGF0IHN1Y2ggYWRkaXRpb25hbCBhdHRyaWJ1dGlvbiBub3RpY2VzIGNhbm5vdCBiZSBjb25zdHJ1ZWQKICAgICAgICAgIGFzIG1vZGlmeWluZyB0aGUgTGljZW5zZS4KCiAgICAgIFlvdSBtYXkgYWRkIFlvdXIgb3duIGNvcHlyaWdodCBzdGF0ZW1lbnQgdG8gWW91ciBtb2RpZmljYXRpb25zIGFuZAogICAgICBtYXkgcHJvdmlkZSBhZGRpdGlvbmFsIG9yIGRpZmZlcmVudCBsaWNlbnNlIHRlcm1zIGFuZCBjb25kaXRpb25zCiAgICAgIGZvciB1c2UsIHJlcHJvZHVjdGlvbiwgb3IgZGlzdHJpYnV0aW9uIG9mIFlvdXIgbW9kaWZpY2F0aW9ucywgb3IKICAgICAgZm9yIGFueSBzdWNoIERlcml2YXRpdmUgV29ya3MgYXMgYSB3aG9sZSwgcHJvdmlkZWQgWW91ciB1c2UsCiAgICAgIHJlcHJvZHVjdGlvbiwgYW5kIGRpc3RyaWJ1dGlvbiBvZiB0aGUgV29yayBvdGhlcndpc2UgY29tcGxpZXMgd2l0aAogICAgICB0aGUgY29uZGl0aW9ucyBzdGF0ZWQgaW4gdGhpcyBMaWNlbnNlLgoKICAgNS4gU3VibWlzc2lvbiBvZiBDb250cmlidXRpb25zLiBVbmxlc3MgWW91IGV4cGxpY2l0bHkgc3RhdGUgb3RoZXJ3aXNlLAogICAgICBhbnkgQ29udHJpYnV0aW9uIGludGVudGlvbmFsbHkgc3VibWl0dGVkIGZvciBpbmNsdXNpb24gaW4gdGhlIFdvcmsKICAgICAgYnkgWW91IHRvIHRoZSBMaWNlbnNvciBzaGFsbCBiZSB1bmRlciB0aGUgdGVybXMgYW5kIGNvbmRpdGlvbnMgb2YKICAgICAgdGhpcyBMaWNlbnNlLCB3aXRob3V0IGFueSBhZGRpdGlvbmFsIHRlcm1zIG9yIGNvbmRpdGlvbnMuCiAgICAgIE5vdHdpdGhzdGFuZGluZyB0aGUgYWJvdmUsIG5vdGhpbmcgaGVyZWluIHNoYWxsIHN1cGVyc2VkZSBvciBtb2RpZnkKICAgICAgdGhlIHRlcm1zIG9mIGFueSBzZXBhcmF0ZSBsaWNlbnNlIGFncmVlbWVudCB5b3UgbWF5IGhhdmUgZXhlY3V0ZWQKICAgICAgd2l0aCBMaWNlbnNvciByZWdhcmRpbmcgc3VjaCBDb250cmlidXRpb25zLgoKICAgNi4gVHJhZGVtYXJrcy4gVGhpcyBMaWNlbnNlIGRvZXMgbm90IGdyYW50IHBlcm1pc3Npb24gdG8gdXNlIHRoZSB0cmFkZQogICAgICBuYW1lcywgdHJhZGVtYXJrcywgc2VydmljZSBtYXJrcywgb3IgcHJvZHVjdCBuYW1lcyBvZiB0aGUgTGljZW5zb3IsCiAgICAgIGV4Y2VwdCBhcyByZXF1aXJlZCBmb3IgcmVhc29uYWJsZSBhbmQgY3VzdG9tYXJ5IHVzZSBpbiBkZXNjcmliaW5nIHRoZQogICAgICBvcmlnaW4gb2YgdGhlIFdvcmsgYW5kIHJlcHJvZHVjaW5nIHRoZSBjb250ZW50IG9mIHRoZSBOT1RJQ0UgZmlsZS4KCiAgIDcuIERpc2NsYWltZXIgb2YgV2FycmFudHkuIFVubGVzcyByZXF1aXJlZCBieSBhcHBsaWNhYmxlIGxhdyBvcgogICAgICBhZ3JlZWQgdG8gaW4gd3JpdGluZywgTGljZW5zb3IgcHJvdmlkZXMgdGhlIFdvcmsgKGFuZCBlYWNoCiAgICAgIENvbnRyaWJ1dG9yIHByb3ZpZGVzIGl0cyBDb250cmlidXRpb25zKSBvbiBhbiAiQVMgSVMiIEJBU0lTLAogICAgICBXSVRIT1VUIFdBUlJBTlRJRVMgT1IgQ09ORElUSU9OUyBPRiBBTlkgS0lORCwgZWl0aGVyIGV4cHJlc3Mgb3IKICAgICAgaW1wbGllZCwgaW5jbHVkaW5nLCB3aXRob3V0IGxpbWl0YXRpb24sIGFueSB3YXJyYW50aWVzIG9yIGNvbmRpdGlvbnMKICAgICAgb2YgVElUTEUsIE5PTi1JTkZSSU5HRU1FTlQsIE1FUkNIQU5UQUJJTElUWSwgb3IgRklUTkVTUyBGT1IgQQogICAgICBQQVJUSUNVTEFSIFBVUlBPU0UuIFlvdSBhcmUgc29sZWx5IHJlc3BvbnNpYmxlIGZvciBkZXRlcm1pbmluZyB0aGUKICAgICAgYXBwcm9wcmlhdGVuZXNzIG9mIHVzaW5nIG9yIHJlZGlzdHJpYnV0aW5nIHRoZSBXb3JrIGFuZCBhc3N1bWUgYW55CiAgICAgIHJpc2tzIGFzc29jaWF0ZWQgd2l0aCBZb3VyIGV4ZXJjaXNlIG9mIHBlcm1pc3Npb25zIHVuZGVyIHRoaXMgTGljZW5zZS4KCiAgIDguIExpbWl0YXRpb24gb2YgTGlhYmlsaXR5LiBJbiBubyBldmVudCBhbmQgdW5kZXIgbm8gbGVnYWwgdGhlb3J5LAogICAgICB3aGV0aGVyIGluIHRvcnQgKGluY2x1ZGluZyBuZWdsaWdlbmNlKSwgY29udHJhY3QsIG9yIG90aGVyd2lzZSwKICAgICAgdW5sZXNzIHJlcXVpcmVkIGJ5IGFwcGxpY2FibGUgbGF3IChzdWNoIGFzIGRlbGliZXJhdGUgYW5kIGdyb3NzbHkKICAgICAgbmVnbGlnZW50IGFjdHMpIG9yIGFncmVlZCB0byBpbiB3cml0aW5nLCBzaGFsbCBhbnkgQ29udHJpYnV0b3IgYmUKICAgICAgbGlhYmxlIHRvIFlvdSBmb3IgZGFtYWdlcywgaW5jbHVkaW5nIGFueSBkaXJlY3QsIGluZGlyZWN0LCBzcGVjaWFsLAogICAgICBpbmNpZGVudGFsLCBvciBjb25zZXF1ZW50aWFsIGRhbWFnZXMgb2YgYW55IGNoYXJhY3RlciBhcmlzaW5nIGFzIGEKICAgICAgcmVzdWx0IG9mIHRoaXMgTGljZW5zZSBvciBvdXQgb2YgdGhlIHVzZSBvciBpbmFiaWxpdHkgdG8gdXNlIHRoZQogICAgICBXb3JrIChpbmNsdWRpbmcgYnV0IG5vdCBsaW1pdGVkIHRvIGRhbWFnZXMgZm9yIGxvc3Mgb2YgZ29vZHdpbGwsCiAgICAgIHdvcmsgc3RvcHBhZ2UsIGNvbXB1dGVyIGZhaWx1cmUgb3IgbWFsZnVuY3Rpb24sIG9yIGFueSBhbmQgYWxsCiAgICAgIG90aGVyIGNvbW1lcmNpYWwgZGFtYWdlcyBvciBsb3NzZXMpLCBldmVuIGlmIHN1Y2ggQ29udHJpYnV0b3IKICAgICAgaGFzIGJlZW4gYWR2aXNlZCBvZiB0aGUgcG9zc2liaWxpdHkgb2Ygc3VjaCBkYW1hZ2VzLgoKICAgOS4gQWNjZXB0aW5nIFdhcnJhbnR5IG9yIEFkZGl0aW9uYWwgTGlhYmlsaXR5LiBXaGlsZSByZWRpc3RyaWJ1dGluZwogICAgICB0aGUgV29yayBvciBEZXJpdmF0aXZlIFdvcmtzIHRoZXJlb2YsIFlvdSBtYXkgY2hvb3NlIHRvIG9mZmVyLAogICAgICBhbmQgY2hhcmdlIGEgZmVlIGZvciwgYWNjZXB0YW5jZSBvZiBzdXBwb3J0LCB3YXJyYW50eSwgaW5kZW1uaXR5LAogICAgICBvciBvdGhlciBsaWFiaWxpdHkgb2JsaWdhdGlvbnMgYW5kL29yIHJpZ2h0cyBjb25zaXN0ZW50IHdpdGggdGhpcwogICAgICBMaWNlbnNlLiBIb3dldmVyLCBpbiBhY2NlcHRpbmcgc3VjaCBvYmxpZ2F0aW9ucywgWW91IG1heSBhY3Qgb25seQogICAgICBvbiBZb3VyIG93biBiZWhhbGYgYW5kIG9uIFlvdXIgc29sZSByZXNwb25zaWJpbGl0eSwgbm90IG9uIGJlaGFsZgogICAgICBvZiBhbnkgb3RoZXIgQ29udHJpYnV0b3IsIGFuZCBvbmx5IGlmIFlvdSBhZ3JlZSB0byBpbmRlbW5pZnksCiAgICAgIGRlZmVuZCwgYW5kIGhvbGQgZWFjaCBDb250cmlidXRvciBoYXJtbGVzcyBmb3IgYW55IGxpYWJpbGl0eQogICAgICBpbmN1cnJlZCBieSwgb3IgY2xhaW1zIGFzc2VydGVkIGFnYWluc3QsIHN1Y2ggQ29udHJpYnV0b3IgYnkgcmVhc29uCiAgICAgIG9mIHlvdXIgYWNjZXB0aW5nIGFueSBzdWNoIHdhcnJhbnR5IG9yIGFkZGl0aW9uYWwgbGlhYmlsaXR5LgoKICAgRU5EIE9GIFRFUk1TIEFORCBDT05ESVRJT05TCgogICBBUFBFTkRJWDogSG93IHRvIGFwcGx5IHRoZSBBcGFjaGUgTGljZW5zZSB0byB5b3VyIHdvcmsuCgogICAgICBUbyBhcHBseSB0aGUgQXBhY2hlIExpY2Vuc2UgdG8geW91ciB3b3JrLCBhdHRhY2ggdGhlIGZvbGxvd2luZwogICAgICBib2lsZXJwbGF0ZSBub3RpY2UsIHdpdGggdGhlIGZpZWxkcyBlbmNsb3NlZCBieSBicmFja2V0cyAiW10iCiAgICAgIHJlcGxhY2VkIHdpdGggeW91ciBvd24gaWRlbnRpZnlpbmcgaW5mb3JtYXRpb24uIChEb24ndCBpbmNsdWRlCiAgICAgIHRoZSBicmFja2V0cyEpICBUaGUgdGV4dCBzaG91bGQgYmUgZW5jbG9zZWQgaW4gdGhlIGFwcHJvcHJpYXRlCiAgICAgIGNvbW1lbnQgc3ludGF4IGZvciB0aGUgZmlsZSBmb3JtYXQuIFdlIGFsc28gcmVjb21tZW5kIHRoYXQgYQogICAgICBmaWxlIG9yIGNsYXNzIG5hbWUgYW5kIGRlc2NyaXB0aW9uIG9mIHB1cnBvc2UgYmUgaW5jbHVkZWQgb24gdGhlCiAgICAgIHNhbWUgInByaW50ZWQgcGFnZSIgYXMgdGhlIGNvcHlyaWdodCBub3RpY2UgZm9yIGVhc2llcgogICAgICBpZGVudGlmaWNhdGlvbiB3aXRoaW4gdGhpcmQtcGFydHkgYXJjaGl2ZXMuCgogICBDb3B5cmlnaHQgMjAyMCBDbG91ZEV2ZW50cyBhdXRob3JzCgogICBMaWNlbnNlZCB1bmRlciB0aGUgQXBhY2hlIExpY2Vuc2UsIFZlcnNpb24gMi4wICh0aGUgIkxpY2Vuc2UiKTsKICAgeW91IG1heSBub3QgdXNlIHRoaXMgZmlsZSBleGNlcHQgaW4gY29tcGxpYW5jZSB3aXRoIHRoZSBMaWNlbnNlLgogICBZb3UgbWF5IG9idGFpbiBhIGNvcHkgb2YgdGhlIExpY2Vuc2UgYXQKCiAgICAgICBodHRwOi8vd3d3LmFwYWNoZS5vcmcvbGljZW5zZXMvTElDRU5TRS0yLjAKCiAgIFVubGVzcyByZXF1aXJlZCBieSBhcHBsaWNhYmxlIGxhdyBvciBhZ3JlZWQgdG8gaW4gd3JpdGluZywgc29mdHdhcmUKICAgZGlzdHJpYnV0ZWQgdW5kZXIgdGhlIExpY2Vuc2UgaXMgZGlzdHJpYnV0ZWQgb24gYW4gIkFTIElTIiBCQVNJUywKICAgV0lUSE9VVCBXQVJSQU5USUVTIE9SIENPTkRJVElPTlMgT0YgQU5ZIEtJTkQsIGVpdGhlciBleHByZXNzIG9yIGltcGxpZWQuCiAgIFNlZSB0aGUgTGljZW5zZSBmb3IgdGhlIHNwZWNpZmljIGxhbmd1YWdlIGdvdmVybmluZyBwZXJtaXNzaW9ucyBhbmQKICAgbGltaXRhdGlvbnMgdW5kZXIgdGhlIExpY2Vuc2UuCg==</text>
-        </license>
-      </licenses>
-      <purl>pkg:cargo/cloudevents-sdk@0.9.0</purl>
-      <externalReferences>
-        <reference type="documentation">
-          <url>https://docs.rs/cloudevents-sdk</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://github.com/cloudevents/sdk-rust</url>
-        </reference>
-      </externalReferences>
-    </component>
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#cmac@0.7.2">
       <author>RustCrypto Developers</author>
       <name>cmac</name>
@@ -5297,25 +5272,6 @@
         </reference>
         <reference type="vcs">
           <url>https://github.com/anatawa12/deflate64-rs</url>
-        </reference>
-      </externalReferences>
-    </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#delegate-attr@0.3.0">
-      <author>Xidorn Quan &lt;me@upsuper.org&gt;</author>
-      <name>delegate-attr</name>
-      <version>0.3.0</version>
-      <description>Attribute proc-macro to delegate method to a field</description>
-      <scope>required</scope>
-      <hashes>
-        <hash alg="SHA-256">51aac4c99b2e6775164b412ea33ae8441b2fde2dbf05a20bc0052a63d08c475b</hash>
-      </hashes>
-      <licenses>
-        <expression>MIT</expression>
-      </licenses>
-      <purl>pkg:cargo/delegate-attr@0.3.0</purl>
-      <externalReferences>
-        <reference type="vcs">
-          <url>https://github.com/upsuper/delegate-attr</url>
         </reference>
       </externalReferences>
     </component>
@@ -12482,18 +12438,18 @@
         </reference>
       </externalReferences>
     </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.13">
+    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.14">
       <name>quinn-proto</name>
-      <version>0.11.13</version>
+      <version>0.11.14</version>
       <description>State machine for the QUIC transport protocol</description>
       <scope>required</scope>
       <hashes>
-        <hash alg="SHA-256">f1906b49b0c3bc04b5fe5d86a77925ae6524a19b816ae38ce1e426255f1d8a31</hash>
+        <hash alg="SHA-256">434b42fec591c96ef50e21e886936e66d3cc3f737104fdb9b737c40ffb94c098</hash>
       </hashes>
       <licenses>
         <expression>MIT OR Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/quinn-proto@0.11.13</purl>
+      <purl>pkg:cargo/quinn-proto@0.11.14</purl>
       <externalReferences>
         <reference type="vcs">
           <url>https://github.com/quinn-rs/quinn</url>
@@ -19157,7 +19113,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#dyn-clone@1.0.20" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#vrl@0.28.1" />
     </dependency>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve#0.80.0">
+    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve#0.80.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#ahash@0.8.12" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#argon2@0.5.3" />
@@ -19182,8 +19138,7 @@
       <dependency ref="git+https://github.com/mattsse/chromiumoxide?rev=6f2392f78ae851e2acf33df8e9764cc299d837db#0.7.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#chrono@0.4.44" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#clap@4.5.60" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#cloudevents-sdk@0.9.0" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/config#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/config#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#cron@0.15.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#csv@1.4.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#dashmap@6.1.0" />
@@ -19196,7 +19151,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#env_logger@0.11.9" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#faststr@0.2.34" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#flate2@1.1.9" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/flight#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/flight#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.32" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures-core@0.3.32" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures-util@0.3.32" />
@@ -19209,8 +19164,8 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http-body-util@0.1.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hyper@1.8.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hyper-util@0.1.20" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/infra#0.1.0" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/ingester#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/infra#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/ingester#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#itertools@0.14.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#jsonwebtoken@10.3.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#lettre@0.11.19" />
@@ -19234,12 +19189,12 @@
       <dependency ref="git+https://github.com/openobserve/promql-parser?branch=openobserve#0.6.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-wkt-types@0.7.1" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/proto#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/proto#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rand@0.10.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rayon@1.11.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#regex@1.12.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#regex-syntax@0.8.10" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/report_server#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/report_server#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#reqwest@0.12.28" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#roaring@0.11.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rquickjs@0.11.0" />
@@ -19260,7 +19215,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#svix-ksuid@0.8.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tantivy@0.25.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tantivy-fst@0.5.0" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/tantivy_utils#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/tantivy_utils#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tempfile@3.26.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.18" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tiktoken-rs@0.9.1" />
@@ -19284,13 +19239,13 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#utoipa-swagger-ui@9.0.2" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#version-compare@0.2.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#vrl@0.28.1" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/wal#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/wal#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#webpki-roots@1.0.6" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#x509-parser@0.18.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#zip@8.2.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#zstd@0.13.3" />
     </dependency>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/config#0.1.0">
+    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/config#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#aes-siv@0.7.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#ahash@0.8.12" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102" />
@@ -19338,7 +19293,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parquet@57.3.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#pin-project-lite@0.2.17" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prometheus@0.14.0" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/proto#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/proto#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rand@0.10.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#regex@1.12.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#reqwest@0.12.28" />
@@ -19373,12 +19328,12 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#uuid@1.21.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#vrl@0.28.1" />
     </dependency>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/flight#0.1.0">
+    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/flight#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow@57.3.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-flight@57.3.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-schema@57.3.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/config#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/config#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#datafusion@52.2.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#flatbuffers@25.12.19" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.32" />
@@ -19388,7 +19343,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.50.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.14.5" />
     </dependency>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/infra#0.1.0">
+    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/infra#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#aes-siv@0.7.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#ahash@0.8.12" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102" />
@@ -19400,7 +19355,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#chrono@0.4.44" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/config#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/config#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#datafusion@52.2.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.32" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.16.1" />
@@ -19412,7 +19367,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#opentelemetry@0.31.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.5" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parquet@57.3.0" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/proto#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/proto#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#reqwest@0.12.28" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#sea-orm@1.1.19" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#sea-orm-migration@1.1.19" />
@@ -19429,19 +19384,19 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tracing-opentelemetry@0.32.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#zstd@0.13.3" />
     </dependency>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/ingester#0.1.0">
+    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/ingester#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow@57.3.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-schema@57.3.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#byteorder@1.5.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#chrono@0.4.44" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/config#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/config#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#core_affinity@0.8.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#datafusion@52.2.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.32" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.16.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#indexmap@2.13.0" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/infra#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/infra#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#itertools@0.14.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#once_cell@1.21.3" />
@@ -19450,9 +19405,9 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#snafu@0.9.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.50.0" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/wal#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/wal#0.1.0" />
     </dependency>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/proto#0.1.0">
+    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/proto#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-trait@0.1.89" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#datafusion@52.2.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#datafusion-proto@52.2.0" />
@@ -19466,12 +19421,12 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic-prost@0.14.5" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic-prost-build@0.14.5" />
     </dependency>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/report_server#0.1.0">
+    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/report_server#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#axum@0.8.8" />
       <dependency ref="git+https://github.com/mattsse/chromiumoxide?rev=6f2392f78ae851e2acf33df8e9764cc299d837db#0.7.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#chrono@0.4.44" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/config#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/config#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#env_logger@0.11.9" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.32" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#lettre@0.11.19" />
@@ -19483,16 +19438,16 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tower@0.5.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tower-http@0.6.8" />
     </dependency>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/tantivy_utils#0.1.0">
+    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/tantivy_utils#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-trait@0.1.89" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bitflags@2.11.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#byteorder@1.5.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/config#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/config#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.32" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.16.1" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/infra#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/infra#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#object_store@0.12.5" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.5" />
@@ -19502,10 +19457,10 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.50.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#zstd@0.13.3" />
     </dependency>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/wal#0.1.0">
+    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/wal#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#byteorder@1.5.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
-      <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/config#0.1.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/config#0.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#crc32fast@1.5.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.5" />
@@ -20451,24 +20406,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#syn@2.0.117" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#clap_lex@1.0.0" />
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#cloudevents-sdk@0.9.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-trait@0.1.89" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#axum@0.8.8" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bitflags@2.11.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#chrono@0.4.44" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#delegate-attr@0.3.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hostname@0.4.2" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http@1.4.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http-body-util@0.1.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hyper@1.8.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#snafu@0.8.9" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#url@2.5.8" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#uuid@1.21.0" />
-    </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#cmac@0.7.2">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#cipher@0.4.4" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#dbl@0.3.2" />
@@ -21157,11 +21094,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#generic-array@0.14.7" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#deflate64@0.1.11" />
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#delegate-attr@0.3.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.106" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quote@1.0.45" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#syn@2.0.117" />
-    </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#der-parser@10.0.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#asn1-rs@0.7.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#displaydoc@0.2.5" />
@@ -22497,7 +22429,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#unarray@0.1.4" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-build@0.14.3">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.5.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.4.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#itertools@0.14.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#multimap@0.10.1" />
@@ -22537,7 +22469,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-wkt-build@0.7.1">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.5.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.4.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-build@0.14.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-types@0.14.3" />
@@ -22657,7 +22589,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rand@0.10.0" />
     </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.13">
+    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.14">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#lru-slab@0.1.2" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rand@0.9.2" />
@@ -22679,7 +22611,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#cfg_aliases@0.2.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#pin-project-lite@0.2.17" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.13" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.14" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quinn-udp@0.5.14" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rustc-hash@2.1.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rustls@0.23.37" />
@@ -23312,13 +23244,13 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#syn@1.0.109" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#snafu-derive@0.8.9">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.5.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.4.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.106" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quote@1.0.45" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#syn@2.0.117" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#snafu-derive@0.9.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.5.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.4.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.106" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quote@1.0.45" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#syn@2.0.117" />
@@ -24039,7 +23971,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#idna@1.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#percent-encoding@2.3.2" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde_derive@1.0.228" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#urlencoding@2.1.3" />
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#utf-8@0.7.6" />
