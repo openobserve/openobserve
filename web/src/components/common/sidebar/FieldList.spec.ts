@@ -19,6 +19,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
 import FieldList from "./FieldList.vue";
 import streamService from "@/services/stream";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 // Mock streamService
 vi.mock("@/services/stream", () => ({
@@ -454,6 +455,75 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       });
 
       expect(vm.fieldValues["test_field"].values).toEqual([]);
+    });
+
+    it("should include WHERE clause in sql when query prop is set", async () => {
+      const query = "session_has_replay IS NOT NULL AND session_id is not null";
+      wrapper = createWrapper({ query });
+      const vm = wrapper.vm as any;
+      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
+
+      await vm.openFilterCreator(mockEvent, {
+        name: "test_field",
+        ftsKey: false,
+      });
+
+      expect(fieldValuesMocks.fetchFieldValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sql: b64EncodeUnicode(`SELECT * FROM "test-stream" WHERE ${query}`),
+        }),
+      );
+    });
+
+    it("should not include WHERE clause in sql when query prop is empty", async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
+
+      await vm.openFilterCreator(mockEvent, {
+        name: "test_field",
+        ftsKey: false,
+      });
+
+      expect(fieldValuesMocks.fetchFieldValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sql: b64EncodeUnicode(`SELECT * FROM "test-stream"`),
+        }),
+      );
+    });
+
+    it("should pass query WHERE clause through handleSearchFieldValues", async () => {
+      const query = "country = 'US'";
+      wrapper = createWrapper({
+        query,
+        fields: [{ name: "test_field", showValues: true }],
+      });
+      const vm = wrapper.vm as any;
+
+      await vm.handleSearchFieldValues("test_field", "US");
+
+      expect(fieldValuesMocks.fetchFieldValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sql: b64EncodeUnicode(`SELECT * FROM "test-stream" WHERE ${query}`),
+        }),
+      );
+    });
+
+    it("should pass query WHERE clause through handleLoadMoreValues", async () => {
+      const query = "country = 'US'";
+      wrapper = createWrapper({
+        query,
+        fields: [{ name: "test_field", showValues: true }],
+      });
+      const vm = wrapper.vm as any;
+
+      await vm.handleLoadMoreValues("test_field");
+
+      expect(fieldValuesMocks.fetchFieldValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sql: b64EncodeUnicode(`SELECT * FROM "test-stream" WHERE ${query}`),
+        }),
+      );
     });
 
     it("should handle API error and show notification", async () => {

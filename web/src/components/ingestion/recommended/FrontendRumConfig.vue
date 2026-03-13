@@ -52,7 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, onUpdated, onActivated } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { getImageURL, getIngestionURL, maskText } from "../../../utils/zincutils";
+import {
+  getImageURL,
+  getIngestionURL,
+  maskText,
+} from "../../../utils/zincutils";
 import CopyContent from "../../CopyContent.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
@@ -75,10 +79,10 @@ export default defineComponent({
     const { t } = useI18n();
 
     const npmStep1 = ref(
-      "<b>Step1: </b>Add <a href='https://www.npmjs.com/package/&#64;openobserve/browser-rum' style='color:darkorange' target='_blank'>&#64;openobserve/browser-rum</a> and <a href='https://www.npmjs.com/package/&#64;openobserve/browser-logs' style='color:darkorange' target='_blank'>&#64;openobserve/browser-logs</a> to your package.json file, or run the following command:"
+      "<b>Step1: </b>Add <a href='https://www.npmjs.com/package/&#64;openobserve/browser-rum' style='color:darkorange' target='_blank'>&#64;openobserve/browser-rum</a> and <a href='https://www.npmjs.com/package/&#64;openobserve/browser-logs' style='color:darkorange' target='_blank'>&#64;openobserve/browser-logs</a> to your package.json file, or run the following command:",
     );
     const npmStep2 = ref(
-      "<b>Step2: </b>Initialize the OpenObserve RUM and Logs SDKs in your application entry point (e.g. index.js or main.js)."
+      "<b>Step2: </b>Initialize the OpenObserve RUM and Logs SDKs in your application entry point (e.g. index.js or main.js).",
     );
     const rumToken = ref("");
     const defaultConfig = `
@@ -165,12 +169,12 @@ openobserveRum.startSessionReplayRecording();`;
         ingestionURL
           .replace("https://", "")
           .replace("http://", "")
-          .replace(/\/$/, "")
+          .replace(/\/$/, ""),
       );
 
       configData = configData.replace(
         /<OPENOBSERVE_ORGANIZATION_IDENTIFIER>/g,
-        store.state.selectedOrganization.identifier
+        store.state.selectedOrganization.identifier,
       );
 
       if (store.state.API_ENDPOINT.indexOf("https://") > -1) {
@@ -181,12 +185,12 @@ openobserveRum.startSessionReplayRecording();`;
 
       initConfiguration.value = configData.replace(
         /<OPENOBSERVE_CLIENT_TOKEN>/g,
-        rumToken.value
+        rumToken.value,
       );
 
       displayConfiguration.value = configData.replace(
         /<OPENOBSERVE_CLIENT_TOKEN>/g,
-        maskText(rumToken.value)
+        maskText(rumToken.value),
       );
     };
 

@@ -1007,6 +1007,75 @@ describe("SearchBar", () => {
 
       expect(searchObjInstance.data.editorValue).toBe("service_name='svc-a'");
     });
+
+    it("should not duplicate the filter when the same condition already exists in the query", async () => {
+      searchObjInstance.data.editorValue = "span_status='ERROR'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const mockSetValue = vi.fn();
+      (wrapper.vm as any).queryEditorRef = { setValue: mockSetValue };
+
+      searchObjInstance.data.stream.addToFilter = "span_status='ERROR'";
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      expect(searchObjInstance.data.editorValue).toBe("span_status='ERROR'");
+    });
+
+    it("should replace an existing condition for the same field rather than appending", async () => {
+      searchObjInstance.data.editorValue = "span_status='ERROR'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const mockSetValue = vi.fn();
+      (wrapper.vm as any).queryEditorRef = { setValue: mockSetValue };
+
+      searchObjInstance.data.stream.addToFilter = "span_status='OK'";
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      expect(searchObjInstance.data.editorValue).toBe("span_status='OK'");
+    });
+
+    it("should append with 'and' when the filter field does not exist in the current query", async () => {
+      searchObjInstance.data.editorValue = "service_name='svc-a'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const mockSetValue = vi.fn();
+      (wrapper.vm as any).queryEditorRef = { setValue: mockSetValue };
+
+      searchObjInstance.data.stream.addToFilter = "span_status='ERROR'";
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      expect(searchObjInstance.data.editorValue).toBe(
+        "service_name='svc-a' and span_status='ERROR'",
+      );
+    });
+
+    it("should append filter when the filter expression has no parseable field name", async () => {
+      // A bare keyword without an operator (=, !=, >=, etc.) causes
+      // getFieldFromExpression to return null. With the new logic the caller
+      // treats a null field as "no replacement possible" and falls through to
+      // the append path, producing: <existing> and <filter>.
+      searchObjInstance.data.editorValue = "service_name='svc-a'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const mockSetValue = vi.fn();
+      (wrapper.vm as any).queryEditorRef = { setValue: mockSetValue };
+
+      // "some bare keyword" has no operator — getFieldFromExpression returns null
+      searchObjInstance.data.stream.addToFilter = "some bare keyword";
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      expect(searchObjInstance.data.editorValue).toBe(
+        "service_name='svc-a' and some bare keyword",
+      );
+    });
   });
 
   // -------------------------------------------------------------------------

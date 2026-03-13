@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="show"
             ref="dashboardChartsRef"
             :viewOnly="true"
-            :dashboardData="dashboardData"
+            :dashboardData="dashboardData || {}"
             :currentTimeObj="currentTimeObj"
             :allowAlertCreation="false"
             searchType="dashboards"
