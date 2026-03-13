@@ -73,8 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: General -->
     <q-expansion-item
-      v-show="sectionVisible(generalKeywords)"
-      :model-value="isExpanded('general', generalKeywords)"
+      v-show="isSectionVisible('general')"
+      :model-value="isExpanded('general')"
       @update:model-value="
         (v) => {
           expandedSections.general = v;
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="config-section-body">
         <div
-          v-show="itemVisible(['description'], 'general')"
+          v-show="isConfigOptionVisible('general', 'description')"
           class="tw:max-w-[300px]"
         >
           <div class="q-mb-sm tw:font-semibold">
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="promqlMode"
-          v-show="itemVisible(['step', 'step value', 'promql step'], 'general')"
+          v-show="isConfigOptionVisible('general', 'step')"
           v-model="dashboardPanelData.data.config.step_value"
           type="text"
           color="input-border"
@@ -149,19 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Panel Default Time Configuration -->
         <div
-          v-show="
-            itemVisible(
-              [
-                'panel time',
-                'default time',
-                'use default time',
-                'duration',
-                'set panel time',
-                'panel default time',
-              ],
-              'general',
-            )
-          "
+          v-show="isConfigOptionVisible('general', 'panel-default-time')"
           class="q-mb-sm"
         >
           <div class="row items-center">
@@ -258,12 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type !== 'geomap' &&
             dashboardPanelData.data.type !== 'maps'
           "
-          v-show="
-            itemVisible(
-              ['promql', 'step', 'chart config', 'promql chart'],
-              'general',
-            )
-          "
+          v-show="isConfigOptionVisible('general', 'promql-chart-config')"
           :chart-type="dashboardPanelData.data.type"
         />
       </div>
@@ -276,8 +259,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (dashboardPanelData.data.type === 'geomap' ||
           dashboardPanelData.data.type === 'maps')
       "
-      v-show="sectionVisible(geographicKeywords)"
-      :model-value="isExpanded('geographic', geographicKeywords)"
+      v-show="isSectionVisible('geographic')"
+      :model-value="isExpanded('geographic')"
       @update:model-value="
         (v) => {
           expandedSections.geographic = v;
@@ -297,8 +280,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Legend -->
     <q-expansion-item
-      v-show="sectionVisible(legendKeywords) && legendSectionHasContent"
-      :model-value="isExpanded('legend', legendKeywords)"
+      v-show="isSectionVisible('legend')"
+      :model-value="isExpanded('legend')"
       @update:model-value="
         (v) => {
           expandedSections.legend = v;
@@ -314,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="config-section-body o2-input">
         <q-toggle
           v-if="shouldShowLegendsToggle(dashboardPanelData)"
-          v-show="itemVisible(['legend', 'show legend', 'legends'], 'legend')"
+          v-show="isConfigOptionVisible('legend', 'show-legends')"
           v-model="dashboardPanelData.data.config.show_legends"
           :label="t('dashboard.showLegendsLabel')"
           data-test="dashboard-config-show-legend"
@@ -604,12 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-select
           v-if="shouldShowLegendType(dashboardPanelData)"
-          v-show="
-            itemVisible(
-              ['legend type', 'type', 'scroll', 'plain', 'legend'],
-              'legend',
-            )
-          "
+          v-show="isConfigOptionVisible('legend', 'legend-type')"
           borderless
           v-model="dashboardPanelData.data.config.legends_type"
           :options="legendTypeOptions"
@@ -627,12 +605,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-select>
 
         <div
-          v-show="
-            itemVisible(
-              ['legend width', 'legend height', 'width', 'height', 'legend'],
-              'legend',
-            )
-          "
+          v-show="isConfigOptionVisible('legend', 'legend-size')"
           style="display: flex; gap: 8px; flex-wrap: wrap"
         >
           <!-- Legend Width + unit selector -->
@@ -760,9 +733,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-select
           v-if="shouldApplyChartAlign(dashboardPanelData)"
-          v-show="
-            itemVisible(['align', 'chart align', 'chart alignment'], 'legend')
-          "
+          v-show="isConfigOptionVisible('legend', 'chart-align')"
           borderless
           v-model="dashboardPanelData.data.config.chart_align"
           :options="chartAlignOptions"
@@ -785,7 +756,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type != 'geomap' &&
             dashboardPanelData.data.type != 'maps'
           "
-          v-show="itemVisible(['promql legend', 'legend', 'query'], 'legend')"
+          v-show="isConfigOptionVisible('legend', 'promql-legend')"
           class="showLabelOnTop"
           style="font-weight: 600"
         >
@@ -804,7 +775,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="t('dashboard.queryLabel') + ' ' + (index + 1)"
+              :label="`${t('dashboard.queryLabel')} ${Number(index) + 1}`"
               :data-test="`dashboard-config-query-tab-${index}`"
             >
             </q-tab>
@@ -817,9 +788,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type != 'geomap' &&
             dashboardPanelData.data.type != 'maps'
           "
-          v-show="
-            itemVisible(['promql legend', 'legend', 'legend label'], 'legend')
-          "
+          v-show="isConfigOptionVisible('legend', 'promql-legend-label')"
           :label="t('common.legend')"
           v-model="
             dashboardPanelData.data.queries[
@@ -868,8 +837,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Data -->
     <q-expansion-item
-      v-show="sectionVisible(dataKeywords) && dataSectionHasVisibleContent"
-      :model-value="isExpanded('data', dataKeywords)"
+      v-show="isSectionVisible('data')"
+      :model-value="isExpanded('data')"
       @update:model-value="
         (v) => {
           expandedSections.data = v;
@@ -884,7 +853,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="config-section-body o2-input">
         <q-select
-          v-show="itemVisible(['unit'], 'data')"
+          v-show="isConfigOptionVisible('data', 'unit')"
           borderless
           v-model="dashboardPanelData.data.config.unit"
           :options="unitOptions"
@@ -906,7 +875,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="dashboardPanelData.data.config.unit == 'custom'"
-          v-show="itemVisible(['custom unit', 'unit'], 'data')"
+          v-show="isConfigOptionVisible('data', 'custom-unit')"
           v-model="dashboardPanelData.data.config.unit_custom"
           :label="t('dashboard.customunitLabel')"
           color="input-border"
@@ -921,7 +890,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <q-input
-          v-show="itemVisible(['decimals'], 'data')"
+          v-show="isConfigOptionVisible('data', 'decimals')"
           type="number"
           v-model.number="dashboardPanelData.data.config.decimals"
           value="2"
@@ -955,7 +924,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].customQuery
           "
-          v-show="itemVisible(['limit', 'query limit'], 'data')"
+          v-show="isConfigOptionVisible('data', 'limit')"
           v-model.number="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -1005,12 +974,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
-          v-show="
-            itemVisible(
-              ['top results', 'top n', 'show top n', 'top n values'],
-              'data',
-            )
-          "
+          v-show="isConfigOptionVisible('data', 'top-results')"
           v-model.number="dashboardPanelData.data.config.top_results"
           :min="0"
           @update:model-value="
@@ -1065,12 +1029,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="row items-center"
           v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
-          v-show="
-            itemVisible(
-              ['others', 'others series', 'top results others', 'add others'],
-              'data',
-            )
-          "
+          v-show="isConfigOptionVisible('data', 'top-results-others')"
         >
           <q-toggle
             v-model="dashboardPanelData.data.config.top_results_others"
@@ -1109,9 +1068,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toggle
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
-          v-show="
-            itemVisible(['connect null', 'connect null values', 'null'], 'data')
-          "
+          v-show="isConfigOptionVisible('data', 'connect-nulls')"
           v-model="dashboardPanelData.data.config.connect_nulls"
           :label="t('dashboard.connectNullValues')"
           data-test="dashboard-config-connect-null-values"
@@ -1142,7 +1099,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
-          v-show="itemVisible(['no value', 'no value replacement'], 'data')"
+          v-show="isConfigOptionVisible('data', 'no-value-replacement')"
           v-model="dashboardPanelData.data.config.no_value_replacement"
           :label="t('dashboard.noValueReplacement')"
           color="input-border"
@@ -1182,8 +1139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Axis -->
     <q-expansion-item
-      v-show="sectionVisible(axisKeywords) && axisSectionHasContent"
-      :model-value="isExpanded('axis', axisKeywords)"
+      v-show="isSectionVisible('axis')"
+      :model-value="isExpanded('axis')"
       @update:model-value="
         (v) => {
           expandedSections.axis = v;
@@ -1199,7 +1156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="config-section-body">
         <q-input
           v-if="shouldShowAxisConfig(dashboardPanelData)"
-          v-show="itemVisible(['axis width'], 'axis')"
+          v-show="isConfigOptionVisible('axis', 'axis-width')"
           v-model.number="dashboardPanelData.data.config.axis_width"
           :label="t('common.axisWidth')"
           color="input-border"
@@ -1222,7 +1179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toggle
           v-if="shouldShowAxisConfig(dashboardPanelData)"
-          v-show="itemVisible(['border', 'axis border', 'show border'], 'axis')"
+          v-show="isConfigOptionVisible('axis', 'axis-border')"
           v-model="dashboardPanelData.data.config.axis_border_show"
           :label="t('dashboard.showBorder')"
           data-test="dashboard-config-axis-border"
@@ -1238,20 +1195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           style="width: 100%; display: flex; gap: 16px"
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
-          v-show="
-            itemVisible(
-              [
-                'y axis',
-                'y min',
-                'y max',
-                'y-axis min',
-                'y-axis max',
-                'y axis min',
-                'y axis max',
-              ],
-              'axis',
-            )
-          "
+          v-show="isConfigOptionVisible('axis', 'y-axis')"
         >
           <q-input
             v-model.number="dashboardPanelData.data.config.y_axis_min"
@@ -1341,7 +1285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toggle
           v-if="shouldShowGridlines(dashboardPanelData)"
-          v-show="itemVisible(['gridlines', 'grid', 'show gridlines'], 'axis')"
+          v-show="isConfigOptionVisible('axis', 'gridlines')"
           v-model="dashboardPanelData.data.config.show_gridlines"
           :label="t('dashboard.showGridlines')"
           data-test="dashboard-config-show-gridlines"
@@ -1358,8 +1302,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Labels -->
     <q-expansion-item
-      v-show="sectionVisible(labelsKeywords) && labelsSectionHasContent"
-      :model-value="isExpanded('labels', labelsKeywords)"
+      v-show="isSectionVisible('labels')"
+      :model-value="isExpanded('labels')"
       @update:model-value="
         (v) => {
           expandedSections.labels = v;
@@ -1375,9 +1319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="config-section-body">
         <q-select
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
-          v-show="
-            itemVisible(['label position', 'position', 'label'], 'labels')
-          "
+          v-show="isConfigOptionVisible('labels', 'label-position')"
           borderless
           v-model="dashboardPanelData.data.config.label_option.position"
           :options="labelPositionOptions"
@@ -1401,7 +1343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
-          v-show="itemVisible(['label rotate', 'rotate', 'label'], 'labels')"
+          v-show="isConfigOptionVisible('labels', 'label-rotate')"
           v-model.number="dashboardPanelData.data.config.label_option.rotate"
           :label="t('dashboard.labelRotate')"
           color="input-border"
@@ -1425,18 +1367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           style="width: 100%; display: flex; gap: 16px"
           v-if="shouldShowAxisLabelConfig(dashboardPanelData)"
-          v-show="
-            itemVisible(
-              [
-                'axis label',
-                'axis label rotate',
-                'axis label truncate',
-                'rotate',
-                'truncate',
-              ],
-              'labels',
-            )
-          "
+          v-show="isConfigOptionVisible('labels', 'axis-label')"
         >
           <q-input
             v-model.number="dashboardPanelData.data.config.axis_label_rotate"
@@ -1538,8 +1469,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Line Style -->
     <q-expansion-item
-      v-show="sectionVisible(lineStyleKeywords) && lineStyleSectionHasContent"
-      :model-value="isExpanded('lineStyle', lineStyleKeywords)"
+      v-show="isSectionVisible('lineStyle')"
+      :model-value="isExpanded('lineStyle')"
       @update:model-value="
         (v) => {
           expandedSections.lineStyle = v;
@@ -1555,7 +1486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="config-section-body o2-input">
         <q-select
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
-          v-show="itemVisible(['symbol', 'show symbol'], 'line style')"
+          v-show="isConfigOptionVisible('lineStyle', 'symbol')"
           borderless
           v-model="dashboardPanelData.data.config.show_symbol"
           :options="showSymbol"
@@ -1590,20 +1521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-select
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
-          v-show="
-            itemVisible(
-              [
-                'interpolation',
-                'line interpolation',
-                'smooth',
-                'step',
-                'linear',
-                'step before',
-                'step after',
-              ],
-              'line style',
-            )
-          "
+          v-show="isConfigOptionVisible('lineStyle', 'interpolation')"
           borderless
           v-model="dashboardPanelData.data.config.line_interpolation"
           :options="lineInterpolationOptions"
@@ -1639,7 +1557,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="shouldShowLineThickness(dashboardPanelData, promqlMode)"
-          v-show="itemVisible(['line thickness', 'thickness'], 'line style')"
+          v-show="isConfigOptionVisible('lineStyle', 'line-thickness')"
           v-model.number="dashboardPanelData.data.config.line_thickness"
           :value="1.5"
           :min="0"
@@ -1667,8 +1585,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Table -->
     <q-expansion-item
       v-if="dashboardPanelData.data.type == 'table'"
-      v-show="sectionVisible(tableKeywords)"
-      :model-value="isExpanded('table', tableKeywords)"
+      v-show="isSectionVisible('table')"
+      :model-value="isExpanded('table')"
       @update:model-value="
         (v) => {
           expandedSections.table = v;
@@ -1683,7 +1601,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="config-section-body">
         <q-toggle
-          v-show="itemVisible(['wrap', 'wrap text', 'wrap table'], 'table')"
+          v-show="isConfigOptionVisible('table', 'wrap')"
           v-model="dashboardPanelData.data.config.wrap_table_cells"
           :label="t('dashboard.wraptext')"
           data-test="dashboard-config-wrap-table-cells"
@@ -1698,7 +1616,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toggle
           v-if="!promqlMode"
-          v-show="itemVisible(['transpose', 'table transpose'], 'table')"
+          v-show="isConfigOptionVisible('table', 'transpose')"
           v-model="dashboardPanelData.data.config.table_transpose"
           :label="t('dashboard.tableTranspose')"
           data-test="dashboard-config-table_transpose"
@@ -1713,12 +1631,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toggle
           v-if="!promqlMode"
-          v-show="
-            itemVisible(
-              ['dynamic', 'dynamic columns', 'table dynamic'],
-              'table',
-            )
-          "
+          v-show="isConfigOptionVisible('table', 'dynamic-columns')"
           v-model="dashboardPanelData.data.config.table_dynamic_columns"
           :label="t('dashboard.tableDynamicColumns')"
           data-test="dashboard-config-table_dynamic_columns"
@@ -1732,7 +1645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <q-toggle
-          v-show="itemVisible(['pagination'], 'table')"
+          v-show="isConfigOptionVisible('table', 'pagination')"
           v-model="dashboardPanelData.data.config.table_pagination"
           :label="t('dashboard.pagination')"
           data-test="dashboard-config-show-pagination"
@@ -1747,7 +1660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-if="dashboardPanelData.data.config.table_pagination"
-          v-show="itemVisible(['rows per page', 'pagination'], 'table')"
+          v-show="isConfigOptionVisible('table', 'rows-per-page')"
           v-model.number="
             dashboardPanelData.data.config.table_pagination_rows_per_page
           "
@@ -1792,10 +1705,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Value Transformations -->
     <q-expansion-item
       v-if="dashboardPanelData.data.type == 'table'"
-      v-show="sectionVisible(valueTransformationsKeywords)"
-      :model-value="
-        isExpanded('valueTransformations', valueTransformationsKeywords)
-      "
+      v-show="isSectionVisible('valueTransformations')"
+      :model-value="isExpanded('valueTransformations')"
       @update:model-value="
         (v) => {
           expandedSections.valueTransformations = v;
@@ -1816,8 +1727,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Field Overrides -->
     <q-expansion-item
       v-if="dashboardPanelData.data.type == 'table'"
-      v-show="sectionVisible(fieldOverridesKeywords)"
-      :model-value="isExpanded('fieldOverrides', fieldOverridesKeywords)"
+      v-show="isSectionVisible('fieldOverrides')"
+      :model-value="isExpanded('fieldOverrides')"
       @update:model-value="
         (v) => {
           expandedSections.fieldOverrides = v;
@@ -1830,7 +1741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expanded-icon="keyboard_arrow_down"
       expand-icon-class="text-grey-6"
     >
-      <div class="config-section-body">
+      <div class="config-section-body hide-child-title">
         <OverrideConfig
           :dashboardPanelData="dashboardPanelData"
           :panelData="panelData"
@@ -1844,8 +1755,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dashboardPanelData.data.type == 'geomap' ||
         dashboardPanelData.data.type == 'maps'
       "
-      v-show="sectionVisible(mapKeywords)"
-      :model-value="isExpanded('map', mapKeywords)"
+      v-show="isSectionVisible('map')"
+      :model-value="isExpanded('map')"
       @update:model-value="
         (v) => {
           expandedSections.map = v;
@@ -2131,8 +2042,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Gauge -->
     <q-expansion-item
       v-if="dashboardPanelData.data.type === 'gauge'"
-      v-show="sectionVisible(gaugeKeywords)"
-      :model-value="isExpanded('gauge', gaugeKeywords)"
+      v-show="isSectionVisible('gauge')"
+      :model-value="isExpanded('gauge')"
       @update:model-value="
         (v) => {
           expandedSections.gauge = v;
@@ -2147,7 +2058,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="config-section-body">
         <q-input
-          v-show="itemVisible(['gauge min', 'min', 'minimum'], 'gauge')"
+          v-show="isConfigOptionVisible('gauge', 'gauge-min')"
           v-model.number="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -2178,7 +2089,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
         <q-input
-          v-show="itemVisible(['gauge max', 'max', 'maximum'], 'gauge')"
+          v-show="isConfigOptionVisible('gauge', 'gauge-max')"
           v-model.number="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -2215,8 +2126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Layout -->
     <q-expansion-item
       v-if="showTrellisConfig"
-      v-show="sectionVisible(layoutKeywords) && layoutSectionHasVisibleContent"
-      :model-value="isExpanded('layout', layoutKeywords)"
+      v-show="isSectionVisible('layout')"
+      :model-value="isExpanded('layout')"
       @update:model-value="
         (v) => {
           expandedSections.layout = v;
@@ -2231,9 +2142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="config-section-body">
         <q-select
-          v-show="
-            itemVisible(['trellis', 'layout', 'trellis layout'], 'layout')
-          "
+          v-show="isConfigOptionVisible('layout', 'trellis-layout')"
           :label="t('dashboard.trellisLayout')"
           data-test="dashboard-trellis-chart"
           borderless
@@ -2278,12 +2187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           v-if="dashboardPanelData.data.config.trellis?.layout === 'custom'"
-          v-show="
-            itemVisible(
-              ['columns', 'num of columns', 'trellis columns'],
-              'layout',
-            )
-          "
+          v-show="isConfigOptionVisible('layout', 'trellis-columns')"
         >
           <q-input
             borderless
@@ -2341,12 +2245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.config.trellis?.layout &&
             !(isBreakdownFieldEmpty || hasTimeShifts)
           "
-          v-show="
-            itemVisible(
-              ['group', 'group by y axis', 'y axis', 'trellis'],
-              'layout',
-            )
-          "
+          v-show="isConfigOptionVisible('layout', 'trellis-group-by')"
           class="row items-center"
         >
           <q-toggle
@@ -2399,8 +2298,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Colors -->
     <q-expansion-item
       v-if="showColorPalette"
-      v-show="sectionVisible(colorsKeywords)"
-      :model-value="isExpanded('colors', colorsKeywords)"
+      v-show="isSectionVisible('colors')"
+      :model-value="isExpanded('colors')"
       @update:model-value="
         (v) => {
           expandedSections.colors = v;
@@ -2422,8 +2321,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Drilldown -->
     <q-expansion-item
       v-if="shouldShowDrilldown(dashboardPanelData, dashboardPanelDataPageKey)"
-      v-show="sectionVisible(drilldownKeywords)"
-      :model-value="isExpanded('drilldown', drilldownKeywords)"
+      v-show="isSectionVisible('drilldown')"
+      :model-value="isExpanded('drilldown')"
       @update:model-value="
         (v) => {
           expandedSections.drilldown = v;
@@ -2450,8 +2349,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelDataPageKey,
         )
       "
-      v-show="sectionVisible(comparisonKeywords)"
-      :model-value="isExpanded('comparison', comparisonKeywords)"
+      v-show="isSectionVisible('comparison')"
+      :model-value="isExpanded('comparison')"
       @update:model-value="
         (v) => {
           expandedSections.comparison = v;
@@ -2534,8 +2433,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Mark Lines -->
     <q-expansion-item
       v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
-      v-show="sectionVisible(markLinesKeywords)"
-      :model-value="isExpanded('markLines', markLinesKeywords)"
+      v-show="isSectionVisible('markLines')"
+      :model-value="isExpanded('markLines')"
       @update:model-value="
         (v) => {
           expandedSections.markLines = v;
@@ -2556,8 +2455,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Background -->
     <q-expansion-item
       v-if="dashboardPanelData.data.type == 'metric'"
-      v-show="sectionVisible(backgroundKeywords)"
-      :model-value="isExpanded('background', backgroundKeywords)"
+      v-show="isSectionVisible('background')"
+      :model-value="isExpanded('background')"
       @update:model-value="
         (v) => {
           expandedSections.background = v;
@@ -3384,256 +3283,311 @@ export default defineComponent({
         relativeTimePeriod: "15m",
       };
     };
-    // ΓöÇΓöÇ Section keyword arrays ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-    const generalKeywords = [
-      "description",
-      "step",
-      "time",
-      "panel time",
-      "duration",
+    //Section + option metadata for label-driven
+    type SectionId =
+      | "general"
+      | "geographic"
+      | "legend"
+      | "data"
+      | "axis"
+      | "labels"
+      | "lineStyle"
+      | "table"
+      | "valueTransformations"
+      | "fieldOverrides"
+      | "map"
+      | "gauge"
+      | "layout"
+      | "colors"
+      | "drilldown"
+      | "comparison"
+      | "markLines"
+      | "background";
+
+    const configOptions = computed(() => ({
+      general: {
+        description: { label: t("dashboard.description") },
+        step: {
+          label: t("dashboard.stepValue"),
+          visible: !!promqlMode.value,
+        },
+        "panel-default-time": { label: t("dashboard.panelTimeEnabled") },
+        "promql-chart-config": {
+          label: t("dashboard.promqlChartConfig"),
+          visible:
+            !!promqlMode.value &&
+            dashboardPanelData.data.type !== "geomap" &&
+            dashboardPanelData.data.type !== "maps",
+        },
+      },
+      geographic: {
+        "geographic-config": {
+          label: t("dashboard.geographicConfig"),
+          visible:
+            !!promqlMode.value &&
+            (dashboardPanelData.data.type === "geomap" ||
+              dashboardPanelData.data.type === "maps"),
+        },
+      },
+      legend: {
+        "show-legends": {
+          label: t("dashboard.showLegendsLabel"),
+          visible: shouldShowLegendsToggle(dashboardPanelData),
+        },
+        "legend-position": {
+          label: t("dashboard.legendsPositionLabel"),
+          visible: shouldShowLegendPosition(dashboardPanelData),
+        },
+        "legend-type": {
+          label: t("dashboard.legendsType"),
+          visible: shouldShowLegendType(dashboardPanelData),
+        },
+        "legend-size": {
+          label: [t("common.legendWidth"), t("dashboard.legendHeight")],
+          visible:
+            shouldShowLegendWidth(dashboardPanelData) ||
+            shouldShowLegendHeight(dashboardPanelData),
+        },
+        "chart-align": {
+          label: t("dashboard.chartAlign"),
+          visible: shouldApplyChartAlign(dashboardPanelData),
+        },
+        "promql-legend": {
+          label: t("dashboard.query"),
+          visible:
+            !!promqlMode.value &&
+            dashboardPanelData.data.type !== "geomap" &&
+            dashboardPanelData.data.type !== "maps",
+        },
+        "promql-legend-label": {
+          label: [t("dashboard.legendLabel"), t("common.legend")],
+          visible:
+            !!promqlMode.value &&
+            dashboardPanelData.data.type !== "geomap" &&
+            dashboardPanelData.data.type !== "maps",
+        },
+      },
+      data: {
+        unit: {
+          label: t("dashboard.unitLabel"),
+        },
+        "custom-unit": {
+          label: t("dashboard.customunitLabel"),
+          visible: dashboardPanelData.data.config.unit === "custom",
+        },
+        decimals: {
+          label: t("dashboard.decimals"),
+        },
+        limit: {
+          label: t("dashboard.queryLimit"),
+          visible:
+            !promqlMode.value &&
+            !dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.customQuery,
+        },
+        "top-results": {
+          label: t("dashboard.showTopNValues"),
+          visible: shouldShowTopResultsConfig(
+            dashboardPanelData,
+            promqlMode.value,
+          ),
+        },
+        "top-results-others": {
+          label: t("dashboard.addOthersSeries"),
+          visible: shouldShowTopResultsConfig(
+            dashboardPanelData,
+            promqlMode.value,
+          ),
+        },
+        "connect-nulls": {
+          label: t("dashboard.connectNullValues"),
+          visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
+        },
+        "no-value-replacement": {
+          label: t("dashboard.noValueReplacement"),
+          visible: shouldShowNoValueReplacement(
+            dashboardPanelData,
+            promqlMode.value,
+          ),
+        },
+      },
+      axis: {
+        "axis-width": {
+          label: t("common.axisWidth"),
+          visible: shouldShowAxisConfig(dashboardPanelData),
+        },
+        "axis-border": {
+          label: t("dashboard.showBorder"),
+          visible: shouldShowAxisConfig(dashboardPanelData),
+        },
+        "y-axis": {
+          label: [t("common.yAxisMin"), t("common.yAxisMax")],
+          visible: shouldShowCartesianAxisConfig(dashboardPanelData),
+        },
+        gridlines: {
+          label: t("dashboard.showGridlines"),
+          visible: shouldShowGridlines(dashboardPanelData),
+        },
+      },
+      labels: {
+        "label-position": {
+          label: t("dashboard.labelPosition"),
+          visible: shouldShowCartesianAxisConfig(dashboardPanelData),
+        },
+        "label-rotate": {
+          label: t("dashboard.labelRotate"),
+          visible: shouldShowCartesianAxisConfig(dashboardPanelData),
+        },
+        "axis-label": {
+          label: [t("dashboard.labelRotate"), t("dashboard.labelTruncate")],
+          visible: shouldShowAxisLabelConfig(dashboardPanelData),
+        },
+      },
+      lineStyle: {
+        symbol: {
+          label: t("dashboard.showSymbol"),
+          visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
+        },
+        interpolation: {
+          label: t("dashboard.lineInterpolation"),
+          visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
+        },
+        "line-thickness": {
+          label: t("dashboard.lineThickness"),
+          visible: shouldShowLineThickness(
+            dashboardPanelData,
+            promqlMode.value,
+          ),
+        },
+      },
+      table: {
+        wrap: {
+          label: t("dashboard.wraptext"),
+        },
+        transpose: {
+          label: t("dashboard.tableTranspose"),
+          visible: !promqlMode.value,
+        },
+        "dynamic-columns": {
+          label: t("dashboard.tableDynamicColumns"),
+          visible: !promqlMode.value,
+        },
+        pagination: {
+          label: t("dashboard.pagination"),
+        },
+        "rows-per-page": {
+          label: t("dashboard.rowsPerPage"),
+          visible: !!dashboardPanelData.data.config.table_pagination,
+        },
+      },
+      valueTransformations: {
+        "value-transformations": {
+          label: t("dashboard.valueTransformations"),
+        },
+      },
+      fieldOverrides: {
+        "field-overrides": {
+          label: t("dashboard.fieldOverrides"),
+        },
+      },
+      map: {
+        "map-config": {
+          label: t("dashboard.map"),
+          visible:
+            dashboardPanelData.data.type === "geomap" ||
+            dashboardPanelData.data.type === "maps",
+        },
+      },
+      gauge: {
+        "gauge-min": {
+          label: t("dashboard.gaugeMinimum"),
+          visible: dashboardPanelData.data.type === "gauge",
+        },
+        "gauge-max": {
+          label: t("dashboard.gaugeMaximum"),
+          visible: dashboardPanelData.data.type === "gauge",
+        },
+      },
+      layout: {
+        "trellis-layout": {
+          label: t("dashboard.trellisLayout"),
+          visible: showTrellisConfig.value,
+        },
+        "trellis-columns": {
+          label: t("dashboard.trellisColumns"),
+          visible:
+            showTrellisConfig.value &&
+            dashboardPanelData.data.config.trellis?.layout === "custom",
+        },
+        "trellis-group-by": {
+          label: t("dashboard.trellisGroupBy"),
+          visible:
+            showTrellisConfig.value &&
+            dashboardPanelData.data.config.trellis?.layout != null,
+        },
+      },
+      colors: {
+        colors: {
+          label: t("dashboard.colors"),
+          visible: showColorPalette.value,
+        },
+      },
+      drilldown: {
+        drilldown: {
+          label: t("dashboard.drilldown"),
+          visible: shouldShowDrilldown(
+            dashboardPanelData,
+            dashboardPanelDataPageKey,
+          ),
+        },
+      },
+      comparison: {
+        comparison: {
+          label: t("dashboard.comparisonAgainst"),
+          visible: shouldShowTimeShift(
+            dashboardPanelData,
+            promqlMode.value,
+            dashboardPanelDataPageKey,
+          ),
+        },
+      },
+      markLines: {
+        "mark-lines": {
+          label: t("dashboard.markLines"),
+          visible: shouldShowCartesianAxisConfig(dashboardPanelData),
+        },
+      },
+      background: {
+        background: {
+          label: t("dashboard.background"),
+          visible: dashboardPanelData.data.type === "metric",
+        },
+      },
+    }));
+
+    const orderedSectionIds: SectionId[] = [
       "general",
-      "promql",
-      "panel default time",
-      "use default time",
-      "set panel time",
-      "step value",
-      "promql step",
-      "default duration",
-    ];
-
-    const legendKeywords = [
-      "legend",
-      "show legend",
-      "position",
-      "legend type",
-      "legend width",
-      "legend height",
-      "chart align",
-      "chart alignment",
-      "scroll",
-      "plain",
-      "promql legend",
-      "align",
-      "legend override",
-      "legend width unit",
-      "legend height unit",
-    ];
-
-    const dataKeywords = [
-      "unit",
-      "decimals",
-      "limit",
-      "top results",
-      "top n",
-      "others",
-      "connect null",
-      "no value",
-      "data",
-      "query limit",
-      "show top n values",
-      "others series",
-      "connect null values",
-      "no value replacement",
-      "custom unit",
-    ];
-
-    const axisKeywords = [
-      "axis",
-      "border",
-      "y axis",
-      "y min",
-      "y max",
-      "gridlines",
-      "grid",
-      "axis width",
-      "y-axis min",
-      "y-axis max",
-      "x axis",
-      "show border",
-      "show gridlines",
-      "axis border",
-    ];
-
-    const labelsKeywords = [
-      "label",
-      "label position",
-      "rotate",
-      "truncate",
-      "label rotate",
-      "axis label",
-      "overflow",
-      "font size",
-      "label font",
-      "label truncate",
-      "axis label rotate",
-      "axis label truncate",
-    ];
-
-    const lineStyleKeywords = [
-      "line",
-      "symbol",
-      "interpolation",
-      "thickness",
-      "smooth",
-      "step",
-      "linear",
-      "line style",
-      "line thickness",
-      "fill area",
-      "line interpolation",
-      "show symbol",
-      "step before",
-      "step after",
-    ];
-
-    const tableKeywords = [
-      "table",
-      "wrap",
-      "transpose",
-      "dynamic",
-      "columns",
-      "pagination",
-      "rows per page",
-      "column width",
-      "wrap text",
-      "row background",
-      "sticky header",
-      "column border",
-      "wrap table",
-      "table transpose",
-      "table dynamic",
-    ];
-
-    const valueTransformationsKeywords = [
-      "value transformations",
-      "value transform",
-      "transformations",
-      "mapping",
-      "value mapping",
-      "map values",
-      "data mapping",
-      "transform data",
-    ];
-
-    const fieldOverridesKeywords = [
-      "field overrides",
-      "column overrides",
-      "overrides",
-      "override config",
-      "override",
-      "field config",
-      "column config",
-      "custom field",
-    ];
-
-    const mapKeywords = [
-      "map",
-      "basemap",
-      "latitude",
-      "longitude",
-      "zoom",
-      "symbol",
-      "layer",
-      "weight",
-      "geomap",
-      "map type",
-      "initial view",
-      "map symbol",
-      "layer type",
-      "fixed value",
-      "minimum",
-      "maximum",
-    ];
-
-    const geographicKeywords = [
       "geographic",
-      "geo",
-      "location",
-      "coordinates",
-      "aggregation",
-      "aggregate",
-      "latitude",
-      "lat",
-      "longitude",
-      "lon",
-      "weight",
-      "name label",
-      "geographic data",
-    ];
-
-    const gaugeKeywords = [
+      "legend",
+      "data",
+      "axis",
+      "labels",
+      "lineStyle",
+      "table",
+      "valueTransformations",
+      "fieldOverrides",
+      "map",
       "gauge",
-      "min",
-      "max",
-      "minimum",
-      "maximum",
-      "gauge min",
-      "gauge max",
-      "gauge pointer",
-      "arc width",
-    ];
-
-    const layoutKeywords = [
       "layout",
-      "trellis",
-      "columns",
-      "group",
-      "small multiples",
-      "trellis columns",
-      "layout rows",
-      "trellis layout",
-      "num of columns",
-      "group by y axis",
-    ];
-
-    const colorsKeywords = [
-      "color",
-      "palette",
-      "color by series",
-      "theme",
       "colors",
-      "color palette",
-      "color scheme",
-      "custom color",
-    ];
-
-    const drilldownKeywords = [
       "drilldown",
-      "drill",
-      "link",
-      "navigate",
-      "drilldown url",
-      "target",
-      "open in",
-    ];
-
-    const comparisonKeywords = [
       "comparison",
-      "time shift",
-      "compare",
-      "offset",
-      "period",
-      "comparison against",
-    ];
-
-    const markLinesKeywords = [
-      "mark line",
-      "mark",
-      "threshold",
-      "reference",
-      "mark lines",
-      "baseline",
-    ];
-
-    const backgroundKeywords = [
+      "markLines",
       "background",
-      "background color",
-      "metric",
-      "bg color",
-      "panel background",
     ];
 
-    // ΓöÇΓöÇ Search and section expansion state ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // Search and section expansion state
     const searchQuery = ref("");
     const expandedSections = ref<Record<string, boolean>>({
       general: true,
@@ -3656,29 +3610,44 @@ export default defineComponent({
       background: true,
     });
 
-    // Word-boundary match: query must start at a word boundary within the keyword
-    const matchesSearch = (keyword: string, query: string): boolean => {
-      const k = keyword.toLowerCase();
-      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return new RegExp(`\\b${escaped}`).test(k);
+    // Simple substring match: query can match anywhere in the label (partial/middle-of-string)
+    const matchesSearch = (label: string, query: string): boolean => {
+      return label.toLowerCase().includes(query.toLowerCase());
     };
 
-    const sectionVisible = (keywords: string[]) => {
-      const q = (searchQuery.value ?? "").trim().toLowerCase();
+    const normalizedSearchQuery = computed(() =>
+      (searchQuery.value ?? "").trim().toLowerCase(),
+    );
+
+    const isConfigOptionVisible = (sectionId: SectionId, optionId: string) => {
+      const option = configOptions.value[sectionId]?.[optionId] as any;
+
+      // 1. Check visibility
+      if (!option || (option.visible !== undefined && option.visible === false))
+        return false;
+
+      // 2. Check search query
+      const q = normalizedSearchQuery.value;
       if (!q) return true;
-      return keywords.some((k) => matchesSearch(k, q));
+
+      const labels = Array.isArray(option.label)
+        ? option.label
+        : [option.label];
+
+      return labels.some((l: string) => matchesSearch(l, q));
     };
 
-    // Item-level filter. When the section's own label matches the query all
-    // items in that section are visible regardless of their own keywords.
-    const itemVisible = (keywords: string[], sectionLabel?: string) => {
-      const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q) return true;
-      if (sectionLabel && matchesSearch(sectionLabel, q)) return true;
-      return keywords.some((k) => matchesSearch(k, q));
+    const isSectionVisible = (sectionId: SectionId) => {
+      const sectionOptions = configOptions.value[sectionId];
+      if (!sectionOptions) return false;
+
+      // Check if any option in this section is visible
+      return Object.keys(sectionOptions).some((optionId) =>
+        isConfigOptionVisible(sectionId, optionId),
+      );
     };
 
-    const isExpanded = (key: string, _keywords: string[]) => {
+    const isExpanded = (key: string) => {
       return expandedSections.value[key] ?? true;
     };
 
@@ -3702,258 +3671,10 @@ export default defineComponent({
       }
     });
 
-    // ΓöÇΓöÇ hasContent guards — query-aware: when searching, also verify that the
-    // items matching the query are actually renderable (their v-if is true).
-    const legendSectionHasContent = computed(() => {
-      const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q || matchesSearch("legend", q))
-        return (
-          shouldShowLegendsToggle(dashboardPanelData) ||
-          shouldShowLegendPosition(dashboardPanelData) ||
-          shouldShowLegendType(dashboardPanelData) ||
-          shouldShowLegendWidth(dashboardPanelData) ||
-          shouldShowLegendHeight(dashboardPanelData) ||
-          shouldApplyChartAlign(dashboardPanelData) ||
-          (promqlMode.value &&
-            dashboardPanelData.data.type !== "geomap" &&
-            dashboardPanelData.data.type !== "maps")
-        );
-      if (
-        ["legend", "show legend", "legends"].some((k) => matchesSearch(k, q)) &&
-        shouldShowLegendsToggle(dashboardPanelData)
-      )
-        return true;
-      if (
-        ["legend position", "position", "legend"].some((k) =>
-          matchesSearch(k, q),
-        ) &&
-        shouldShowLegendPosition(dashboardPanelData)
-      )
-        return true;
-      if (
-        ["legend type", "type", "scroll", "plain", "legend"].some((k) =>
-          matchesSearch(k, q),
-        ) &&
-        shouldShowLegendType(dashboardPanelData)
-      )
-        return true;
-      if (
-        ["legend width", "legend height", "width", "height", "legend"].some(
-          (k) => matchesSearch(k, q),
-        ) &&
-        (shouldShowLegendWidth(dashboardPanelData) ||
-          shouldShowLegendHeight(dashboardPanelData))
-      )
-        return true;
-      if (
-        ["align", "chart align", "chart alignment"].some((k) =>
-          matchesSearch(k, q),
-        ) &&
-        shouldApplyChartAlign(dashboardPanelData)
-      )
-        return true;
-      if (
-        ["promql legend", "legend", "query", "legend label"].some((k) =>
-          matchesSearch(k, q),
-        ) &&
-        promqlMode.value &&
-        dashboardPanelData.data.type !== "geomap" &&
-        dashboardPanelData.data.type !== "maps"
-      )
-        return true;
-      return false;
-    });
+    // Section visibility and empty-state computation are now fully driven by
+    // the option labels and their runtime visibility predicates.
 
-    const axisSectionHasContent = computed(() => {
-      const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q || matchesSearch("axis", q))
-        return (
-          shouldShowAxisConfig(dashboardPanelData) ||
-          shouldShowCartesianAxisConfig(dashboardPanelData) ||
-          shouldShowGridlines(dashboardPanelData)
-        );
-      if (
-        ["axis width"].some((k) => matchesSearch(k, q)) &&
-        shouldShowAxisConfig(dashboardPanelData)
-      )
-        return true;
-      if (
-        ["border", "axis border", "show border"].some((k) =>
-          matchesSearch(k, q),
-        ) &&
-        shouldShowAxisConfig(dashboardPanelData)
-      )
-        return true;
-      if (
-        [
-          "y axis",
-          "y min",
-          "y max",
-          "y-axis min",
-          "y-axis max",
-          "y axis min",
-          "y axis max",
-        ].some((k) => matchesSearch(k, q)) &&
-        shouldShowCartesianAxisConfig(dashboardPanelData)
-      )
-        return true;
-      if (
-        ["gridlines", "grid", "show gridlines"].some((k) =>
-          matchesSearch(k, q),
-        ) &&
-        shouldShowGridlines(dashboardPanelData)
-      )
-        return true;
-      return false;
-    });
-
-    const labelsSectionHasContent = computed(() => {
-      const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q || matchesSearch("labels", q))
-        return (
-          shouldShowCartesianAxisConfig(dashboardPanelData) ||
-          shouldShowAxisLabelConfig(dashboardPanelData)
-        );
-      if (
-        ["label position", "position", "label"].some((k) =>
-          matchesSearch(k, q),
-        ) &&
-        shouldShowCartesianAxisConfig(dashboardPanelData)
-      )
-        return true;
-      if (
-        ["label rotate", "rotate", "label"].some((k) => matchesSearch(k, q)) &&
-        shouldShowCartesianAxisConfig(dashboardPanelData)
-      )
-        return true;
-      if (
-        [
-          "axis label",
-          "axis label rotate",
-          "axis label truncate",
-          "rotate",
-          "truncate",
-        ].some((k) => matchesSearch(k, q)) &&
-        shouldShowAxisLabelConfig(dashboardPanelData)
-      )
-        return true;
-      return false;
-    });
-
-    const lineStyleSectionHasContent = computed(() => {
-      const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q || matchesSearch("line style", q))
-        return (
-          shouldShowAreaLineStyleConfig(dashboardPanelData) ||
-          shouldShowLineThickness(dashboardPanelData, promqlMode.value)
-        );
-      if (
-        ["symbol", "show symbol"].some((k) => matchesSearch(k, q)) &&
-        shouldShowAreaLineStyleConfig(dashboardPanelData)
-      )
-        return true;
-      if (
-        [
-          "interpolation",
-          "line interpolation",
-          "smooth",
-          "step",
-          "linear",
-          "step before",
-          "step after",
-        ].some((k) => matchesSearch(k, q)) &&
-        shouldShowAreaLineStyleConfig(dashboardPanelData)
-      )
-        return true;
-      if (
-        ["line thickness", "thickness"].some((k) => matchesSearch(k, q)) &&
-        shouldShowLineThickness(dashboardPanelData, promqlMode.value)
-      )
-        return true;
-      return false;
-    });
-
-    const dataSectionHasVisibleContent = computed(() => {
-      const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q || matchesSearch("data", q)) return true;
-      // unit + decimals have no v-if — always renderable
-      if (["unit", "decimals"].some((k) => matchesSearch(k, q))) return true;
-      // custom unit — only renderable when unit is 'custom'
-      if (
-        matchesSearch("custom unit", q) &&
-        dashboardPanelData.data.config.unit === "custom"
-      )
-        return true;
-      // limit — gated by !promqlMode && !customQuery
-      const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
-      if (
-        ["limit", "query limit"].some((k) => matchesSearch(k, q)) &&
-        !promqlMode.value &&
-        !currentQuery?.customQuery
-      )
-        return true;
-      // top results + others — gated by shouldShowTopResultsConfig
-      if (
-        [
-          "top results",
-          "top n",
-          "others",
-          "show top n values",
-          "others series",
-          "top n values",
-        ].some((k) => matchesSearch(k, q)) &&
-        shouldShowTopResultsConfig(dashboardPanelData, promqlMode.value)
-      )
-        return true;
-      // connect null — gated by shouldShowAreaLineStyleConfig
-      if (
-        ["connect null", "connect null values"].some((k) =>
-          matchesSearch(k, q),
-        ) &&
-        shouldShowAreaLineStyleConfig(dashboardPanelData)
-      )
-        return true;
-      // no value replacement — gated by shouldShowNoValueReplacement
-      if (
-        ["no value", "no value replacement"].some((k) => matchesSearch(k, q)) &&
-        shouldShowNoValueReplacement(dashboardPanelData, promqlMode.value)
-      )
-        return true;
-      return false;
-    });
-
-    const layoutSectionHasVisibleContent = computed(() => {
-      const q = (searchQuery.value ?? "").trim().toLowerCase();
-      if (!q || matchesSearch("layout", q)) return true;
-      // Trellis select — always renderable when section is visible
-      if (
-        ["trellis", "layout", "trellis layout"].some((k) => matchesSearch(k, q))
-      )
-        return true;
-      // Columns input — only renders when trellis layout is 'custom'
-      if (
-        ["columns", "num of columns", "trellis columns"].some((k) =>
-          matchesSearch(k, q),
-        ) &&
-        dashboardPanelData.data.config.trellis?.layout === "custom"
-      )
-        return true;
-      // Group toggle — only renders when trellis layout is set
-      if (
-        ["group", "group by y axis", "trellis"].some((k) =>
-          matchesSearch(k, q),
-        ) &&
-        !!dashboardPanelData.data.config.trellis?.layout &&
-        !(isBreakdownFieldEmpty.value || hasTimeShifts.value)
-      )
-        return true;
-      return false;
-    });
-
-    // ΓöÇΓöÇ Global expand / collapse toggle ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // Global expand / collapse toggle
     const allSectionsExpanded = computed(() =>
       Object.values(expandedSections.value).some((v) => v === true),
     );
@@ -3965,48 +3686,19 @@ export default defineComponent({
       });
     };
 
-    // ΓöÇΓöÇ anySectionVisible ΓÇô drives the "No results" empty state ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // anySectionVisible – drives the "No results" empty state
     const anySectionVisible = computed(() => {
-      return (
-        sectionVisible(generalKeywords) ||
-        (promqlMode.value &&
-          (dashboardPanelData.data.type === "geomap" ||
-            dashboardPanelData.data.type === "maps") &&
-          sectionVisible(geographicKeywords)) ||
-        (sectionVisible(legendKeywords) && legendSectionHasContent.value) ||
-        (sectionVisible(dataKeywords) && dataSectionHasVisibleContent.value) ||
-        (sectionVisible(axisKeywords) && axisSectionHasContent.value) ||
-        (sectionVisible(labelsKeywords) && labelsSectionHasContent.value) ||
-        (sectionVisible(lineStyleKeywords) &&
-          lineStyleSectionHasContent.value) ||
-        (dashboardPanelData.data.type === "table" &&
-          sectionVisible(tableKeywords)) ||
-        (dashboardPanelData.data.type === "table" &&
-          sectionVisible(valueTransformationsKeywords)) ||
-        (dashboardPanelData.data.type === "table" &&
-          sectionVisible(fieldOverridesKeywords)) ||
-        ((dashboardPanelData.data.type === "geomap" ||
-          dashboardPanelData.data.type === "maps") &&
-          sectionVisible(mapKeywords)) ||
-        (dashboardPanelData.data.type === "gauge" &&
-          sectionVisible(gaugeKeywords)) ||
-        (showTrellisConfig.value &&
-          sectionVisible(layoutKeywords) &&
-          layoutSectionHasVisibleContent.value) ||
-        (showColorPalette.value && sectionVisible(colorsKeywords)) ||
-        (shouldShowDrilldown(dashboardPanelData, dashboardPanelDataPageKey) &&
-          sectionVisible(drilldownKeywords)) ||
-        (shouldShowTimeShift(
-          dashboardPanelData,
-          promqlMode.value,
-          dashboardPanelDataPageKey,
-        ) &&
-          sectionVisible(comparisonKeywords)) ||
-        (shouldShowCartesianAxisConfig(dashboardPanelData) &&
-          sectionVisible(markLinesKeywords)) ||
-        (dashboardPanelData.data.type === "metric" &&
-          sectionVisible(backgroundKeywords))
-      );
+      const q = normalizedSearchQuery.value;
+      if (!q) {
+        // When not searching, any enabled section with at least one renderable
+        // option counts as "visible".
+        return orderedSectionIds.some((sectionId) =>
+          isSectionVisible(sectionId),
+        );
+      }
+      // When searching, only sections that actually have matching, renderable
+      // options should be considered visible.
+      return orderedSectionIds.some((sectionId) => isSectionVisible(sectionId));
     });
 
     // Clear legend width when switching away from plain type or when position is not right
@@ -4097,35 +3789,9 @@ export default defineComponent({
       onCancelPanelTime,
       searchQuery,
       expandedSections,
-      sectionVisible,
-      itemVisible,
       isExpanded,
-      // keyword arrays
-      generalKeywords,
-      legendKeywords,
-      dataKeywords,
-      axisKeywords,
-      labelsKeywords,
-      lineStyleKeywords,
-      tableKeywords,
-      valueTransformationsKeywords,
-      fieldOverridesKeywords,
-      mapKeywords,
-      geographicKeywords,
-      gaugeKeywords,
-      layoutKeywords,
-      colorsKeywords,
-      drilldownKeywords,
-      comparisonKeywords,
-      markLinesKeywords,
-      backgroundKeywords,
-      // hasContent / empty-state computeds
-      legendSectionHasContent,
-      axisSectionHasContent,
-      labelsSectionHasContent,
-      lineStyleSectionHasContent,
-      dataSectionHasVisibleContent,
-      layoutSectionHasVisibleContent,
+      isSectionVisible,
+      isConfigOptionVisible,
       anySectionVisible,
       allSectionsExpanded,
       toggleAllSections,
