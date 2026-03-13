@@ -360,11 +360,16 @@ pub async fn get_built_in(
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
+    use std::sync::LazyLock;
+
     use crate::service::github::GitHubDataService;
+
+    static GITHUB_SERVICE: LazyLock<GitHubDataService> =
+        LazyLock::new(GitHubDataService::new);
 
     let source_url = config::get_config().common.model_pricing_source_url.clone();
 
-    let github_service = GitHubDataService::new();
+    let github_service = &*GITHUB_SERVICE;
 
     let models: Vec<BuiltInModelPricingEntry> = match github_service
         .fetch_json::<Vec<BuiltInModelPricingEntry>>(&source_url)
