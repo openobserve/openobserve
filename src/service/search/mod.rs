@@ -139,7 +139,7 @@ pub async fn search(
     let cfg = get_config();
 
     let trace_id = if trace_id.is_empty() {
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+        if cfg.common.should_create_span() {
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
@@ -361,7 +361,7 @@ pub async fn search_multi(
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
     let trace_id = if trace_id.is_empty() {
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+        if cfg.common.should_create_span() {
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {

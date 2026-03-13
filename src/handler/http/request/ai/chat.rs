@@ -188,6 +188,45 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             return MetaHttpResponse::bad_request("AI agent URL is not set");
         }
 
+        // AI credit check (cloud only)
+        // All orgs try free quota first. On exhaustion, paid orgs overflow to
+        // Stripe billing; unpaid orgs get a hard 402.
+        #[cfg(feature = "cloud")]
+        {
+            let deduction = crate::service::trial_quota::try_deduct(
+                org_id_str,
+                crate::service::trial_quota::TrialQuotaFeature::AiChat,
+            )
+            .await;
+
+            let usage_ctx = crate::service::trial_quota::AiUsageContext {
+                user_email: user_id.to_string(),
+                trace_id: Some(trace_id.clone()),
+                session_id: None,
+                incident_id: None,
+            };
+            match &deduction {
+                Ok(_) => {
+                    crate::service::trial_quota::record_free_ai_usage(
+                        org_id_str,
+                        &usage_ctx,
+                        crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                    );
+                }
+                Err(e) => {
+                    if crate::service::trial_quota::org_has_active_subscription(org_id_str).await {
+                        crate::service::trial_quota::record_billable_ai_usage(
+                            org_id_str,
+                            &usage_ctx,
+                            crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                        );
+                    } else {
+                        return MetaHttpResponse::payment_required(e.to_string());
+                    }
+                }
+            }
+        }
+
         // Extract user token from cookie/header for per-user MCP auth
         // Unwrap Session:: wrapper if present, otherwise use token as-is
         let auth_str = crate::common::utils::auth::extract_auth_str_from_parts(&parts).await;
@@ -585,6 +624,47 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             )
             .await;
             return MetaHttpResponse::bad_request("AI is not enabled");
+        }
+
+        // AI credit check (cloud only)
+        // All orgs try free quota first. On exhaustion, paid orgs overflow to
+        // Stripe billing; unpaid orgs get a hard 402.
+        #[cfg(feature = "cloud")]
+        {
+            let deduction = crate::service::trial_quota::try_deduct(
+                &org_id_str,
+                crate::service::trial_quota::TrialQuotaFeature::AiChat,
+            )
+            .await;
+
+            let usage_ctx = crate::service::trial_quota::AiUsageContext {
+                user_email: user_id.clone(),
+                trace_id: Some(trace_id.clone()),
+                session_id: forward_headers
+                    .get(X_O2_ASSISTANT_SESSION_ID.as_str())
+                    .cloned(),
+                incident_id: None,
+            };
+            match &deduction {
+                Ok(_) => {
+                    crate::service::trial_quota::record_free_ai_usage(
+                        &org_id_str,
+                        &usage_ctx,
+                        crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                    );
+                }
+                Err(e) => {
+                    if crate::service::trial_quota::org_has_active_subscription(&org_id_str).await {
+                        crate::service::trial_quota::record_billable_ai_usage(
+                            &org_id_str,
+                            &usage_ctx,
+                            crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                        );
+                    } else {
+                        return MetaHttpResponse::payment_required(e.to_string());
+                    }
+                }
+            }
         }
 
         // Get global agent client

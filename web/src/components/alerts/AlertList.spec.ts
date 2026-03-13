@@ -18,6 +18,14 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 
+// Mock aws-exports so isEnterprise / isCloud can be controlled per-test
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isCloud: "false",
+    isEnterprise: "false",
+  },
+}));
+
 // Mock services before importing component (follow reference style)
 vi.mock("@/services/alerts", () => ({
   default: {
@@ -41,6 +49,7 @@ vi.mock("@/services/alert_destination", () => ({
 }));
 
 import AlertList from "@/components/alerts/AlertList.vue";
+import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -849,6 +858,93 @@ describe("AlertList - micro validations", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     expect(typeof wrapper.vm.filteredResults[0].last_triggered_at).toBe("string");
+  });
+});
+
+// 11. isAnomalyDetectionEnabled computed
+describe("AlertList - isAnomalyDetectionEnabled", () => {
+  beforeEach(() => {
+    // Reset to defaults: non-enterprise frontend, no build_type
+    (config as any).isEnterprise = "false";
+    (config as any).isCloud = "false";
+    delete (store.state as any).zoConfig.build_type;
+  });
+
+  it("should enable anomalyDetection tab when isEnterprise=true, isCloud=false, and build_type is not opensource", async () => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "false";
+    (store.state as any).zoConfig.build_type = "enterprise";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).toContain("anomalyDetection");
+  });
+
+  it("should disable anomalyDetection tab when build_type=opensource even when enterprise flags are set", async () => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "false";
+    (store.state as any).zoConfig.build_type = "opensource";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).not.toContain("anomalyDetection");
+  });
+
+  it("should disable anomalyDetection tab when isCloud=true (cloud build)", async () => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "true";
+    (store.state as any).zoConfig.build_type = "enterprise";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).not.toContain("anomalyDetection");
+  });
+
+  it("should disable anomalyDetection tab when isEnterprise=false (opensource frontend)", async () => {
+    (config as any).isEnterprise = "false";
+    (config as any).isCloud = "false";
+    (store.state as any).zoConfig.build_type = "enterprise";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).not.toContain("anomalyDetection");
+  });
+
+  it("should disable anomalyDetection tab by default (no env vars set)", async () => {
+    // isEnterprise defaults to "false" → feature disabled
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).not.toContain("anomalyDetection");
+  });
+
+  it("should include anomalyDetection tab in alertTabs when enabled", async () => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "false";
+    (store.state as any).zoConfig.build_type = "enterprise";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).toContain("anomalyDetection");
+  });
+
+  it("should exclude anomalyDetection tab from alertTabs when disabled", async () => {
+    (config as any).isEnterprise = "false";
+    (config as any).isCloud = "false";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).not.toContain("anomalyDetection");
+  });
+
+  it("should fall back activeTab to 'all' when anomalyDetection tab requested but feature disabled", async () => {
+    (config as any).isEnterprise = "false";
+    (config as any).isCloud = "false";
+
+    const wrapper: any = await mountAlertList();
+    // Simulate URL query requesting anomalyDetection tab when feature is off
+    wrapper.vm.router.currentRoute.value.query = { tab: "anomalyDetection" } as any;
+    // The computed initialises activeTab to 'all' when the feature is disabled
+    expect(wrapper.vm.activeTab).not.toBe("anomalyDetection");
   });
 });
 
