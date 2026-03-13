@@ -68,6 +68,11 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Geomap lat/lng/zoom set");
     await pm.dashboardPanelActions.waitForChartToRender();
+    // Wait for Leaflet tiles to finish loading after pan/zoom change (tiles are async HTTP)
+    await page.waitForFunction(
+      () => document.querySelectorAll('.leaflet-tile-loaded').length > 0,
+      { timeout: 10000 }
+    ).catch(() => {});
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
     await pm.dashboardPanelActions.savePanel();
