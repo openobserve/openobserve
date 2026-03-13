@@ -1859,7 +1859,13 @@
     "discountTag": "On Discount",
     "enterpriseNote": "High volume needs? Let's talk scale! Contact us for tailored solutions.",
     "contactSupport": "Contact Support",
-    "totalUsage": "Total Usage"
+    "totalUsage": "Total Usage",
+    "aiCredits": "AI Credits",
+    "aiModeFree": "Free",
+    "aiModePayAsYouGo": "Pay as you go",
+    "aiModeExhausted": "Exhausted",
+    "aiExhaustedMessage": "Subscribe to continue using AI features",
+    "aiPaygMessage": "Free credits exhausted — usage billed to subscription"
   },
   "awsMarketplace": {
     "title": "AWS Marketplace Registration",
