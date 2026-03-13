@@ -114,8 +114,8 @@ describe("Deduplication.vue", () => {
       expect(wrapper.vm.localDeduplication.time_window_minutes).toBeUndefined();
     });
 
-    it("should initialize enabled as true", () => {
-      expect(wrapper.vm.localDeduplication.enabled).toBe(true);
+    it("should initialize enabled as false when no fingerprint fields", () => {
+      expect(wrapper.vm.localDeduplication.enabled).toBe(false);
     });
 
     it("should initialize with provided fingerprint fields", async () => {
@@ -342,8 +342,15 @@ describe("Deduplication.vue", () => {
       expect(emitted).toHaveProperty("time_window_minutes");
     });
 
-    it("should always emit enabled as true", async () => {
-      wrapper.vm.localDeduplication.enabled = false;
+    it("should emit enabled as false when no fingerprint fields", async () => {
+      wrapper.vm.localDeduplication.fingerprint_fields = [];
+      await wrapper.vm.emitUpdate();
+
+      expect(wrapper.emitted("update:deduplication")![0][0].enabled).toBe(false);
+    });
+
+    it("should emit enabled as true when fingerprint fields are set", async () => {
+      wrapper.vm.localDeduplication.fingerprint_fields = ["field1"];
       await wrapper.vm.emitUpdate();
 
       expect(wrapper.emitted("update:deduplication")![0][0].enabled).toBe(true);
