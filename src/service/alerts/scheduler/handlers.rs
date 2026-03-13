@@ -629,7 +629,7 @@ async fn handle_alert_triggers(
 
     // send notification
     if let Some(data) = trigger_results.data
-        && data.len() > 0
+        && !data.is_empty()
     {
         // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
         #[cfg(feature = "enterprise")]
