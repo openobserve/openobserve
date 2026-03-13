@@ -119,7 +119,7 @@ impl TrialQuotaFeature {
         match self {
             TrialQuotaFeature::AiChat => cfg.cloud.ai_credit_cost_chat,
             TrialQuotaFeature::NewIncident => cfg.cloud.ai_credit_cost_incident,
-            TrialQuotaFeature::IncidentReAnalysis => cfg.cloud.ai_credit_cost_incident,
+            TrialQuotaFeature::IncidentReAnalysis => cfg.cloud.ai_credit_cost_incident_reanalysis,
         }
     }
 
