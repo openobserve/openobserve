@@ -151,6 +151,7 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying panel time toggle enabled persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-allow-panel-time"]')).toHaveAttribute("aria-checked", "true");

@@ -49,6 +49,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying time shift count persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('.custom-date-time-picker')).toHaveCount(2);
@@ -88,7 +89,6 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
     // Open and cancel
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.openColorBySeries();
     await expect(page.locator('[data-test="dashboard-color-by-series-popup"]')).toBeVisible();
     await pm.dashboardPanelConfigs.cancelColorBySeries();
@@ -145,6 +145,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Background color set to Single Color");
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying background color Single Color persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-color-mode"]')).toContainText("Single Color");
@@ -167,6 +168,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying top N value persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-top-n"]')).toHaveValue("5");

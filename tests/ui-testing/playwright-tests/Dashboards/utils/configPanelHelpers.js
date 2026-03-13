@@ -22,7 +22,14 @@ export async function reopenPanelConfig(page, pm) {
   await page.locator('[data-test="dashboard-panel-bar"]').first().hover();
   await page.locator('[data-test*="dashboard-edit-panel"][data-test$="-dropdown"]').first().click();
   await page.locator('[data-test="dashboard-edit-panel"]').click();
-  await pm.dashboardPanelConfigs.openConfigPanel();
+  // Wait for the add_panel page to fully load before interacting with the config sidebar
+  await page.waitForURL(/\/add_panel/, { timeout: 15000 });
+  await page.locator('[data-test="dashboard-sidebar"]').waitFor({ state: "visible", timeout: 15000 });
+  // Config panel may already be open (state preserved); only open if not already visible
+  const isConfigOpen = await page.locator('[data-test="dashboard-config-description"]').isVisible();
+  if (!isConfigOpen) {
+    await pm.dashboardPanelConfigs.openConfigPanel();
+  }
 }
 
 export const generateDashboardName = () =>

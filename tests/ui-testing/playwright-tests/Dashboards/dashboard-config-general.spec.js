@@ -39,17 +39,14 @@ test.describe("ConfigPanel — General Settings", () => {
     await pm.dashboardPanelActions.savePanel();
 
     testLogger.info("Description saved, re-opening panel to verify persistence");
-    await page.locator('[data-test="dashboard-panel-bar"]').first().hover();
-    await page.locator('[data-test*="dashboard-edit-panel"][data-test$="-dropdown"]').first().click();
-    await page.locator('[data-test="dashboard-edit-panel"]').click();
-    await pm.dashboardPanelConfigs.openConfigPanel();
+    await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-description"]')).toHaveValue(description);
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
-  test("unit: set Bytes → chart renders; set Custom → input remains visible", async ({ page }) => {
+  test("unit: set Bytes → chart renders; set Custom → custom unit input appears + fill value", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
@@ -65,17 +62,22 @@ test.describe("ConfigPanel — General Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
-    // Set to Custom — unit field should remain visible
-    await pm.dashboardPanelConfigs.openConfigPanel();
+    // Set to Custom — custom unit input appears
     await pm.dashboardPanelConfigs.selectUnit("Custom");
     await expect(unitDropdown).toBeVisible();
+    const customUnitInput = page.locator('[data-test="dashboard-config-custom-unit"]');
+    await expect(customUnitInput).toBeVisible();
+    await customUnitInput.click();
+    await customUnitInput.fill("ms");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying unit config persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-unit"]')).toContainText("Custom");
+    await expect(page.locator('[data-test="dashboard-config-custom-unit"]')).toHaveValue("ms");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -95,13 +97,13 @@ test.describe("ConfigPanel — General Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectDecimals("4");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Decimals set to 4");
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying decimals config persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-decimals"]')).toHaveValue("4");
@@ -124,6 +126,7 @@ test.describe("ConfigPanel — General Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying no-value replacement persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-no-value-replacement"]')).toHaveValue("N/A");
@@ -146,6 +149,7 @@ test.describe("ConfigPanel — General Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying query limit persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-limit"]')).toHaveValue("100");

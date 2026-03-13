@@ -41,7 +41,6 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
     // Clear both to restore auto-scaling
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await yAxisMinInput.click();
     await yAxisMinInput.fill("");
     await yAxisMaxInput.click();
@@ -51,6 +50,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying Y-axis cleared state persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-y_axis_min"]')).toHaveValue("");
@@ -72,6 +72,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying axis width persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-axis-width"]')).toHaveValue("80");
@@ -93,6 +94,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying axis border enabled persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-axis-border"]')).toHaveAttribute("aria-checked", "true");
@@ -114,6 +116,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying gridlines disabled persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-show-gridlines"]')).toHaveAttribute("aria-checked", "false");
@@ -134,13 +137,13 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectValueRotate("45");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Label rotate set to 45");
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying label position and rotate persist after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-label-position"]')).toContainText("Top");
@@ -164,6 +167,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying x-axis label rotate persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-axis-label-rotate"]')).toHaveValue("30");
@@ -186,6 +190,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying label truncate width persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-axis-label-truncate-width"]')).toHaveValue("50");

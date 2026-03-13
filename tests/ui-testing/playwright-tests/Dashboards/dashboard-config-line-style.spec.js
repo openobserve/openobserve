@@ -38,13 +38,13 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectSymbols("No Symbol");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Symbol set to No Symbol");
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying symbol No Symbol persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-show_symbol"]')).toContainText("No Symbol");
@@ -62,7 +62,6 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await expect(interpolationDropdown).toBeVisible();
 
     for (const mode of ["Smooth", "Linear", "Step After"]) {
-      await pm.dashboardPanelConfigs.openConfigPanel();
       await pm.dashboardPanelConfigs.selectLineInterpolation(mode);
       await pm.dashboardPanelActions.applyDashboardBtn();
       testLogger.info(`Line interpolation set to ${mode}`);
@@ -70,6 +69,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.verifyChartHasData(expect);
     }
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying line interpolation Step After persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-line_interpolation"]')).toContainText("Step After");
@@ -90,6 +90,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying line thickness persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-line_thickness"]')).toHaveValue("3");
@@ -111,6 +112,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying connect null values enabled persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-connect-null-values"]')).toHaveAttribute("aria-checked", "true");

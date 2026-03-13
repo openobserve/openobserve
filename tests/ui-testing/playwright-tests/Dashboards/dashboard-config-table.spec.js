@@ -37,6 +37,7 @@ test.describe("ConfigPanel — Table Settings", () => {
     testLogger.info("Wrap cells enabled for table chart");
     await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying wrap cells toggle persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-wrap-table-cells"]')).toHaveAttribute("aria-checked", "true");
@@ -58,6 +59,7 @@ test.describe("ConfigPanel — Table Settings", () => {
     testLogger.info("Transpose enabled");
     await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying transpose toggle persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-table_transpose"]')).toHaveAttribute("aria-checked", "true");
@@ -79,6 +81,7 @@ test.describe("ConfigPanel — Table Settings", () => {
     testLogger.info("Dynamic columns enabled");
     await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying dynamic columns toggle persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-table_dynamic_columns"]')).toHaveAttribute("aria-checked", "true");
@@ -110,10 +113,10 @@ test.describe("ConfigPanel — Table Settings", () => {
     await expect(page.locator(".q-table__bottom")).toBeVisible();
 
     // Re-open config and disable pagination → input hidden again
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await paginationToggle.click();
     await expect(rowsPerPageInput).not.toBeVisible();
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying pagination disabled state persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-show-pagination"]')).toHaveAttribute("aria-checked", "false");

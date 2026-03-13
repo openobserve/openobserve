@@ -40,7 +40,6 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
     // Vertical
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectTrellisLayout("Vertical");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Trellis set to Vertical");
@@ -48,7 +47,6 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
     // Custom — columns input appears, set 3, then cap at 16
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectTrellisLayout("Custom");
     const colInput = page.locator('[data-test="trellis-chart-num-of-columns"]');
     await expect(colInput).toBeVisible();
@@ -60,13 +58,14 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
     // Cap at 16
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await colInput.click();
     await colInput.fill("20");
     await colInput.blur();
     await expect(colInput).toHaveValue("16");
     testLogger.info("Trellis columns capped at 16");
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying trellis Custom layout and 16 columns persist after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-trellis-chart"]')).toContainText("Custom");
@@ -111,7 +110,6 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.selectTrellisLayout("Auto");
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelConfigs.openConfigPanel();
 
     const groupByYAxisToggle = page.locator('[data-test="dashboard-trellis-group-by-y-axis"]');
     await expect(groupByYAxisToggle).toBeVisible();
@@ -121,6 +119,7 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying group by Y axis enabled persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-trellis-group-by-y-axis"]')).toHaveAttribute("aria-checked", "true");

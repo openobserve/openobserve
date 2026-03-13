@@ -42,6 +42,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying gauge min/max persist after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-gauge-min"]')).toHaveValue("10");
@@ -69,6 +70,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying geomap lat/lng/zoom persist after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-latitude"]')).toHaveValue("40.7128");
@@ -100,13 +102,14 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
     // Fixed — fixed input appears, min/max hidden
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectSymbolSize("Fixed");
     await expect(symbolMinInput).not.toBeVisible();
     await expect(symbolMaxInput).not.toBeVisible();
     await expect(page.locator('[data-test="dashboard-config-map-symbol-fixed"]')).toBeVisible();
     testLogger.info("Symbol size Fixed: fixed input visible, min/max hidden");
 
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying symbol size Fixed persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-map-symbol-size"]')).toContainText("Fixed");
@@ -128,13 +131,13 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectLayerType("Heatmap");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Layer type set to Heatmap");
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying layer type Heatmap persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-layer-type"]')).toContainText("Heatmap");
@@ -155,6 +158,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying map type World persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-map-type"]')).toContainText("World");

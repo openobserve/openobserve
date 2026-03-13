@@ -37,6 +37,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying show legends toggle persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-show-legends"]')).toHaveAttribute("aria-checked", "false");
@@ -70,6 +71,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend position Right persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toContainText("Right");
@@ -104,6 +106,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend position Bottom persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toContainText("Bottom");
@@ -125,6 +128,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend position Auto persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toContainText("Auto");
@@ -148,7 +152,6 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
-    await pm.dashboardPanelConfigs.openConfigPanel();
     await legendTypeDropdown.click();
     await page.getByRole("option", { name: "Plain" }).click();
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -156,6 +159,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
+    await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend type Plain persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-legend-type"]')).toContainText("Plain");
