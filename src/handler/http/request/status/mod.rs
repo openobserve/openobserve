@@ -37,7 +37,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::{
-    cache, file_list,
+    cache, cluster, file_list,
     schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST},
 };
 use serde::Serialize;
@@ -66,12 +66,9 @@ use {
 };
 
 use crate::{
-    common::{
-        infra::cluster,
-        meta::{
-            http::HttpResponse as MetaHttpResponse,
-            user::{AuthTokens, AuthTokensExt},
-        },
+    common::meta::{
+        http::HttpResponse as MetaHttpResponse,
+        user::{AuthTokens, AuthTokensExt},
     },
     service::{
         db,
@@ -155,13 +152,8 @@ struct ConfigResponse<'a> {
     log_page_default_field_list: String,
     query_values_default_num: i64,
     mysql_deprecated_warning: bool,
-    #[cfg(feature = "enterprise")]
+    alert_preview_timerange_minutes: i64,
     service_graph_enabled: bool,
-    #[cfg(not(feature = "enterprise"))]
-    service_graph_enabled: bool,
-    #[cfg(feature = "enterprise")]
-    service_streams_enabled: bool,
-    #[cfg(not(feature = "enterprise"))]
     service_streams_enabled: bool,
     /// Available FQN priority dimensions from O2_FQN_PRIORITY_DIMENSIONS env var
     /// Used by UI to populate the FQN priority dimension selector
@@ -169,6 +161,7 @@ struct ConfigResponse<'a> {
     fqn_priority_dimensions: Vec<String>,
     #[cfg(not(feature = "enterprise"))]
     fqn_priority_dimensions: Vec<String>,
+    enable_cross_linking: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -196,6 +189,9 @@ struct Rum {
                    and orchestration platforms to determine service availability and readiness.",
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"}))
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/healthz")]
@@ -224,6 +220,9 @@ pub async fn healthz_head() -> Result<HttpResponse, Error> {
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"})),
         (status = 404, description="Status Not OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "not ok"})),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/schedulez")]
@@ -434,6 +433,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         ingestion_quota_used,
         query_values_default_num: cfg.limit.query_values_default_num,
         mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
+        alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         service_graph_enabled,
         service_streams_enabled,
         #[cfg(feature = "enterprise")]
@@ -442,6 +442,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             .get_fqn_priority_dimensions(),
         #[cfg(not(feature = "enterprise"))]
         fqn_priority_dimensions: vec![],
+        enable_cross_linking: cfg.common.enable_cross_linking,
     }))
 }
 
@@ -1067,7 +1068,7 @@ async fn enable_node(
             }
         }
     }
-    match cluster::update_local_node(&node).await {
+    match crate::common::infra::cluster::update_local_node(&node).await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }

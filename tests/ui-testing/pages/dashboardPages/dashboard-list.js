@@ -63,4 +63,14 @@ export default class DashboardListPage {
     const MenuItem = this.page.locator(`[data-test="menu-link-\\/${item}"]`);
     await MenuItem.click();
   }
+
+  // Click on a dashboard by name to open it
+  async clickOnDashboard(dashboardName) {
+    // Find the dashboard row by title and click on it
+    const dashboardRow = this.page.locator(`//tr[.//div[@title="${dashboardName}"]]`);
+    await dashboardRow.waitFor({ state: "visible", timeout: 10000 });
+    // Click on the dashboard name/title area to open it
+    const dashboardTitle = dashboardRow.locator(`div[title="${dashboardName}"]`);
+    await dashboardTitle.click();
+  }
 }

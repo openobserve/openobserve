@@ -127,7 +127,51 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
 
     });
 
+    /**
+     * Monaco Lazy Loading Test - PR #10146
+     * Verifies that when exploring a scheduled job, the query is correctly
+     * pre-filled in the Monaco editor after lazy loading.
+     */
+    test("Explore Job Search should pre-fill Monaco editor with scheduled query", {
+        tag: ['@monacoLazyLoad', '@queryPrefill', '@scheduleSearch']
+    }, async ({ page }) => {
 
+        // Step 1: Navigate to search scheduler list
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/logs?action=search_scheduler&org_identifier=default&type=search_scheduler_list");
+        await page.waitForTimeout(10000);
+
+        // Step 2: Submit a search job via API
+        const jobId = await jobSchedulerPage.submitSearchJob();
+        console.log(`Job ID: ${jobId}`);
+        expect(jobId).not.toBeNull();
+
+        // Step 3: Get trace ID for the job
+        const traceId = await jobSchedulerPage.getTraceIdByJobId(jobId);
+        console.log(`Trace ID: ${traceId}`);
+        await page.waitForTimeout(10000);
+
+        // Step 4: Click explore to navigate to logs with the job's query
+        await jobSchedulerPage.exploreJob(traceId);
+
+        // Step 5: Wait for Monaco editor to load (lazy loading)
+        await page.locator('[data-test="logs-search-bar-query-editor"]').waitFor({
+            state: 'visible',
+            timeout: 30000
+        });
+        await page.waitForTimeout(2000);
+
+        // Step 6: Verify Monaco editor contains the job's SQL query
+        // The job query is: SELECT * FROM "e2e_automate"
+        const monacoEditor = page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines');
+        const editorContent = await monacoEditor.textContent();
+        console.log(`Monaco editor content: ${editorContent}`);
+
+        // Verify the query structure is present
+        expect(editorContent).toContain('SELECT');
+        expect(editorContent).toContain('e2e_automate');
+
+        console.log('Monaco editor pre-fill verification completed successfully');
+    });
 
 
 

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 20;
+pub const DB_SCHEMA_VERSION: u64 = 21;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -865,7 +865,7 @@ pub struct Common {
     pub feature_enrichment_broadcast_join_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
-        default = true,
+        default = false,
         help = "Enable dynamic pushdown filter"
     )]
     pub feature_dynamic_pushdown_filter_enabled: bool,
@@ -1213,7 +1213,7 @@ pub struct Common {
     pub aggregation_topk_enabled: bool,
     #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
     pub search_inspector_enabled: bool,
-    #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
+    #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = false)]
     pub utf8_view_enabled: bool,
     #[env_config(
         name = "ZO_DASHBOARD_SHOW_SYMBOL_ENABLED",
@@ -1253,6 +1253,12 @@ pub struct Common {
         help = "enable ingestion error logs reporting"
     )]
     pub ingestion_log_enabled: bool,
+    #[env_config(
+        name = "ZO_ENABLE_CROSS_LINKING",
+        default = false,
+        help = "Enable cross-linking feature for drill-down links on log/trace records"
+    )]
+    pub enable_cross_linking: bool,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -1375,6 +1381,8 @@ pub struct Limit {
     pub traces_file_retention: String,
     #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "hourly")]
     pub metrics_file_retention: String,
+    #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "daily")]
+    pub metrics_query_retention: String,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
@@ -1383,6 +1391,8 @@ pub struct Limit {
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
     pub metrics_cache_max_entries: usize,
+    #[env_config(name = "ZO_METRICS_INLIST_FILTER_ENABLED", default = false)]
+    pub metrics_inlist_filter_enabled: bool,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
@@ -1403,6 +1413,8 @@ pub struct Limit {
     pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
     #[env_config(name = "ZO_JOB_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub job_runtime_shutdown_timeout: u64,
+    #[env_config(name = "ZO_WAL_RUNTIME_WORKER_NUM", default = 0)]
+    pub wal_runtime_worker_num: usize, // equals to mem_table_bucket_num if 0
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT_SECS", default = 600)] // seconds
@@ -1423,6 +1435,12 @@ pub struct Limit {
     pub alert_schedule_concurrency: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
+    #[env_config(
+        name = "ZO_ALERT_PREVIEW_TIMERANGE_MINUTES",
+        default = 0,
+        help = "Time range in minutes for alert preview. If set to 0 (default), uses the alert's period value. If greater than 0, overrides period for preview."
+    )]
+    pub alert_preview_timerange_minutes: i64,
     #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
     pub report_schedule_timeout: i64,
     #[env_config(name = "ZO_DERIVED_STREAM_SCHEDULE_INTERVAL", default = 300)] // seconds
@@ -1567,6 +1585,12 @@ pub struct Limit {
         help = "Maximum length of a token in the inverted index."
     )]
     pub inverted_index_max_token_length: usize,
+    #[env_config(
+        name = "ZO_INDEX_ALL_MAX_VALUE_LENGTH",
+        default = 0,
+        help = "Maximum length of a value in the index all feature."
+    )]
+    pub index_all_max_value_length: usize,
     #[env_config(
         name = "ZO_DEFAULT_MAX_QUERY_RANGE_DAYS",
         default = 0,
@@ -2957,11 +2981,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        if cfg.common.local_mode {
-            cfg.compact.batch_size = 100;
-        } else {
-            cfg.compact.batch_size = cfg.limit.cpu_num as i64 * 4;
-        }
+        cfg.compact.batch_size = 100;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;

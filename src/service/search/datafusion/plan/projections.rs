@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-use config::datafusion::request::Request;
+use config::{
+    datafusion::request::Request,
+    meta::search::{HavingNode, LogicalOperator},
+};
 use datafusion::{
     common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
-    logical_expr::LogicalPlan,
+    logical_expr::{LogicalPlan, Operator},
     prelude::Expr,
 };
 use hashbrown::HashSet;
@@ -38,6 +41,11 @@ pub struct ResultSchemaExtractor {
     /// this will correspond to the same alias (if present)
     /// in the projections
     pub group_by: HashSet<String>,
+    /// Tree structure representing the HAVING clause conditions
+    /// from the top-level query only (not from subqueries or CTEs)
+    pub having: Option<HavingNode>,
+    /// Legacy: field names used in having clause (for backwards compatibility)
+    pub having_fields: HashSet<String>,
     /// internal field, used to store intermediate _timestamp field aliases
     timestamp_alias: Option<String>,
     /// internal field, used to store intermediate histogram(_timestamp) aliases
@@ -46,6 +54,17 @@ pub struct ResultSchemaExtractor {
     /// with preference to histogram(_timestamp) if present. This will correspond to same alias
     /// (if present) in projections
     pub timeseries: Option<String>,
+    /// internal field, track the last node type we visited (to detect Filter immediately after
+    /// Aggregate)
+    last_node_was_aggregate: bool,
+    /// internal field, temporarily store the last HAVING tree we saw (before finalizing)
+    temp_having: Option<HavingNode>,
+    /// internal field, store projections for alias resolution in HAVING
+    temp_projections: Vec<Expr>,
+    /// Mapping from original field name to alias (for cross-linking).
+    /// e.g., "namespace_name" -> "x_axis_1" when query has `namespace_name AS x_axis_1`
+    /// For unaliased fields: "trace_id" -> "trace_id"
+    pub field_alias_map: HashMap<String, String>,
 }
 
 impl ResultSchemaExtractor {
@@ -53,9 +72,15 @@ impl ResultSchemaExtractor {
         Self {
             projections: Vec::new(),
             group_by: HashSet::new(),
+            having: None,
+            having_fields: HashSet::new(),
             timestamp_alias: None,
             ts_hist_alias: None,
             timeseries: None,
+            last_node_was_aggregate: false,
+            temp_having: None,
+            temp_projections: Vec::new(),
+            field_alias_map: HashMap::new(),
         }
     }
 }
@@ -85,6 +110,235 @@ fn is_ts_hist_udf(e: &Expr, ts_alias: &Option<String>) -> bool {
     }
 }
 
+/// Recursively extract column names from an expression
+#[allow(dead_code)]
+fn extract_columns_from_expr(expr: &Expr, columns: &mut HashSet<String>) {
+    match expr {
+        Expr::Column(col) => {
+            columns.insert(col.name.clone());
+        }
+        Expr::Alias(alias) => {
+            extract_columns_from_expr(&alias.expr, columns);
+        }
+        Expr::BinaryExpr(binary) => {
+            extract_columns_from_expr(&binary.left, columns);
+            extract_columns_from_expr(&binary.right, columns);
+        }
+        Expr::AggregateFunction(_agg) => {
+            // For aggregate functions in HAVING, we want to capture the whole expression
+            columns.insert(expr.schema_name().to_string());
+        }
+        Expr::ScalarFunction(func) => {
+            for arg in &func.args {
+                extract_columns_from_expr(arg, columns);
+            }
+        }
+        Expr::Cast(cast) => {
+            extract_columns_from_expr(&cast.expr, columns);
+        }
+        Expr::Not(e) | Expr::Negative(e) | Expr::IsNull(e) | Expr::IsNotNull(e) => {
+            extract_columns_from_expr(e, columns);
+        }
+        Expr::Between(between) => {
+            extract_columns_from_expr(&between.expr, columns);
+            extract_columns_from_expr(&between.low, columns);
+            extract_columns_from_expr(&between.high, columns);
+        }
+        Expr::Case(case) => {
+            if let Some(e) = &case.expr {
+                extract_columns_from_expr(e, columns);
+            }
+            for (when, then) in &case.when_then_expr {
+                extract_columns_from_expr(when, columns);
+                extract_columns_from_expr(then, columns);
+            }
+            if let Some(e) = &case.else_expr {
+                extract_columns_from_expr(e, columns);
+            }
+        }
+        Expr::InList(in_list) => {
+            extract_columns_from_expr(&in_list.expr, columns);
+            for e in &in_list.list {
+                extract_columns_from_expr(e, columns);
+            }
+        }
+        // For literals and other leaf expressions, do nothing
+        _ => {}
+    }
+}
+
+/// Convert DataFusion operator to string
+fn operator_to_string(op: &Operator) -> String {
+    match op {
+        Operator::Eq => "=".to_string(),
+        Operator::NotEq => "!=".to_string(),
+        Operator::Lt => "<".to_string(),
+        Operator::LtEq => "<=".to_string(),
+        Operator::Gt => ">".to_string(),
+        Operator::GtEq => ">=".to_string(),
+        _ => format!("{:?}", op),
+    }
+}
+
+/// Extract value as string from expression
+fn get_value_string(expr: &Expr) -> String {
+    match expr {
+        Expr::Literal(scalar_value, _) => format!("{}", scalar_value),
+        _ => expr.schema_name().to_string(),
+    }
+}
+
+/// Get expression as string (for display)
+fn get_expr_string(expr: &Expr) -> String {
+    match expr {
+        Expr::Column(col) => col.name.clone(),
+        Expr::AggregateFunction(agg) => {
+            // Format like "count(*)" or "avg(field)"
+            let args_str = if agg.params.args.is_empty() {
+                "*".to_string()
+            } else {
+                agg.params
+                    .args
+                    .iter()
+                    .map(get_col_name)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            format!("{}({})", agg.func.name(), args_str)
+        }
+        Expr::Alias(alias) => alias.name.clone(),
+        Expr::Cast(cast) => format!("CAST({} AS ...)", get_expr_string(&cast.expr)),
+        _ => expr.schema_name().to_string(),
+    }
+}
+
+/// Find alias for an expression in the projections list
+fn find_alias_for_expr(expr: &Expr, projections: &[Expr]) -> Option<String> {
+    let target = get_expr_string(expr);
+
+    for proj in projections {
+        if let Expr::Alias(alias) = proj {
+            let proj_expr = get_expr_string(&alias.expr);
+            if proj_expr == target || alias.expr.schema_name().to_string() == target {
+                return Some(alias.name.clone());
+            }
+        }
+    }
+    None
+}
+
+/// Build HAVING tree from expression recursively
+fn extract_having_tree(expr: &Expr, projections: &[Expr]) -> Option<HavingNode> {
+    match expr {
+        Expr::BinaryExpr(binary) => match binary.op {
+            // Logical operators - recurse
+            Operator::And => {
+                let left = extract_having_tree(&binary.left, projections);
+                let right = extract_having_tree(&binary.right, projections);
+
+                let mut conditions = Vec::new();
+                if let Some(l) = left {
+                    conditions.push(l);
+                }
+                if let Some(r) = right {
+                    conditions.push(r);
+                }
+
+                if conditions.is_empty() {
+                    None
+                } else {
+                    Some(HavingNode::LogicalOp {
+                        operator: LogicalOperator::And,
+                        conditions,
+                    })
+                }
+            }
+
+            Operator::Or => {
+                let left = extract_having_tree(&binary.left, projections);
+                let right = extract_having_tree(&binary.right, projections);
+
+                let mut conditions = Vec::new();
+                if let Some(l) = left {
+                    conditions.push(l);
+                }
+                if let Some(r) = right {
+                    conditions.push(r);
+                }
+
+                if conditions.is_empty() {
+                    None
+                } else {
+                    Some(HavingNode::LogicalOp {
+                        operator: LogicalOperator::Or,
+                        conditions,
+                    })
+                }
+            }
+
+            // Comparison operators - create leaf condition
+            Operator::Gt
+            | Operator::GtEq
+            | Operator::Lt
+            | Operator::LtEq
+            | Operator::Eq
+            | Operator::NotEq => {
+                let expression = get_expr_string(&binary.left);
+                let operator = operator_to_string(&binary.op);
+                let value = get_value_string(&binary.right);
+
+                // Try to find alias in projections
+                let alias = find_alias_for_expr(&binary.left, projections);
+
+                Some(HavingNode::Condition {
+                    expression,
+                    alias,
+                    operator,
+                    value,
+                })
+            }
+
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Extract field names from HavingNode tree for backwards compatibility
+fn extract_having_fields(having: &Option<HavingNode>, fields: &mut HashSet<String>) {
+    if let Some(node) = having {
+        extract_having_fields_recursive(node, fields);
+    }
+}
+
+/// Recursively traverse HavingNode tree and extract field names/aliases
+fn extract_having_fields_recursive(node: &HavingNode, fields: &mut HashSet<String>) {
+    match node {
+        HavingNode::Condition {
+            expression,
+            alias,
+            operator: _,
+            value: _,
+        } => {
+            // Prefer alias if present, otherwise use expression
+            if let Some(alias_name) = alias {
+                fields.insert(alias_name.clone());
+            } else {
+                fields.insert(expression.clone());
+            }
+        }
+        HavingNode::LogicalOp {
+            operator: _,
+            conditions,
+        } => {
+            // Recurse into all child conditions
+            for condition in conditions {
+                extract_having_fields_recursive(condition, fields);
+            }
+        }
+    }
+}
+
 impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
     type Node = LogicalPlan;
 
@@ -94,6 +348,25 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
     ) -> Result<TreeNodeRecursion, datafusion::error::DataFusionError> {
         match node {
             LogicalPlan::Projection(proj) => {
+                // Store projections for alias resolution in HAVING
+                self.temp_projections = proj.expr.clone();
+
+                // When we hit a Projection, finalize the temp_having if it exists
+                // In bottom-up traversal, the LAST projection is the top-level one
+                // So we always update, and the final value will be correct
+                if let Some(temp_having) = self.temp_having.take() {
+                    self.having = Some(temp_having);
+                    // Also extract field names for backwards compatibility
+                    extract_having_fields(&self.having, &mut self.having_fields);
+                } else {
+                    // No HAVING clause for this projection level
+                    self.having = None;
+                    self.having_fields = HashSet::new();
+                }
+
+                // Reset the aggregate flag - projection breaks the Aggregate->Filter chain
+                self.last_node_was_aggregate = false;
+
                 let mut temp = Vec::new();
                 for expr in &proj.expr {
                     // we first add the name of this in fields
@@ -164,8 +437,61 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                     }
                 }
                 self.projections = temp;
+
+                // Build field_alias_map from projection expressions.
+                // This maps original field name -> final output alias for cross-linking.
+                // For CTEs/subqueries the visitor fires once per Projection layer (bottom-up),
+                // so we thread the accumulated map forward transitively:
+                //   inner layer:  unique_id -> t_id
+                //   outer layer sees Column(t_id) -> naively t_id -> t_id
+                //   transitive:   unique_id -> t_id  (preserved)
+                // For simple single-projection queries self.field_alias_map is empty on first
+                // visit, so we skip the transitive step entirely (fast path).
+                let mut layer_map = HashMap::new();
+                for expr in &proj.expr {
+                    match expr {
+                        Expr::Alias(alias) => {
+                            let original = get_col_name(&alias.expr.clone().unalias_nested().data);
+                            layer_map.insert(original, alias.name.clone());
+                        }
+                        Expr::Column(col) => {
+                            layer_map.insert(col.name.clone(), col.name.clone());
+                        }
+                        _ => {
+                            let name = get_col_name(expr);
+                            layer_map.insert(name.clone(), name);
+                        }
+                    }
+                }
+
+                self.field_alias_map = if self.field_alias_map.is_empty() {
+                    // Fast path: no inner layers seen yet, use layer_map directly.
+                    layer_map
+                } else {
+                    // Slow path: thread accumulated inner-layer mappings through this layer.
+                    // For each (orig -> intermediate) known from inner layers:
+                    //   - if this layer outputs `intermediate`, follow it to the final alias
+                    //   - if this layer doesn't mention `intermediate`, the column was projected
+                    //     away and should be dropped
+                    let mut resolved = HashMap::with_capacity(self.field_alias_map.len());
+                    for (orig, intermediate) in &self.field_alias_map {
+                        if let Some(final_alias) = layer_map.get(intermediate) {
+                            resolved.insert(orig.clone(), final_alias.clone());
+                        }
+                    }
+                    // Also include columns first introduced at this layer (no inner history).
+                    for (k, v) in layer_map {
+                        resolved.entry(k).or_insert(v);
+                    }
+                    resolved
+                };
             }
             LogicalPlan::Aggregate(aggr) => {
+                // Mark that we just saw an aggregate node
+                self.last_node_was_aggregate = true;
+
+                // In bottom-up traversal, always keep updating. The last aggregate we see
+                // will be the top-level one
                 let mut temp = HashSet::new();
                 for expr in &aggr.group_expr {
                     let name = get_col_name(expr);
@@ -194,7 +520,25 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                 }
                 self.group_by = temp;
             }
-            _ => {}
+            LogicalPlan::Filter(filter) => {
+                // Only capture as HAVING if the immediately previous node was an Aggregate
+                // This ensures we only capture Filter nodes that are HAVING clauses (immediately
+                // after GROUP BY) and not WHERE clauses or filters on CTE results
+                if self.last_node_was_aggregate {
+                    // Build the HAVING tree structure from the filter predicate
+                    if let Some(having_tree) =
+                        extract_having_tree(&filter.predicate, &self.temp_projections)
+                    {
+                        self.temp_having = Some(having_tree);
+                    }
+                }
+                // Reset the flag after processing filter
+                self.last_node_was_aggregate = false;
+            }
+            _ => {
+                // Any other node type breaks the Aggregate->Filter chain
+                self.last_node_was_aggregate = false;
+            }
         }
         Ok(TreeNodeRecursion::Continue)
     }
@@ -524,6 +868,72 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_field_alias_map_cte() {
+        // Single-level CTE: field renamed inside CTE, re-selected by alias outside.
+        // field_alias_map must trace unique_id -> t_id through the CTE layer.
+        let sql = r#"WITH base AS (
+            SELECT k8s_namespace_name AS t_id FROM "default"
+        )
+        SELECT t_id FROM base"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.projections, vec!["_timestamp", "t_id"]);
+        assert_eq!(
+            extractor.field_alias_map.get("k8s_namespace_name"),
+            Some(&"t_id".to_string()),
+            "original field must map to its final output alias through CTE"
+        );
+        assert_eq!(
+            extractor.field_alias_map.get("t_id"),
+            Some(&"t_id".to_string()),
+            "alias itself must also be present as identity mapping"
+        );
+
+        // Two-level CTE rename chain: orig -> mid -> final
+        let sql = r#"WITH a AS (
+            SELECT k8s_namespace_name AS mid FROM "default"
+        ),
+        b AS (
+            SELECT mid AS final_id FROM a
+        )
+        SELECT final_id FROM b"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.projections, vec!["_timestamp", "final_id"]);
+        assert_eq!(
+            extractor.field_alias_map.get("k8s_namespace_name"),
+            Some(&"final_id".to_string()),
+            "original field must be transitively resolved through two CTE layers"
+        );
+
+        // Column projected away in outer CTE should not appear in field_alias_map.
+        let sql = r#"WITH base AS (
+            SELECT k8s_namespace_name AS ns, k8s_node_name AS node FROM "default"
+        )
+        SELECT ns FROM base"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert!(
+            !extractor.field_alias_map.contains_key("k8s_node_name"),
+            "projected-away column must not appear in field_alias_map"
+        );
+        assert_eq!(
+            extractor.field_alias_map.get("k8s_namespace_name"),
+            Some(&"ns".to_string()),
+        );
+
+        // Simple query (no CTE): fast path, field_alias_map built directly.
+        let sql = r#"SELECT k8s_namespace_name AS ns FROM "default""#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(
+            extractor.field_alias_map.get("k8s_namespace_name"),
+            Some(&"ns".to_string()),
+            "simple alias must work on fast path"
+        );
+    }
+
+    #[tokio::test]
     async fn test_basic_joins() {
         let sql = r#"SELECT *
         FROM "default" t1 INNER JOIN "default" t2
@@ -685,5 +1095,284 @@ mod tests {
         assert_eq!(extractor.timestamp_alias, None);
         assert!(extractor.group_by.is_empty());
         assert_eq!(extractor.projections, vec!["a", "b"]);
+    }
+
+    #[tokio::test]
+    async fn test_having_clause() {
+        // Simple HAVING with aggregate function
+        let sql = r#"SELECT k8s_namespace_name, COUNT(*) as count
+        FROM "default"
+        GROUP BY k8s_namespace_name
+        HAVING COUNT(*) > 10"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
+        assert!(
+            extractor.having.is_some(),
+            "HAVING clause should be detected"
+        );
+        assert_eq!(extractor.projections, vec!["k8s_namespace_name", "count"]);
+
+        // HAVING with multiple conditions
+        let sql = r#"SELECT k8s_namespace_name, COUNT(*) as count, AVG(floatvalue) as avg_val
+        FROM "default"
+        GROUP BY k8s_namespace_name
+        HAVING COUNT(*) > 10 AND AVG(floatvalue) < 100"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
+        assert!(
+            extractor.having.is_some(),
+            "HAVING clause should be detected"
+        );
+        assert_eq!(
+            extractor.projections,
+            vec!["k8s_namespace_name", "count", "avg_val"]
+        );
+
+        // HAVING with histogram
+        let sql = r#"SELECT histogram(_timestamp) as time_bucket, k8s_namespace_name, COUNT(*) as count
+        FROM "default"
+        GROUP BY histogram(_timestamp), k8s_namespace_name
+        HAVING COUNT(*) > 5"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.timeseries, Some("time_bucket".to_string()));
+        assert!(
+            extractor.having.is_some(),
+            "HAVING clause should be detected"
+        );
+        assert_eq!(
+            extractor.projections,
+            vec!["time_bucket", "k8s_namespace_name", "count"]
+        );
+
+        // HAVING with column reference (not aggregate)
+        let sql = r#"SELECT k8s_namespace_name, COUNT(*) as count
+        FROM "default"
+        GROUP BY k8s_namespace_name
+        HAVING k8s_namespace_name = 'production'"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
+        assert!(
+            extractor.having.is_some(),
+            "HAVING clause should be detected"
+        );
+        // Having tree should be present for column reference in HAVING
+        assert!(extractor.having.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_having_with_cte() {
+        // CTE with HAVING - only top-level HAVING should be captured
+        let sql = r#"WITH aggregated_data AS (
+            SELECT k8s_namespace_name, COUNT(*) as count
+            FROM "default"
+            GROUP BY k8s_namespace_name
+            HAVING COUNT(*) > 5
+        )
+        SELECT k8s_namespace_name, count
+        FROM aggregated_data
+        WHERE count < 100"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        // HAVING from CTE should NOT be captured as it's internal filtering
+        assert!(
+            extractor.having.is_none(),
+            "HAVING from CTE should not be captured: {:?}",
+            extractor.having
+        );
+        // Note: group_by will contain the CTE's GROUP BY columns (this matches existing behavior)
+        // The important part is that HAVING from the CTE is not captured
+        assert_eq!(extractor.projections, vec!["k8s_namespace_name", "count"]);
+
+        // CTE without HAVING, but top-level with HAVING
+        let sql = r#"WITH base_data AS (
+            SELECT k8s_namespace_name, floatvalue
+            FROM "default"
+            WHERE floatvalue > 0
+        )
+        SELECT k8s_namespace_name, AVG(floatvalue) as avg_val, COUNT(*) as count
+        FROM base_data
+        GROUP BY k8s_namespace_name
+        HAVING AVG(floatvalue) > 50"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
+        // Top-level HAVING should be captured
+        assert!(
+            extractor.having.is_some(),
+            "Top-level HAVING should be detected"
+        );
+        assert_eq!(
+            extractor.projections,
+            vec!["k8s_namespace_name", "avg_val", "count"]
+        );
+
+        // Nested CTEs with HAVING at different levels
+        let sql = r#"WITH cte1 AS (
+            SELECT k8s_namespace_name, COUNT(*) as count
+            FROM "default"
+            GROUP BY k8s_namespace_name
+            HAVING COUNT(*) > 10
+        ),
+        cte2 AS (
+            SELECT k8s_namespace_name, count
+            FROM cte1
+            WHERE count < 100
+        )
+        SELECT k8s_namespace_name, SUM(count) as total
+        FROM cte2
+        GROUP BY k8s_namespace_name
+        HAVING SUM(count) > 50"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        // DataFusion includes "count" in group_expr as input to SUM(count)
+        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name", "count"]);
+        // Only the outermost HAVING should be captured
+        assert!(
+            extractor.having.is_some(),
+            "Only top-level HAVING should be detected"
+        );
+        assert_eq!(extractor.projections, vec!["k8s_namespace_name", "total"]);
+    }
+
+    #[tokio::test]
+    async fn test_having_with_subquery() {
+        // Subquery with HAVING in WHERE clause
+        let sql = r#"SELECT k8s_namespace_name, floatvalue
+        FROM "default"
+        WHERE k8s_namespace_name IN (
+            SELECT k8s_namespace_name
+            FROM "default"
+            GROUP BY k8s_namespace_name
+            HAVING COUNT(*) > 10
+        )"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        // Top-level query has no GROUP BY or HAVING
+        assert!(extractor.group_by.is_empty());
+        assert!(
+            extractor.having.is_none(),
+            "HAVING from subquery should not be captured: {:?}",
+            extractor.having
+        );
+        assert_eq!(
+            extractor.projections,
+            vec!["k8s_namespace_name", "floatvalue"]
+        );
+
+        // Subquery in FROM clause with HAVING
+        let sql = r#"SELECT namespace, total_count
+        FROM (
+            SELECT k8s_namespace_name as namespace, COUNT(*) as total_count
+            FROM "default"
+            GROUP BY k8s_namespace_name
+            HAVING COUNT(*) > 5
+        ) AS subquery
+        WHERE total_count < 100"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        // Subquery's GROUP BY leaks through (aliased from k8s_namespace_name to namespace)
+        // since there is no top-level Aggregate to overwrite it
+        assert_eq!(extractor.group_by, hashset!["namespace"]);
+        // HAVING from subquery should NOT be captured
+        assert!(
+            extractor.having.is_none(),
+            "HAVING from subquery should not be captured: {:?}",
+            extractor.having
+        );
+        assert_eq!(extractor.projections, vec!["namespace", "total_count"]);
+
+        // Top-level HAVING with subquery in SELECT
+        let sql = r#"SELECT
+            k8s_namespace_name,
+            COUNT(*) as count,
+            (SELECT AVG(floatvalue) FROM "default") as overall_avg
+        FROM "default"
+        GROUP BY k8s_namespace_name
+        HAVING COUNT(*) > 10"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
+        // Top-level HAVING should be captured
+        assert!(
+            extractor.having.is_some(),
+            "Top-level HAVING should be detected"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_having_with_nested_aggregations() {
+        // Query with aggregation on aggregated results (no subquery syntax)
+        let sql = r#"SELECT k8s_namespace_name, COUNT(*) as count
+        FROM "default"
+        GROUP BY k8s_namespace_name
+        HAVING COUNT(*) > 10"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
+        assert!(extractor.having.is_some());
+
+        // Complex HAVING with multiple aggregate functions
+        let sql = r#"SELECT
+            k8s_namespace_name,
+            COUNT(*) as count,
+            AVG(floatvalue) as avg_float,
+            MAX(code) as max_code
+        FROM "default"
+        GROUP BY k8s_namespace_name
+        HAVING COUNT(*) > 10
+            AND AVG(floatvalue) BETWEEN 10 AND 100
+            AND MAX(code) < 500"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
+        assert!(
+            extractor.having.is_some(),
+            "Complex HAVING should be detected"
+        );
+
+        // HAVING with CASE expression
+        let sql = r#"SELECT
+            k8s_namespace_name,
+            COUNT(*) as count
+        FROM "default"
+        GROUP BY k8s_namespace_name
+        HAVING COUNT(CASE WHEN floatvalue > 50 THEN 1 END) > 5"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
+        assert!(
+            extractor.having.is_some(),
+            "HAVING with CASE should be detected"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_no_having_queries() {
+        // Query with WHERE but no HAVING
+        let sql = r#"SELECT k8s_namespace_name, COUNT(*) as count
+        FROM "default"
+        WHERE floatvalue > 10
+        GROUP BY k8s_namespace_name"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.group_by, hashset!["k8s_namespace_name"]);
+        assert!(
+            extractor.having.is_none(),
+            "Should not have HAVING: {:?}",
+            extractor.having
+        );
+
+        // Query without aggregation
+        let sql = r#"SELECT k8s_namespace_name, floatvalue
+        FROM "default"
+        WHERE floatvalue > 10"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert!(extractor.group_by.is_empty());
+        assert!(extractor.having.is_none());
     }
 }

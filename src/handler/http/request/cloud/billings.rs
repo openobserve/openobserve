@@ -56,6 +56,9 @@ use crate::{
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[get("/{org_id}/billings/hosted_subscription_url")]
 pub async fn create_checkout_session(
@@ -230,6 +233,9 @@ pub async fn process_session_detail(
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[get("/{org_id}/billings/unsubscribe")]
 pub async fn unsubscribe(
@@ -280,6 +286,9 @@ pub async fn unsubscribe(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[get("/{org_id}/billings/invoices")]
 pub async fn list_invoices(
@@ -320,6 +329,9 @@ pub async fn list_invoices(
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[get("/{org_id}/billings/list_subscription")]
 pub async fn list_subscription(
@@ -354,6 +366,9 @@ pub async fn list_subscription(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[get("/{org_id}/billings/billing_portal")]

@@ -20,7 +20,8 @@ use config::meta::search::Request;
 #[cfg(feature = "enterprise")]
 use {
     crate::handler::http::request::search::{
-        query_manager::cancel_query_inner, utils::check_stream_permissions,
+        query_manager::cancel_query_inner,
+        utils::{StreamPermissionResourceType, check_stream_permissions},
     },
     crate::service::search_jobs::{get_result, merge_response},
     crate::{
@@ -86,7 +87,8 @@ use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
         (status = 500, description = "Internal Server Error", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Submit async search job", "category": "search"}))
     )
 )]
 #[post("/{org_id}/search_jobs")]
@@ -172,8 +174,14 @@ pub async fn submit_job(
 
         // Check permissions on stream
         for stream_name in stream_names.iter() {
-            if let Some(res) =
-                check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
+            if let Some(res) = check_stream_permissions(
+                stream_name,
+                &org_id,
+                &user_id,
+                &stream_type,
+                StreamPermissionResourceType::Search,
+            )
+            .await
             {
                 return Ok(res);
             }
@@ -252,7 +260,8 @@ pub async fn submit_job(
         (status = 400, description = "Bad Request", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all search jobs", "category": "search"}))
     )
 )]
 #[get("/{org_id}/search_jobs")]
@@ -311,7 +320,8 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
         (status = 400, description = "Bad Request", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get search job status", "category": "search"}))
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/status")]
@@ -369,7 +379,8 @@ pub async fn get_status(
         (status = 400, description = "Bad Request", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Cancel a running search job", "category": "search"}))
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/cancel")]
@@ -429,7 +440,8 @@ pub async fn cancel_job(
         (status = 404, description = "Not Found", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get search job results", "category": "search"}))
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/result")]
@@ -513,7 +525,8 @@ pub async fn get_job_result(
         (status = 404, description = "Not Found", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a search job", "category": "search", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/search_jobs/{job_id}")]
@@ -581,7 +594,8 @@ pub async fn delete_job(
         (status = 403, description = "Forbidden - Job cannot be retried", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Retry a failed search job", "category": "search"}))
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/retry")]
@@ -706,8 +720,14 @@ async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Optio
     let stream_type = StreamType::from(job.stream_type.as_str());
     let stream_names: Vec<String> = json::from_str(&job.stream_names).unwrap();
     for stream_name in stream_names.iter() {
-        if let Some(res) =
-            check_stream_permissions(stream_name, org_id, user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            stream_name,
+            org_id,
+            user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
         {
             return Some(res);
         }

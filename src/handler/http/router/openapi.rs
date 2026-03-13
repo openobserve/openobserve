@@ -171,6 +171,7 @@ use crate::{common::meta, handler::http::request};
         request::mcp::oauth_authorization_server_metadata,
         request::pipeline::save_pipeline,
         request::pipeline::list_pipelines,
+        request::pipeline::get_pipeline,
         request::pipeline::list_streams_with_pipeline,
         request::pipeline::delete_pipeline,
         request::pipeline::update_pipeline,

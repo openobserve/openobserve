@@ -140,6 +140,7 @@ jobs:
                 "unflattened.spec.js",
                 "logstable.spec.js",
                 "shareLink.spec.js",
+                "monaco-query-prefill.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
@@ -171,6 +172,7 @@ jobs:
                 "dashboard-import.spec.js",
                 "maxquery.spec.js",
                 "dashboard-chartJson.spec.js",
+                "dashboard-promql-suggestions.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
@@ -183,6 +185,8 @@ jobs:
                 "dashboard-transpose.spec.js",
                 "dashboard-join.spec.js",
                 "dashboard-nested-functions.spec.js",
+                "dashboard-legends-copy.spec.js",
+                "dashboard-raw-query.spec.js",
               ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
@@ -193,7 +197,8 @@ jobs:
                 "dashboard-multi-y-axis.spec.js",
                 "dashboard-html-chart.spec.js",
                 "visualize.spec.js",
-                # "visualization-vrl.spec.js"
+                "visualize-vrl.spec.js",
+                "dashboard-series-color-multiwindow.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
@@ -211,7 +216,7 @@ jobs:
           - testfolder: "Reports"
             browser: "chrome"
             run_files: [
-              "reportsScheduleNow.spec.js", 
+              "reportsScheduleNow.spec.js",
               "reportsScheduleLater.spec.js"
               ]
           - testfolder: "Streams"
@@ -223,9 +228,41 @@ jobs:
                 "streaming.spec.js",
                 "stream-settings.spec.js",
               ]
+          - testfolder: "Traces"
+            browser: "chrome"
+            run_files:
+              [
+                "tracesSearch.spec.js",
+                "traceQueryEditor.spec.js",
+                "traceErrorFilter.spec.js",
+                "traceDetails.spec.js",
+                "traceAdvancedFiltering.spec.js",
+              ]
+          - testfolder: "Metrics"
+            browser: "chrome"
+            run_files:
+              [
+                "metrics.spec.js",
+                "metrics-queries.spec.js",
+                "metrics-aggregations.spec.js",
+                "metrics-advanced.spec.js",
+                "metrics-config-tabs.spec.js",
+                "metrics-visualizations.spec.js",
+                "metrics-config.spec.js",
+                "metrics-promql-query-persistence.spec.js",
+              ]
           - testfolder: "RegressionSet"
             browser: "chrome"
-            run_files: ["logs-regression.spec.js", "streams-regression.spec.js", "enrichment-regression.spec.js", "ui-regression.spec.js"]
+            run_files:
+              [
+                "logs-regression.spec.js",
+                "logs-regression-bugs.spec.js",
+                "logs-9754.spec.js",
+                "streams-regression.spec.js",
+                "enrichment-regression.spec.js",
+                "ui-regression.spec.js",
+                "pipeline-regression.spec.js",
+              ]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -386,7 +423,7 @@ jobs:
                 ACTUAL_FOLDER="Logs"
                 ;;
               "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming")
-                ACTUAL_FOLDER="Dashboards"
+                ACTUAL_FOLDER="dashboards"
                 ;;
               *)
                 ACTUAL_FOLDER="${{ matrix.testfolder }}"

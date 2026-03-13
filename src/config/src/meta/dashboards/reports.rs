@@ -156,7 +156,9 @@ pub struct Report {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = String, format = DateTime)]
     pub updated_at: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
     pub owner: String,
+    #[serde(default)]
     pub last_edited_by: String,
 }
 

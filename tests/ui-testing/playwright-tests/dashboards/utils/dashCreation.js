@@ -1,6 +1,7 @@
 import { expect } from "playwright/test";
 import logData from "../../../fixtures/log.json";
 import testLogger from '../../utils/test-logger.js';
+import { SELECTORS } from "../../../pages/dashboardPages/dashboard-selectors.js";
 
 // Function to wait for the dashboard page to load
 export const waitForDashboardPage = async function (page) {
@@ -183,4 +184,140 @@ export async function deleteDashboard(page, dashboardName) {
 
   // Ensure the dashboard row is removed from the table
   // await expect(dashboardRow).not.toBeVisible({ timeout: 5000 });
+}
+
+/**
+ * Reopen a dashboard from the dashboard list
+ * Uses the same XPath pattern as deleteDashboard for reliable dashboard selection
+ *
+ * @param {import('@playwright/test').Page} page - Playwright page
+ * @param {string} dashboardName - Name of the dashboard to open
+ */
+export async function reopenDashboardFromList(page, dashboardName) {
+  testLogger.info('Reopening dashboard from list', { dashboardName });
+
+  // Wait for dashboard list to load
+  await Promise.race([
+    page.waitForResponse(
+      (response) => {
+        const url = response.url();
+        return (
+          ( /\/api\/.*\/dashboards/.test(url) ||
+            /\/api\/.*\/folders/.test(url) ) &&
+          response.status() === 200
+        );
+      },
+      { timeout: 20000 }
+    ),
+    page.waitForSelector('[data-test="dashboard-table"]', { timeout: 20000 }),
+  ]);
+
+  // Find the dashboard row using XPath (same pattern as deleteDashboard)
+  const dashboardRow = page
+    .locator('//tr[.//div[@title="' + dashboardName + '"]]')
+    .nth(0);
+
+  // Click on the dashboard name to open it (using CSS attribute selector)
+  const dashboardNameDiv = dashboardRow.locator('div[title="' + dashboardName + '"]');
+  await dashboardNameDiv.click();
+
+  testLogger.debug('Clicked on dashboard name');
+
+  // Wait for dashboard to open
+  await page.waitForSelector('[data-test="dashboard-if-no-panel-add-panel-btn"]', {
+    state: "visible",
+    timeout: 10000
+  });
+
+  testLogger.info('Dashboard reopened successfully', { dashboardName });
+}
+
+/**
+ * Set up a test dashboard for variable tests
+ * Consolidates the common pattern of navigating to dashboards,
+ * creating a dashboard, and waiting for it to be ready
+ *
+ * @param {import('@playwright/test').Page} page - Playwright page
+ * @param {Object} pm - PageManager instance
+ * @param {string} dashboardName - Name for the dashboard
+ * @param {Object} options - Additional options
+ * @param {boolean} options.waitForAddPanelBtn - Wait for add panel button (default: true)
+ */
+export async function setupTestDashboard(page, pm, dashboardName, options = {}) {
+  const { waitForAddPanelBtn = true } = options;
+
+  testLogger.info('Setting up test dashboard', { dashboardName });
+
+  await pm.dashboardList.menuItem("dashboards-item");
+  await waitForDashboardPage(page);
+  await pm.dashboardCreate.waitForDashboardUIStable();
+  await pm.dashboardCreate.createDashboard(dashboardName);
+
+  if (waitForAddPanelBtn) {
+    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  testLogger.info('Test dashboard setup complete', { dashboardName });
+}
+
+/**
+ * Clean up a test dashboard after test completion
+ * Consolidates the common pattern of going back to list and deleting
+ *
+ * @param {import('@playwright/test').Page} page - Playwright page
+ * @param {Object} pm - PageManager instance
+ * @param {string} dashboardName - Name of dashboard to delete
+ */
+export async function cleanupTestDashboard(page, pm, dashboardName) {
+  testLogger.info('Cleaning up test dashboard', { dashboardName });
+
+  await pm.dashboardCreate.backToDashboardList();
+  await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+  await deleteDashboard(page, dashboardName);
+
+  testLogger.info('Test dashboard cleanup complete', { dashboardName });
+}
+
+/**
+ * Add a simple panel with basic configuration
+ * Consolidates the common pattern of:
+ * - addPanel() -> selectChartType() -> selectStream() -> searchAndAddField(y) -> addPanelName() -> savePanel()
+ *
+ * @param {Object} pm - PageManager instance
+ * @param {string} panelName - Name for the panel
+ * @param {Object} options - Additional options
+ * @param {string} options.chartType - Chart type (default: "line")
+ * @param {string} options.streamName - Stream name (default: "e2e_automate")
+ * @param {string} options.yAxisField - Y-axis field name (default: "kubernetes_pod_name")
+ * @param {boolean} options.save - Whether to save the panel (default: true)
+ * @param {Array<string>} options.filterFields - Optional array of filter field names to add
+ */
+export async function addSimplePanel(pm, panelName, options = {}) {
+  const {
+    chartType = "line",
+    streamName = "e2e_automate",
+    yAxisField = "kubernetes_pod_name",
+    save = true,
+    filterFields = []
+  } = options;
+
+  testLogger.info('Adding simple panel', { panelName, chartType, streamName, yAxisField });
+
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType(chartType);
+  await pm.chartTypeSelector.selectStream(streamName);
+  await pm.chartTypeSelector.searchAndAddField(yAxisField, "y");
+
+  // Add filter fields if specified
+  for (const filterField of filterFields) {
+    await pm.chartTypeSelector.searchAndAddField(filterField, "filter");
+  }
+
+  await pm.dashboardPanelActions.addPanelName(panelName);
+
+  if (save) {
+    await pm.dashboardPanelActions.savePanel();
+  }
+
+  testLogger.info('Simple panel added', { panelName, saved: save });
 }

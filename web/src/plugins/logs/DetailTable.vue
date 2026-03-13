@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <O2AIContextAddBtn
             class="tw-px-2 tw-py-2"
             @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
-             />
+          />
         </q-tabs>
       </div>
       <div
@@ -101,7 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-tab-panels
       data-test="log-detail-tab-container"
-      :class="['tab-panels-container', tab.startsWith('correlated-') ? 'full-height-panels' : '']"
+      :class="[
+        'tab-panels-container',
+        tab.startsWith('correlated-') ? 'full-height-panels' : '',
+      ]"
       v-model="tab"
       animated
     >
@@ -116,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             mode="sidebar"
             hide-view-related
             :highlight-query="highlightQuery"
+            :should-wrap-values="shouldWrapValues"
             @copy="copyContentToClipboard"
             @add-field-to-table="addFieldToTable"
             @add-search-term="toggleIncludeSearchTerm"
@@ -150,7 +154,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-td
                 :data-test="`log-detail-${props.row.field}-key`"
                 class="text-left"
-                :class="store.state.theme == 'dark' ? 'tw-text-[#f67a7aff]' : 'tw-text-[#B71C1C]'"
+                :class="
+                  store.state.theme == 'dark'
+                    ? 'tw-text-[#f67a7aff]'
+                    : 'tw-text-[#B71C1C]'
+                "
               >
                 {{ props.row.field }}
               </q-td>
@@ -171,14 +179,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="pointer"
                     name="'img:' + getImageURL('images/common/add_icon.svg')"
                   >
-                    <q-list data-test="field-list-modal" class="logs-table-list">
+                    <q-list
+                      data-test="field-list-modal"
+                      class="logs-table-list"
+                    >
                       <q-item
                         clickable
                         v-close-popup="true"
                         v-if="
                           searchObj.data.stream.selectedStreamFields.some(
                             (item: any) =>
-                              item.name === props.row.field ? item.isSchemaField : '',
+                              item.name === props.row.field
+                                ? item.isSchemaField
+                                : '',
                           )
                         "
                       >
@@ -186,7 +199,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-include-field-btn"
                             @click="
-                              toggleIncludeSearchTerm(props.row.field, props.row.value, 'include')
+                              toggleIncludeSearchTerm(
+                                props.row.field,
+                                props.row.value,
+                                'include',
+                              )
                             "
                             ><q-btn
                               title="Add to search query"
@@ -208,7 +225,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="
                           searchObj.data.stream.selectedStreamFields.some(
                             (item: any) =>
-                              item.name === props.row.field ? item.isSchemaField : '',
+                              item.name === props.row.field
+                                ? item.isSchemaField
+                                : '',
                           )
                         "
                       >
@@ -216,7 +235,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-exclude-field-btn"
                             @click="
-                              toggleExcludeSearchTerm(props.row.field, props.row.value, 'exclude')
+                              toggleExcludeSearchTerm(
+                                props.row.field,
+                                props.row.value,
+                                'exclude',
+                              )
                             "
                             ><q-btn
                               title="Add to search query"
@@ -278,6 +301,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                         </q-item-section>
                       </q-item>
+                      <!-- Cross-link options -->
+                      <template v-if="getCrossLinksForField(props.row.field).length > 0">
+                        <q-separator class="q-my-xs" />
+                        <q-item
+                          v-for="crossLink in getCrossLinksForField(props.row.field)"
+                          :key="crossLink.name"
+                          clickable
+                          v-close-popup
+                          @click.stop="openCrossLink(crossLink.resolvedUrl)"
+                        >
+                          <q-item-section>
+                            <q-item-label>
+                              <q-btn
+                                icon="open_in_new"
+                                size="6px"
+                                round
+                                class="q-mr-sm pointer"
+                              />{{ crossLink.name }}
+                            </q-item-label>
+                          </q-item-section>
+                        </q-item>
+                      </template>
                     </q-list>
                   </q-btn-dropdown>
                   <pre
@@ -288,7 +333,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'tw-whitespace-nowrap'
                         : 'tw-whitespace-pre-wrap'
                     "
-                  ><LogsHighLighting :data="props.row.value" :show-braces="false" :query-string="highlightQuery" /></pre>
+                  ><ChunkedContent
+                      v-if="getContentSize(props.row.value) > 50000"
+                      :data="props.row.value"
+                      :field-key="`detail_${props.row.field}`"
+                      :query-string="highlightQuery"
+                      :simple-mode="false"
+                    /><LogsHighLighting
+                      v-else
+                      :data="props.row.value"
+                      :show-braces="false"
+                      :query-string="highlightQuery"
+                    /></pre>
                 </div>
               </q-td>
             </template>
@@ -315,11 +371,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="tab = 'json'"
         />
         <!-- Loading/Empty state when no data -->
-        <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
+        <div
+          v-else
+          class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20"
+        >
           <div class="tw-text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
-            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
+            <q-spinner-hourglass
+              v-if="correlationLoading"
+              color="primary"
+              size="3rem"
+              class="tw-mb-4"
+            />
+            <div
+              v-else-if="correlationError"
+              class="tw-text-base tw-text-red-500"
+            >
+              {{ correlationError }}
+            </div>
+            <div v-else class="tw-text-base tw-text-gray-500">
+              {{ t("correlation.clickToLoadLogs") }}
+            </div>
           </div>
         </div>
       </q-tab-panel>
@@ -344,11 +415,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="tab = 'json'"
         />
         <!-- Loading/Empty state when no data -->
-        <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
+        <div
+          v-else
+          class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20"
+        >
           <div class="tw-text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
-            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+            <q-spinner-hourglass
+              v-if="correlationLoading"
+              color="primary"
+              size="3rem"
+              class="tw-mb-4"
+            />
+            <div
+              v-else-if="correlationError"
+              class="tw-text-base tw-text-red-500"
+            >
+              {{ correlationError }}
+            </div>
+            <div v-else class="tw-text-base tw-text-gray-500">
+              {{ t("correlation.clickToLoadMetrics") }}
+            </div>
           </div>
         </div>
       </q-tab-panel>
@@ -373,11 +459,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="tab = 'json'"
         />
         <!-- Loading/Empty state when no data -->
-        <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
+        <div
+          v-else
+          class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20"
+        >
           <div class="tw-text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
-            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
+            <q-spinner-hourglass
+              v-if="correlationLoading"
+              color="primary"
+              size="3rem"
+              class="tw-mb-4"
+            />
+            <div
+              v-else-if="correlationError"
+              class="tw-text-base tw-text-red-500"
+            >
+              {{ correlationError }}
+            </div>
+            <div v-else class="tw-text-base tw-text-gray-500">
+              {{ t("correlation.clickToLoadTraces") }}
+            </div>
           </div>
         </div>
       </q-tab-panel>
@@ -385,7 +486,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <q-separator v-if="tab === 'json' || tab === 'table'" />
-    <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md">
+    <q-card-section
+      v-if="tab === 'json' || tab === 'table'"
+      class="q-pa-md q-pb-md"
+    >
       <div class="row items-center no-wrap justify-between">
         <div class="col-1">
           <q-btn
@@ -430,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-        <div class="col-1 items-end" style="display: contents;">
+        <div class="col-1 items-end" style="display: contents">
           <q-btn
             data-test="log-detail-next-detail-btn"
             class="o2-secondary-button tw-h-[36px]"
@@ -458,6 +562,7 @@ import { copyToClipboard, useQuasar } from "quasar";
 import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -471,7 +576,15 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, TelemetryCorrelationDashboard },
+  components: {
+    EqualIcon,
+    NotEqualIcon,
+    JsonPreview,
+    O2AIContextAddBtn,
+    LogsHighLighting,
+    ChunkedContent,
+    TelemetryCorrelationDashboard,
+  },
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -483,7 +596,7 @@ export default defineComponent({
     "sendToAiChat",
     "closeTable",
     "show-correlation",
-    "load-correlation" // New event for lazy loading correlation data
+    "load-correlation", // New event for lazy loading correlation data
   ],
   props: {
     modelValue: {
@@ -538,7 +651,7 @@ export default defineComponent({
     ) {
       this.$emit("add:searchterm", field, field_value, action);
     },
-    searchTimeBoxed(rowData: any, size: number) { 
+    searchTimeBoxed(rowData: any, size: number) {
       this.$emit("search:timeboxed", {
         key: rowData[this.store.state.zoConfig.timestamp_column],
         size: size,
@@ -556,7 +669,7 @@ export default defineComponent({
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(true);
     const { searchObj } = searchState();
-    const {fnParsedSQL, hasAggregation} = logsUtils();
+    const { fnParsedSQL, hasAggregation } = logsUtils();
 
     const $q = useQuasar();
 
@@ -715,12 +828,81 @@ export default defineComponent({
       emit("add:table", value);
     };
 
+    // Cross-linking: get all matching cross-links for a field
+    const getCrossLinksForField = (fieldName: string): Array<{ name: string; resolvedUrl: string }> => {
+      if (!store.state.zoConfig?.enable_cross_linking) return [];
+
+      const crossLinks = searchObj.data.crossLinks;
+      if (!crossLinks) return [];
+
+      const { stream_links = [], org_links = [] } = crossLinks;
+
+      const aliasToOriginal: Record<string, string> = {};
+      for (const link of [...stream_links, ...org_links]) {
+        for (const f of link.fields || []) {
+          if (f.alias) aliasToOriginal[f.alias] = f.name;
+        }
+      }
+
+      const originalFieldName = aliasToOriginal[fieldName] || fieldName;
+      const fieldValue = rowData.value?.[fieldName];
+
+      const streamCoveredFields = new Set<string>();
+      for (const link of stream_links) {
+        for (const f of link.fields || []) {
+          if (f.alias) streamCoveredFields.add(f.name);
+        }
+      }
+
+      const results: Array<{ name: string; resolvedUrl: string }> = [];
+
+      for (const link of stream_links) {
+        if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+          const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
+          results.push({ name: link.name, resolvedUrl: resolved });
+        }
+      }
+
+      if (!streamCoveredFields.has(originalFieldName)) {
+        for (const link of org_links) {
+          if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+            const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
+            results.push({ name: link.name, resolvedUrl: resolved });
+          }
+        }
+      }
+
+      return results;
+    };
+
+    const resolveCrossLinkUrl = (
+      urlTemplate: string,
+      fieldName: string,
+      fieldValue: any,
+    ): string => {
+      const startTime = searchObj.data.datetime?.startTime || 0;
+      const endTime = searchObj.data.datetime?.endTime || 0;
+      const query = searchObj.data.crossLinkQuery || searchObj.data.query || "";
+
+      return urlTemplate
+        .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
+        .replace(/\$\{field\.__value\}/g, encodeURIComponent(String(fieldValue ?? "")))
+        .replace(/\$\{start_time\}/g, String(startTime))
+        .replace(/\$\{end_time\}/g, String(endTime))
+        .replace(/\$\{query\}/g, encodeURIComponent(query))
+        .replace(/\$\{query_encoded\}/g, btoa(query));
+    };
+
+    const openCrossLink = (url: string) => {
+      window.open(url, "_blank");
+    };
+
     const viewTrace = () => {
       emit("view-trace");
     };
 
-    const sendToAiChat = (value: any) => {
-      emit("sendToAiChat", value);
+    const sendToAiChat = (value: any, append: boolean = true) => {
+      emit("sendToAiChat", value, append);
       emit("closeTable");
     };
     const closeTable = () => {
@@ -734,6 +916,19 @@ export default defineComponent({
       );
       // Emit the original modelValue (not flattened rowData) as it has _timestamp
       emit("show-correlation", props.modelValue);
+    };
+
+    const getContentSize = (data: any): number => {
+      if (data === null || data === undefined) return 0;
+      if (typeof data === "string") return data.length;
+      if (typeof data === "object") {
+        try {
+          return JSON.stringify(data).length;
+        } catch {
+          return 0;
+        }
+      }
+      return String(data).length;
     };
 
     return {
@@ -750,6 +945,8 @@ export default defineComponent({
       toggleWrapLogDetails,
       copyContentToClipboard,
       addFieldToTable,
+      getCrossLinksForField,
+      openCrossLink,
       searchObj,
       multiStreamFields,
       viewTrace,
@@ -762,6 +959,7 @@ export default defineComponent({
       tableRows,
       tablePagination,
       serviceStreamsEnabled,
+      getContentSize,
     };
   },
   async created() {

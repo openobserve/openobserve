@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -97,8 +97,8 @@ pub fn round_step(mut step: i64) -> i64 {
     }
     if step == 0 {
         micros(DEFAULT_STEP)
-    } else if step > (100 * second) {
-        step - (step % (10 * second))
+    } else if step > (60 * second) {
+        step - (step % (60 * second))
     } else if step > (10 * second) {
         step - (step % (5 * second))
     } else {

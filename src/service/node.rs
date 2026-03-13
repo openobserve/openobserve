@@ -16,13 +16,12 @@
 use std::sync::Arc;
 
 use config::meta::cluster::{Node as ConfigNode, NodeInfo, NodeStatus, Role, RoleGroup};
+use infra::cluster::get_cached_nodes;
 use proto::cluster_rpc::{
     EmptyRequest, GetNodesResponse, NodeDetails, NodeMetrics as ProtoNodeMetrics,
     NodeStatus as ProtoNodeStatus, Role as ProtoRole, RoleGroup as ProtoRoleGroup,
 };
 use tonic::{Request, Response, Status};
-
-use crate::common::infra::cluster;
 
 pub struct NodeService;
 
@@ -158,9 +157,7 @@ impl proto::cluster_rpc::node_service_server::NodeService for NodeService {
         _request: Request<EmptyRequest>,
     ) -> Result<Response<GetNodesResponse>, Status> {
         // Get all nodes from cache
-        let nodes = cluster::get_cached_nodes(|_| true)
-            .await
-            .unwrap_or_default();
+        let nodes = get_cached_nodes(|_| true).await.unwrap_or_default();
 
         // Convert config nodes to proto nodes
         let proto_nodes = nodes.into_iter().map(config_node_to_proto).collect();

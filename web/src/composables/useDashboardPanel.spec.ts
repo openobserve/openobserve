@@ -5740,5 +5740,115 @@ describe("useDashboardPanel", () => {
       const newField = panel.dashboardPanelData.data.queries[0].fields.y[panel.dashboardPanelData.data.queries[0].fields.y.length - 1];
       expect(newField.color).toBeDefined();
     });
+
+    /**
+     * VRL Visualization Support Tests
+     * PR Reference: https://github.com/openobserve/openobserve/pull/9295
+     *
+     * Tests for the VRL function check added to determineChartType function.
+     * When VRL functions produce derived fields, chart type should always be "table".
+     */
+    describe("VRL Visualization Support - determineChartType", () => {
+      it("should return 'table' when vrlFunctionFieldList has items (VRL functions present)", () => {
+        // Set VRL function fields to simulate VRL function output
+        panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+          { name: "parsed_json", type: "Utf8" },
+          { name: "extracted_value", type: "Int64" },
+        ];
+
+        const extractedFields = {
+          group_by: ["service"],
+          projections: ["timestamp", "count", "parsed_json"],
+          timeseries_field: "timestamp", // Has timeseries - would normally be "line"
+        };
+
+        // With VRL functions present, should always return "table"
+        const chartType = panel.determineChartType(extractedFields);
+        expect(chartType).toBe("table");
+      });
+
+      it("should return 'line' when vrlFunctionFieldList is empty and timeseries conditions met", () => {
+        // Clear VRL function fields
+        panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
+
+        const extractedFields = {
+          group_by: ["service"],
+          projections: ["timestamp", "count"],
+          timeseries_field: "timestamp",
+        };
+
+        // Without VRL functions, normal logic applies
+        const chartType = panel.determineChartType(extractedFields);
+        expect(chartType).toBe("line");
+      });
+
+      it("should return 'table' with VRL functions even when perfect line chart conditions exist", () => {
+        // Single VRL derived field
+        panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+          { name: "computed_field", type: "Float64" },
+        ];
+
+        // Perfect conditions for line chart: timeseries + single group_by
+        const extractedFields = {
+          group_by: ["service"],
+          projections: ["timestamp", "count"],
+          timeseries_field: "timestamp",
+        };
+
+        // VRL check takes precedence
+        const chartType = panel.determineChartType(extractedFields);
+        expect(chartType).toBe("table");
+      });
+
+      it("should return 'table' with VRL functions when no group_by fields", () => {
+        panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+          { name: "vrl_output", type: "Utf8" },
+        ];
+
+        const extractedFields = {
+          group_by: [],
+          projections: ["timestamp", "message", "vrl_output"],
+          timeseries_field: "timestamp",
+        };
+
+        const chartType = panel.determineChartType(extractedFields);
+        expect(chartType).toBe("table");
+      });
+
+      it("should return 'table' with multiple VRL derived fields", () => {
+        panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+          { name: "field1", type: "Utf8" },
+          { name: "field2", type: "Int64" },
+          { name: "field3", type: "Float64" },
+          { name: "field4", type: "Boolean" },
+        ];
+
+        const extractedFields = {
+          group_by: [],
+          projections: ["timestamp"],
+          timeseries_field: "timestamp",
+        };
+
+        const chartType = panel.determineChartType(extractedFields);
+        expect(chartType).toBe("table");
+      });
+
+      it("should handle empty vrlFunctionFieldList array correctly (length check)", () => {
+        panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
+
+        // Verify the condition check
+        expect(panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length).toBe(0);
+        expect(panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0).toBe(false);
+      });
+
+      it("should handle single item vrlFunctionFieldList array correctly (truthy check)", () => {
+        panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
+          { name: "single_field", type: "Utf8" },
+        ];
+
+        expect(panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length).toBe(1);
+        expect(panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0).toBe(true);
+      });
+    });
   });
 });

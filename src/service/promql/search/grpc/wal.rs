@@ -28,28 +28,26 @@ use datafusion::{
     prelude::{SessionContext, col, lit},
 };
 use hashbrown::HashSet;
+use infra::cluster::get_cached_online_ingester_nodes;
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::infra::cluster::get_cached_online_ingester_nodes,
-    service::{
-        promql::{
-            search::grpc::Context,
-            utils::{apply_label_selector, apply_matchers},
-        },
-        search::{
-            datafusion::{
-                distributed_plan::{
-                    node::{RemoteScanNode, SearchInfos},
-                    remote_scan_exec::RemoteScanExec,
-                },
-                exec::DataFusionContextBuilder,
-                table_provider::empty_table::NewEmptyTable,
+use crate::service::{
+    promql::{
+        search::grpc::Context,
+        utils::{apply_label_selector, apply_matchers},
+    },
+    search::{
+        datafusion::{
+            distributed_plan::{
+                node::{RemoteScanNode, SearchInfos},
+                remote_scan_exec::RemoteScanExec,
             },
-            utils::ScanStatsVisitor,
+            exec::DataFusionContextBuilder,
+            table_provider::empty_table::NewEmptyTable,
         },
+        utils::ScanStatsVisitor,
     },
 };
 

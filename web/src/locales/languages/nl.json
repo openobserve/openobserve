@@ -88,7 +88,8 @@
     "status": "Status",
     "cancel": "Annuleer",
     "relative": "Relatief",
-    "absolute": "Absoluut"
+    "absolute": "Absoluut",
+    "off": "Uit"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -277,7 +278,16 @@
     "transformLabel": "Transformeren",
     "addToDashboard": "Aan dashboard toevoegen",
     "selectStream": "Selecteer Stream",
-    "pattern_summary": "Toont 1 tot 50 van de {totalEvents} -gebeurtenissen en {PatternsFound} -patronen gevonden in {logsAnalyzed} -gebeurtenissen in {totalTime} ms."
+    "pattern_summary": "Toont 1 tot 50 van de {totalEvents} -gebeurtenissen en {PatternsFound} -patronen gevonden in {logsAnalyzed} -gebeurtenissen in {totalTime} ms.",
+    "toggleFunctionEditor": "Functie-editor in- en uitschakelen",
+    "hide": "Verstoppen",
+    "show": "Laat zien",
+    "editor": "Redacteur",
+    "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder.",
+    "showHideColumns": "Kolommen tonen/verbergen",
+    "autoRefresh": "Automatisch verversen",
+    "createSavedView": "Opgeslagen weergave maken",
+    "listSavedViews": "Opgeslagen weergaven weergeven"
   },
   "menu": {
     "home": "Home",
@@ -1469,6 +1479,154 @@
       "searchField": "Zoek naar een veld",
       "savedFunctions": "Opgeslagen functies",
       "autoUsesCheckInterval": "Auto (maakt gebruik van controle-interval)"
+    },
+    "steps": {
+      "alertSetup": "Instellen van de waarschuwing",
+      "conditions": "Voorwaarden",
+      "compareWithPast": "Vergelijk met Past",
+      "alertSettings": "Waarschuwingsinstellingen",
+      "deduplication": "Deduplicatie",
+      "advanced": "Geavanceerd"
+    },
+    "stepCaptions": {
+      "alertSetup": "Maak de weg vrij voor je waarschuwing",
+      "conditions": "Wat zou de waarschuwing moeten activeren",
+      "compareWithPast": "Vergelijk de huidige resultaten met gegevens uit een andere periode",
+      "alertSettings": "Stel je waarschuwingsregels in en kies hoe je op de hoogte wilt worden gehouden.",
+      "deduplication": "Voorkom dat dezelfde waarschuwing meerdere keren wordt verzonden door soortgelijke meldingen te groeperen.",
+      "advanced": "Contextvariabelen, beschrijving en rijsjabloon"
+    },
+    "template": "Sjabloon overschrijven",
+    "searchDestinationType": "Soorten bestemmingen zoeken...",
+    "customDestination": "Bestemming op maat",
+    "customDestinationDescription": "Configureer een aangepast HTTP-eindpunt of e-mailbestemming",
+    "noDestinationTypesFound": "Geen soorten bestemmingen gevonden",
+    "clearSearch": "Zoekopdracht wissen",
+    "popular": "Populair",
+    "testIdleMessage": "Klik op 'Test' om de configuratie van uw bestemming te verifiëren",
+    "destinationPreview": "Voorbeeld van de bestemming",
+    "testSuccessMessage": "Test geslaagd! Je bestemming is correct geconfigureerd.",
+    "testFailedMessage": "De test is mislukt. Controleer je configuratie en probeer het opnieuw.",
+    "testInProgress": "Bestemming van de test...",
+    "sendingNotification": "Testmeldingen verzenden om de connectiviteit te verifiëren",
+    "testErrorDNS": "DNS-resolutie is mislukt. Controleer de webhook-URL of hostnaam.",
+    "testErrorConnection": "De verbinding is geweigerd. Controleer de URL en zorg ervoor dat de service bereikbaar is.",
+    "testErrorTimeout": "Er is een time-out opgetreden voor het verzoek. De bestemmingsdienst is mogelijk traag of onbereikbaar.",
+    "testErrorSSL": "SSL/TLS-certificaatfout. Verifieer het certificaat of schakel SSL-verificatie uit.",
+    "testErrorGeneric": "De test is mislukt vanwege een fout. Bekijk de details hieronder.",
+    "testErrorClientError": "Klantfout (4xx). Controleer uw inloggegevens en configuratie.",
+    "testErrorServerError": "Serverfout (5xx). Er zijn problemen met de bestemmingsservice.",
+    "viewDetails": "Details bekijken",
+    "error": "Fout",
+    "httpStatus": "HTTP-status",
+    "responseBody": "Reactielichaam",
+    "responseHeaders": "Reactiekoppen",
+    "retry": "Probeer het opnieuw",
+    "suggestCheckUrl": "Controleer of de webhook-URL correct en bereikbaar is.",
+    "suggestCheckFirewall": "Controleer de instellingen van uw firewall en zorg ervoor dat de doelservice toegankelijk is.",
+    "suggestCheckCredentials": "Controleer of je API-inloggegevens correct zijn.",
+    "suggestCheckPermissions": "Controleer of uw inloggegevens over de vereiste machtigingen beschikken.",
+    "suggestCheckEndpoint": "Controleer of de URL van het eindpunt juist is.",
+    "suggestRateLimit": "Je hebt de tarieflimiet overschreden. Een ogenblik geduld a.u.b. voordat u het opnieuw probeert.",
+    "suggestServerIssue": "Er zijn problemen met de bestemmingsservice. Probeer het later opnieuw.",
+    "discord": "Onenigheid",
+    "msteams": "Microsoft Teams",
+    "pagerduty": "PagerDuty",
+    "opsgenie": "Opsgenie",
+    "servicenow": "ServiceNow",
+    "saveAlert": "Waarschuwing opslaan",
+    "aggregation_threshold": "Waarschuwing als er groepen zijn",
+    "thresholdDynamic": {
+      "alertMeWhen": "Waarschuw me wanneer",
+      "metricTypes": {
+        "resultsPassedFilter": "resultaten geslaagd: filters",
+        "distinctGroupsAffected": "verschillende groepen worden getroffen",
+        "metricsMatchCriteria": "statistieken komen overeen met criteria",
+        "matchingLogsFound": "overeenkomende logboeken gevonden",
+        "groupsPassFilter": "groepen voldoen aan filtercriteria",
+        "distinctGroups": "verschillende groepen gevonden",
+        "resultRows": "resultaatrijen geretourneerd",
+        "timeSeries": "actieve tijdreeksen gevonden",
+        "matchingRecords": "overeenkomende records gevonden",
+        "groupsWithHaving": "wedstrijdvoorwaarden voor groepen",
+        "uniqueGroups": "unieke groepen",
+        "events": "wedstrijdvoorwaarden voor evenementen",
+        "aggregatedValue": "wedstrijdvoorwaarden"
+      },
+      "contextLabels": {
+        "groupedBy": "Gegroepeerd op:",
+        "havingConditions": "De voorwaarden met betrekking tot:"
+      }
+    },
+    "alertDetails": {
+      "alertName": "Naam van de waarschuwing",
+      "sqlQuery": "SQL-zoekopdracht",
+      "promqlQuery": "ProMQL-zoekopdracht",
+      "conditions": "Voorwaarden",
+      "copy": "Kopiëren",
+      "noCondition": "Geen voorwaarde",
+      "noDescription": "Geen beschrijving",
+      "evaluationHistory": "Geschiedenis van de evaluatie",
+      "loadingHistory": "Geschiedenis wordt geladen...",
+      "noHistoryAvailable": "Geen evaluatiegeschiedenis beschikbaar voor deze waarschuwing",
+      "results": "Resultaten"
+    },
+    "historyTable": {
+      "timestamp": "Tijdstempel",
+      "status": "Status",
+      "evaluationTime": "Evaluatie (s)",
+      "queryTime": "Zoekopdracht (ms)",
+      "error": "Fout"
+    },
+    "back": "Terug",
+    "continue": "Ga verder",
+    "wouldTrigger": "ZOU TRIGGEREN",
+    "wouldNotTrigger": "ZOU NIET ACTIVEREN",
+    "queryBuilder": "Bouwer",
+    "groupByHelp": {
+      "description": "Groepeer de geaggregeerde gegevens op specifieke velden om afzonderlijke waarschuwingen te creëren voor elke unieke waarde.",
+      "example": "Voorbeeld: groepeer op „hostnaam” om individuele meldingen per server te ontvangen, of op „status_code” om fouten afzonderlijk bij te houden."
+    },
+    "conditions": {
+      "condition": "Conditie",
+      "conditionGroup": "Conditiegroep",
+      "addConditionTooltip": "Een nieuwe voorwaarde aan deze groep toevoegen",
+      "addConditionGroupTooltip": "Een geneste conditiegroep toevoegen (maximale diepte: 2)",
+      "maxDepthReachedTooltip": "Maximale nestdiepte bereikt"
+    },
+    "compareWithPast": {
+      "alertSetFor": "Waarschuwing ingesteld voor",
+      "currentWindow": "Huidig venster",
+      "cycle": "Cyclus",
+      "cycleTooltip": "Vergelijk de resultaten met dezelfde periode in de vorige cyclus.",
+      "runningFor": "Hardlopen gedurende {periode} in het interval van elke {frequentie}",
+      "currentWindowCannotBeDeleted": "Het huidige venster kan niet worden verwijderd",
+      "comparingWith": "Vergelijken met",
+      "referenceWindow": "Referentievenster",
+      "timeFrame": "Tijdsbestek",
+      "timeFrameTooltip": "Tijdbereik voor uw vraag.",
+      "comparingText": "Vergelijking van het huidige vensterqueryresultaat met het queryresultaat van de vorige {offset}.",
+      "addComparisonWindow": "Vergelijkingsvenster toevoegen",
+      "goToConditions": "Ga naar de voorwaarden",
+      "goToConditionsTooltip": "Klik op „Ga naar de voorwaarden” om de gebeurtenissen voor geselecteerde vergelijkingsvensters te verifiëren"
+    },
+    "alertSettings": {
+      "cronSchedule": "Cron-schema",
+      "addNewDestination": "Nieuwe bestemming toevoegen",
+      "cooldownTooltip": "Als de waarschuwing wordt geactiveerd, hoe lang moet het dan wachten voordat een nieuwe melding wordt verzonden. Als de waarschuwing bijvoorbeeld om 16.00 uur wordt geactiveerd en de stiltemelding is ingesteld op 10 minuten, dan wordt er pas om 16.10 uur nog een melding gestuurd, zelfs als de waarschuwing na 1 minuut nog steeds duurt. Dit is om te voorkomen dat de gebruiker wordt gespamd met meldingen.",
+      "thresholdTooltip": "Definieert wanneer de waarschuwing moet worden geactiveerd op basis van het aantal gebeurtenissen of de geaggregeerde waarde. Voorbeeld: Indien ingesteld op „> 100\", wordt de waarschuwing geactiveerd wanneer het aantal meer dan 100 gebeurtenissen bedraagt.",
+      "periodTooltip": "Periode gedurende welke de query moet worden uitgevoerd. Bijvoorbeeld 10 minuten betekent dat telkens wanneer de query wordt uitgevoerd, de laatste 10 minuten aan gegevens worden gebruikt.",
+      "frequencyTooltipMinutes": "Hoe vaak de taak moet worden uitgevoerd. bijv. elke 5 minuten.",
+      "frequencyTooltipCron": "Standaard UNIX cron-formaat met 5 velden gescheiden door spaties: [Minuut 0-59] [Uur 0-23] [Dag van maand 1-31] [Maand 1-12 of JAN-DEC] [Dag van week 0-7 of '1L-7L', 0 en 7 voor zondag].",
+      "timezoneWarning": "Waarschuwing: De weergegeven tijdzone is bij benadering. Controleer en selecteer handmatig de juiste tijdzone.",
+      "destinationsTooltip": "Selecteer een of meer bestemmingen om waarschuwingsmeldingen te verzenden.",
+      "templateTooltip": "Optioneel: Selecteer een sjabloon om te gebruiken voor alle bestemmingen in deze waarschuwing. Met sjablonen kunt u de indeling van waarschuwingsberichten aanpassen. Indien niet geselecteerd, zal elke bestemming zijn eigen geconfigureerde sjabloon gebruiken."
+    },
+    "advanced": {
+      "addVariable": "Variabele toevoegen",
+      "variablesTooltip": "Variabelen worden gebruikt om gegevens van de waarschuwing naar de bestemming door te geven.",
+      "rowTemplateTooltip": "Rijsjabloon wordt gebruikt om het waarschuwingsbericht op te maken.",
+      "templateType": "Sjabloontype:"
     }
   },
   "alert_templates": {
@@ -1508,7 +1666,10 @@
     "add_template": "Nieuw sjabloon",
     "skip_tls_verify": "TLS-verificatie overslaan",
     "action": "Actie",
-    "output_format": "Uitvoerformaat"
+    "output_format": "Uitvoerformaat",
+    "separator": "Separator",
+    "separator_placeholder": "Voer een scheidingsteken in (bijvoorbeeld |,\\n,\\ t, spatie)",
+    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)"
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",
@@ -2060,7 +2221,8 @@
     "showLegends": "Legendes weergeven"
   },
   "alert_list": {
-    "alert_details": "Details van de waarschuwing"
+    "alert_details": "Details van de waarschuwing",
+    "alert_history": "Waarschuwingsgeschiedenis"
   },
   "latencyInsights": {
     "title": "Inzichten",
@@ -2146,5 +2308,47 @@
     "clearChatTitle": "Chat wissen",
     "clearChatMessage": "Weet je zeker dat je dit gesprek wilt beëindigen?",
     "copiedToClipboard": "Gekopieerd naar klembord"
+  },
+  "crossLinks": {
+    "header": "Cross-Linking",
+    "addCrossLink": "Cross-link toevoegen",
+    "editCrossLink": "Cross-link bewerken",
+    "name": "Naam",
+    "nameRequired": "Naam is verplicht",
+    "namePlaceholder": "bijv. Traceergegevens bekijken",
+    "urlTemplate": "URL-sjabloon",
+    "urlRequired": "URL is vereist",
+    "urlPlaceholder": "bijv. https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlHint": "Gebruik {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
+    "fields": "Velden",
+    "fieldsHint": "Link alleen tonen als er minstens één veld in de record aanwezig is",
+    "fieldSearchPlaceholder": "Typ om te zoeken of voer een aangepast veld in",
+    "fieldInputPlaceholder": "Voer de veldnaam in en druk op Enter of klik op +",
+    "noMatchingFields": "Geen overeenkomende velden. Druk op Enter of + om een aangepast veld toe te voegen.",
+    "emptyState": "Er zijn geen kruislinks geconfigureerd. Klik op „{addLabel}” om er een aan te maken.",
+    "update": "Bijwerken",
+    "add": "Toevoegen",
+    "streamCrossLinks": "Crosslinks streamen",
+    "streamCrossLinksSubtitle": "Links die specifiek zijn voor deze stream. Deze hebben voorrang op links op organisatieniveau.",
+    "orgCrossLinks": "Links op organisatieniveau (alleen-lezen)",
+    "orgCrossLinksSubtitle": "Deze links worden gedefinieerd op organisatieniveau. Ga naar Organisatieparameters om ze aan te passen.",
+    "orgConfigTitle": "Configuratie voor verknoping",
+    "orgConfigSubtitle": "Definieer globale kruislinks die van toepassing zijn op alle streams.",
+    "userGuide": "Gebruikershandleiding",
+    "guideIntro": "Je kunt de volgende variabelen gebruiken in je URL-sjabloon:",
+    "guideFieldHeader": "Informatie in het veld",
+    "guideFieldDesc": "Verwijs naar het veld dat de crosslink heeft geactiveerd:",
+    "guideFieldName": "De veldnaam (bijvoorbeeld trace_id, kubernetes_namespace_name)",
+    "guideFieldValue": "De waarde van dat veld uit het record",
+    "guideTimeHeader": "Tijdbereik",
+    "guideTimeDesc": "Verwijs naar de huidige geselecteerde periode:",
+    "guideStartTime": "Starttijd (epoch milliseconden)",
+    "guideEndTime": "Eindtijd (milliseconden van het tijdperk)",
+    "guideTimeExample": "Bijvoorbeeld:",
+    "guideQueryHeader": "Zoekopdracht",
+    "guideQueryDesc": "Verwijs naar de huidige SQL-query:",
+    "guideQuery": "Huidige SQL-query",
+    "guideQueryEncoded": "SQL-query met Base64-codering",
+    "guideExampleHeader": "Voorbeeld"
   }
 }

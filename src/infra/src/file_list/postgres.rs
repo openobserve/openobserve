@@ -119,8 +119,8 @@ impl super::FileList for PostgresFileList {
         DB_QUERY_NUMS
             .with_label_values(&["insert", "file_list"])
             .inc();
-        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT DO NOTHING;"#
+        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT DO NOTHING;"#
                 )
                 .bind(&dump_file.account)
                 .bind(org_id)
@@ -135,7 +135,6 @@ impl super::FileList for PostgresFileList {
                 .bind(meta.compressed_size)
                 .bind(meta.index_size)
                 .bind(meta.flattened)
-                .bind(now_ts)
                 .bind(now_ts)
                 .execute(&mut *tx).await
         {
@@ -1729,8 +1728,8 @@ impl PostgresFileList {
         let ret: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
             format!(
                 r#"
-INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     ON CONFLICT DO NOTHING
     RETURNING id;
                 "#
@@ -1749,7 +1748,6 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             .bind(meta.compressed_size)
             .bind(meta.index_size)
             .bind(meta.flattened)
-            .bind(now_ts)
             .bind(now_ts)
             .fetch_one(&pool).await;
         match ret {
@@ -1779,7 +1777,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)").as_str()
+                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str()
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let Ok((stream_key, date_key, file_name)) = parse_file_key_columns(&item.key)
@@ -1805,7 +1803,6 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
                         .push_bind(item.meta.flattened)
-                        .push_bind(now_ts)
                         .push_bind(now_ts);
                 });
                 DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
@@ -1919,7 +1916,6 @@ CREATE TABLE IF NOT EXISTS file_list
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
-    created_at      BIGINT not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -1945,7 +1941,6 @@ CREATE TABLE IF NOT EXISTS file_list_history
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
-    created_at      BIGINT not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -2074,12 +2069,6 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
     )
     .await?;
 
-    // create column created_at and updated_at for version >= 0.14.7
-    // Nov 11 2025, just a value, anything large than past is fine
-    let column = "created_at";
-    let data_type = "BIGINT default 1762819200000000 not null";
-    add_column("file_list", column, data_type).await?;
-    add_column("file_list_history", column, data_type).await?;
     let column = "updated_at";
     let data_type = "BIGINT default 1762819200000000 not null";
     add_column("file_list", column, data_type).await?;
@@ -2320,7 +2309,6 @@ mod tests {
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
                 index_size BIGINT not null,
-                created_at BIGINT not null,
                 updated_at BIGINT not null
             )
             "#,
@@ -2345,7 +2333,6 @@ mod tests {
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
                 index_size BIGINT not null,
-                created_at BIGINT not null,
                 updated_at BIGINT not null
             )
             "#,

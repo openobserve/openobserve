@@ -32,7 +32,9 @@ use {
     },
 };
 
-use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyExec;
+use crate::service::search::datafusion::{
+    distributed_plan::empty_exec::NewEmptyExec, plan::deduplication_exec::DeduplicationExec,
+};
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[derive(Debug)]
@@ -53,6 +55,9 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         match proto.plan {
             Some(cluster_rpc::physical_plan_node::Plan::EmptyExec(node)) => {
                 super::empty_exec::try_decode(node, inputs, ctx)
+            }
+            Some(cluster_rpc::physical_plan_node::Plan::DeduplicationExec(node)) => {
+                super::deduplication_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::AggregateTopk(node)) => {
@@ -84,6 +89,8 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         #[cfg(feature = "enterprise")]
         if node.as_any().downcast_ref::<NewEmptyExec>().is_some() {
             super::empty_exec::try_encode(node, buf)
+        } else if node.as_any().downcast_ref::<DeduplicationExec>().is_some() {
+            super::deduplication_exec::try_encode(node, buf)
         } else if node.as_any().downcast_ref::<AggregateTopkExec>().is_some() {
             super::aggregate_topk_exec::try_encode(node, buf)
         } else if node.as_any().downcast_ref::<StreamingAggsExec>().is_some() {
@@ -98,6 +105,8 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         #[cfg(not(feature = "enterprise"))]
         if node.as_any().downcast_ref::<NewEmptyExec>().is_some() {
             super::empty_exec::try_encode(node, buf)
+        } else if node.as_any().downcast_ref::<DeduplicationExec>().is_some() {
+            super::deduplication_exec::try_encode(node, buf)
         } else {
             internal_err!("Not supported")
         }

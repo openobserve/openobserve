@@ -133,7 +133,7 @@ pub async fn search(
             match program {
                 Some(program) => {
                     if apply_over_hits {
-                        let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),
@@ -149,6 +149,9 @@ pub async fn search(
                             &sql.org_id,
                             &stream_names,
                         );
+                        if let Some(e) = err {
+                            log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
+                        }
 
                         ret_val
                             .as_array()
@@ -163,11 +166,12 @@ pub async fn search(
                             })
                             .collect::<Vec<_>>()
                     } else {
-                        json_rows
+                        let mut error = "".to_string();
+                        let res = json_rows
                             .into_iter()
                             .filter(|v| !v.is_empty())
                             .filter_map(|hit| {
-                                let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                                let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
                                     &mut runtime,
                                     &VRLResultResolver {
                                         program: program.program.clone(),
@@ -177,13 +181,22 @@ pub async fn search(
                                     &sql.org_id,
                                     &stream_names,
                                 );
+                                if let Some(e) = err {
+                                    error = e;
+                                }
                                 if !ret_val.is_null() && ret_val.is_object() {
                                     flatten::flatten(ret_val).ok()
                                 } else {
                                     None
                                 }
                             })
-                            .collect::<Vec<_>>()
+                            .collect::<Vec<_>>();
+                        if !error.is_empty() {
+                            log::error!(
+                                "[trace_id {trace_id}] Error applying vrl function: {error}"
+                            );
+                        }
+                        res
                     }
                 }
                 None => json_rows

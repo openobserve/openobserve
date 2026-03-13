@@ -18,7 +18,9 @@ use actix_web::{HttpResponse, post, web};
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::check_stream_permissions;
+use crate::handler::http::request::search::utils::{
+    StreamPermissionResourceType, check_stream_permissions,
+};
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::extractors::Headers,
@@ -54,7 +56,8 @@ use crate::{
         (status = 500, description = "Internal Server Error"),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Extract log patterns", "category": "patterns"}))
     )
 )]
 #[post("/{org_id}/streams/{stream_name}/patterns/extract")]
@@ -145,6 +148,7 @@ pub async fn extract_patterns(
                 &org_id,
                 &user_id,
                 &config::meta::stream::StreamType::Logs,
+                StreamPermissionResourceType::PatternExtract,
             )
             .await
             {

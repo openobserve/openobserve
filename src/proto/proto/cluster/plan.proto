@@ -18,6 +18,7 @@ message PhysicalPlanNode {
     StreamingAggsExecNode streaming_aggs = 3;
     TmpExecNode                 tmp_exec = 4;
     EnrichmentExecNode    enrichment_exec = 5;
+    DeduplicationExecNode deduplication_exec = 6;
   }
 }
 
@@ -44,6 +45,11 @@ message EnrichmentExecNode {
   string                     org_id = 2;
   string                stream_name = 3;
   datafusion_common.Schema   schema = 4;
+}
+
+message DeduplicationExecNode {
+  repeated datafusion.PhysicalExprNode deduplication_columns = 1;
+  uint64                                         max_rows = 2;
 }
 
 message AggregateTopkExecNode {

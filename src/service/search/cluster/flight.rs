@@ -35,8 +35,10 @@ use datafusion::{
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
+    cluster,
     errors::{Error, ErrorCodes, Result},
     file_list::FileId,
+    runtime::DATAFUSION_RUNTIME,
 };
 use itertools::Itertools;
 use parking_lot::Mutex;
@@ -46,12 +48,11 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use crate::service::search::SEARCH_SERVER;
 use crate::{
-    common::infra::cluster as infra_cluster,
     handler::grpc::flight::visitor::get_peak_memory_from_ctx,
     service::{
         db::enrichment_table,
         search::{
-            DATAFUSION_RUNTIME, SearchResult,
+            SearchResult,
             datafusion::{
                 exec::{DataFusionContextBuilder, register_udf},
                 optimizer::{
@@ -153,7 +154,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
-    if req.local_mode.unwrap_or_default() {
+    if is_local_mode {
         if LOCAL_NODE.is_querier() {
             nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
         } else {
@@ -374,7 +375,10 @@ pub async fn run_datafusion(
     register_table(&ctx, &sql).await?;
 
     // create physical plan
-    let physical_plan = create_physical_plan(&ctx, &sql.sql).await?;
+    let physical_plan = create_physical_plan(&ctx, &sql.sql).await.map_err(|e| {
+        log::error!("[trace_id {trace_id}] flight->search: create physical plan error: {e}");
+        e
+    })?;
 
     if cfg.common.print_key_sql {
         log::info!("[trace_id {trace_id}] leader physical plan");
@@ -431,9 +435,9 @@ pub async fn get_online_querier_nodes(
     // get nodes from cluster
     let cfg = get_config();
     let nodes = if cfg.common.feature_query_skip_wal {
-        infra_cluster::get_cached_online_querier_nodes(role_group).await
+        cluster::get_cached_online_querier_nodes(role_group).await
     } else {
-        infra_cluster::get_cached_online_query_nodes(role_group).await
+        cluster::get_cached_online_query_nodes(role_group).await
     };
     let mut nodes = match nodes {
         Some(nodes) => nodes,
@@ -576,8 +580,7 @@ pub(crate) async fn partition_file_by_hash(
     let mut partitions = vec![Vec::new(); idx];
     for fk in file_id_list {
         let node_name =
-            infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
-                .await;
+            cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group).await;
         let idx = match node_name {
             Some(node_name) => match node_idx.get(&node_name) {
                 Some(idx) => *idx,

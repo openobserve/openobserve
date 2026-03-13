@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -37,7 +37,7 @@ use tokio::sync::RwLock;
 
 const METRICS_INDEX_CACHE_GC_TRIGGER_NUM: usize = 10;
 const METRICS_INDEX_CACHE_GC_PERCENT: usize = 10; // 10% of the items will be removed
-const METRICS_INDEX_CACHE_MAX_ITEMS: usize = 10;
+const METRICS_INDEX_CACHE_MAX_ITEMS: usize = 100;
 const METRICS_INDEX_CACHE_BUCKETS: usize = 100;
 
 static CACHE_KEY_SUFFIX: Lazy<AtomicI64> = Lazy::new(|| AtomicI64::new(now_micros()));
@@ -226,7 +226,7 @@ pub async fn set(
 ) -> Result<()> {
     // check time range, if over ZO_MAX_FILE_RETENTION_TIME, return
     let cfg = get_config();
-    let max_ts = now_micros() - second_micros(cfg.limit.cache_delay_secs as i64);
+    let max_ts = now_micros() - second_micros(cfg.limit.cache_delay_secs);
     let new_end = if end > max_ts { max_ts } else { end };
     if range_values.is_empty() || start >= max_ts || new_end <= start + step {
         // all of the data in retention time, no need to store

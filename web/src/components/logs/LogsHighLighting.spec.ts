@@ -643,8 +643,21 @@ describe("LogsHighLighting Component", () => {
       await wrapper.vm.$nextTick();
 
       const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("&lt;");
-      expect(span.html()).not.toContain('onerror="');
+      const html = span.html();
+
+      // The key security check: dangerous tags should be escaped as text, not rendered as HTML
+      // &lt; and &gt; will remain in the HTML source because they're needed to display < and > as text
+      expect(html).toContain("&lt;"); // < must be escaped
+      expect(html).toContain("&gt;"); // > must be escaped
+
+      // Make sure no actual <img> tag was created (it should be text only)
+      expect(html).not.toContain("<img");
+
+      // Verify the text is displayed, not executed
+      const textContent = span.text();
+      expect(textContent).toContain('<img');
+      expect(textContent).toContain('onerror');
+      expect(textContent).toContain('alert(1)');
     });
 
     it("should handle quotes safely", async () => {

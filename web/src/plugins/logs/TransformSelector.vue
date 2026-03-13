@@ -15,30 +15,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="toolbar-toggle-container float-left">
-    <q-toggle
-      data-test="logs-search-bar-show-query-toggle-btn"
-      v-model="searchObj.meta.showTransformEditor"
-      class="o2-toggle-button-xs element-box-shadow"
-      size="xs"
-      flat
-      :disable="
-        !searchObj.data.transformType ||
-        searchObj.meta.logsVisualizeToggle === 'visualize'
-      "
-    >
-      <q-icon :name="transformIcon" class="toolbar-icon-in-toggle" :class="transformsLabel" />
-      <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
-        {{ getTransformLabelTooltip }}
-      </q-tooltip>
-    </q-toggle>
-  </div>
-
   <q-btn-group
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="q-pa-none float-left q-mr-xs tw-h-[32px] transform-selector element-box-shadow el-border"
   >
-    <div>
+    <div class="tw-flex tw-items-center">
+      <q-toggle
+        data-test="logs-search-bar-show-query-toggle-btn"
+        v-model="searchObj.meta.showTransformEditor"
+        class="o2-toggle-button-xs"
+        size="xs"
+        flat
+        :disable="!searchObj.data.transformType"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-toggle-button-xs-dark'
+            : 'o2-toggle-button-xs-light'
+        "
+      >
+        <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
+          {{ getTransformLabelTooltip }}
+        </q-tooltip>
+      </q-toggle>
+    </div>
+    <div style="border-right: 1px solid var(--o2-border-color)">
       <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">{{
         transformsLabel
       }}</q-tooltip>
@@ -47,13 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="functionModel"
         size="12px"
         :icon="transformIcon"
-        :label="transformsLabel"
         no-caps
-        class="btn-function no-case q-pl-sm q-pr-none no-border no-outline tw-border-none"
+        class="btn-function no-case q-pr-none no-border no-outline tw-border-none"
         :class="`${searchObj.data.transformType || 'transform'}-icon`"
         label-class="no-case"
-        :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
       >
+        <q-tooltip :delay="0">
+          {{ transformsLabel }}
+        </q-tooltip>
         <q-list data-test="logs-search-saved-function-list">
           <!-- Search Input -->
           <div
@@ -135,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="logs-search-bar-save-transform-btn"
       class=" save-transform-btn q-px-sm"
       icon="save"
-      :disable="searchObj.data.transformType !== 'function' || searchObj.meta.logsVisualizeToggle === 'visualize'"
+      :disable="searchObj.data.transformType !== 'function'"
       @click="fnSavedFunctionDialog"
 
     >
@@ -143,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{
           searchObj.data.transformType === "action"
             ? t("search.saveActionDisabled")
-            : searchObj.meta.logsVisualizeToggle === 'visualize' ? 'Not supported for visualization' : t("common.save")
+            : t("common.save")
         }}
       </q-tooltip>
     </q-btn>
@@ -244,8 +245,6 @@ const transformsLabel = computed(() => {
     return searchObj.data.selectedTransform.name;
   }
 
-  if (searchObj.meta.logsVisualizeToggle === 'visualize') return t("search.functionSelectionNotSupportedVisualization");
-
   if (!isActionsEnabled.value) return t("search.functionLabel");
 
   return searchObj.data.transformType === "action"
@@ -314,9 +313,6 @@ const fnSavedFunctionDialog = () => {
 };
 
 const getTransformLabelTooltip = computed(() => {
-
-  // function selection is not supported for visualization
-  if (searchObj.meta.logsVisualizeToggle === 'visualize') return "Function selection is not supported for visualization";
 
   if (!isActionsEnabled.value) return "Toggle Function Editor";
 

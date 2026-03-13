@@ -24,7 +24,7 @@ use config::{
 };
 use futures_util::StreamExt;
 use hashbrown::{HashMap, HashSet};
-use infra::cache::file_data;
+use infra::{cache::file_data, cluster};
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::{SimpleFileList, event_client::EventClient};
 use tokio::sync::{
@@ -32,8 +32,6 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
 };
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue};
-
-use crate::common::infra::cluster;
 
 /// (trace_id, file_id, account, file, size, cache_type)
 type FileInfo = (String, i64, String, String, usize, file_data::CacheType);

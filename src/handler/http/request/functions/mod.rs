@@ -43,7 +43,8 @@ use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a VRL (Vector Remap Language) function for data transformation", "category": "functions"}))
     )
 )]
 #[post("/{org_id}/functions")]
@@ -79,7 +80,8 @@ pub async fn save_function(
         (status = 200, description = "Success", content_type = "application/json", body = inline(FunctionList)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all functions", "category": "functions"}))
     )
 )]
 #[get("/{org_id}/functions")]
@@ -138,7 +140,8 @@ async fn list_functions(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a function", "category": "functions", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/functions/{name}")]
@@ -171,7 +174,8 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a VRL function", "category": "functions"}))
     )
 )]
 #[put("/{org_id}/functions/{name}")]
@@ -211,7 +215,8 @@ pub async fn update_function(
         (status = 500, description = "Internal server error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Check function dependencies before deletion", "category": "functions"}))
     )
 )]
 #[get("/{org_id}/functions/{name}")]
@@ -227,11 +232,11 @@ pub async fn list_pipeline_dependencies(
     context_path = "/api",
     tag = "Functions",
     operation_id = "testFunction",
-    summary = "Test function execution",
-    description = "Tests a VRL transformation function against sample events to validate the function logic and preview \
-                   the expected output before deployment to production pipelines. Allows developers to verify data \
-                   transformations, debug VRL code issues, and ensure correct field mappings without affecting live \
-                   data processing workflows.",
+    summary = "Validate VRL function syntax",
+    description = "Validates VRL (Vector Remap Language) transformation function syntax by testing it against sample events. \
+                   Returns validation results with any syntax errors or successful transformation output. \
+                   Use this to verify VRL code is correct before creating or updating a function. \
+                   Accepts function code, sample events to test against, and optional trans_type (0 for VRL, 1 for JS).",
     security(
         ("Authorization"= [])
     ),
@@ -242,6 +247,9 @@ pub async fn list_pipeline_dependencies(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"category": "functions"})),
     )
 )]
 #[post("/{org_id}/functions/test")]

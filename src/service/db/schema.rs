@@ -28,6 +28,7 @@ use config::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
+    cluster::get_cached_online_querier_nodes,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
         SchemaCache, unwrap_stream_settings,
@@ -41,10 +42,7 @@ use {
 
 use crate::{
     common::{
-        infra::{
-            cluster::get_cached_online_querier_nodes,
-            config::{ENRICHMENT_TABLES, ORGANIZATIONS},
-        },
+        infra::config::{ENRICHMENT_TABLES, ORGANIZATIONS},
         meta::stream::StreamSchema,
     },
     service::{db, enrichment::StreamTable, organization::check_and_create_org},

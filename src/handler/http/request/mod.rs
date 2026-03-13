@@ -59,3 +59,18 @@ pub mod users;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
+#[derive(Default, Deserialize, ToSchema)]
+pub struct BulkDeleteRequest {
+    pub ids: Vec<String>,
+}
+
+#[derive(Default, Serialize, ToSchema)]
+pub struct BulkDeleteResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+}

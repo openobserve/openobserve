@@ -20,10 +20,10 @@ const stream = {
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-    
+
     return `/api/${org_identifier}/_search_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}`;
   },
-  
+
   // HTTP/2 streaming histogram endpoint with SSE
   histogramStreamUrl: (
     {
@@ -42,10 +42,10 @@ const stream = {
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-        
+
     return `/api/${org_identifier}/_search_histogram_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}`;
   },
-  
+
   // HTTP/2 streaming page count endpoint with SSE
   pageCountStreamUrl: (
     {
@@ -64,10 +64,10 @@ const stream = {
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-        
+
     return `/api/${org_identifier}/_search_pagecount_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}`;
   },
-  
+
   // HTTP/2 streaming values endpoint with SSE for field value lookups
   fieldValuesStreamUrl: (
     {
@@ -89,10 +89,10 @@ const stream = {
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-        
+
     return `/api/${org_identifier}/${stream_name}/_values_stream?fields=${fieldsString}&type=${page_type}&use_cache=${use_cache}&trace_id=${traceId}`;
   },
-  
+
   // Start a streaming search request
   search: (
     {
@@ -114,16 +114,16 @@ const stream = {
     if (!traceId) {
       traceId = generateTraceContext()?.traceId;
     }
-    
+
     const use_cache: boolean =
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-        
+
     const url = `/api/${org_identifier}/_search_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}&clear_cache=${clear_cache}`;
     return http().post(url, query);
   },
-  
+
   // Start a streaming multi-stream search request
   searchMulti: (
     {
@@ -143,16 +143,16 @@ const stream = {
     if (!traceId) {
       traceId = generateTraceContext()?.traceId;
     }
-    
+
     const use_cache: boolean =
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-        
-    const url = `/api/${org_identifier}/_multi_search_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}`;
+
+    const url = `/api/${org_identifier}/_search_multi_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}`;
     return http().post(url, query);
   },
-  
+
   // Start a streaming histogram request
   histogram: (
     {
@@ -172,16 +172,16 @@ const stream = {
     if (!traceId) {
       traceId = generateTraceContext()?.traceId;
     }
-    
+
     const use_cache: boolean =
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-        
+
     const url = `/api/${org_identifier}/_search_histogram_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}`;
     return http().post(url, query);
   },
-  
+
   // Start a streaming page count request
   pageCount: (
     {
@@ -201,16 +201,16 @@ const stream = {
     if (!traceId) {
       traceId = generateTraceContext()?.traceId;
     }
-    
+
     const use_cache: boolean =
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-        
+
     const url = `/api/${org_identifier}/_search_pagecount_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}`;
     return http().post(url, query);
   },
-  
+
   // Fetch field values using streaming
   fieldValues: (
     {
@@ -232,17 +232,17 @@ const stream = {
     if (!traceId) {
       traceId = generateTraceContext()?.traceId;
     }
-    
+
     const fieldsString = fields.join(',');
     const use_cache: boolean =
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-        
+
     const url = `/api/${org_identifier}/${stream_name}/_values_stream?fields=${fieldsString}&type=${page_type}&use_cache=${use_cache}&trace_id=${traceId}`;
     return http().post(url, query);
   },
-  
+
   // Cancel an ongoing HTTP/2 stream
   cancelStream: async (
     {

@@ -51,6 +51,9 @@ use crate::{
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[post("/{org_id}/billings/new_user_attribution")]
 pub async fn handle_new_attribution_event(

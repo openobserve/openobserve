@@ -93,7 +93,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         {
             log::debug!("[SEARCH JOB] Running check on running jobs");
             let now = config::utils::time::now_micros();
-            let updated_at = now - (get_config().limit.search_job_run_timeout as i64 * 1_000_000);
+            let updated_at = now - (get_config().limit.search_job_run_timeout * 1_000_000);
             if let Err(e) =
                 service::db::search_job::search_jobs::check_running_jobs(updated_at).await
             {
@@ -121,7 +121,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             log::debug!("[SEARCH JOB] Running delete jobs by retention");
             let retention_seconds = get_config().limit.search_job_retention * 24 * 60 * 60;
             let now = config::utils::time::now_micros();
-            let updated_at = now - (retention_seconds as i64 * 1_000_000);
+            let updated_at = now - (retention_seconds * 1_000_000);
             if let Err(e) = service::db::search_job::search_jobs::delete_jobs(updated_at).await {
                 log::error!("[SEARCH JOB] Error deleting jobs: {e}");
             }
@@ -144,13 +144,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
     {
         let o2_config = get_o2_config();
         if o2_config.incidents.enabled && o2_config.incidents.rca_enabled {
-            if o2_config.incidents.rca_agent_url.is_empty() {
+            if o2_config.ai.agent_url.is_empty() {
                 log::warn!("[INCIDENTS::RCA] RCA enabled but O2_AGENT_URL is not set");
             } else {
                 log::info!(
                     "[INCIDENTS::RCA] RCA job enabled (interval: {}s, agent: {})",
                     o2_config.incidents.rca_interval_secs,
-                    o2_config.incidents.rca_agent_url
+                    o2_config.ai.agent_url
                 );
 
                 spawn_pausable_job!(
@@ -229,7 +229,7 @@ async fn run_rca_job() -> Result<(), anyhow::Error> {
     let password = &zo_config.auth.root_user_password;
 
     // Create RCA agent client
-    let client = RcaAgentClient::new(&config.incidents.rca_agent_url, username, password)?;
+    let client = RcaAgentClient::new(&config.ai.agent_url, username, password)?;
 
     // Check agent health first
     if let Err(e) = client.health().await {

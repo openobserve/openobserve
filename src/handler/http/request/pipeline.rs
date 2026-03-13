@@ -64,7 +64,57 @@ impl From<PipelineError> for HttpResponse {
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-mcp" = json!({
+            "description": r#"Create a data pipeline for processing and transforming data streams.
+
+PIPELINE STRUCTURE:
+- name: Pipeline name (required, lowercase)
+- source: { "source_type": "realtime" } for real-time pipelines
+- nodes: Array of processing nodes (required)
+- edges: Array of connections between nodes (required)
+
+NODE STRUCTURE (each node requires):
+- id: Unique identifier (use UUID format)
+- io_type: MUST be one of: "input" (source stream), "output" (destination stream), "default" (processing node like function/condition)
+- position: { "x": number, "y": number } for visual layout
+- data: Node configuration (structure depends on node_type)
+
+NODE DATA TYPES:
+1. Stream node (input/output): { "node_type": "stream", "org_id": "default", "stream_name": "your_stream", "stream_type": "logs"|"metrics"|"traces" }
+2. Function node: { "node_type": "function", "name": "function_name", "after_flatten": true|false }
+3. Condition node (MUST use version 2): { "node_type": "condition", "version": 2, "conditions": <group> }
+
+CONDITION FORMAT (version 2):
+The conditions field is a group containing a flat array of items. Each item has a logicalOperator field (AND/OR) — this is the boolean connector BEFORE that item. The first item's logicalOperator is ignored but must be present (use AND). AND has higher precedence than OR. Use nested groups for explicit parentheses.
+- Group: { "filterType": "group", "logicalOperator": "AND", "conditions": [...] }
+- Condition: { "filterType": "condition", "column": "field", "operator": "<op>", "value": "val", "logicalOperator": "AND"|"OR" }
+- Operators: =, !=, >, >=, <, <=, contains, not_contains
+
+EXAMPLE - status = "error" AND (level > 5 OR source = "nginx"):
+{ "node_type": "condition", "version": 2, "conditions": { "filterType": "group", "logicalOperator": "AND", "conditions": [{ "filterType": "condition", "column": "status", "operator": "=", "value": "error", "logicalOperator": "AND" }, { "filterType": "group", "logicalOperator": "AND", "conditions": [{ "filterType": "condition", "column": "level", "operator": ">", "value": "5", "logicalOperator": "OR" }, { "filterType": "condition", "column": "source", "operator": "=", "value": "nginx", "logicalOperator": "OR" }] }] } }
+
+EDGE STRUCTURE:
+- id: Format "e{source_id}-{target_id}"
+- source: Source node id
+- target: Target node id
+
+EXAMPLE - Simple pipeline with function:
+{
+  "name": "my_pipeline",
+  "source": { "source_type": "realtime" },
+  "nodes": [
+    { "id": "input-1", "io_type": "input", "position": {"x": 100, "y": 100}, "data": {"node_type": "stream", "org_id": "default", "stream_name": "source_stream", "stream_type": "logs"} },
+    { "id": "func-1", "io_type": "default", "position": {"x": 100, "y": 200}, "data": {"node_type": "function", "name": "my_function", "after_flatten": true} },
+    { "id": "output-1", "io_type": "output", "position": {"x": 100, "y": 300}, "data": {"node_type": "stream", "org_id": "default", "stream_name": "dest_stream", "stream_type": "logs"} }
+  ],
+  "edges": [
+    { "id": "einput-1-func-1", "source": "input-1", "target": "func-1" },
+    { "id": "efunc-1-output-1", "source": "func-1", "target": "output-1" }
+  ]
+}"#,
+            "category": "pipelines"
+        }))
     )
 )]
 #[post("/{org_id}/pipelines")]
@@ -111,7 +161,8 @@ pub async fn save_pipeline(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PipelineList)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all pipelines", "category": "pipelines"}))
     )
 )]
 #[get("/{org_id}/pipelines")]
@@ -186,6 +237,78 @@ async fn list_pipelines(
     )))
 }
 
+/// GetPipeline
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/pipelines/{pipeline_id}",
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "getPipeline",
+    summary = "Get pipeline by ID",
+    description = "Retrieves the details of a specific data processing pipeline by its ID, including its status, trigger info, and any recent errors",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(crate::handler::http::models::pipelines::Pipeline)),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get pipeline details by ID", "category": "pipelines"}))
+    )
+)]
+#[get("/{org_id}/pipelines/{pipeline_id}")]
+pub async fn get_pipeline(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (_org_id, pipeline_id) = path.into_inner();
+    let meta_pipeline = match crate::service::db::pipeline::get_by_id(&pipeline_id).await {
+        Ok(pipeline) => pipeline,
+        Err(e) => return Ok(e.into()),
+    };
+
+    // Get paused_at from trigger if this is a scheduled pipeline
+    let paused_at = if let Some(derived_stream) = meta_pipeline.get_derived_stream() {
+        let module_key =
+            derived_stream.get_scheduler_module_key(&meta_pipeline.name, &meta_pipeline.id);
+        match crate::service::db::scheduler::get(
+            &meta_pipeline.org,
+            config::meta::triggers::TriggerModule::DerivedStream,
+            &module_key,
+        )
+        .await
+        {
+            Ok(trigger) => trigger.end_time,
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
+
+    // Get last error info
+    let last_error =
+        match crate::service::db::pipeline_errors::get_by_pipeline_id(&pipeline_id).await {
+            Ok(Some(error)) => Some(crate::handler::http::models::pipelines::PipelineErrorInfo {
+                last_error_timestamp: error.last_error_timestamp,
+                error_summary: error.error_summary,
+                node_errors: error.node_errors,
+            }),
+            _ => None,
+        };
+
+    Ok(MetaHttpResponse::json(
+        crate::handler::http::models::pipelines::Pipeline::from(
+            meta_pipeline,
+            paused_at,
+            last_error,
+        ),
+    ))
+}
+
 /// GetStreamsWithPipeline
 
 #[utoipa::path(
@@ -204,7 +327,8 @@ async fn list_pipelines(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PipelineList)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List streams using pipelines", "category": "pipelines"}))
     )
 )]
 #[get("/{org_id}/pipelines/streams")]
@@ -236,7 +360,8 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a pipeline", "category": "pipelines", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/pipelines/{pipeline_id}")]
@@ -271,11 +396,19 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-mcp" = json!({
+            "description": "Update an existing pipeline. Uses the same schema as createPipeline - include pipeline_id and version from the existing pipeline. See createPipeline for full node/edge structure documentation.",
+            "category": "pipelines"
+        }))
     )
 )]
 #[put("/{org_id}/pipelines")]
-pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Result<HttpResponse, Error> {
+pub async fn update_pipeline(
+    org_id: web::Path<String>,
+    Json(mut pipeline): Json<Pipeline>,
+) -> Result<HttpResponse, Error> {
+    pipeline.org = org_id.into_inner();
     match pipeline::update_pipeline(pipeline).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK,
@@ -307,7 +440,8 @@ pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Result<HttpRespo
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Enable or disable a pipeline", "category": "pipelines"}))
     )
 )]
 #[put("/{org_id}/pipelines/{pipeline_id}/enable")]
@@ -360,7 +494,8 @@ pub async fn enable_pipeline(
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/pipelines/bulk/enable")]

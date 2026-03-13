@@ -134,6 +134,7 @@ impl Partition {
 
     pub(crate) async fn persist(
         &self,
+        id: u64,
         idx: usize,
         org_id: &str,
         stream_type: &str,
@@ -233,7 +234,7 @@ impl Partition {
 
                 // write into local file
                 let file_name =
-                    generate_filename_with_time_range(file_meta.min_ts, file_meta.max_ts);
+                    generate_filename_with_time_range(file_meta.min_ts, file_meta.max_ts, id);
                 let mut path = path.clone();
                 path.push(hour.to_string());
                 path.push(file_name);

@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#![feature(btree_cursors)]
+
 pub mod cache;
 pub mod client;
+pub mod cluster;
 pub mod coordinator;
 pub mod db;
 pub mod dist_lock;
@@ -23,6 +26,7 @@ pub mod file_list;
 pub mod local_lock;
 pub mod pipeline;
 pub mod queue;
+pub mod runtime;
 pub mod scheduler;
 pub mod schema;
 pub mod storage;

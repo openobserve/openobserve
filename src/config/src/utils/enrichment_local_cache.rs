@@ -57,7 +57,8 @@ pub fn get_key(org_id: &str, table_name: &str) -> String {
 pub fn get_table_dir(key: &str) -> PathBuf {
     let cfg = get_config();
     let cache_dir = if cfg.enrichment_table.cache_dir.is_empty() {
-        format!("{}/enrichment_table_cache", cfg.common.data_cache_dir)
+        // The data_cache_dir is expected to end with `/`
+        format!("{}enrichment_table_cache", cfg.common.data_cache_dir)
     } else {
         cfg.enrichment_table.cache_dir.clone()
     };
@@ -71,7 +72,8 @@ pub fn get_table_path(table_dir: &str, created_at: i64) -> PathBuf {
 pub fn get_metadata_path() -> PathBuf {
     let cfg = get_config();
     let cache_dir = if cfg.enrichment_table.cache_dir.is_empty() {
-        format!("{}/enrichment_table_cache", cfg.common.data_cache_dir)
+        // The data_cache_dir is expected to end with `/`
+        format!("{}enrichment_table_cache", cfg.common.data_cache_dir)
     } else {
         cfg.enrichment_table.cache_dir.clone()
     };
@@ -97,7 +99,8 @@ pub async fn get_metadata_content() -> Result<HashMap<String, i64>> {
 pub async fn cleanup_old_json_format() -> Result<()> {
     let cfg = get_config();
     let cache_dir = if cfg.enrichment_table.cache_dir.is_empty() {
-        format!("{}/enrichment_table_cache", cfg.common.data_cache_dir)
+        // The data_cache_dir is expected to end with `/`
+        format!("{}enrichment_table_cache", cfg.common.data_cache_dir)
     } else {
         cfg.enrichment_table.cache_dir.clone()
     };

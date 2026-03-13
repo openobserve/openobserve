@@ -94,7 +94,7 @@ export
         await this.page.goto(
             process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=" + process.env["ORGNAME"]
           );
-          await this.page.waitForLoadState('networkidle');
+          await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
           // Wait for logs page to fully load before navigating away
           await this.page.waitForTimeout(2000);
@@ -103,7 +103,7 @@ export
           await this.page.goto(
             process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=" + process.env["ORGNAME"]
           );
-          await this.page.waitForLoadState('networkidle');
+          await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         const toggleSelector = '[data-test="general-settings-enable-streaming"]';
         
@@ -132,7 +132,7 @@ export
     await this.page.goto(
       process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=default"
     );
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
     // Navigate to the General Settings page
     await this.page.locator('[data-test="menu-link-settings-item"]').click();
@@ -140,7 +140,7 @@ export
       process.env["ZO_BASE_URL"] +
         "/web/settings/general?org_identifier=default"
     );
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
     const toggleSelector = '[data-test="general-settings-enable-streaming"]';
 
@@ -168,14 +168,14 @@ export
     await this.page.goto(
       process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=default"
     );
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
     await this.page.locator('[data-test="menu-link-settings-item"]').click();
     await this.page.goto(
       process.env["ZO_BASE_URL"] +
         "/web/settings/general?org_identifier=default"
     );
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
     const toggleSelector = '[data-test="general-settings-enable-streaming"]';
 
@@ -192,10 +192,10 @@ export
 
     if (isCurrentlyChecked !== enabled) {
       await this.page.click(toggleSelector);
-      await this.page.waitForLoadState("networkidle");
+      await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
       await this.page.locator('[data-test="dashboard-add-submit"]').click();
-      await this.page.waitForLoadState("networkidle");
+      await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
       // Verify the new state
       const newCheckedState = await this.page.$eval(

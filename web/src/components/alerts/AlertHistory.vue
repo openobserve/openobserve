@@ -713,7 +713,7 @@ const columns = ref([
     name: "status",
     label: "Status",
     field: "status",
-    align: "center",
+    align: "left",
     sortable: true,
     style: "width: 150px;",
   },

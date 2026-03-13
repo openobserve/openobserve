@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="handleMultiStreamSelection"
       >
         <q-tooltip
-          v-if="searchObj.data.stream.selectedStream.length > 0"
+          v-if="searchObj.data.stream.selectedStream.length > 1"
           :delay="500"
           anchor="bottom left"
           self="top left"
@@ -219,21 +219,21 @@ export default defineComponent({
         this.searchObj.data.stream.selectedFields = [];
       }
       this.searchObj.data.stream.selectedStream = [opt.value];
-      // Clear the filter input and close the menu when single stream is selected
-      //we will first check if qselect is there or not and then call the method
-      //we will use the quasar next tick to ensure that the dom is updated before we call the method
-      //we will also us the quasar's updateInputValue method to clear the input value
+      // Close the popup first (synchronously) before clearing the filter.
+      // If we clear the filter first, the virtual scroll re-renders with the full
+      // list while the dropdown is still open, causing a blank/misaligned display.
+      const indexListSelectField = this.$refs.streamSelect as any;
+      if (indexListSelectField?.hidePopup) {
+        indexListSelectField.hidePopup();
+      }
       this.$nextTick(() => {
-        const indexListSelectField = this.$refs.streamSelect;
-        if (indexListSelectField) {
-          // Clear the search input
-          if (indexListSelectField.updateInputValue) {
-            indexListSelectField.updateInputValue("");
-          }
-          // // Close the dropdown menu
-          // if (indexListSelectField.hidePopup) {
-          //   indexListSelectField.hidePopup();
-          // }
+        if (indexListSelectField?.updateInputValue) {
+          indexListSelectField.updateInputValue("");
+        }
+        // Reset virtual scroll to the top so the list starts from position 0
+        // the next time the dropdown is opened.
+        if (indexListSelectField?.scrollTo) {
+          indexListSelectField.scrollTo(0);
         }
       });
       this.onStreamChange("");
@@ -378,7 +378,8 @@ export default defineComponent({
     const scrollToTop = () => {
       if (fieldListRef.value) {
         // Find the scrollable container within the q-table
-        const scrollContainer = fieldListRef.value.querySelector(
+        // fieldListRef.value is a component instance, need to access $el for DOM
+        const scrollContainer = fieldListRef.value.$el?.querySelector(
           ".q-table__middle.scroll",
         );
         if (scrollContainer) {
@@ -702,11 +703,8 @@ export default defineComponent({
           action_id = searchObj.data.selectedTransform.id;
         }
 
-        fieldValues.value[name] = {
-          isLoading: true,
-          values: [],
-          errMsg: "",
-        };
+        resetFieldValues(name, true);
+
         if (whereClause.trim() != "") {
           // validateFilterForMultiStream function called to get missingStreamMultiStreamFilter
           const validationFlag = validateFilterForMultiStream();
@@ -1091,6 +1089,15 @@ export default defineComponent({
     // ----- WebSocket Implementation -----
 
     const fetchValuesWithWebsocket = (payload: any) => {
+      const fieldName = payload.fields[0];
+      const streamName = payload.stream_name;
+
+      // Pre-allocate the stream slot so handleSearchResponse can write directly
+      // to .values without a null check. The field-level object is guaranteed
+      // to exist because resetFieldValues always runs before this function.
+      if (fieldName && streamName && streamFieldValues.value[fieldName])
+        streamFieldValues.value[fieldName][streamName] = { values: [] };
+
       const wsPayload = {
         queryReq: payload,
         type: "values",
@@ -1204,9 +1211,10 @@ export default defineComponent({
           streamFieldValues.value[fieldName] = {};
         }
 
-        streamFieldValues.value[fieldName][streamName] = {
-          values: [],
-        };
+        if (!streamFieldValues.value[fieldName][streamName])
+          streamFieldValues.value[fieldName][streamName] = {
+            values: [],
+          };
 
         // Process the results
         if (response.content.results.hits.length) {
@@ -1263,20 +1271,26 @@ export default defineComponent({
       }
     };
 
-    const handleSearchReset = (data: any) => {
-      const fieldName = data.payload.queryReq.fields[0];
-
+    const resetFieldValues = (
+      fieldName: string,
+      isLoading: boolean = false,
+    ) => {
       // Reset the main fieldValues state
       fieldValues.value[fieldName] = {
         values: [],
-        isLoading: true,
+        isLoading,
         errMsg: "",
       };
 
       // Reset the streamFieldValues state for this field
-      if (streamFieldValues.value[fieldName]) {
-        streamFieldValues.value[fieldName] = {};
-      }
+      streamFieldValues.value[fieldName] = {};
+    };
+
+    const handleSearchReset = (data: any) => {
+      const fieldName = data.payload.queryReq.fields[0];
+
+      resetFieldValues(fieldName, true);
+      traceIdMapper.value[fieldName] = [];
 
       fetchValuesWithWebsocket(data.payload.queryReq);
     };

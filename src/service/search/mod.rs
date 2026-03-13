@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -44,6 +44,7 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     cache::stats,
+    cluster::get_cached_online_querier_nodes,
     errors::{Error, ErrorCodes},
     schema::unwrap_stream_settings,
 };
@@ -51,18 +52,20 @@ use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
 use sql::Sql;
-use tokio::runtime::Runtime;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::sql::visitor::group_by::get_group_by_fields,
-    config::META_ORG_ID,
-    config::meta::search::CardinalityLevel,
-    config::meta::search::generate_aggregation_search_interval,
-    config::meta::self_reporting::usage::USAGE_STREAM,
-    config::utils::sql::is_simple_aggregate_query,
-    infra::client::grpc::make_grpc_search_client,
+    config::{
+        META_ORG_ID,
+        meta::{
+            search::{CardinalityLevel, generate_aggregation_search_interval},
+            self_reporting::usage::USAGE_STREAM,
+        },
+        utils::sql::is_simple_aggregate_query,
+    },
+    infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
     o2_enterprise::enterprise::{
         common::config::get_config as get_o2_config,
         search::{
@@ -81,12 +84,9 @@ use {
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{
-        infra::cluster as infra_cluster,
-        utils::{
-            functions::{get_all_transform_keys, init_vrl_runtime},
-            stream::get_settings_max_query_range,
-        },
+    common::utils::{
+        functions::{get_all_transform_keys, init_vrl_runtime},
+        stream::get_settings_max_query_range,
     },
     handler::grpc::request::search::Searcher,
     service::search::{
@@ -123,16 +123,6 @@ type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
 
 // search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
-
-pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
-    tokio::runtime::Builder::new_multi_thread()
-        .thread_name("datafusion_runtime")
-        .worker_threads(config::get_config().limit.cpu_num)
-        .thread_stack_size(16 * 1024 * 1024)
-        .enable_all()
-        .build()
-        .unwrap()
-});
 
 // Please note: `query_fn` which is the vrl needs to be base64::decoded
 // when using this search
@@ -512,7 +502,7 @@ pub async fn search_multi(
             Some(program) => {
                 report_function_usage = true;
                 if apply_over_hits {
-                    let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -522,6 +512,9 @@ pub async fn search_multi(
                         org_id,
                         &stream_names,
                     );
+                    if let Some(e) = err {
+                        log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
+                    }
                     ret_val
                         .as_array()
                         .unwrap()
@@ -544,11 +537,12 @@ pub async fn search_multi(
                         })
                         .collect()
                 } else {
-                    multi_res
+                    let mut error = "".to_string();
+                    let res = multi_res
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
@@ -558,10 +552,17 @@ pub async fn search_multi(
                                 org_id,
                                 &stream_names,
                             );
+                            if let Some(e) = err {
+                                error = e;
+                            }
                             (!ret_val.is_null())
                                 .then_some(config::utils::flatten::flatten(ret_val).unwrap())
                         })
-                        .collect()
+                        .collect();
+                    if !error.is_empty() {
+                        log::error!("[trace_id {trace_id}] Error applying vrl function: {error}");
+                    }
+                    res
                 }
             }
             None => multi_res.hits,
@@ -623,7 +624,7 @@ pub async fn search_partition(
     skip_max_query_range: bool,
     is_http_req: bool,
     enable_align_histogram: bool,
-    use_aggs_cache: bool,
+    use_cache: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -815,7 +816,7 @@ pub async fn search_partition(
         return Ok(response);
     };
 
-    let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+    let nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
     if nodes.is_empty() {
@@ -913,12 +914,13 @@ pub async fn search_partition(
     }
 
     log::info!(
-        "[trace_id {trace_id}] search_partition: original_size: {}, cpu_cores: {}, base_speed: {}, partition_secs: {}, part_num: {}",
+        "[trace_id {trace_id}] search_partition: \
+        original_size: {}, cpu_cores: {cpu_cores}, base_speed: {}, \
+        partition_secs: {}, part_num: {part_num}, \
+        is_streaming_aggregate: {is_streaming_aggregate}, use_cache: {use_cache}",
         resp.original_size,
-        cpu_cores,
         cfg.limit.query_group_base_speed,
         cfg.limit.query_partition_by_secs,
-        part_num
     );
 
     // Calculate step with all constraints
@@ -1040,7 +1042,7 @@ pub async fn search_partition(
             );
 
             // Discover existing cache files for this query
-            let cache_discovery_result = if !use_aggs_cache {
+            let cache_discovery_result = if !use_cache {
                 o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::empty(
                     query.start_time,
                     query.end_time,
@@ -1167,7 +1169,8 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+
+    let mut nodes = match get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("query_status: no querier node online");
@@ -1302,7 +1305,7 @@ pub async fn cancel_query(
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("cancel_query: no querier node online");

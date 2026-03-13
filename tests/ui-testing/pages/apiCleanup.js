@@ -359,12 +359,13 @@ class APICleanup {
     }
 
     /**
-     * Fetch all functions
+     * Fetch all functions in a specific organization
+     * @param {string} org - The organization identifier (defaults to 'default')
      * @returns {Promise<Array>} Array of function objects
      */
-    async fetchFunctions() {
+    async fetchFunctionsInOrg(org = 'default') {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
+            const response = await fetch(`${this.baseUrl}/api/${org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -373,26 +374,27 @@ class APICleanup {
             });
 
             if (!response.ok) {
-                testLogger.error('Failed to fetch functions', { status: response.status });
+                testLogger.error('Failed to fetch functions', { org, status: response.status });
                 return [];
             }
 
             const data = await response.json();
             return data.list || [];
         } catch (error) {
-            testLogger.error('Failed to fetch functions', { error: error.message });
+            testLogger.error('Failed to fetch functions', { org, error: error.message });
             return [];
         }
     }
 
     /**
-     * Delete a single function
+     * Delete a single function in a specific organization
+     * @param {string} org - The organization identifier
      * @param {string} functionName - The function name
      * @returns {Promise<Object>} Deletion result
      */
-    async deleteFunction(functionName) {
+    async deleteFunctionInOrg(org, functionName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/functions/${functionName}`, {
+            const response = await fetch(`${this.baseUrl}/api/${org}/functions/${functionName}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -401,15 +403,61 @@ class APICleanup {
             });
 
             if (!response.ok) {
-                testLogger.error('Failed to delete function', { functionName, status: response.status });
+                testLogger.error('Failed to delete function', { org, functionName, status: response.status });
                 return { code: response.status, message: 'Failed to delete function' };
             }
 
             const result = await response.json();
             return result;
         } catch (error) {
-            testLogger.error('Failed to delete function', { functionName, error: error.message });
+            testLogger.error('Failed to delete function', { org, functionName, error: error.message });
             return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up functions matching patterns in a specific organization
+     * @param {string} org - The organization identifier
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match function names
+     */
+    async cleanupFunctionsInOrg(org, patterns = []) {
+        testLogger.info(`Starting functions cleanup in ${org} org`, { patterns: patterns.map(p => p.source) });
+
+        try {
+            // Fetch all functions in the specified org
+            const functions = await this.fetchFunctionsInOrg(org);
+            testLogger.info(`Fetched functions from ${org}`, { total: functions.length });
+
+            // Filter functions matching patterns
+            const matchingFunctions = functions.filter(f =>
+                patterns.some(pattern => pattern.test(f.name))
+            );
+            testLogger.info(`Found functions matching cleanup patterns in ${org}`, { count: matchingFunctions.length });
+
+            if (matchingFunctions.length === 0) {
+                testLogger.info(`No functions to clean up in ${org}`);
+                return;
+            }
+
+            // Delete each function
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const func of matchingFunctions) {
+                const result = await this.deleteFunctionInOrg(org, func.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted function', { org, name: func.name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete function', { org, name: func.name, result });
+                }
+            }
+
+            testLogger.info(`Functions cleanup completed in ${org}`, { deletedCount, failedCount });
+        } catch (error) {
+            testLogger.error(`Failed to cleanup functions in ${org}`, { error: error.message });
         }
     }
 
@@ -469,11 +517,12 @@ class APICleanup {
     }
 
     /**
-     * Clean up enrichment tables matching specified patterns
+     * Clean up file-based enrichment tables matching specified patterns
+     * These are tables uploaded via file and tracked in /api/{org}/streams?type=enrichment_tables
      * @param {Array<RegExp>} patterns - Array of regex patterns to match table names
      */
-    async cleanupEnrichmentTables(patterns = []) {
-        testLogger.info('Starting enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
+    async cleanupFileEnrichmentTables(patterns = []) {
+        testLogger.info('Starting file-based enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
 
         try {
             // Fetch all enrichment tables
@@ -507,64 +556,95 @@ class APICleanup {
                 }
             }
 
-            testLogger.info('Enrichment tables cleanup completed', {
+            testLogger.info('File-based enrichment tables cleanup completed', {
                 total: matchingTables.length,
                 deleted: deletedCount,
                 failed: failedCount
             });
 
         } catch (error) {
-            testLogger.error('Enrichment tables cleanup failed', { error: error.message });
+            testLogger.error('File-based enrichment tables cleanup failed', { error: error.message });
         }
     }
 
     /**
-     * Clean up functions matching specified patterns
-     * @param {Array<RegExp>} patterns - Array of regex patterns to match function names
+     * Fetch all URL-based enrichment tables from the status API
+     * @returns {Promise<Array<string>>} Array of URL enrichment table names
      */
-    async cleanupFunctions(patterns = []) {
-        testLogger.info('Starting functions cleanup', { patterns: patterns.map(p => p.source) });
+    async fetchUrlEnrichmentTables() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/enrichment_tables/status`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                testLogger.error('Failed to fetch URL enrichment tables', { status: response.status, body: errorBody });
+                return [];
+            }
+
+            const data = await response.json();
+            // Response is a map where keys are table names
+            // Guard against null/undefined response
+            return Object.keys(data || {});
+        } catch (error) {
+            testLogger.error('Failed to fetch URL enrichment tables', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Clean up URL-based enrichment tables matching specified patterns
+     * These are tables created via URL ingestion that show as "NaN MB" in the UI
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match table names
+     */
+    async cleanupUrlEnrichmentTables(patterns = []) {
+        testLogger.info('Starting URL enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
 
         try {
-            // Fetch all functions
-            const functions = await this.fetchFunctions();
-            testLogger.info('Fetched functions', { total: functions.length });
+            // Fetch all URL-based enrichment tables
+            const tableNames = await this.fetchUrlEnrichmentTables();
+            testLogger.info('Fetched URL enrichment tables', { total: tableNames.length });
 
-            // Filter functions matching patterns
-            const matchingFunctions = functions.filter(f =>
-                patterns.some(pattern => pattern.test(f.name))
+            // Filter tables matching patterns
+            const matchingTables = tableNames.filter(name =>
+                patterns.some(pattern => pattern.test(name))
             );
-            testLogger.info('Found functions matching cleanup patterns', { count: matchingFunctions.length });
+            testLogger.info('Found URL enrichment tables matching cleanup pattern', { count: matchingTables.length });
 
-            if (matchingFunctions.length === 0) {
-                testLogger.info('No functions to clean up');
+            if (matchingTables.length === 0) {
+                testLogger.info('No URL enrichment tables to clean up');
                 return;
             }
 
-            // Delete each function
+            // Delete each table (uses same delete endpoint as file-based tables)
             let deletedCount = 0;
             let failedCount = 0;
 
-            for (const func of matchingFunctions) {
-                const result = await this.deleteFunction(func.name);
+            for (const tableName of matchingTables) {
+                const result = await this.deleteEnrichmentTable(tableName);
 
                 if (result.code === 200) {
                     deletedCount++;
-                    testLogger.debug('Deleted function', { name: func.name });
+                    testLogger.debug('Deleted URL enrichment table', { name: tableName });
                 } else {
                     failedCount++;
-                    testLogger.warn('Failed to delete function', { name: func.name, result });
+                    testLogger.warn('Failed to delete URL enrichment table', { name: tableName, result });
                 }
             }
 
-            testLogger.info('Functions cleanup completed', {
-                total: matchingFunctions.length,
+            testLogger.info('URL enrichment tables cleanup completed', {
+                total: matchingTables.length,
                 deleted: deletedCount,
                 failed: failedCount
             });
 
         } catch (error) {
-            testLogger.error('Functions cleanup failed', { error: error.message });
+            testLogger.error('URL enrichment tables cleanup failed', { error: error.message });
         }
     }
 
@@ -973,6 +1053,123 @@ class APICleanup {
         }
 
         return { ready: readyCount, blocked: blockedStreams };
+    }
+
+    /**
+     * Fetch all metrics streams
+     * @returns {Promise<Array>} Array of metrics stream objects
+     */
+    async fetchMetricsStreams() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams?type=metrics`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch metrics streams', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.list || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch metrics streams', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single metrics stream
+     * @param {string} streamName - The metrics stream name
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteMetricsStream(streamName) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=metrics&delete_all=true`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete metrics stream', { streamName, status: response.status });
+                return { code: response.status, message: 'Failed to delete metrics stream' };
+            }
+
+            const result = await response.json();
+            // Ensure success response has code: 200 for consistency
+            return { code: 200, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete metrics stream', { streamName, error: error.message });
+            return { code: 500, message: error.message };
+        }
+    }
+
+    /**
+     * Clean up metrics streams matching specified patterns
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match metrics stream names
+     * @param {Array<string>} protectedStreams - Array of metrics stream names to never delete (optional, e.g., 'default')
+     */
+    async cleanupMetricsStreams(patterns = [], protectedStreams = ['default']) {
+        testLogger.info('Starting metrics streams cleanup', {
+            patterns: patterns.map(p => p.source),
+            protectedStreams
+        });
+
+        // Safety check: If no patterns provided, don't delete anything
+        if (patterns.length === 0) {
+            testLogger.info('No patterns provided for metrics cleanup - skipping');
+            return;
+        }
+
+        try {
+            // Fetch all metrics streams
+            const streams = await this.fetchMetricsStreams();
+            testLogger.info('Fetched metrics streams', { total: streams.length });
+
+            // Filter streams matching patterns but excluding protected streams
+            const matchingStreams = streams.filter(s =>
+                patterns.some(pattern => pattern.test(s.name)) &&
+                !protectedStreams.includes(s.name)
+            );
+            testLogger.info('Found metrics streams matching cleanup patterns', { count: matchingStreams.length });
+
+            if (matchingStreams.length === 0) {
+                testLogger.info('No metrics streams to clean up');
+                return;
+            }
+
+            // Delete all matching metrics streams
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const stream of matchingStreams) {
+                const result = await this.deleteMetricsStream(stream.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.info('Deleted metrics stream', { name: stream.name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete metrics stream', { name: stream.name, result });
+                }
+            }
+
+            testLogger.info('Metrics streams cleanup completed', {
+                total: matchingStreams.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Metrics streams cleanup failed', { error: error.message });
+        }
     }
 
     /**
@@ -1768,216 +1965,183 @@ class APICleanup {
     }
 
     /**
-     * Complete cascade cleanup: Alert -> Folder -> Destination -> Template
-     * Deletes all resources linked to destinations matching specified patterns
-     * @param {Array<string>} destinationPrefixes - Array of destination name prefixes to match (e.g., ['auto_', 'newdest_'])
+     * Complete cascade cleanup: Alerts -> Folders -> Destinations -> Templates
+     * Deletes resources in correct dependency order to avoid conflicts
+     * @param {Array<string|RegExp>} destinationPrefixes - Array of destination name prefixes or regex patterns to match (e.g., ['auto_', /^destination\d{1,3}$/])
      * @param {Array<string>} templatePrefixes - Array of template name prefixes to match (e.g., ['auto_email_template_', 'auto_webhook_template_'])
      * @param {Array<string>} folderPrefixes - Array of folder name prefixes to match (e.g., ['auto_'])
      */
     async completeCascadeCleanup(destinationPrefixes = [], templatePrefixes = [], folderPrefixes = []) {
-        testLogger.info('Starting complete cascade cleanup', {
+        testLogger.info('Starting complete cascade cleanup (Alerts -> Folders -> Destinations -> Templates)', {
             destinationPrefixes,
             templatePrefixes,
             folderPrefixes
         });
 
+        // Alert name prefixes to match - alerts with these prefixes will be deleted from ANY folder
+        // This is derived from destination prefixes since alerts typically use similar naming
+        const alertPrefixes = [
+            'auto_',
+            'Automation_',
+            'sanity',
+            'rbac_',
+            'user_delete_test_',      // RBAC user delete test alerts (orphaned)
+            'user_update_test_',      // RBAC user update test alerts (orphaned)
+            'viewer_delete_test_',    // RBAC viewer delete test alerts (orphaned)
+            'viewer_update_test_',    // RBAC viewer update test alerts (orphaned)
+            'editor_create_test_',    // RBAC editor create test alerts (orphaned)
+            'editor_delete_test_'     // RBAC editor delete test alerts (orphaned)
+        ];
+
         try {
-            // Step 1: Fetch all destinations and filter by prefixes
-            const { destinations, templateToDestinations } = await this.fetchDestinationsWithTemplateMapping();
-            const matchingDestinations = destinations.filter(d =>
-                destinationPrefixes.some(prefix => d.name.startsWith(prefix))
-            );
+            // ============================================
+            // STEP 1: Delete all ALERTS matching prefixes from ALL folders
+            // (Alerts depend on destinations, so delete first)
+            // ============================================
+            let deletedAlerts = 0;
+            let deletedFolders = 0;
 
-            testLogger.info('Found destinations to process', { total: matchingDestinations.length });
+            testLogger.info('Step 1: Deleting alerts matching prefixes from ALL folders', { alertPrefixes });
 
-            const failedDestinations = [];
-            const deletedDestinations = [];
-            const linkedTemplates = new Set();
+            const allFolders = await this.fetchAlertFolders();
+            testLogger.info('Fetched all alert folders', { total: allFolders.length });
 
-            // Only process destinations if we found any matching the prefix
-            if (matchingDestinations.length > 0) {
-                // Step 2: Attempt to delete each destination
-                for (const destination of matchingDestinations) {
-                // Track template for potential cleanup
-                if (destination.template) {
-                    linkedTemplates.add(destination.template);
-                }
+            for (const folder of allFolders) {
+                // Fetch all alerts in this folder
+                const alerts = await this.fetchAlertsInFolder(folder.folderId);
 
-                const deleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${destination.name}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': this.authHeader,
-                        'Content-Type': 'application/json'
-                    }
-                });
+                if (alerts.length === 0) continue;
 
-                const result = await deleteResult.json();
+                // Filter alerts matching our prefixes
+                const matchingAlerts = alerts.filter(alert =>
+                    alertPrefixes.some(prefix => alert.name.startsWith(prefix))
+                );
 
-                if (result.code === 409 && result.message) {
-                    // Extract alert name from error
-                    const match = result.message.match(/alert:\s*(.+)$/);
-                    const linkedAlert = match && match[1] ? match[1].trim() : null;
-
-                    if (linkedAlert) {
-                        failedDestinations.push({
-                            destinationName: destination.name,
-                            templateName: destination.template,
-                            alertName: linkedAlert
-                        });
-                        testLogger.info('Destination blocked by alert', {
-                            destination: destination.name,
-                            alert: linkedAlert,
-                            template: destination.template
-                        });
-                    }
-                } else if (result.code === 200) {
-                    deletedDestinations.push(destination.name);
-                    testLogger.debug('Deleted destination successfully', { name: destination.name });
-                }
-            }
-
-            testLogger.info('Initial destination deletion summary', {
-                total: matchingDestinations.length,
-                deleted: deletedDestinations.length,
-                blocked: failedDestinations.length
-            });
-
-            // Step 3: Fetch all folders (only if there are failed destinations)
-            let folders = [];
-            if (failedDestinations.length > 0) {
-                folders = await this.fetchAlertFolders();
-                testLogger.info('Fetched alert folders', { total: folders.length });
-            }
-
-            // Step 4: Process each failed destination with cascade
-            for (const failed of failedDestinations) {
-                testLogger.info('Processing cascade cleanup', {
-                    destination: failed.destinationName,
-                    alert: failed.alertName,
-                    template: failed.templateName
-                });
-
-                // Extract suffix from alert name (e.g., Automation_Alert_8OvH5 -> 8OvH5)
-                const alertSuffix = failed.alertName.split('_').pop();
-                const expectedFolderName = `auto_${alertSuffix}`;
-
-                // Try to find matching folder by name first
-                let folder = folders.find(f => f.name === expectedFolderName);
-                let alerts = [];
-
-                if (!folder) {
-                    testLogger.warn('Could not find expected folder, searching all folders for alert', {
-                        alert: failed.alertName,
-                        expectedFolder: expectedFolderName
+                if (matchingAlerts.length > 0) {
+                    testLogger.info('Found matching alerts in folder', {
+                        folderId: folder.folderId,
+                        folderName: folder.name,
+                        totalAlerts: alerts.length,
+                        matchingAlerts: matchingAlerts.length
                     });
 
-                    // Search testfoldermove first, then all other folders
-                    const testFolderMove = folders.find(f => f.name === 'testfoldermove');
-                    const otherFolders = folders.filter(f => f.name !== 'testfoldermove');
-                    const searchOrder = testFolderMove ? [testFolderMove, ...otherFolders] : folders;
-
-                    // Search through each folder to find the alert
-                    for (const searchFolder of searchOrder) {
-                        const alertsInFolder = await this.fetchAlertsInFolder(searchFolder.folderId);
-                        const foundAlert = alertsInFolder.find(a => a.name === failed.alertName);
-
-                        if (foundAlert) {
-                            folder = searchFolder;
-                            alerts = alertsInFolder;
-                            testLogger.info('Found alert in folder', {
-                                alert: failed.alertName,
-                                folderId: folder.folderId,
-                                folderName: folder.name
+                    for (const alert of matchingAlerts) {
+                        const alertDeleteResult = await this.deleteAlert(alert.alert_id, folder.folderId);
+                        if (alertDeleteResult.code === 200) {
+                            deletedAlerts++;
+                            testLogger.debug('Deleted alert', { alertId: alert.alert_id, name: alert.name });
+                        } else {
+                            testLogger.warn('Failed to delete alert', {
+                                alertId: alert.alert_id,
+                                name: alert.name,
+                                result: alertDeleteResult
                             });
-                            break;
                         }
                     }
-
-                    if (!folder) {
-                        testLogger.error('Could not find alert in any folder', {
-                            alert: failed.alertName,
-                            searchedFolders: folders.length
-                        });
-                        continue;
-                    }
-                } else {
-                    testLogger.info('Found folder for alert', {
-                        folderId: folder.folderId,
-                        folderName: folder.name
-                    });
-
-                    // Step 5: Fetch alerts in folder
-                    alerts = await this.fetchAlertsInFolder(folder.folderId);
-                }
-
-                testLogger.info('Alerts in folder', { count: alerts.length });
-
-                // Step 6: Delete all alerts in folder
-                for (const alert of alerts) {
-                    const alertDeleteResult = await this.deleteAlert(alert.alert_id, folder.folderId);
-                    if (alertDeleteResult.code === 200) {
-                        testLogger.debug('Deleted alert', { alertId: alert.alert_id, name: alert.name });
-                    } else {
-                        testLogger.warn('Failed to delete alert', {
-                            alertId: alert.alert_id,
-                            name: alert.name,
-                            result: alertDeleteResult
-                        });
-                    }
-                }
-
-                // Step 7: Delete folder
-                const folderDeleteResult = await this.deleteFolder(folder.folderId);
-                if (folderDeleteResult.code === 200) {
-                    testLogger.info('Deleted folder', { folderId: folder.folderId, name: folder.name });
-                } else {
-                    testLogger.warn('Failed to delete folder', { folderId: folder.folderId, result: folderDeleteResult });
-                }
-
-                // Step 8: Delete destination (retry after alert removal)
-                const destDeleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${failed.destinationName}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': this.authHeader,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                const destResult = await destDeleteResult.json();
-                if (destResult.code === 200) {
-                    testLogger.info('Deleted destination', { name: failed.destinationName });
-                    deletedDestinations.push(failed.destinationName);
-                } else {
-                    testLogger.warn('Failed to delete destination', { name: failed.destinationName, result: destResult });
                 }
             }
 
-                // Step 9: Delete templates that were linked to deleted destinations
-                testLogger.info('Cleaning up linked templates', { templates: Array.from(linkedTemplates) });
+            // ============================================
+            // STEP 2: Delete FOLDERS matching prefixes (after alerts are gone)
+            // ============================================
+            if (folderPrefixes.length > 0) {
+                testLogger.info('Step 2: Deleting folders matching prefixes', { prefixes: folderPrefixes });
 
-                for (const templateName of linkedTemplates) {
-                    const templateDeleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates/${templateName}`, {
+                // Re-fetch folders to get current state
+                const currentFolders = await this.fetchAlertFolders();
+                const matchingFolders = currentFolders.filter(f =>
+                    folderPrefixes.some(prefix => f.name.startsWith(prefix))
+                );
+                testLogger.info('Found folders matching prefixes', { total: matchingFolders.length });
+
+                for (const folder of matchingFolders) {
+                    // Delete any remaining alerts in the folder first
+                    const remainingAlerts = await this.fetchAlertsInFolder(folder.folderId);
+                    for (const alert of remainingAlerts) {
+                        await this.deleteAlert(alert.alert_id, folder.folderId);
+                        deletedAlerts++;
+                    }
+
+                    // Then delete the folder
+                    const folderDeleteResult = await this.deleteFolder(folder.folderId);
+
+                    if (folderDeleteResult.code === 200 || folderDeleteResult.message?.includes('Folder deleted')) {
+                        deletedFolders++;
+                        testLogger.info('Deleted folder', { folderId: folder.folderId, name: folder.name });
+                    } else {
+                        testLogger.warn('Failed to delete folder', {
+                            folderId: folder.folderId,
+                            name: folder.name,
+                            result: folderDeleteResult
+                        });
+                    }
+                }
+            }
+
+            testLogger.info('Step 1-2 complete: Alerts and folders deleted', {
+                deletedAlerts,
+                deletedFolders
+            });
+
+            // ============================================
+            // STEP 3: Delete DESTINATIONS matching prefixes
+            // (Destinations depend on templates, delete before templates)
+            // ============================================
+            let deletedDestinations = 0;
+
+            if (destinationPrefixes.length > 0) {
+                testLogger.info('Step 3: Deleting destinations matching prefixes/patterns', { prefixes: destinationPrefixes });
+
+                const { destinations } = await this.fetchDestinationsWithTemplateMapping();
+                const matchingDestinations = destinations.filter(d =>
+                    destinationPrefixes.some(prefix => {
+                        if (prefix instanceof RegExp) {
+                            return prefix.test(d.name);
+                        }
+                        return d.name.startsWith(prefix);
+                    })
+                );
+                testLogger.info('Found destinations matching prefixes/patterns', { total: matchingDestinations.length });
+
+                for (const destination of matchingDestinations) {
+                    const deleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${destination.name}`, {
                         method: 'DELETE',
                         headers: {
                             'Authorization': this.authHeader,
                             'Content-Type': 'application/json'
                         }
                     });
-                    const templateResult = await templateDeleteResult.json();
-                    if (templateResult.code === 200) {
-                        testLogger.info('Deleted template', { name: templateName });
+
+                    const result = await deleteResult.json();
+
+                    if (result.code === 200) {
+                        deletedDestinations++;
+                        testLogger.debug('Deleted destination', { name: destination.name });
+                    } else if (result.code === 409) {
+                        // Destination still blocked by an alert - this shouldn't happen if alerts were deleted correctly
+                        testLogger.warn('Destination still blocked by alert (unexpected)', {
+                            name: destination.name,
+                            result: result
+                        });
                     } else {
-                        testLogger.warn('Failed to delete template', {
-                            name: templateName,
-                            result: templateResult,
-                            note: 'Template may still be in use by other destinations'
+                        testLogger.warn('Failed to delete destination', {
+                            name: destination.name,
+                            result: result
                         });
                     }
                 }
             }
 
-            // Step 9b: Delete templates matching specified prefixes
+            testLogger.info('Step 3 complete: Destinations deleted', { deletedDestinations });
+
+            // ============================================
+            // STEP 4: Delete TEMPLATES matching prefixes
+            // (Templates have no dependencies, delete last)
+            // ============================================
+            let deletedTemplates = 0;
+
             if (templatePrefixes.length > 0) {
-                testLogger.info('Cleaning up templates', { prefixes: templatePrefixes });
+                testLogger.info('Step 4: Deleting templates matching prefixes', { prefixes: templatePrefixes });
 
                 const allTemplatesResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates?page_num=1&page_size=100000&sort_by=name&desc=false`, {
                     method: 'GET',
@@ -1992,8 +2156,7 @@ class APICleanup {
                     const matchingTemplates = allTemplates.filter(t =>
                         templatePrefixes.some(prefix => t.name.startsWith(prefix))
                     );
-
-                    testLogger.info('Found templates to delete', { count: matchingTemplates.length });
+                    testLogger.info('Found templates matching prefixes', { total: matchingTemplates.length });
 
                     for (const template of matchingTemplates) {
                         const templateDeleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates/${template.name}`, {
@@ -2004,8 +2167,16 @@ class APICleanup {
                             }
                         });
                         const templateResult = await templateDeleteResult.json();
+
                         if (templateResult.code === 200) {
-                            testLogger.info('Deleted template', { name: template.name });
+                            deletedTemplates++;
+                            testLogger.debug('Deleted template', { name: template.name });
+                        } else if (templateResult.code === 409) {
+                            // Template still in use by a destination - this shouldn't happen if destinations were deleted
+                            testLogger.warn('Template still in use (unexpected)', {
+                                name: template.name,
+                                result: templateResult
+                            });
                         } else {
                             testLogger.warn('Failed to delete template', {
                                 name: template.name,
@@ -2016,64 +2187,13 @@ class APICleanup {
                 }
             }
 
-            // Step 10: Delete remaining folders matching specified prefixes
-            let matchingFolders = [];
-            if (folderPrefixes.length > 0) {
-                testLogger.info('Cleaning up folders', { prefixes: folderPrefixes });
-
-                // Fetch fresh list of all folders
-                const allFolders = await this.fetchAlertFolders();
-                matchingFolders = allFolders.filter(f =>
-                    folderPrefixes.some(prefix => f.name.startsWith(prefix))
-                );
-                testLogger.info('Found folders to clean up', { total: matchingFolders.length });
-
-                for (const folder of matchingFolders) {
-                    // First, delete all alerts in the folder
-                    const alerts = await this.fetchAlertsInFolder(folder.folderId);
-
-                    if (alerts.length > 0) {
-                        testLogger.info('Deleting alerts in folder before folder deletion', {
-                            folderId: folder.folderId,
-                            folderName: folder.name,
-                            alertCount: alerts.length
-                        });
-
-                        for (const alert of alerts) {
-                            const alertDeleteResult = await this.deleteAlert(alert.alert_id, folder.folderId);
-                            if (alertDeleteResult.code === 200) {
-                                testLogger.debug('Deleted alert', { alertId: alert.alert_id, name: alert.name });
-                            } else {
-                                testLogger.warn('Failed to delete alert', {
-                                    alertId: alert.alert_id,
-                                    name: alert.name,
-                                    result: alertDeleteResult
-                                });
-                            }
-                        }
-                    }
-
-                    // Then delete the folder
-                    const folderDeleteResult = await this.deleteFolder(folder.folderId);
-
-                    // Handle both JSON and plain text responses
-                    if (folderDeleteResult.code === 200 || folderDeleteResult.message?.includes('Folder deleted')) {
-                        testLogger.info('Deleted folder', { folderId: folder.folderId, name: folder.name });
-                    } else {
-                        testLogger.warn('Failed to delete folder', {
-                            folderId: folder.folderId,
-                            name: folder.name,
-                            result: folderDeleteResult
-                        });
-                    }
-                }
-            }
+            testLogger.info('Step 4 complete: Templates deleted', { deletedTemplates });
 
             testLogger.info('Complete cascade cleanup finished', {
-                totalDestinations: matchingDestinations.length,
-                deletedDestinations: deletedDestinations.length,
-                linkedTemplates: linkedTemplates.size,
-                foldersDeleted: folderPrefixes.length > 0 ? matchingFolders.length : 0
+                deletedAlerts,
+                deletedFolders,
+                deletedDestinations,
+                deletedTemplates
             });
 
         } catch (error) {
@@ -2576,6 +2696,93 @@ class APICleanup {
         } catch (error) {
             testLogger.error('SDR Test Cleanup failed', { error: error.message });
             // Don't throw - allow test to continue even if cleanup fails
+        }
+    }
+
+    /**
+     * ==========================================
+     * CORRELATION SETTINGS CLEANUP METHODS
+     * ==========================================
+     */
+
+    /**
+     * Clean up test semantic groups created by correlation settings tests
+     * Uses the alerts deduplication config API (same as frontend)
+     * Test groups created by ensureSemanticGroupsExist(): k8s-cluster, k8s-namespace, k8s-deployment, service
+     * @param {Array<string>} groupIds - Array of semantic group IDs to delete (default: test group IDs)
+     */
+    async cleanupCorrelationSettings(groupIds = ['k8s-cluster', 'k8s-namespace', 'k8s-deployment', 'service']) {
+        testLogger.info('Starting correlation settings cleanup', { groupIds });
+
+        try {
+            // First, fetch the current deduplication config
+            const getResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!getResponse.ok) {
+                if (getResponse.status === 404) {
+                    testLogger.info('Deduplication config not found (nothing to clean up)');
+                    return;
+                }
+                testLogger.warn('Failed to fetch deduplication config', { status: getResponse.status });
+                return;
+            }
+
+            const config = await getResponse.json();
+            const currentGroups = config.semantic_field_groups || [];
+            testLogger.info('Current semantic groups in dedup config', { count: currentGroups.length });
+
+            if (currentGroups.length === 0) {
+                testLogger.info('No semantic groups to clean up');
+                return;
+            }
+
+            // Filter out the test groups
+            const remainingGroups = currentGroups.filter(g => !groupIds.includes(g.id));
+            const removedCount = currentGroups.length - remainingGroups.length;
+
+            if (removedCount === 0) {
+                testLogger.info('No test semantic groups found to clean up');
+                return;
+            }
+
+            testLogger.info('Removing test semantic groups', {
+                total: currentGroups.length,
+                removing: removedCount,
+                remaining: remainingGroups.length
+            });
+
+            // Update the config with remaining groups
+            const updatePayload = {
+                ...config,
+                semantic_field_groups: remainingGroups,
+                // Also clean up fingerprint groups that reference removed semantic groups
+                alert_fingerprint_groups: (config.alert_fingerprint_groups || [])
+                    .filter(id => !groupIds.includes(id))
+            };
+
+            const updateResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updatePayload)
+            });
+
+            if (updateResponse.ok) {
+                testLogger.info('Correlation settings cleanup completed', { removedGroups: removedCount });
+            } else {
+                testLogger.warn('Failed to update deduplication config', { status: updateResponse.status });
+            }
+
+        } catch (error) {
+            testLogger.error('Correlation settings cleanup failed', { error: error.message });
         }
     }
 

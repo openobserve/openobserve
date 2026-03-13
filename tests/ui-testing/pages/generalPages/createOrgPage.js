@@ -228,7 +228,7 @@ export class CreateOrgPage {
                 
                 // Ensure we search for the organization first to make it visible
                 await this.searchOrg(orgName);
-                await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
                 
                 // Wait for table to be stable
                 await this.page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 5000 });

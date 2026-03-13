@@ -915,7 +915,7 @@ export default defineComponent({
       searchObj.loading = true;
 
       try {
-        const queryReq = buildSearch(false, false);
+        const queryReq = buildSearch(false, true);
         if (!queryReq) {
           console.log("[Index] No query request available");
           searchObj.loading = false;
@@ -925,6 +925,9 @@ export default defineComponent({
         // Set size to -1 to let backend determine sampling size based on config
         console.log("[Patterns] Using default sampling from backend configuration");
         queryReq.query.size = -1;
+
+        // Set quick_mode false for patterns explicitly
+        queryReq.query.quick_mode = false;
 
         const streamName = searchObj.data.stream.selectedStream[0];
         if (!streamName) {
@@ -1419,9 +1422,11 @@ export default defineComponent({
           `"${searchObj.data.stream.selectedStream[0]}"`,
         );
 
-      searchObj.data.query = newQuery;
-      searchObj.data.editorValue = newQuery;
-      searchBarRef.value.updateQuery();
+      if (newQuery) {
+        searchObj.data.query = newQuery;
+        searchObj.data.editorValue = newQuery;
+        searchBarRef.value.updateQuery();
+      }
     };
 
     const processInterestingFiledInSQLQuery = (
@@ -1603,6 +1608,20 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ].customQuery = true;
 
+            // Copy VRL function query if present
+            if (
+              searchObj.data.tempFunctionContent &&
+              searchObj.data.transformType === "function"
+            ) {
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
+            } else {
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery = "";
+            }
+
             // Store current config and chart type to preserve them during rebuild
             const queryParams = router.currentRoute.value.query;
             let preservedConfig = null;
@@ -1661,15 +1680,24 @@ export default defineComponent({
               isFirstVisualizationToggle.value = false;
             }
 
+            // Ensure stream fields are loaded before building the query.
+            // On page reload, loadVisualizeData() runs async and may not have
+            // finished populating interestingFieldList yet. Without fields,
+            // buildSearch() produces SELECT * which is invalid for visualization.
+            if (
+              searchObj.data.stream.selectedStream?.length > 0 &&
+              searchObj.data.stream.selectedStreamFields?.length === 0
+            ) {
+              await getStreamList();
+              await extractFields();
+            }
+
             let logsPageQuery = "";
 
-            // handle sql mode
-            if (!searchObj.meta.sqlMode) {
+
+            // Everytime, build the query inrespective of sqlMode
               const queryBuild = buildSearch();
               logsPageQuery = queryBuild?.query?.sql ?? "";
-            } else {
-              logsPageQuery = searchObj.data.query;
-            }
 
             // Check if query is SELECT * which is not supported for visualization
             if (
@@ -1691,6 +1719,35 @@ export default defineComponent({
             // if not able to parse query, do not do anything
             if (shouldUseHistogramQuery.value === null) {
               return;
+            }
+
+            // Force table chart if VRL functions are present
+            if (
+              searchObj.data.tempFunctionContent &&
+              searchObj.data.transformType === "function" &&
+              shouldAutoSelectChartType
+            ) {
+              dashboardPanelData.data.type = "table";
+              // Enable dynamic columns for VRL table charts
+              dashboardPanelData.data.config.table_dynamic_columns = true;
+            }
+
+            // Clear VRL if chart type is not table (VRL only supported for table in visualization)
+            if (
+              dashboardPanelData.data.type !== "table" &&
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery
+            ) {
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].vrlFunctionQuery = "";
+            }
+
+            // Recalculate shouldUseHistogramQuery after chart type is finalized
+            // Table charts should not use histogram query
+            if (dashboardPanelData.data.type === "table") {
+              shouldUseHistogramQuery.value = false;
             }
 
             // set logs page data to searchResponseForVisualization
@@ -1720,6 +1777,8 @@ export default defineComponent({
                   // assign to visualizeChartData as well
                   visualizeChartData.value.queries[0].query =
                     dashboardPanelData.data.queries[0].query;
+                  visualizeChartData.value.queries[0].vrlFunctionQuery =
+                    dashboardPanelData.data.queries[0].vrlFunctionQuery;
                 }
               }
             } else {
@@ -1782,6 +1841,15 @@ export default defineComponent({
               };
             }
 
+            // Enable dynamic columns for VRL table charts (after preservedConfig to ensure it's set)
+            if (
+              searchObj.data.tempFunctionContent &&
+              searchObj.data.transformType === "function" &&
+              dashboardPanelData.data.type === "table"
+            ) {
+              dashboardPanelData.data.config.table_dynamic_columns = true;
+            }
+
             // run query
             visualizeChartData.value = JSON.parse(
               JSON.stringify(dashboardPanelData.data),
@@ -1832,6 +1900,22 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = true;
 
+          // Update VRL function query if present
+          // VRL is only supported for table chart type in visualization
+          if (
+            searchObj.data.tempFunctionContent &&
+            searchObj.data.transformType === "function" &&
+            dashboardPanelData.data.type === "table"
+          ) {
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
+          } else {
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].vrlFunctionQuery = "";
+          }
+
           // reset old rendered chart
           visualizeChartData.value = {};
 
@@ -1841,6 +1925,15 @@ export default defineComponent({
           // if not able to parse query, do not do anything
           if (shouldUseHistogramQuery.value === null) {
             return false;
+          }
+
+          // Enable dynamic columns for VRL table charts
+          if (
+            searchObj.data.tempFunctionContent &&
+            searchObj.data.transformType === "function" &&
+            dashboardPanelData.data.type === "table"
+          ) {
+            dashboardPanelData.data.config.table_dynamic_columns = true;
           }
 
           // emit resize event
@@ -1930,21 +2023,48 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Watch AI chat state and adjust splitter to give more space when chat is open
+    const originalSplitterValue = ref(searchObj.config.splitterModel);
+    watch(
+      () => store.state.isAiChatEnabled,
+      (isEnabled) => {
+        // Only adjust splitter if field list is shown
+        if (searchObj.meta.showFields) {
+          if (isEnabled) {
+            // AI chat opened - save current value and set splitter to 25
+            originalSplitterValue.value = searchObj.config.splitterModel;
+            searchObj.config.splitterModel = 25;
+          } else {
+            // AI chat closed - restore original splitter value
+            searchObj.config.splitterModel = originalSplitterValue.value;
+          }
+        }
+      }
+    );
+
     const handleRunQueryFn = async (clear_cache = false) => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // Set the shouldRefreshWithoutCache flag
         shouldRefreshWithoutCache.value = clear_cache;
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
+          // Ensure stream fields are loaded before building the query.
+          // On page reload, loadVisualizeData() runs async and may not have
+          // finished populating interestingFieldList yet. Without fields,
+          // buildSearch() produces SELECT * which is invalid for visualization.
+          if (
+            searchObj.data.stream.selectedStream?.length > 0 &&
+            searchObj.data.stream.selectedStreamFields?.length === 0
+          ) {
+            await getStreamList();
+            await extractFields();
+          }
+
           let logsPageQuery = "";
 
-          // handle sql mode
-          if (!searchObj.meta.sqlMode) {
-            const queryBuild = buildSearch();
-            logsPageQuery = queryBuild?.query?.sql ?? "";
-          } else {
-            logsPageQuery = searchObj.data.query;
-          }
+          // Build the query regardless of sqlMode
+          const queryBuild = buildSearch();
+          logsPageQuery = queryBuild?.query?.sql ?? "";
 
           // Check if query is SELECT * which is not supported for visualization
           if (
@@ -2194,9 +2314,18 @@ export default defineComponent({
         checkAbort();
 
         /* Decide whether to use histogram query - don't use for table charts or when there are group_by fields */
+        /* Note: VRL functions are only supported for table charts, and VRL will force table chart type */
+        /* So if VRL is present and autoSelectChartType is true, we know chart will be table */
+        const willBeTableChart =
+          dashboardPanelData.data.type === "table" ||
+          (autoSelectChartType &&
+            searchObj.data.tempFunctionContent &&
+            searchObj.data.transformType === "function");
+
         shouldUseHistogramQuery.value =
-          dashboardPanelData.data.type !== "table" &&
+          !willBeTableChart &&
           !(extractedFields?.group_by && extractedFields.group_by.length);
+
 
         const finalQuery = logsPageQuery;
 
@@ -2426,8 +2555,8 @@ export default defineComponent({
 
     // [END] Context Provider Setup
 
-    const sendToAiChat = (value: any) => {
-      emit("sendToAiChat", value);
+    const sendToAiChat = (value: any, append: boolean = true) => {
+      emit("sendToAiChat", value, append);
     };
 
     const clearAllTimeouts = () => {

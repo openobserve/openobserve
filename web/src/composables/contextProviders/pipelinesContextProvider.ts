@@ -41,7 +41,7 @@ export const createPipelinesContextProvider = (
       
       return {
         currentPage: 'Pipelines',
-        pipelineId: pipeline?.id || '',
+        pipelineId: pipeline?.pipeline_id || '',
         pipelineName: pipeline?.name || '',
         organization_identifier: store?.state?.selectedOrganization?.identifier || '',
         user_intent: pipelineObj?.isEditPipeline ? 'edit existing pipeline' : 'create new pipeline'

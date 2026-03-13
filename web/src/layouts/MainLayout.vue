@@ -88,20 +88,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-page-container>
       </div>
 
-      <!-- Right Panel (AI Chat) -->
-
-      <div
+      <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
+<div
         class="col-auto"
         v-show="store.state.isAiChatEnabled && isLoading"
-        style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10"
-        :class="
-          store.state.theme == 'dark'
-            ? 'dark-mode-chat-container'
-            : 'light-mode-chat-container'
-        "
+        style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: 44px; padding-right: 0.625rem;"
       >
         <O2AIChat
-          :header-height="82.5"
+          :header-height="42.5"
           :is-open="store.state.isAiChatEnabled"
           @close="closeChat"
           :aiChatInputContext="aiChatInputContext"
@@ -113,14 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col-auto"
         v-show="store.state.isSREChatOpen"
         style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10"
-        :class="
-          store.state.theme == 'dark'
-            ? 'dark-mode-chat-container'
-            : 'light-mode-chat-container'
-        "
       >
         <SREChat
-          :header-height="82.5"
+          :header-height="42.5"
           :context-type="store.state.sreChatContext.type"
           :context-data="store.state.sreChatContext.data"
           @close="closeSREChat"
@@ -213,6 +202,7 @@ import {
   outlinedDescription,
   outlinedCode,
   outlinedDevices,
+  outlinedNotificationsActive,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -260,8 +250,8 @@ export default defineComponent({
     ThemeSwitcher,
     PredefinedThemes,
     O2AIChat,
-    SREChat,
     GetStarted,
+    SREChat,
   },
   methods: {
     navigateToDocs() {
@@ -279,6 +269,11 @@ export default defineComponent({
     },
     signout() {
       this.closeSocket();
+
+      // Stop session replay recording on logout
+      if (this.store.state.zoConfig?.rum?.enabled) {
+        openobserveRum.stopSessionReplayRecording();
+      }
 
       if (config.isEnterprise == "true") {
         invalidateLoginData();
@@ -331,6 +326,7 @@ export default defineComponent({
     );
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
+    const aiChatAppendMode = ref(true);
     const rowsPerPage = ref(10);
     const searchQuery = ref("");
 
@@ -557,16 +553,16 @@ export default defineComponent({
 
     const updateActionsMenu = () => {
       if (isActionsEnabled.value) {
-        const alertIndex = linksList.value.findIndex(
-          (link) => link.name === "alertList",
+        const incidentIndex = linksList.value.findIndex(
+          (link) => link.name === "incidentList",
         );
 
         const actionExists = linksList.value.some(
           (link) => link.name === "actionScripts",
         );
 
-        if (alertIndex !== -1 && !actionExists) {
-          linksList.value.splice(alertIndex + 1, 0, {
+        if (incidentIndex !== -1 && !actionExists) {
+          linksList.value.splice(incidentIndex + 1, 0, {
             title: t("menu.actions"),
             icon: outlinedCode,
             link: "/actions",
@@ -875,6 +871,21 @@ export default defineComponent({
 
     // get organizations settings on first load and identifier change
     const getOrganizationSettings = async () => {
+      // Default settings to use if API call fails
+      const defaultSettings = {
+        scrape_interval: 15,
+        span_id_field_name: "spanId",
+        trace_id_field_name: "traceId",
+        toggle_ingestion_logs: false,
+        enable_websocket_search: false,
+        enable_streaming_search: false,
+        streaming_aggregation_enabled: false,
+        free_trial_expiry: "",
+        light_mode_theme_color: undefined,
+        dark_mode_theme_color: undefined,
+        claim_parser_function: "",
+      };
+
       try {
         //get organizations settings
         const orgSettings: any = await organizations.get_organization_settings(
@@ -884,23 +895,24 @@ export default defineComponent({
         //set settings in store
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
-          scrape_interval: orgSettings?.data?.data?.scrape_interval ?? 15,
+          scrape_interval: orgSettings?.data?.data?.scrape_interval ?? defaultSettings.scrape_interval,
           span_id_field_name:
-            orgSettings?.data?.data?.span_id_field_name ?? "spanId",
+            orgSettings?.data?.data?.span_id_field_name ?? defaultSettings.span_id_field_name,
           trace_id_field_name:
-            orgSettings?.data?.data?.trace_id_field_name ?? "traceId",
+            orgSettings?.data?.data?.trace_id_field_name ?? defaultSettings.trace_id_field_name,
           toggle_ingestion_logs:
-            orgSettings?.data?.data?.toggle_ingestion_logs ?? false,
+            orgSettings?.data?.data?.toggle_ingestion_logs ?? defaultSettings.toggle_ingestion_logs,
           enable_websocket_search:
-            orgSettings?.data?.data?.enable_websocket_search ?? false,
+            orgSettings?.data?.data?.enable_websocket_search ?? defaultSettings.enable_websocket_search,
           enable_streaming_search:
-            orgSettings?.data?.data?.enable_streaming_search ?? false,
+            orgSettings?.data?.data?.enable_streaming_search ?? defaultSettings.enable_streaming_search,
           streaming_aggregation_enabled:
-            orgSettings?.data?.data?.streaming_aggregation_enabled ?? false,
-          free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
+            orgSettings?.data?.data?.streaming_aggregation_enabled ?? defaultSettings.streaming_aggregation_enabled,
+          free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? defaultSettings.free_trial_expiry,
           light_mode_theme_color: orgSettings?.data?.data?.light_mode_theme_color,
           dark_mode_theme_color: orgSettings?.data?.data?.dark_mode_theme_color,
-          claim_parser_function: orgSettings?.data?.data?.claim_parser_function ?? "",
+          claim_parser_function: orgSettings?.data?.data?.claim_parser_function ?? defaultSettings.claim_parser_function,
+          cross_links: orgSettings?.data?.data?.cross_links ?? [],
         });
 
         if (
@@ -922,8 +934,17 @@ export default defineComponent({
             });
           }
         }
-      } catch (error) {
-        console.error("Error in getOrganizationSettings:", error);
+      } catch (error: any) {
+        // Handle permission errors gracefully (403 = Forbidden)
+        if (error?.response?.status === 403) {
+          console.warn("Organization settings access denied (403). Using default settings.");
+          // Set default settings when access is denied
+          store.dispatch("setOrganizationSettings", defaultSettings);
+        } else {
+          console.error("Error in getOrganizationSettings:", error);
+          // Still set defaults for other errors to prevent undefined values
+          store.dispatch("setOrganizationSettings", defaultSettings);
+        }
       }
       return;
     };
@@ -962,10 +983,14 @@ export default defineComponent({
     const setRumUser = () => {
       if (store.state.zoConfig?.rum?.enabled == true) {
         const userInfo = store.state.userInfo;
+        // Set user information first
         openobserveRum.setUser({
           name: userInfo.given_name + " " + userInfo.family_name,
           email: userInfo.email,
         });
+        // Start session replay recording after user is identified
+        // This handles cases where user refreshes the page or accesses app directly
+        openobserveRum.startSessionReplayRecording({ force: true });
       }
     };
 
@@ -1010,6 +1035,7 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+
     const getBtnLogo = computed(() => {
       if (isHovered.value || store.state.isAiChatEnabled) {
         return getImageURL("images/common/ai_icon_dark.svg");
@@ -1026,15 +1052,22 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
-    const sendToAiChat = (value: any) => {
+    const sendToAiChat = (value: any, append: boolean = true) => {
       if (!store.state.isAiChatEnabled) {
         store.dispatch("setIsAiChatEnabled", true);
       }
-      //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
-      //so to force trigger we do this
+
+      // Set the append mode
+      aiChatAppendMode.value = append;
+
+      // Always clear and set to trigger the watcher in O2AIChat
       aiChatInputContext.value = "";
       nextTick(() => {
         aiChatInputContext.value = value;
+        // Clear it after another tick so it doesn't accumulate in parent
+        nextTick(() => {
+          aiChatInputContext.value = "";
+        });
       });
     };
 
@@ -1092,13 +1125,13 @@ export default defineComponent({
       splitterModel,
       toggleAIChat,
       closeChat,
-      closeSREChat,
       getBtnLogo,
       isHovered,
       showGetStarted,
       removeFirstTimeLogin,
       sendToAiChat,
       aiChatInputContext,
+      aiChatAppendMode,
       userClickedOrg,
       searchQuery,
       filteredOrganizations,
@@ -1111,6 +1144,7 @@ export default defineComponent({
       openPredefinedThemes,
       isPredefinedThemesOpen,
       handleMenuHover,
+      closeSREChat,
     };
   },
   computed: {
@@ -1555,14 +1589,6 @@ body.ai-chat-open {
   border-radius: 4px;
   padding: 0px 8px;
   color: white;
-}
-.dark-mode-chat-container {
-  border-left: 1.5px solid #232323ff;
-  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
-}
-.light-mode-chat-container {
-  border-left: 1.5px solid #f7f7f7;
-  box-shadow: -0rem 0.1rem 0.3rem var(--hover-shadow);
 }
 
 .ai-btn-active {

@@ -16,19 +16,20 @@
 use config::{cluster::LOCAL_NODE, meta::cluster::get_internal_grpc_token};
 use infra::{
     client::grpc::get_cached_channel,
+    cluster,
     errors::{Error, ErrorCodes},
 };
 use proto::cluster_rpc;
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 use tracing::{Instrument, info_span};
 
-use crate::service::search::{infra_cluster, server_internal_error};
+use crate::service::search::server_internal_error;
 
 pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
     let trace_id = path.clone();
     let mut delete_response = true;
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(None).await {
+    let mut nodes = match cluster::get_cached_online_querier_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] delete_cached_results: no querier node online");
@@ -40,7 +41,7 @@ pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
 
     nodes.sort_by_key(|x| x.id);
 
-    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
+    let local_node = cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
     nodes.retain(|node| node.is_querier() && !node.uuid.eq(LOCAL_NODE.uuid.as_str()));
 
     let querier_num = nodes.len();

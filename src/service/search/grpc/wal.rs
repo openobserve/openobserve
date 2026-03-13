@@ -28,7 +28,9 @@ use config::{
     utils::{
         async_file::{create_wal_dir_datetime_filter, scan_files_filtered},
         file::is_exists,
-        parquet::{parse_time_range_from_filename, read_metadata_from_file},
+        parquet::{
+            get_memtable_id_from_file_name, parse_time_range_from_filename, read_metadata_from_file,
+        },
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
         time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
@@ -44,7 +46,7 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::unwrap_partition_time_level,
 };
-use ingester::{WAL_PARQUET_METADATA, get_memtable_id_from_file_name};
+use ingester::WAL_PARQUET_METADATA;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{

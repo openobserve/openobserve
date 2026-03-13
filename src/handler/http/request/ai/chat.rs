@@ -13,14 +13,47 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! AI Chat handlers that redirect to o2-sre-agent.
+//!
+//! These endpoints accept the legacy PromptRequest format for backward compatibility
+//! but internally forward all requests to the o2-sre-agent service, which handles
+//! the actual AI processing with MCP tool integration.
+
+use std::io::Error;
+
 use actix_http::StatusCode;
-use actix_web::{
-    HttpRequest, HttpResponse, Responder, post,
-    web::{self, Json},
-};
-use o2_enterprise::enterprise::{ai::agent, common::config::get_config as get_o2_config};
+use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde::Deserialize;
 use tracing::Span;
+
+/// Agent type for general chat/copilot requests (SQL help, observability questions, etc.)
+#[cfg(feature = "enterprise")]
+const DEFAULT_AGENT_TYPE: &str = "o2-ai";
+
+/// Agent type for incident-specific queries (triggered when incident_id is in context)
+#[cfg(feature = "enterprise")]
+const INCIDENT_AGENT_TYPE: &str = "sre";
+
+/// Determine agent type based on context.
+/// - If context contains incident_id, use SRE agent for incident investigation
+/// - Otherwise use default copilot agent
+#[cfg(feature = "enterprise")]
+fn get_agent_type(context: &serde_json::Value) -> &'static str {
+    if context
+        .as_object()
+        .map(|obj| obj.contains_key("incident_id"))
+        .unwrap_or(false)
+    {
+        INCIDENT_AGENT_TYPE
+    } else {
+        DEFAULT_AGENT_TYPE
+    }
+}
+
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::ai::agent::meta::Role;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -31,13 +64,58 @@ use crate::{
     },
 };
 
+/// Session ID header for AI chat correlation
+pub const X_O2_ASSISTANT_SESSION_ID: &str = "x-o2-assistant-session-id";
+
+/// Extract headers from the request that match the configured passthrough patterns.
+/// Supports exact matches and prefix wildcards (e.g., "x-forwarded-*").
+fn extract_passthrough_headers(
+    headers: &actix_web::http::header::HeaderMap,
+    passthrough_config: &str,
+) -> std::collections::HashMap<String, String> {
+    let mut result = std::collections::HashMap::new();
+
+    // Parse the passthrough config into patterns
+    let patterns: Vec<&str> = passthrough_config
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    for (header_name, header_value) in headers.iter() {
+        let header_name_lower = header_name.as_str().to_lowercase();
+
+        for pattern in &patterns {
+            let pattern_lower = pattern.to_lowercase();
+            let matches = if pattern_lower.ends_with('*') {
+                // Prefix match (e.g., "x-forwarded-*" matches "x-forwarded-for")
+                let prefix = &pattern_lower[..pattern_lower.len() - 1];
+                header_name_lower.starts_with(prefix)
+            } else {
+                // Exact match
+                header_name_lower == pattern_lower
+            };
+
+            if matches {
+                if let Ok(value) = header_value.to_str() {
+                    result.insert(header_name_lower.clone(), value.to_string());
+                }
+                break;
+            }
+        }
+    }
+
+    result
+}
+
 /// CreateChat
 #[utoipa::path(
     context_path = "/api",
     tag = "Ai",
     operation_id = "Chat",
     summary = "Generate AI chat response",
-    description = "Generates an AI-powered response to user queries and requests",
+    description = "Generates an AI-powered response to user queries and requests. \
+                   This endpoint redirects to the o2-sre-agent service for processing.",
     security(
         ("Authorization" = [])
     ),
@@ -69,42 +147,169 @@ use crate::{
 pub async fn chat(
     Headers(auth_data): Headers<TraceInfo>,
     org_id: web::Path<String>,
-    Json(body): Json<PromptRequest>,
+    body: web::Json<PromptRequest>,
+    in_req: HttpRequest,
 ) -> impl Responder {
-    let trace_id = auth_data.get_trace_id();
-    let user_id = &auth_data.user_id;
-    let org_id_str = org_id.as_str();
-    let config = get_o2_config();
+    let prompt_body = body.into_inner();
 
-    // Create root span for AI tracing if enabled
-    let _span = if config.ai.traces_enabled {
-        tracing::info_span!(
-            "http.request",
-            http.method = "POST",
-            http.route = "/api/{org_id}/ai/chat",
-            http.target = format!("/api/{}/ai/chat", org_id_str),
-            otel.kind = "server",
-        )
-        .entered()
-    } else {
-        Span::none().entered()
-    };
+    #[cfg(feature = "enterprise")]
+    {
+        use config::get_config;
+        use o2_enterprise::enterprise::alerts::rca_agent::{QueryRequest, RcaAgentClient};
 
-    if config.ai.enabled {
-        let response = agent::service::chat(
-            agent::meta::AiServerRequest::new(body.messages, body.model, body.context),
-            trace_id.clone(),
-        )
-        .await;
-        match response {
-            Ok(response) => HttpResponse::Ok().json(PromptResponse::from(response)),
+        let trace_id = auth_data.get_trace_id();
+        let user_id = &auth_data.user_id;
+        let org_id_str = org_id.as_str();
+        let config = get_o2_config();
+
+        // Create root span for AI tracing if enabled
+        let _span = if config.ai.traces_enabled {
+            tracing::info_span!(
+                "http.request",
+                http.method = "POST",
+                http.route = "/api/{org_id}/ai/chat",
+                http.target = format!("/api/{}/ai/chat", org_id_str),
+                otel.kind = "server",
+            )
+            .entered()
+        } else {
+            Span::none().entered()
+        };
+
+        // Check if AI/agent is enabled
+        if !config.ai.enabled {
+            return MetaHttpResponse::bad_request("AI is not enabled");
+        }
+
+        if config.ai.agent_url.is_empty() {
+            return MetaHttpResponse::bad_request("AI agent URL is not set");
+        }
+
+        // Extract user token from cookie/header for per-user MCP auth
+        let auth_str = crate::common::utils::auth::extract_auth_str(&in_req).await;
+        let user_token = if auth_str.starts_with("Session::") {
+            // Session format: "Session::{session_id}::{actual_token}"
+            // Extract actual token (already has Bearer/Basic prefix)
+            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
+        } else if !auth_str.is_empty() {
+            Some(auth_str)
+        } else {
+            None
+        };
+
+        // Create agent client
+        let zo_config = get_config();
+        let client = match RcaAgentClient::new(
+            &config.ai.agent_url,
+            &zo_config.auth.root_user_email,
+            &zo_config.auth.root_user_password,
+        ) {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!(
+                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                     Failed to create agent client: {e}"
+                );
+                return MetaHttpResponse::internal_error(format!(
+                    "Failed to create agent client: {e}"
+                ));
+            }
+        };
+
+        // Extract headers to pass through to the agent
+        let passthrough_headers =
+            extract_passthrough_headers(in_req.headers(), &config.ai.passthrough_headers);
+
+        // Transform PromptRequest -> QueryRequest
+        // Extract the last user message as the query
+        let last_user_message = prompt_body
+            .messages
+            .iter()
+            .rfind(|m| m.role == Role::User)
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+
+        // Build history from all messages except the last user message
+        let history: Vec<serde_json::Value> = prompt_body
+            .messages
+            .iter()
+            .take(prompt_body.messages.len().saturating_sub(1))
+            .map(|m| {
+                serde_json::json!({
+                    "role": format!("{:?}", m.role).to_lowercase(),
+                    "content": m.content
+                })
+            })
+            .collect();
+
+        // Merge org_id into context
+        let mut context = serde_json::to_value(&prompt_body.context).unwrap_or_default();
+        if let Some(obj) = context.as_object_mut() {
+            obj.insert(
+                "org_id".to_string(),
+                serde_json::Value::String(org_id.to_string()),
+            );
+        }
+
+        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
+        let agent_type = get_agent_type(&context);
+
+        // Convert images to agent format
+        let images = prompt_body.images.map(|imgs| {
+            imgs.into_iter()
+                .map(
+                    |img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
+                        data: img.data,
+                        mime_type: img.mime_type,
+                        filename: img.filename,
+                    },
+                )
+                .collect()
+        });
+
+        let query_req = QueryRequest {
+            query: last_user_message,
+            context,
+            model: if prompt_body.model.is_empty() {
+                None
+            } else {
+                Some(prompt_body.model)
+            },
+            history: if history.is_empty() {
+                None
+            } else {
+                Some(history)
+            },
+            user_token,
+            images,
+        };
+
+        // Query agent with headers
+        // TODO: Once RcaAgentClient.query_with_headers() method is available, pass headers
+        // For now, passthrough_headers are collected but not passed to maintain compatibility
+        let _headers_to_forward = if passthrough_headers.is_empty() {
+            None
+        } else {
+            Some(passthrough_headers)
+        };
+
+        match client.query(agent_type, query_req).await {
+            Ok(response) => {
+                // QueryResponse has a `response: String` field
+                let prompt_response = PromptResponse {
+                    role: Role::Assistant,
+                    content: response.response,
+                };
+                HttpResponse::Ok().json(prompt_response)
+            }
             Err(e) => {
                 let error_msg = e.to_string();
                 log::error!(
-                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] Error in AI chat: {error_msg}"
+                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                     Agent query failed: {error_msg}"
                 );
 
-                // Check if this is a rate limit error (429) - pass through to client
+                // Check if this is a rate limit error (429)
                 if error_msg.contains("status 429") || error_msg.contains("rate_limit_exceeded") {
                     return HttpResponse::TooManyRequests().json(serde_json::json!({
                         "error": error_msg,
@@ -112,37 +317,46 @@ pub async fn chat(
                     }));
                 }
 
-                // All other errors (4XX except 429, and 5XX) are internal server errors
-                // as they indicate misconfiguration or provider issues
                 MetaHttpResponse::internal_error(error_msg)
             }
         }
-    } else {
-        MetaHttpResponse::bad_request("AI is not enabled")
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
+        drop(auth_data);
+        drop(in_req);
+        drop(prompt_body);
+        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
     }
 }
 
 #[derive(Debug, Deserialize)]
-struct TraceInfo {
-    user_id: String,
+pub struct TraceInfo {
+    pub user_id: String,
     #[serde(default)]
-    traceparent: String,
+    pub traceparent: Option<String>,
+    #[serde(default)]
+    pub authorization: Option<String>,
 }
 
 impl TraceInfo {
     /// Extract trace_id from traceparent header if present, otherwise generate UUID v7
-    fn get_trace_id(&self) -> String {
-        if !self.traceparent.is_empty() {
-            // Parse traceparent format: 00-{trace_id}-{span_id}-{flags}
-            let parts: Vec<&str> = self.traceparent.split('-').collect();
-            if parts.len() >= 3 {
-                let trace_id = parts[1].to_string();
-                // Validate trace_id (32 hex chars, not all zeros)
-                if trace_id.len() == 32
-                    && trace_id.chars().all(|c| c.is_ascii_hexdigit())
-                    && trace_id.chars().any(|c| c != '0')
-                {
-                    return trace_id;
+    pub fn get_trace_id(&self) -> String {
+        if let Some(ref traceparent) = self.traceparent {
+            if !traceparent.is_empty() {
+                // Parse traceparent format: 00-{trace_id}-{span_id}-{flags}
+                let parts: Vec<&str> = traceparent.split('-').collect();
+                if parts.len() >= 3 {
+                    let trace_id = parts[1].to_string();
+                    // Validate trace_id (32 hex chars, not all zeros)
+                    if trace_id.len() == 32
+                        && trace_id.chars().all(|c| c.is_ascii_hexdigit())
+                        && trace_id.chars().any(|c| c != '0')
+                    {
+                        return trace_id;
+                    }
                 }
             }
         }
@@ -157,7 +371,8 @@ impl TraceInfo {
     tag = "Ai",
     operation_id = "ChatStream",
     summary = "Generate streaming AI chat response",
-    description = "Generates an AI response with real-time streaming for improved user experience",
+    description = "Generates an AI response with real-time streaming for improved user experience. \
+                   This endpoint redirects to the o2-sre-agent service for processing.",
     security(
         ("Authorization" = [])
     ),
@@ -193,102 +408,574 @@ pub async fn chat_stream(
     in_req: HttpRequest,
 ) -> impl Responder {
     let trace_id = auth_data.get_trace_id();
-    let user_id = auth_data.user_id;
+    let user_id = auth_data.user_id.clone();
     let org_id = org_id.into_inner();
+    let prompt_body = body.into_inner();
 
-    let config = get_o2_config();
+    // Collect headers to forward
+    let mut forward_headers = std::collections::HashMap::new();
 
-    // Create root span for AI tracing if enabled
-    let _span = if config.ai.traces_enabled {
-        tracing::info_span!(
-            "http.request",
-            http.method = "POST",
-            http.route = "/api/{org_id}/ai/chat_stream",
-            http.target = format!("/api/{}/ai/chat_stream", org_id),
-            otel.kind = "server",
-        )
-        .entered()
-    } else {
-        Span::none().entered()
-    };
-
-    let mut code = StatusCode::OK.as_u16();
-    let req_body = body.into_inner();
-    let body_bytes = serde_json::to_string(&req_body).unwrap();
-
-    if !config.ai.enabled {
-        let error_message = Some("AI is not enabled".to_string());
-        code = StatusCode::BAD_REQUEST.as_u16();
-        report_to_audit(
-            user_id,
-            org_id,
-            trace_id.clone(),
-            code,
-            error_message,
-            &in_req,
-            body_bytes,
-        )
-        .await;
-
-        return MetaHttpResponse::bad_request("AI is not enabled");
-    }
-    let auth_str = crate::common::utils::auth::extract_auth_str(&in_req).await;
-
-    let stream = match agent::service::chat_stream(
-        agent::meta::AiServerRequest::new(req_body.messages, req_body.model, req_body.context),
-        auth_str,
-        trace_id.clone(),
-    )
-    .await
-    {
-        Ok(stream) => stream,
-        Err(e) => {
-            let error_msg = e.to_string();
-            log::error!(
-                "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id}] Error in AI chat_stream: {error_msg}"
-            );
-
-            // Check if this is a rate limit error (429) - pass through to client
-            if error_msg.contains("status 429") || error_msg.contains("rate_limit_exceeded") {
-                code = StatusCode::TOO_MANY_REQUESTS.as_u16();
-                let error_message = Some(error_msg.clone());
-                report_to_audit(
-                    user_id,
-                    org_id,
-                    trace_id,
-                    code,
-                    error_message,
-                    &in_req,
-                    body_bytes,
-                )
-                .await;
-
-                return HttpResponse::TooManyRequests().json(serde_json::json!({
-                    "error": error_msg,
-                    "code": 429
-                }));
+    // Extract and validate session ID
+    if let Some(session_id) = in_req.headers().get(X_O2_ASSISTANT_SESSION_ID) {
+        if let Ok(val) = session_id.to_str() {
+            if val.len() == 36 && val.chars().filter(|&c| c == '-').count() == 4 {
+                forward_headers.insert(X_O2_ASSISTANT_SESSION_ID.to_string(), val.to_string());
+            } else {
+                log::warn!("[trace_id:{}] Invalid session ID format: {}", trace_id, val);
             }
+        }
+    }
 
-            // All other errors (4XX except 429, and 5XX) are internal server errors
-            let error_message = Some(error_msg.clone());
-            code = StatusCode::INTERNAL_SERVER_ERROR.as_u16();
+    if let Some(ref traceparent) = auth_data.traceparent {
+        if !traceparent.is_empty() {
+            forward_headers.insert("traceparent".to_string(), traceparent.clone());
+        }
+    }
+
+    if let Some(user_agent) = in_req.headers().get("user-agent") {
+        if let Ok(val) = user_agent.to_str() {
+            forward_headers.insert("user-agent".to_string(), val.to_string());
+        }
+    }
+
+    // Add user_id to forwarded headers
+    if !user_id.is_empty() {
+        forward_headers.insert("user_id".to_string(), user_id.clone());
+    }
+
+    // Extract and merge passthrough headers from config
+    #[cfg(feature = "enterprise")]
+    {
+        let config = get_o2_config();
+        let passthrough_headers =
+            extract_passthrough_headers(in_req.headers(), &config.ai.passthrough_headers);
+        // Merge passthrough headers, but don't override already-set headers (like session_id,
+        // traceparent, user_id)
+        for (key, value) in passthrough_headers {
+            forward_headers.entry(key).or_insert(value);
+        }
+    }
+
+    // Log correlation context for debugging
+    log::info!(
+        "[trace_id:{}] AI chat request: user_id={}, session_id={}",
+        trace_id,
+        user_id,
+        forward_headers
+            .get(X_O2_ASSISTANT_SESSION_ID)
+            .unwrap_or(&"none".to_string())
+    );
+
+    #[cfg(feature = "enterprise")]
+    {
+        use async_stream::stream;
+        use futures::StreamExt;
+        use o2_enterprise::enterprise::alerts::rca_agent::{QueryRequest, get_agent_client};
+
+        let config = get_o2_config();
+        let org_id_str = org_id.clone();
+
+        // Create root span for AI tracing if enabled
+        let _span = if config.ai.traces_enabled {
+            tracing::info_span!(
+                "http.request",
+                http.method = "POST",
+                http.route = "/api/{org_id}/ai/chat_stream",
+                http.target = format!("/api/{}/ai/chat_stream", org_id_str),
+                otel.kind = "server",
+            )
+            .entered()
+        } else {
+            Span::none().entered()
+        };
+
+        let mut code = StatusCode::OK.as_u16();
+        let body_bytes_str = serde_json::to_string(&prompt_body).unwrap_or_default();
+
+        // Check if AI/agent is enabled
+        if !config.ai.enabled {
+            let error_message = Some("AI is not enabled".to_string());
+            code = StatusCode::BAD_REQUEST.as_u16();
             report_to_audit(
-                user_id,
-                org_id,
-                trace_id,
+                user_id.clone(),
+                org_id_str.clone(),
+                trace_id.clone(),
                 code,
                 error_message,
                 &in_req,
-                body_bytes,
+                body_bytes_str,
             )
             .await;
-
-            return MetaHttpResponse::internal_error(error_msg);
+            return MetaHttpResponse::bad_request("AI is not enabled");
         }
-    };
 
-    report_to_audit(user_id, org_id, trace_id, code, None, &in_req, body_bytes).await;
-    HttpResponse::Ok()
-        .content_type(mime::TEXT_EVENT_STREAM)
-        .streaming(stream)
+        // Get global agent client
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
+                let error_message = Some("Agent service not configured".to_string());
+                code = StatusCode::BAD_REQUEST.as_u16();
+                report_to_audit(
+                    user_id.clone(),
+                    org_id_str.clone(),
+                    trace_id.clone(),
+                    code,
+                    error_message,
+                    &in_req,
+                    body_bytes_str,
+                )
+                .await;
+                return MetaHttpResponse::bad_request("Agent service not configured");
+            }
+        };
+
+        // Extract user token from cookie/header for per-user MCP auth
+        let auth_str = crate::common::utils::auth::extract_auth_str(&in_req).await;
+        let user_token = if auth_str.starts_with("Session::") {
+            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
+        } else if !auth_str.is_empty() {
+            Some(auth_str)
+        } else {
+            None
+        };
+
+        // Transform PromptRequest -> QueryRequest
+        let last_user_message = prompt_body
+            .messages
+            .iter()
+            .rfind(|m| m.role == Role::User)
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+
+        let history: Vec<serde_json::Value> = prompt_body
+            .messages
+            .iter()
+            .take(prompt_body.messages.len().saturating_sub(1))
+            .map(|m| {
+                serde_json::json!({
+                    "role": format!("{:?}", m.role).to_lowercase(),
+                    "content": m.content
+                })
+            })
+            .collect();
+
+        let mut context = serde_json::to_value(&prompt_body.context).unwrap_or_default();
+        if let Some(obj) = context.as_object_mut() {
+            obj.insert(
+                "org_id".to_string(),
+                serde_json::Value::String(org_id_str.clone()),
+            );
+        }
+
+        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
+        let agent_type = get_agent_type(&context);
+
+        // Convert images to agent format
+        let images = prompt_body.images.map(|imgs| {
+            imgs.into_iter()
+                .map(
+                    |img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
+                        data: img.data,
+                        mime_type: img.mime_type,
+                        filename: img.filename,
+                    },
+                )
+                .collect()
+        });
+
+        let query_req = QueryRequest {
+            query: last_user_message,
+            context,
+            model: if prompt_body.model.is_empty() {
+                None
+            } else {
+                Some(prompt_body.model)
+            },
+            history: if history.is_empty() {
+                None
+            } else {
+                Some(history)
+            },
+            user_token,
+            images,
+        };
+
+        // Report successful start to audit
+        report_to_audit(
+            user_id.clone(),
+            org_id_str.clone(),
+            trace_id.clone(),
+            code,
+            None,
+            &in_req,
+            body_bytes_str,
+        )
+        .await;
+
+        // Create streaming response
+        let headers_to_forward = if forward_headers.is_empty() {
+            None
+        } else {
+            Some(forward_headers)
+        };
+
+        let s = stream! {
+            // Call the agent service with forwarded headers
+            let response = match client.query_stream_with_headers(agent_type, query_req, headers_to_forward.as_ref()).await {
+                Ok(r) => r,
+                Err(e) => {
+                    log::error!(
+                        "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                         Agent query failed: {e}"
+                    );
+                    let error_event = serde_json::json!({
+                        "type": "error",
+                        "error": format!("Agent query failed: {}", e)
+                    });
+                    yield Ok::<web::Bytes, std::io::Error>(web::Bytes::from(format!("data: {}\n\n", error_event)));
+                    return;
+                }
+            };
+
+            // Forward the streaming response from agent
+            let mut agent_stream = response.bytes_stream();
+
+            while let Some(chunk_result) = agent_stream.next().await {
+                match chunk_result {
+                    Ok(bytes) => {
+                        yield Ok(web::Bytes::from(bytes.to_vec()));
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                             Agent stream chunk error: {e}"
+                        );
+                        let error_event = serde_json::json!({
+                            "type": "error",
+                            "error": format!("Stream interrupted: {}", e)
+                        });
+                        yield Ok(web::Bytes::from(format!("data: {}\n\n", error_event)));
+                        break;
+                    }
+                }
+            }
+            log::info!(
+                "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                 Agent stream ended"
+            );
+        };
+
+        HttpResponse::Ok()
+            .content_type(mime::TEXT_EVENT_STREAM)
+            .insert_header(("Cache-Control", "no-cache"))
+            .insert_header(("X-Accel-Buffering", "no"))
+            .streaming(Box::pin(s))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
+        drop(auth_data);
+        drop(trace_id);
+        drop(user_id);
+        drop(prompt_body);
+        drop(forward_headers);
+        drop(in_req);
+        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+    }
+}
+
+/// ConfirmAction - Proxy confirmation response to o2-sre-agent
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/confirm/{session_id}",
+    context_path = "/api",
+    tag = "Ai",
+    operation_id = "ConfirmAction",
+    summary = "Confirm or reject a destructive AI tool action",
+    description = "Forwards user confirmation or rejection to the o2-sre-agent service \
+                   for a pending destructive tool call.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("session_id" = String, Path, description = "Chat session ID")
+    ),
+    request_body(
+        content = serde_json::Value,
+        description = "Confirmation payload",
+        example = json!({"approved": true}),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Confirmation forwarded", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[post("/{org_id}/ai/confirm/{session_id}")]
+pub async fn confirm_action(
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+    body: web::Bytes,
+) -> Result<HttpResponse, Error> {
+    let (_org_id, session_id) = path.into_inner();
+    let body_bytes = body;
+
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::alerts::rca_agent::get_agent_client;
+
+        let config = get_o2_config();
+
+        if !config.ai.enabled {
+            return Ok(MetaHttpResponse::bad_request("AI is not enabled"));
+        }
+
+        if get_agent_client().is_none() {
+            return Ok(MetaHttpResponse::bad_request(
+                "Agent service not configured",
+            ));
+        }
+
+        // Extract user token for identity verification (same as chat_stream)
+        let auth_str = crate::common::utils::auth::extract_auth_str(&req).await;
+        let user_token = if auth_str.starts_with("Session::") {
+            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
+        } else if !auth_str.is_empty() {
+            Some(auth_str)
+        } else {
+            None
+        };
+
+        // Inject user_token into the body for identity verification by the agent
+        let mut forward_body: serde_json::Value =
+            serde_json::from_slice(&body_bytes).unwrap_or(serde_json::json!({}));
+        if let Some(token) = &user_token
+            && let Some(obj) = forward_body.as_object_mut()
+        {
+            obj.insert(
+                "user_token".to_string(),
+                serde_json::Value::String(token.clone()),
+            );
+        }
+        let forward_bytes = serde_json::to_vec(&forward_body).unwrap_or_default();
+
+        // Forward the confirmation to the agent's /confirm endpoint
+        let confirm_url = format!(
+            "{}/confirm/{}",
+            config.ai.agent_url.trim_end_matches('/'),
+            session_id
+        );
+
+        let http_client = reqwest::Client::new();
+        match http_client
+            .post(&confirm_url)
+            .header("Content-Type", "application/json")
+            .body(forward_bytes)
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                let status = resp.status();
+                let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
+
+                if status.is_success() {
+                    let json_value: serde_json::Value = serde_json::from_str(&response_body)
+                        .unwrap_or(serde_json::json!({"ok": true}));
+                    return Ok(HttpResponse::Ok().json(json_value));
+                } else {
+                    log::error!(
+                        "Agent confirm endpoint returned {}: {}",
+                        status,
+                        response_body
+                    );
+                    return Ok(MetaHttpResponse::internal_error(format!(
+                        "Confirmation failed: {}",
+                        response_body
+                    )));
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to forward confirmation to agent: {e}");
+                return Ok(MetaHttpResponse::internal_error(format!(
+                    "Failed to forward confirmation: {e}"
+                )));
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(session_id);
+        drop(req);
+        drop(body_bytes);
+        Ok(MetaHttpResponse::bad_request(
+            "AI chat is only available in enterprise version",
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_passthrough_headers_exact_match() {
+        // Create a test request with headers
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            HeaderValue::from_static("Mozilla/5.0"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-custom-header"),
+            HeaderValue::from_static("custom-value"),
+        );
+        headers.insert(
+            HeaderName::from_static("authorization"),
+            HeaderValue::from_static("Bearer secret"),
+        );
+
+        let config = "user-agent,x-custom-header";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result.get("user-agent"), Some(&"Mozilla/5.0".to_string()));
+        assert_eq!(
+            result.get("x-custom-header"),
+            Some(&"custom-value".to_string())
+        );
+        // Authorization should not be included
+        assert!(result.get("authorization").is_none());
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_wildcard_match() {
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-forwarded-for"),
+            HeaderValue::from_static("192.168.1.1"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-forwarded-proto"),
+            HeaderValue::from_static("https"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-forwarded-host"),
+            HeaderValue::from_static("example.com"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-other-header"),
+            HeaderValue::from_static("other"),
+        );
+
+        let config = "x-forwarded-*";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 3);
+        assert_eq!(
+            result.get("x-forwarded-for"),
+            Some(&"192.168.1.1".to_string())
+        );
+        assert_eq!(result.get("x-forwarded-proto"), Some(&"https".to_string()));
+        assert_eq!(
+            result.get("x-forwarded-host"),
+            Some(&"example.com".to_string())
+        );
+        // X-Other-Header should not match
+        assert!(result.get("x-other-header").is_none());
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_mixed_patterns() {
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            HeaderValue::from_static("curl/7.68.0"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-forwarded-for"),
+            HeaderValue::from_static("10.0.0.1"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-forwarded-proto"),
+            HeaderValue::from_static("http"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-request-id"),
+            HeaderValue::from_static("abc-123"),
+        );
+
+        let config = "x-forwarded-*,user-agent,x-request-id";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 4);
+        assert!(result.contains_key("user-agent"));
+        assert!(result.contains_key("x-forwarded-for"));
+        assert!(result.contains_key("x-forwarded-proto"));
+        assert!(result.contains_key("x-request-id"));
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_empty_config() {
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            HeaderValue::from_static("test"),
+        );
+
+        let config = "";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_case_insensitive() {
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            HeaderValue::from_static("test-agent"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-forwarded-for"),
+            HeaderValue::from_static("1.2.3.4"),
+        );
+
+        let config = "User-Agent,x-forwarded-for";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result.get("user-agent"), Some(&"test-agent".to_string()));
+        assert_eq!(result.get("x-forwarded-for"), Some(&"1.2.3.4".to_string()));
+    }
+
+    #[test]
+    fn test_extract_passthrough_headers_whitespace_handling() {
+        use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            HeaderValue::from_static("test"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-custom"),
+            HeaderValue::from_static("value"),
+        );
+
+        let config = " user-agent , x-custom , ";
+        let result = extract_passthrough_headers(&headers, config);
+
+        assert_eq!(result.len(), 2);
+        assert!(result.contains_key("user-agent"));
+        assert!(result.contains_key("x-custom"));
+    }
 }

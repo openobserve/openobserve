@@ -160,8 +160,8 @@ pub struct PanelFields {
     pub stream_type: StreamType,
     pub x: Vec<AxisItem>,
     pub y: Vec<AxisItem>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub z: Option<Vec<AxisItem>>,
+    #[serde(default)]
+    pub z: Vec<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub breakdown: Option<Vec<AxisItem>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -221,6 +221,8 @@ pub struct AxisItem {
     pub treat_as_non_timestamp: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub show_field_as_json: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub raw_query: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]

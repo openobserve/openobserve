@@ -1007,9 +1007,11 @@ function getIcon(data, ioType) {
   border-top-color: #dc2626;
 }
 
-// Pipeline error tooltip styling
+// Pipeline error tooltip styling - increased specificity to override global theme styles
+.body--dark .pipeline-error-tooltip,
+.body--light .pipeline-error-tooltip,
 .pipeline-error-tooltip {
-  background: #ef4444 !important;
+  background-color: #ef4444 !important;
   color: white !important;
   font-size: 12px !important;
   white-space: pre-wrap !important;

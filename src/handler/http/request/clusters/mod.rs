@@ -39,7 +39,8 @@ use {
         (status = 200, description = "Success", content_type = "application/json", body = inline(HashMap<String, Vec<String>>)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Clusters", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Clusters", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/clusters")]

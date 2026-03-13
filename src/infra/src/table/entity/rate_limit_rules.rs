@@ -14,6 +14,7 @@ pub struct Model {
     pub api_group_name: String,
     pub api_group_operation: String,
     pub threshold: i32,
+    pub stat_interval_ms: i64,
     pub created_at: i64,
 }
 

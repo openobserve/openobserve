@@ -83,7 +83,8 @@ fn validate_environment_variables(env_vars: &HashMap<String, String>) -> Result<
         (status = 400, description = "Error",   content_type = "application/json",body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/actions/{ksuid}")]
@@ -128,7 +129,8 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
         (status = 400, description = "Error",   content_type = "application/json",body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/actions/download/{ksuid}")]
@@ -181,7 +183,8 @@ pub async fn serve_action_zip(path: web::Path<(String, Ksuid)>) -> Result<HttpRe
         (status = 400, description = "Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/actions/{action_id}")]
@@ -257,7 +260,8 @@ pub async fn update_action_details(
         (status = 400, description = "Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/actions")]
@@ -310,7 +314,8 @@ pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error
         (status = 400, description = "Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/actions/{action_id}")]
@@ -365,7 +370,8 @@ pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<Htt
         (status = 500, description = "Internal server error", content_type = "application/json", body = String),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/actions/upload")]

@@ -85,7 +85,8 @@ impl From<FolderError> for HttpResponse {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a new folder for organizing dashboards and alerts", "category": "folders"}))
     ),
 )]
 #[post("/v2/{org_id}/folders/{folder_type}")]
@@ -132,7 +133,8 @@ pub async fn create_folder(
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update folder properties", "category": "folders"}))
     ),
 )]
 #[put("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -166,7 +168,8 @@ pub async fn update_folder(
         (status = StatusCode::OK, body = inline(ListFoldersResponseBody)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all folders", "category": "folders"}))
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}")]
@@ -212,7 +215,8 @@ pub async fn list_folders(
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get folder details by ID", "category": "folders"}))
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -247,7 +251,8 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get folder by name", "category": "folders"}))
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/name/{folder_name}")]
@@ -283,7 +288,8 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = String),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a folder by ID", "category": "folders", "requires_confirmation": true}))
     ),
 )]
 #[delete("/v2/{org_id}/folders/{folder_type}/{folder_id}")]

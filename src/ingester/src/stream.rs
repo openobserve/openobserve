@@ -70,6 +70,7 @@ impl Stream {
 
     pub(crate) async fn persist(
         &self,
+        id: u64,
         idx: usize,
         org_id: &str,
         stream_type: &str,
@@ -79,7 +80,7 @@ impl Stream {
         let mut paths = Vec::new();
         for (_, partition) in self.partitions.iter() {
             let (part_schema_size, partitions) = partition
-                .persist(idx, org_id, stream_type, stream_name)
+                .persist(id, idx, org_id, stream_type, stream_name)
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);

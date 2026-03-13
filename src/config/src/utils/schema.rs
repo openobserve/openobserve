@@ -131,9 +131,9 @@ fn infer_json_schema_from_object(
                 } else if v.is_f64() {
                     convert_data_type(fields, key, DataType::Float64)?;
                 } else {
-                    return Err(ArrowError::SchemaError(
-                        "Cannot infer schema from non-basic-number type value".to_string(),
-                    ));
+                    return Err(ArrowError::SchemaError(format!(
+                        "Cannot infer schema from non-basic-number type value: {v:?}",
+                    )));
                 }
             }
             Value::Bool(_) => {

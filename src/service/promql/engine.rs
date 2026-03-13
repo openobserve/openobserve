@@ -1282,15 +1282,27 @@ async fn selector_load_data_from_datafusion(
 
     // get series
     let start2 = std::time::Instant::now();
-    let series = df_group
-        .clone()
-        .filter(col(TIMESTAMP_COL_NAME).in_list(
-            timestamp_set.iter().map(|&v| lit(v)).collect::<Vec<_>>(),
-            false,
-        ))?
-        .select(label_cols)?
-        .collect()
-        .await?;
+    let series =
+        if config::get_config().limit.metrics_inlist_filter_enabled || timestamp_set.is_empty() {
+            df_group
+                .clone()
+                .filter(col(TIMESTAMP_COL_NAME).in_list(
+                    timestamp_set.iter().map(|&v| lit(v)).collect::<Vec<_>>(),
+                    false,
+                ))?
+                .select(label_cols)?
+                .collect()
+                .await?
+        } else {
+            let min = timestamp_set.iter().min().unwrap();
+            let max = timestamp_set.iter().max().unwrap();
+            df_group
+                .clone()
+                .filter(col(TIMESTAMP_COL_NAME).between(lit(*min), lit(*max)))?
+                .select(label_cols)?
+                .collect()
+                .await?
+        };
 
     log::info!(
         "[trace_id: {}] load all labels took: {:?}",

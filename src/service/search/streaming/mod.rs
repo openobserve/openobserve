@@ -23,11 +23,12 @@ use std::{collections::HashMap, time::Instant};
 use config::{
     meta::{
         dashboards::usage_report::DashboardInfo,
-        search::{SearchEventType, StreamResponses, ValuesEventContext},
+        function::{RESULT_ARRAY, VRLResultResolver},
+        search::{SearchEventType, StreamResponses, TimeOffset, ValuesEventContext},
         sql::OrderBy,
         stream::StreamType,
     },
-    utils::time::hour_micros,
+    utils::{flatten, json, time::hour_micros},
 };
 use log;
 #[cfg(feature = "enterprise")]
@@ -37,6 +38,7 @@ use o2_enterprise::enterprise::common::{
 };
 use tokio::sync::mpsc;
 use tracing::Instrument;
+use vector_enrichment::TableRegistry;
 
 use crate::{
     common::{
@@ -728,9 +730,15 @@ pub async fn process_search_stream_request_multi(
     _dashboard_info: Option<DashboardInfo>,
     search_type: Option<SearchEventType>,
     search_event_context: Option<config::meta::search::SearchEventContext>,
+    // When true, all query results are buffered and VRL (query_fn) is applied on the
+    // combined 2D array after all queries complete. When false, results stream as they
+    // arrive (VRL, if any, is already set on individual requests by the handler).
+    needs_post_vrl: bool,
+    // Top-level VRL function for post-hoc application. Only used when needs_post_vrl=true.
+    query_fn: Option<String>,
 ) {
     log::debug!(
-        "[HTTP2_STREAM_MULTI trace_id {trace_id}] Processing multi-stream request with {} queries for org_id: {org_id}",
+        "[HTTP2_STREAM_MULTI trace_id {trace_id}] Processing multi-stream request with {} queries for org_id: {org_id}, needs_post_vrl: {needs_post_vrl}",
         queries.len()
     );
 
@@ -767,14 +775,21 @@ pub async fn process_search_stream_request_multi(
         let query_search_type = search_type;
         let query_search_event_context = search_event_context.clone();
 
+        let needs_post_vrl_clone = needs_post_vrl;
+
         let task = tokio::spawn(async move {
             log::debug!(
                 "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Starting query {query_index}: {}",
                 req.query.sql
             );
 
+            log::debug!(
+                "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] query_fn on request: {:?}, needs_post_vrl: {}",
+                req.query.query_fn.as_deref().map(|s| &s[..s.len().min(80)]),
+                needs_post_vrl_clone,
+            );
+
             // Get stream names for this specific query
-            // Note: Permissions are now checked at the handler level using the streams field
             let stream_names = match config::meta::sql::resolve_stream_names(&req.query.sql) {
                 Ok(v) => v,
                 Err(e) => {
@@ -782,7 +797,7 @@ pub async fn process_search_stream_request_multi(
                         "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Failed to resolve stream names: {e}"
                     );
                     let _ = sender_clone.send(Err(e.into())).await;
-                    return;
+                    return (query_index, Vec::new(), None);
                 }
             };
 
@@ -807,69 +822,90 @@ pub async fn process_search_stream_request_multi(
                 query_sender,
                 None,  // no values context for multi-stream
                 None,  // no fallback order by col
-                None,  // no audit context for individualueries
+                None,  // no audit context for individual queries
                 false, // not multi stream search at individual level
                 false, // no pattern extraction for multi-stream
             );
 
             tokio::spawn(search_task);
 
+            // Buffer for collecting hits when we need post-hoc VRL
+            let mut buffered_hits: Vec<json::Value> = Vec::new();
+            // Keep the last response metadata for sending VRL results later
+            let mut last_response_meta: Option<config::meta::search::Response> = None;
+
             // Forward results from this query to the main sender, prefixed with query info
             while let Some(result) = query_receiver.recv().await {
                 match result {
                     Ok(response) => {
-                        // Add query index to the response
-                        let prefixed_response = match response {
+                        match response {
                             StreamResponses::SearchResponse {
                                 mut results,
                                 streaming_aggs,
                                 streaming_id,
                                 time_offset,
                             } => {
-                                // Add query index to metadata
-                                results.query_index = Some(query_index);
-                                StreamResponses::SearchResponse {
-                                    results,
-                                    streaming_aggs,
-                                    streaming_id,
-                                    time_offset,
+                                if needs_post_vrl_clone {
+                                    // Buffer hits for post-hoc VRL application
+                                    let batch_size = results.hits.len();
+                                    buffered_hits.extend(std::mem::take(&mut results.hits));
+                                    log::debug!(
+                                        "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Buffered {batch_size} hits for query {query_index}, total buffered: {}",
+                                        buffered_hits.len()
+                                    );
+                                    last_response_meta = Some(results);
+                                } else {
+                                    // Stream directly with query_index
+                                    results.query_index = Some(query_index);
+                                    let prefixed = StreamResponses::SearchResponse {
+                                        results,
+                                        streaming_aggs,
+                                        streaming_id,
+                                        time_offset,
+                                    };
+                                    if sender_clone.send(Ok(prefixed)).await.is_err() {
+                                        log::warn!(
+                                            "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Main sender is closed"
+                                        );
+                                        break;
+                                    }
                                 }
                             }
                             StreamResponses::Progress { percent } => {
-                                // Send progress update to consolidator
                                 let _ = progress_tx_clone.send((query_index, percent)).await;
-                                // Don't forward individual progress events
                                 continue;
                             }
                             StreamResponses::Done => {
-                                // Don't forward individual Done events
-                                // Only the outer wrapper should send Done
                                 continue;
                             }
-                            other => other, // Forward other responses as-is
+                            other => {
+                                if !needs_post_vrl_clone
+                                    && sender_clone.send(Ok(other)).await.is_err()
+                                {
+                                    break;
+                                }
+                            }
                         };
-
-                        if sender_clone.send(Ok(prefixed_response)).await.is_err() {
-                            log::warn!(
-                                "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Main sender is closed"
-                            );
-                            break;
-                        }
                     }
                     Err(e) => {
                         log::error!(
                             "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Query error: {e}"
                         );
-                        // Send error but continue with other queries
-                        let _ = sender_clone.send(Err(e)).await;
+                        if !needs_post_vrl_clone {
+                            let _ = sender_clone.send(Err(e)).await;
+                        }
                         break;
                     }
                 }
             }
 
             log::debug!(
-                "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Query {query_index} completed"
+                "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Query {query_index} completed, buffered {} hits, has_meta: {}",
+                buffered_hits.len(),
+                last_response_meta.is_some()
             );
+
+            (query_index, buffered_hits, last_response_meta)
         });
 
         query_tasks.push(task);
@@ -886,14 +922,10 @@ pub async fn process_search_stream_request_multi(
         let mut last_sent_percent = 0;
 
         while let Some((query_index, percent)) = progress_rx.recv().await {
-            // Update progress for this query
             progress_map.insert(query_index, percent);
-
-            // Calculate average progress across all queries
             let sum: usize = progress_map.values().sum();
             let avg_percent = sum / total_queries;
 
-            // Only send if progress increased (monotonic progress)
             if avg_percent > last_sent_percent {
                 if sender_for_consolidator
                     .send(Ok(StreamResponses::Progress {
@@ -913,22 +945,62 @@ pub async fn process_search_stream_request_multi(
         }
     });
 
-    // Wait for all queries to complete
+    // Collect task results. For the buffered VRL path we need the returned hits.
+    let mut buffered_results: Vec<(
+        usize,
+        Vec<json::Value>,
+        Option<config::meta::search::Response>,
+    )> = Vec::with_capacity(total_queries);
+
     for task in query_tasks {
-        // Check if sender is closed before waiting for next task
         if sender.is_closed() {
             log::warn!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Sender closed, stopping early");
             return;
         }
 
-        if let Err(e) = task.await {
-            log::error!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Task join error: {e}");
+        match task.await {
+            Ok(result) => {
+                if needs_post_vrl {
+                    buffered_results.push(result);
+                }
+            }
+            Err(e) => {
+                log::error!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Task join error: {e}");
+                if needs_post_vrl {
+                    // Push empty result for this slot
+                    buffered_results.push((buffered_results.len(), Vec::new(), None));
+                }
+            }
         }
     }
 
     // Wait for consolidator to finish processing all progress updates
     if let Err(e) = consolidator_task.await {
         log::error!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Consolidator task join error: {e}");
+    }
+
+    // Apply post-hoc VRL when per_query_response=true and query_fn is set
+    if needs_post_vrl {
+        log::debug!(
+            "[HTTP2_STREAM_MULTI trace_id {trace_id}] All queries done, applying post-hoc VRL on {} buffered query results (hits per query: [{}])",
+            buffered_results.len(),
+            buffered_results
+                .iter()
+                .map(|(qi, hits, _)| format!("q{}={}", qi, hits.len()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        if let Some(ref input_fn) = query_fn {
+            apply_vrl_to_multi_results(
+                &trace_id,
+                &org_id,
+                input_fn,
+                &mut buffered_results,
+                total_queries,
+                &sender,
+            )
+            .await;
+        }
     }
 
     log::info!(
@@ -962,6 +1034,426 @@ pub async fn process_search_stream_request_multi(
     if sender.send(Ok(StreamResponses::Done)).await.is_err() {
         log::warn!(
             "[HTTP2_STREAM_MULTI trace_id {trace_id}] Sender is closed, stop sending completion message to client"
+        );
+    }
+}
+
+/// Apply a #ResultArray# VRL function to the combined 2D result array from all queries,
+/// then send the transformed results back through the sender with appropriate query_index.
+///
+/// This is only called when per_query_response=true AND the VRL is a #ResultArray# type.
+/// The VRL function receives the full 2D array `[[query0_hits...], [query1_hits...]]` and
+/// is expected to return a 2D array of the same structure.
+///
+/// This mirrors the VRL application logic in the non-streaming `search_multi()` handler
+/// (multi_streams.rs lines 518-639) for the `per_query_response=true` case.
+async fn apply_vrl_to_multi_results(
+    trace_id: &str,
+    org_id: &str,
+    input_fn: &str,
+    buffered_results: &mut Vec<(
+        usize,
+        Vec<json::Value>,
+        Option<config::meta::search::Response>,
+    )>,
+    total_queries: usize,
+    sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+) {
+    let input_fn = input_fn.trim().to_string();
+    // This should always be true since the handler only calls this for ResultArray VRL,
+    // but we check defensively.
+    let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+
+    log::debug!(
+        "[trace_id {trace_id}] apply_vrl_to_multi_results: apply_over_hits={apply_over_hits}, total_queries={total_queries}, vrl_fn_len={}",
+        input_fn.len()
+    );
+
+    // Sort buffered results by query_index to build the 2D array in order
+    buffered_results.sort_by_key(|(idx, ..)| *idx);
+
+    // Build the 2D array: [[query0_hits...], [query1_hits...], ...]
+    let multi_hits: Vec<json::Value> = buffered_results
+        .iter()
+        .map(|(_, hits, _)| json::Value::Array(hits.clone()))
+        .collect();
+
+    log::debug!(
+        "[trace_id {trace_id}] Built 2D array with {} query arrays (sizes: [{}])",
+        multi_hits.len(),
+        multi_hits
+            .iter()
+            .map(|v| v.as_array().map_or(0, |a| a.len()).to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    // Resolve stream name for VRL context (use first query's stream)
+    let vrl_stream_name = buffered_results
+        .first()
+        .and_then(|(_, _, meta)| meta.as_ref())
+        .map(|_| "".to_string())
+        .unwrap_or_default();
+
+    log::debug!("[trace_id {trace_id}] Compiling VRL function...");
+    let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+    let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
+        Ok(program) => {
+            let registry = program.config.get_custom::<TableRegistry>().unwrap();
+            registry.finish_load();
+            Some(program)
+        }
+        Err(err) => {
+            log::error!("[trace_id {trace_id}] search_multi_stream->vrl: compile err: {err:?}");
+            // Send the un-transformed results with function_error
+            for (qi, hits, meta) in buffered_results.drain(..) {
+                let mut resp = meta.unwrap_or_else(|| config::meta::search::Response::new(0, 0));
+                resp.hits = hits;
+                resp.query_index = Some(qi);
+                resp.function_error = vec![err.to_string()];
+                let _ = sender
+                    .send(Ok(StreamResponses::SearchResponse {
+                        results: resp,
+                        streaming_aggs: false,
+                        streaming_id: None,
+                        time_offset: TimeOffset {
+                            start_time: 0,
+                            end_time: 0,
+                        },
+                    }))
+                    .await;
+            }
+            return;
+        }
+    };
+
+    let Some(program) = program else { return };
+
+    log::debug!("[trace_id {trace_id}] VRL compiled successfully, applying to results...");
+
+    let transformed_hits: Vec<json::Value> = if apply_over_hits {
+        // Apply VRL on the entire 2D array at once
+        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+            &mut runtime,
+            &VRLResultResolver {
+                program: program.program.clone(),
+                fields: program.fields.clone(),
+            },
+            json::Value::Array(multi_hits),
+            org_id,
+            std::slice::from_ref(&vrl_stream_name),
+        );
+        if let Some(e) = err {
+            log::error!("[trace_id {trace_id}] Error applying vrl function in multi_stream: {e}");
+        }
+
+        match ret_val.as_array() {
+            None => {
+                log::error!(
+                    "[trace_id {trace_id}] VRL function did not return an array; returning empty hits"
+                );
+                vec![json::Value::Array(vec![]); total_queries]
+            }
+            Some(arr) => arr.clone(),
+        }
+    } else {
+        // Apply VRL per-hit within each query's array
+        multi_hits
+            .into_iter()
+            .map(|query_hits_val| {
+                let query_hits = match query_hits_val.as_array() {
+                    Some(arr) => arr.clone(),
+                    None => vec![],
+                };
+                let transformed: Vec<json::Value> = query_hits
+                    .into_iter()
+                    .filter_map(|hit| {
+                        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                            &mut runtime,
+                            &VRLResultResolver {
+                                program: program.program.clone(),
+                                fields: program.fields.clone(),
+                            },
+                            hit,
+                            org_id,
+                            std::slice::from_ref(&vrl_stream_name),
+                        );
+                        if let Some(e) = err {
+                            log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
+                        }
+                        if !ret_val.is_null() && ret_val.is_object() {
+                            flatten::flatten(ret_val).ok()
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                json::Value::Array(transformed)
+            })
+            .collect()
+    };
+
+    log::debug!(
+        "[trace_id {trace_id}] VRL execution complete, output has {} arrays (sizes: [{}])",
+        transformed_hits.len(),
+        transformed_hits
+            .iter()
+            .map(|v| v
+                .as_array()
+                .map_or_else(|| "non-array".to_string(), |a| a.len().to_string()))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    // Send the transformed results back, one per query_index
+    for qi in 0..total_queries {
+        let hits_for_query = transformed_hits
+            .get(qi)
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        // Flatten each hit if needed (for apply_over_hits path)
+        let hits_for_query: Vec<json::Value> = if apply_over_hits {
+            hits_for_query
+                .into_iter()
+                .filter_map(|v| {
+                    if !v.is_null() && v.is_object() {
+                        flatten::flatten(v).ok()
+                    } else if v.is_array() {
+                        // Inner array — return as-is (nested per_query structure)
+                        Some(v)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        } else {
+            hits_for_query
+        };
+
+        // Use the original response metadata if available
+        let mut resp = buffered_results
+            .get(qi)
+            .and_then(|(_, _, meta)| meta.clone())
+            .unwrap_or_else(|| config::meta::search::Response::new(0, 0));
+
+        resp.hits = hits_for_query;
+        resp.query_index = Some(qi);
+
+        log::debug!(
+            "[trace_id {trace_id}] Sending VRL-transformed results for query_index={qi}, hits={}",
+            resp.hits.len()
+        );
+
+        if sender
+            .send(Ok(StreamResponses::SearchResponse {
+                results: resp,
+                streaming_aggs: false,
+                streaming_id: None,
+                time_offset: TimeOffset {
+                    start_time: 0,
+                    end_time: 0,
+                },
+            }))
+            .await
+            .is_err()
+        {
+            log::warn!(
+                "[HTTP2_STREAM_MULTI trace_id {trace_id}] Sender closed while sending VRL results"
+            );
+            break;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::{
+        meta::search::{Response, StreamResponses},
+        utils::json,
+    };
+    use tokio::sync::mpsc;
+
+    use super::apply_vrl_to_multi_results;
+
+    /// Helper: collect all StreamResponses::SearchResponse from the receiver channel.
+    async fn collect_responses(
+        mut rx: mpsc::Receiver<Result<StreamResponses, infra::errors::Error>>,
+    ) -> Vec<Response> {
+        let mut responses = Vec::new();
+        while let Some(Ok(StreamResponses::SearchResponse { results, .. })) = rx.recv().await {
+            responses.push(results);
+        }
+        responses
+    }
+
+    /// Test that a valid #ResultArray# VRL function is applied to the combined 2D array
+    /// and the transformed results are sent back with correct query_index values.
+    ///
+    /// VRL: Takes the 2D input array, builds a new 2D array where each inner array has
+    /// a single summary object with a "total" field = length of that query's hits.
+    #[tokio::test]
+    async fn test_apply_vrl_result_array_transforms_and_splits() {
+        let vrl_fn = r#"#ResultArray#
+result = array!(.)
+output = []
+for_each(result) -> |_idx, query_hits| {
+    items = array!(query_hits)
+    summary = { "total": length(items) }
+    output = push(output, [summary])
+}
+. = output
+."#;
+
+        let (tx, rx) = mpsc::channel(100);
+
+        let mut buffered = vec![
+            (
+                0,
+                vec![
+                    json::json!({"msg": "a"}),
+                    json::json!({"msg": "b"}),
+                    json::json!({"msg": "c"}),
+                ],
+                Some(Response::new(0, 10)),
+            ),
+            (
+                1,
+                vec![json::json!({"msg": "x"})],
+                Some(Response::new(0, 10)),
+            ),
+        ];
+
+        apply_vrl_to_multi_results("test-trace", "", vrl_fn, &mut buffered, 2, &tx).await;
+        drop(tx);
+
+        let responses = collect_responses(rx).await;
+        assert_eq!(responses.len(), 2, "Should send one response per query");
+
+        // Query 0 had 3 hits → summary should have total=3
+        assert_eq!(responses[0].query_index, Some(0));
+        assert_eq!(responses[0].hits.len(), 1);
+        assert_eq!(responses[0].hits[0]["total"], json::json!(3));
+
+        // Query 1 had 1 hit → summary should have total=1
+        assert_eq!(responses[1].query_index, Some(1));
+        assert_eq!(responses[1].hits.len(), 1);
+        assert_eq!(responses[1].hits[0]["total"], json::json!(1));
+    }
+
+    /// Test that when VRL compilation fails, the original un-transformed results are
+    /// sent back with function_error populated on each response.
+    #[tokio::test]
+    async fn test_apply_vrl_compile_error_returns_original_hits() {
+        let invalid_vrl = "#ResultArray# \nthis_is_not_valid_vrl!!!";
+
+        let (tx, rx) = mpsc::channel(100);
+
+        let mut buffered = vec![
+            (
+                0,
+                vec![json::json!({"msg": "a"})],
+                Some(Response::new(0, 10)),
+            ),
+            (
+                1,
+                vec![json::json!({"msg": "b"})],
+                Some(Response::new(0, 10)),
+            ),
+        ];
+
+        apply_vrl_to_multi_results("test-trace", "", invalid_vrl, &mut buffered, 2, &tx).await;
+        drop(tx);
+
+        let responses = collect_responses(rx).await;
+        assert_eq!(
+            responses.len(),
+            2,
+            "Should still send responses on compile error"
+        );
+
+        // Original hits should be preserved
+        assert_eq!(responses[0].hits, vec![json::json!({"msg": "a"})]);
+        assert_eq!(responses[1].hits, vec![json::json!({"msg": "b"})]);
+
+        // function_error should be set
+        assert!(!responses[0].function_error.is_empty());
+        assert!(!responses[1].function_error.is_empty());
+
+        // query_index should be set correctly
+        assert_eq!(responses[0].query_index, Some(0));
+        assert_eq!(responses[1].query_index, Some(1));
+    }
+
+    /// Test that buffered results arriving out of order (e.g. query 1 finishes before
+    /// query 0) are sorted correctly before VRL application and output.
+    #[tokio::test]
+    async fn test_apply_vrl_sorts_by_query_index() {
+        // Simple identity VRL that returns the input as-is
+        let vrl_fn = "#ResultArray# \n. = array!(.)\n.";
+
+        let (tx, rx) = mpsc::channel(100);
+
+        // Deliberately out of order: query 2 first, then 0, then 1
+        let mut buffered = vec![
+            (2, vec![json::json!({"q": 2})], Some(Response::new(0, 10))),
+            (0, vec![json::json!({"q": 0})], Some(Response::new(0, 10))),
+            (1, vec![json::json!({"q": 1})], Some(Response::new(0, 10))),
+        ];
+
+        apply_vrl_to_multi_results("test-trace", "", vrl_fn, &mut buffered, 3, &tx).await;
+        drop(tx);
+
+        let responses = collect_responses(rx).await;
+        assert_eq!(responses.len(), 3);
+
+        // Results should be sent in query_index order 0, 1, 2
+        assert_eq!(responses[0].query_index, Some(0));
+        assert_eq!(responses[0].hits[0]["q"], json::json!(0));
+
+        assert_eq!(responses[1].query_index, Some(1));
+        assert_eq!(responses[1].hits[0]["q"], json::json!(1));
+
+        assert_eq!(responses[2].query_index, Some(2));
+        assert_eq!(responses[2].hits[0]["q"], json::json!(2));
+    }
+
+    /// Test with empty hits for some queries — VRL should still process correctly
+    /// and return empty arrays for those query slots.
+    #[tokio::test]
+    async fn test_apply_vrl_handles_empty_query_hits() {
+        // VRL that returns the input as-is
+        let vrl_fn = "#ResultArray# \n. = array!(.)\n.";
+
+        let (tx, rx) = mpsc::channel(100);
+
+        let mut buffered = vec![
+            (
+                0,
+                vec![json::json!({"msg": "data"})],
+                Some(Response::new(0, 10)),
+            ),
+            (
+                1,
+                vec![], // empty — e.g. query failed or returned no results
+                None,   // no metadata either
+            ),
+        ];
+
+        apply_vrl_to_multi_results("test-trace", "", vrl_fn, &mut buffered, 2, &tx).await;
+        drop(tx);
+
+        let responses = collect_responses(rx).await;
+        assert_eq!(responses.len(), 2);
+
+        assert_eq!(responses[0].query_index, Some(0));
+        assert_eq!(responses[0].hits.len(), 1);
+
+        assert_eq!(responses[1].query_index, Some(1));
+        assert!(
+            responses[1].hits.is_empty(),
+            "Empty query should produce empty hits"
         );
     }
 }

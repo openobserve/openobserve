@@ -221,6 +221,28 @@ size="lg" color="primary" />
                 >
               </q-item-section>
             </q-item>
+            <!-- Cross-link options -->
+            <template v-if="getCrossLinksForField(key).length > 0">
+              <q-separator class="q-my-xs" />
+              <q-item
+                v-for="crossLink in getCrossLinksForField(key)"
+                :key="crossLink.name"
+                clickable
+                v-close-popup
+                @click.stop="openCrossLink(crossLink.resolvedUrl)"
+              >
+                <q-item-section>
+                  <q-item-label>
+                    <q-btn
+                      icon="open_in_new"
+                      size="6px"
+                      round
+                      class="q-mr-sm pointer"
+                    />{{ crossLink.name }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
             <q-item
               v-if="
                 config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
@@ -291,11 +313,19 @@ size="lg" color="primary" />
           :data-test="`log-expand-detail-key-${key}`"
           :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
-          <LogsHighLighting
-            :data="{ [key]: value[key] }"
+          <span class="log-key">"{{ key }}"</span><span class="log-separator">: </span><span
+          ><ChunkedContent
+            v-if="getContentSize(value[key]) > 50000"
+            :data="value[key]"
+            :field-key="`json_preview_${key}`"
+            :query-string="highlightQuery"
+            :simple-mode="false"
+          /><LogsHighLighting
+            v-else
+            :data="value[key]"
             :show-braces="false"
             :query-string="highlightQuery"
-          /><span v-if="index < Object.keys(value).length - 1">,</span>
+          /></span><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
       }
@@ -405,6 +435,7 @@ import { defineAsyncComponent } from "vue";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
@@ -444,6 +475,7 @@ export default {
     EqualIcon,
     AppTabs,
     LogsHighLighting,
+    ChunkedContent,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -521,6 +553,98 @@ export default {
       emit("addFieldToTable", value);
     };
     const { searchObj, searchAggData } = searchState();
+
+    // Cross-linking: get all matching cross-links for a field using result_schema data
+    const getCrossLinksForField = (fieldName: string): Array<{ name: string; resolvedUrl: string }> => {
+      if (!store.state.zoConfig?.enable_cross_linking) return [];
+
+      const crossLinks = searchObj.data.crossLinks;
+      if (!crossLinks) return [];
+
+      const { stream_links = [], org_links = [] } = crossLinks;
+
+      // Build alias→original map
+      const aliasToOriginal: Record<string, string> = {};
+      for (const link of [...stream_links, ...org_links]) {
+        for (const f of link.fields || []) {
+          if (f.alias) aliasToOriginal[f.alias] = f.name;
+        }
+      }
+
+      const originalFieldName = aliasToOriginal[fieldName] || fieldName;
+      const fieldValue = props.value?.[fieldName];
+
+      const streamCoveredFields = new Set<string>();
+      for (const link of stream_links) {
+        for (const f of link.fields || []) {
+          if (f.alias) streamCoveredFields.add(f.name);
+        }
+      }
+
+      const results: Array<{ name: string; resolvedUrl: string }> = [];
+
+      for (const link of stream_links) {
+        if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+          const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
+          results.push({ name: link.name, resolvedUrl: resolved });
+        }
+      }
+
+      if (!streamCoveredFields.has(originalFieldName)) {
+        for (const link of org_links) {
+          if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+            const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
+            results.push({ name: link.name, resolvedUrl: resolved });
+          }
+        }
+      }
+
+      return results;
+    };
+
+    const resolveCrossLinkUrl = (
+      urlTemplate: string,
+      fieldName: string,
+      fieldValue: any,
+    ): string => {
+      const startTime = searchObj.data.datetime?.startTime || 0;
+      const endTime = searchObj.data.datetime?.endTime || 0;
+      const query = searchObj.data.crossLinkQuery || searchObj.data.query || "";
+
+      return urlTemplate
+        .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
+        .replace(/\$\{field\.__value\}/g, encodeURIComponent(String(fieldValue ?? "")))
+        .replace(/\$\{start_time\}/g, String(startTime))
+        .replace(/\$\{end_time\}/g, String(endTime))
+        .replace(/\$\{query\}/g, encodeURIComponent(query))
+        .replace(/\$\{query_encoded\}/g, btoa(query));
+    };
+
+    // Dropdown state for multi-link fields
+    const crossLinkDropdownVisible = ref(false);
+    const crossLinkDropdownX = ref(0);
+    const crossLinkDropdownY = ref(0);
+    const crossLinkDropdownItems = ref<Array<{ name: string; resolvedUrl: string }>>([]);
+
+    const onCrossLinkClick = (event: MouseEvent, fieldName: string) => {
+      const links = getCrossLinksForField(fieldName);
+      if (links.length === 0) return;
+
+      if (links.length === 1) {
+        window.open(links[0].resolvedUrl, "_blank");
+        return;
+      }
+
+      crossLinkDropdownItems.value = links;
+      crossLinkDropdownX.value = event.clientX;
+      crossLinkDropdownY.value = event.clientY;
+      crossLinkDropdownVisible.value = true;
+    };
+
+    const openCrossLink = (url: string) => {
+      window.open(url, "_blank");
+      crossLinkDropdownVisible.value = false;
+    };
     let multiStreamFields: any = ref([]);
 
     const showViewTraceBtn = ref(false);
@@ -783,9 +907,9 @@ export default {
       return t("common.addFieldToTable");
     };
 
-    const sendToAiChat = (value: string) => {
+    const sendToAiChat = (value: string, append: boolean = true) => {
       emit("closeTable");
-      emit("sendToAiChat", value);
+      emit("sendToAiChat", value, append);
     };
 
     const getBtnLogo = computed(() => {
@@ -872,6 +996,19 @@ export default {
       }
     };
 
+    const getContentSize = (data: any): number => {
+      if (data === null || data === undefined) return 0;
+      if (typeof data === "string") return data.length;
+      if (typeof data === "object") {
+        try {
+          return JSON.stringify(data).length;
+        } catch {
+          return 0;
+        }
+      }
+      return String(data).length;
+    };
+
     return {
       t,
       copyLogToClipboard,
@@ -918,6 +1055,9 @@ export default {
       typeOfRegexPattern,
       regexPatternType,
       confirmRegexPatternType,
+      getContentSize,
+      getCrossLinksForField,
+      openCrossLink,
     };
   },
 };
@@ -925,4 +1065,6 @@ export default {
 
 <style lang="scss" scoped>
 @import "@/styles/logs/json-preview.scss";
+
+// No custom cross-link CSS needed — cross-links render as q-items inside existing q-btn-dropdown
 </style>

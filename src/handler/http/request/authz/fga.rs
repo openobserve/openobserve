@@ -46,7 +46,8 @@ use crate::common::meta::{
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a role", "category": "authorization"}))
     )
 )]
 #[post("/{org_id}/roles")]
@@ -114,6 +115,8 @@ pub async fn create_role(
 #[cfg(feature = "enterprise")]
 /// DeleteRole
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/roles/{role_id}",
     context_path = "/api",
     tag = "Roles",
     operation_id = "DeleteRole",
@@ -131,13 +134,13 @@ pub async fn create_role(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a role", "category": "authorization", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
 pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, role_name) = path.into_inner();
-
     match o2_openfga::authorizer::roles::delete_role(&org_id, &role_name).await {
         Ok(_) => Ok(MetaHttpResponse::ok(
             serde_json::json!({"successful": "true"}),
@@ -165,7 +168,8 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a role", "category": "authorization", "requires_confirmation": true}))
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
@@ -192,7 +196,8 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all roles", "category": "authorization"}))
     )
 )]
 #[get("/{org_id}/roles")]
@@ -288,7 +293,8 @@ pub async fn get_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a role", "category": "authorization"}))
     )
 )]
 #[put("/{org_id}/roles/{role_id}")]
@@ -870,7 +876,7 @@ pub async fn get_group_details(_path: web::Path<(String, String)>) -> Result<Htt
 pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "cloud")]
     use o2_openfga::meta::mapping::NON_CLOUD_RESOURCE_KEYS;
-    use o2_openfga::meta::mapping::Resource;
+    use o2_openfga::meta::mapping::{Resource, remove_resource_keys};
     let resources = o2_openfga::meta::mapping::OFGA_MODELS
         .values()
         .collect::<Vec<&Resource>>();
@@ -878,6 +884,12 @@ pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, E
     let resources = resources
         .into_iter()
         .filter(|r| !NON_CLOUD_RESOURCE_KEYS.contains(&r.key))
+        .collect::<Vec<&Resource>>();
+
+    let remove_keys = remove_resource_keys();
+    let resources = resources
+        .into_iter()
+        .filter(|r| !remove_keys.contains(&r.key))
         .collect::<Vec<&Resource>>();
     Ok(HttpResponse::Ok().json(resources))
 }

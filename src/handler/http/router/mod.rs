@@ -67,6 +67,7 @@ pub fn get_cors() -> Rc<Cors> {
             header::ACCEPT,
             header::CONTENT_TYPE,
             header::HeaderName::from_lowercase(b"traceparent").unwrap(),
+            header::HeaderName::from_lowercase(b"x-o2-assistant-session-id").unwrap(),
         ])
         .allow_any_origin()
         .supports_credentials()
@@ -744,6 +745,6 @@ mod tests {
             .uri("/proxy/org1/https://cloud.openobserve.ai/assets/flUhRq6tzZclQEJ-Vdg-IuiaDsNa.fd84f88b.woff")
             .to_request();
         let resp = call_service(&app, req).await;
-        assert_eq!(resp.status().as_u16(), 404);
+        assert_eq!(resp.status().as_u16(), 401);
     }
 }

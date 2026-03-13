@@ -41,7 +41,7 @@ export const useSearchResponseHandler = () => {
   const { getHistogramTitle, generateHistogramData, resetHistogramWithError } =
     useHistogram();
 
-  const { refreshPagination } = useSearchPagination();
+  const { refreshPagination, sortResponse } = useSearchPagination();
 
   const { clearCache } = useLogsHighlighter();
 
@@ -56,7 +56,7 @@ export const useSearchResponseHandler = () => {
     notificationMsg,
     searchPartitionMap,
     resetHistogramError,
-    histogramResults
+    histogramResults,
   } = searchState();
 
   const {
@@ -179,14 +179,16 @@ export const useSearchResponseHandler = () => {
     isPagination: boolean,
     appendResult: boolean = false,
   ) => {
+    const hits = response.content?.results?.hits || [];
+
     if (
       (isPagination && searchPartitionMap[payload.traceId].partition === 1) ||
       !appendResult
     ) {
       clearCache();
-      searchObj.data.queryResults.hits = response.content.results.hits;
+      searchObj.data.queryResults.hits = hits;
     } else if (appendResult) {
-      searchObj.data.queryResults.hits.push(...response.content.results.hits);
+      searchObj.data.queryResults.hits.push(...hits);
     }
 
     if (searchObj.meta.refreshInterval == 0) {
@@ -198,6 +200,19 @@ export const useSearchResponseHandler = () => {
       trimPageCountExtraHit(
         payload.queryReq,
         searchObj.data.queryResults.hits.length,
+      );
+    }
+
+    if (
+      searchObj.data.queryResults.hits.length > 0 &&
+      store.state.zoConfig.timestamp_column != "" &&
+      searchObj.data.queryResults.hasOwnProperty("order_by_metadata") &&
+      searchObj.data.queryResults.order_by_metadata.length > 0
+    ) {
+      sortResponse(
+        searchObj.data.queryResults.hits,
+        store.state.zoConfig.timestamp_column,
+        searchObj.data.queryResults.order_by_metadata,
       );
     }
 
@@ -416,7 +431,6 @@ export const useSearchResponseHandler = () => {
         });
       }
     }
-
 
     if (searchObj.data.queryResults.order_by?.toLowerCase() === "desc") {
       searchObj.data.queryResults.aggs.push(...response.content.results.hits);

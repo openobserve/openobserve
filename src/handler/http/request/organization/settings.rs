@@ -56,7 +56,8 @@ use crate::{
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create/update org settings", "category": "users"}))
     )
 )]
 #[post("/{org_id}/settings")]
@@ -129,6 +130,24 @@ async fn create(
         data.claim_parser_function = claim_parser_function;
     }
 
+    if let Some(cross_links) = settings.cross_links {
+        for link in &cross_links {
+            if link.name.is_empty() {
+                return Ok(MetaHttpResponse::bad_request("Cross-link name is required"));
+            }
+            if link.name.len() > 256 {
+                return Ok(MetaHttpResponse::bad_request(
+                    "Cross-link name must be 256 characters or less",
+                ));
+            }
+            if link.url.is_empty() {
+                return Ok(MetaHttpResponse::bad_request("Cross-link URL is required"));
+            }
+        }
+        field_found = true;
+        data.cross_links = cross_links;
+    }
+
     if !field_found {
         return Ok(MetaHttpResponse::bad_request("No valid field found"));
     }
@@ -162,7 +181,8 @@ async fn create(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get organization settings", "category": "users"}))
     )
 )]
 #[get("/{org_id}/settings")]

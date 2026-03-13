@@ -34,40 +34,37 @@ test.describe("Enrichment Table Regression Bugs", () => {
 
     testLogger.info('Navigated to Functions page');
 
-    // Look for enrichment tables tab or section
-    const enrichmentTab = page.locator('text=/enrichment.*table/i').first();
-    const enrichmentVisible = await enrichmentTab.isVisible().catch(() => false);
+    // Look for enrichment tables tab or section - using POM method
+    const enrichmentVisible = await pm.enrichmentPage.isEnrichmentTabVisible();
 
     if (enrichmentVisible) {
-      await enrichmentTab.click();
+      await pm.enrichmentPage.clickEnrichmentTabByText();
       await page.waitForTimeout(1500);
       testLogger.info('Opened Enrichment Tables section');
     }
 
-    // Check if enrichment tables are displayed
-    const enrichmentSearch = page.locator(pm.enrichmentPage.enrichmentTablesSearchInput);
-    const searchVisible = await enrichmentSearch.isVisible().catch(() => false);
+    // Check if enrichment tables are displayed - using POM method
+    const searchVisible = await pm.enrichmentPage.isEnrichmentSearchInputVisible();
 
     if (searchVisible) {
       testLogger.info('✓ Enrichment table UI is visible');
 
-      // Verify table is rendered
-      const enrichmentTable = page.locator('.o2-quasar-table').first();
-      const tableVisible = await enrichmentTable.isVisible().catch(() => false);
+      // Verify table is rendered - using POM method
+      const tableVisible = await pm.enrichmentPage.isQuasarTableVisible();
 
       if (tableVisible) {
         testLogger.info('✓ Enrichment table rendered successfully');
 
-        // Get table bounding box to verify it's displayed properly
-        const tableBox = await enrichmentTable.boundingBox();
+        // Get table bounding box to verify it's displayed properly - using POM method
+        const tableBox = await pm.enrichmentPage.getQuasarTableDimensions();
         if (tableBox) {
           expect(tableBox.width).toBeGreaterThan(100);
           expect(tableBox.height).toBeGreaterThan(50);
           testLogger.info(`✓ Table dimensions: ${tableBox.width}x${tableBox.height}`);
         }
 
-        // Take screenshot for visual verification of contrast
-        await enrichmentTable.screenshot({ path: 'enrichment-table-contrast.png' });
+        // Take screenshot for visual verification of contrast - using POM method
+        await pm.enrichmentPage.screenshotQuasarTable('enrichment-table-contrast.png');
         testLogger.info('Screenshot saved for manual contrast verification');
 
         testLogger.info('✓ PRIMARY CHECK PASSED: Enrichment table displays with proper layout');

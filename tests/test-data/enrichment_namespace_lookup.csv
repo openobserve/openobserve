@@ -1,0 +1,11 @@
+namespace_name,team,priority,cost_center,environment,on_call_email
+monitoring,platform,high,CC001,production,platform-oncall@example.com
+default,general,medium,CC002,development,general-oncall@example.com
+kube-system,infrastructure,critical,CC003,production,infra-oncall@example.com
+logging,observability,high,CC001,production,obs-oncall@example.com
+ingress-nginx,networking,high,CC004,production,network-oncall@example.com
+cert-manager,security,medium,CC005,production,security-oncall@example.com
+argocd,devops,medium,CC006,staging,devops-oncall@example.com
+prometheus,observability,high,CC001,production,obs-oncall@example.com
+grafana,observability,medium,CC001,production,obs-oncall@example.com
+istio-system,networking,critical,CC004,production,network-oncall@example.com

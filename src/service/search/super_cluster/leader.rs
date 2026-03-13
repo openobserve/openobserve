@@ -31,7 +31,10 @@ use config::{
 };
 use datafusion::physical_plan::visit_execution_plan;
 use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes, Result};
+use infra::{
+    errors::{Error, ErrorCodes, Result},
+    runtime::DATAFUSION_RUNTIME,
+};
 use itertools::Itertools;
 use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
 use parking_lot::Mutex;
@@ -40,7 +43,7 @@ use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
-    DATAFUSION_RUNTIME, SEARCH_SERVER, SearchResult,
+    SEARCH_SERVER, SearchResult,
     cluster::flight::{SearchContextBuilder, register_table},
     datafusion::optimizer::{
         context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},

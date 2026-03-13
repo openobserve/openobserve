@@ -118,17 +118,58 @@ impl TreeNodeRewriter for PlanRewriter {
                 .rewrite(&mut add_fst_fields_to_projection)?
                 .data;
 
-            // 3. Rewrite match_all/fuzzy_match_all
-            let mut expr_rewriter =
-                MatchAllRewriter::new(input.schema().clone(), self.fields.clone());
-            let rewritten_predicate = predicate.clone().rewrite(&mut expr_rewriter).data()?;
+            // 3. Update column indices in the predicate to match the new schema
+            let new_schema = input.schema();
+            let mut column_index_rewriter = ColumnIndexRewriter::new(new_schema.clone());
+            let predicate_with_updated_indices = predicate
+                .clone()
+                .rewrite(&mut column_index_rewriter)
+                .data()?;
 
-            // 4. Create new filter with rewritten predicate
+            // 4. Rewrite match_all/fuzzy_match_all
+            let mut expr_rewriter = MatchAllRewriter::new(new_schema.clone(), self.fields.clone());
+            let rewritten_predicate = predicate_with_updated_indices
+                .rewrite(&mut expr_rewriter)
+                .data()?;
+
+            // 5. Create new filter with rewritten predicate
             let new_filter = FilterExec::try_new(rewritten_predicate, input)?
                 .with_projection(add_fst_fields_to_projection.filter_projection.clone())?;
             return Ok(Transformed::yes(Arc::new(new_filter)));
         }
         Ok(Transformed::no(plan))
+    }
+}
+
+// Rewriter for updating column indices when schema changes
+#[derive(Debug, Clone)]
+struct ColumnIndexRewriter {
+    new_schema: SchemaRef,
+}
+
+impl ColumnIndexRewriter {
+    fn new(new_schema: SchemaRef) -> Self {
+        Self { new_schema }
+    }
+}
+
+impl TreeNodeRewriter for ColumnIndexRewriter {
+    type Node = Arc<dyn PhysicalExpr>;
+
+    fn f_up(&mut self, expr: Self::Node) -> Result<Transformed<Self::Node>> {
+        // Check if this is a Column expression
+        if let Some(column) = expr.as_any().downcast_ref::<Column>() {
+            let field_name = column.name();
+            // Find the new index in the new schema
+            if let Ok(new_index) = self.new_schema.index_of(field_name) {
+                // Only update if the index changed
+                if new_index != column.index() {
+                    let new_column = Arc::new(Column::new(field_name, new_index));
+                    return Ok(Transformed::yes(new_column as Arc<dyn PhysicalExpr>));
+                }
+            }
+        }
+        Ok(Transformed::no(expr))
     }
 }
 
@@ -454,7 +495,9 @@ mod tests {
     };
 
     use super::*;
-    use crate::service::search::datafusion::udf::match_all_udf;
+    use crate::service::search::datafusion::{
+        table_provider::empty_table::NewEmptyTable, udf::match_all_udf,
+    };
 
     #[tokio::test]
     async fn test_rewrite_match_physical() {
@@ -554,5 +597,70 @@ mod tests {
             let data = df.collect().await.unwrap();
             assert_batches_eq!(item.1, &data);
         }
+    }
+
+    #[tokio::test]
+    async fn test_column_index_update_with_match_all_and_str_match() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("msg", DataType::Utf8, false),
+            Field::new("error", DataType::Utf8, false),
+            Field::new("message", DataType::Utf8, false),
+        ]));
+
+        let fields = vec![
+            ("error".to_string(), DataType::Utf8),
+            ("msg".to_string(), DataType::Utf8),
+            ("message".to_string(), DataType::Utf8),
+        ];
+
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new())
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_physical_optimizer_rules(vec![Arc::new(RewriteMatchPhysical::new(
+                fields.clone(),
+            ))])
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("t", schema).with_partitions(8);
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+        ctx.register_udf(
+            crate::service::search::datafusion::udf::str_match_udf::STR_MATCH_UDF.clone(),
+        );
+
+        let sql =
+            "select count(*) from t where match_all('test') and str_match(message, 'success')";
+        let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+        let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+        // Verify that all column indices in FilterExec match the input schema
+        let _ = physical_plan.apply(&mut |node: &Arc<dyn ExecutionPlan>| -> Result<TreeNodeRecursion> {
+            if let Some(filter) = node.as_any().downcast_ref::<FilterExec>() {
+                let input_schema = filter.input().schema();
+                let predicate = filter.predicate();
+
+                // Traverse the predicate expression tree to find all Column references
+                let _ = predicate.apply(&mut |expr: &Arc<dyn PhysicalExpr>| -> Result<TreeNodeRecursion> {
+                    if let Some(column) = expr.as_any().downcast_ref::<Column>() {
+                        let column_name = column.name();
+                        let column_index = column.index();
+
+                        // Find the expected index in the input schema
+                        match input_schema.index_of(column_name) {
+                            Ok(expected_index) => {
+                                if column_index != expected_index {
+                                   panic!("Column '{column_name}' has index {column_index} in filter predicate but should be {expected_index} according to input schema");
+                                }
+                            }
+                            Err(_) => panic!("Column '{column_name}' with index {column_index} not found in input schema"),
+                        }
+                    }
+                    Ok(TreeNodeRecursion::Continue)
+                });
+            }
+            Ok(TreeNodeRecursion::Continue)
+        });
     }
 }

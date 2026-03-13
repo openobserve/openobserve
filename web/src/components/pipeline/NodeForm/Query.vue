@@ -516,7 +516,7 @@ const validateSqlQuery = async () => {
       .search({
         org_identifier: store.state.selectedOrganization.identifier,
         query,
-        page_type: "logs",
+        page_type: streamRoute.value.stream_type, //use the selected stream type
         validate: true,
       })
       .then((res: any) => {

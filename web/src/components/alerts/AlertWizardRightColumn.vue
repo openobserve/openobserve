@@ -16,17 +16,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Right Column: Preview & Summary (calc to account for gap) -->
-  <div class="tw-flex-[0_0_calc(32%-0.625rem)] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0;">
+  <div class="tw-flex-[0_0_calc(32%-0.625rem)] tw-flex tw-flex-col tw-gap-2 right-column-container" style="height: calc(100vh - 302px); position: sticky; top: 0;">
     <!-- Preview Section -->
     <div
-      class="collapsible-section card-container"
+      class="collapsible-section card-container preview-section"
       :style="previewSectionStyle"
     >
       <div
         class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-cursor-pointer"
         @click="togglePreview"
       >
-        <span class="tw-text-sm tw-font-semibold">Preview</span>
+        <div class="tw-flex tw-items-center tw-gap-2">
+          <span class="tw-text-sm tw-font-semibold">{{ t('alerts.preview') }}</span>
+          <!-- Status Indicator -->
+          <div
+            v-if="evaluationStatus && !isRealTime"
+            class="alert-status-indicator tw-flex tw-items-center tw-gap-1.5 tw-px-2 tw-py-1 tw-rounded"
+            :class="{
+              'status-would-trigger': evaluationStatus.wouldTrigger,
+              'status-would-not-trigger': !evaluationStatus.wouldTrigger,
+              'status-indicator-light': store.state.theme !== 'dark'
+            }"
+            data-test="alert-status-indicator"
+          >
+            <q-icon
+              :name="evaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'"
+              class="tw-text-xs tw-flex-shrink-0"
+              :class="evaluationStatus.wouldTrigger ? 'text-positive' : 'text-grey-6'"
+            />
+            <span class="tw-text-[0.625rem] tw-font-semibold tw-tracking-wide tw-uppercase tw-flex-shrink-0 tw-whitespace-nowrap">
+              {{ evaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
+            </span>
+            <span class="status-separator tw-text-xs tw-flex-shrink-0">•</span>
+            <span class="tw-text-xs">
+              {{ evaluationStatus.reason }}
+            </span>
+          </div>
+        </div>
         <q-btn
           flat
           dense
@@ -38,15 +64,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div v-show="expandState.preview" class="section-content">
-        <preview-alert
-          style="height: 100%; overflow: auto;"
-          ref="previewAlertRef"
-          :formData="formData"
-          :query="previewQuery"
-          :selectedTab="selectedTab"
-          :isAggregationEnabled="isAggregationEnabled"
-          :isUsingBackendSql="isUsingBackendSql"
-        />
+        <keep-alive>
+          <preview-alert
+            style="height: 100%;"
+            ref="previewAlertRef"
+            :formData="formData"
+            :query="previewQuery"
+            :selectedTab="selectedTab"
+            :isAggregationEnabled="isAggregationEnabled"
+            :isUsingBackendSql="isUsingBackendSql"
+            :isEditorOpen="isEditorOpen"
+          />
+        </keep-alive>
       </div>
     </div>
 
@@ -59,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-cursor-pointer"
         @click="toggleSummary"
       >
-        <span class="tw-text-sm tw-font-semibold">Summary</span>
+        <span class="tw-text-sm tw-font-semibold">{{ t('alerts.summary.title') }}</span>
         <q-btn
           flat
           dense
@@ -70,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="expand-toggle-btn"
         />
       </div>
-      <div v-show="expandState.summary" class="section-content">
+      <div v-show="expandState.summary" class="summary-section-content">
         <alert-summary
           style="height: 100%; overflow: auto;"
           :formData="formData"
@@ -86,8 +115,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, reactive, watch, type PropType } from "vue";
+import { defineComponent, ref, computed, reactive, watch, onMounted, onUnmounted, type PropType } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
 
@@ -135,10 +165,32 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    isEditorOpen: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props, { expose }) {
     const store = useStore();
+    const { t } = useI18n();
     const previewAlertRef = ref(null);
+
+    // Reactive ref for evaluation status
+    const evaluationStatus = ref(null);
+
+    // Watch the child component's evaluation status
+    watch(
+      () => previewAlertRef.value?.evaluationStatus,
+      (newStatus) => {
+        evaluationStatus.value = newStatus;
+      },
+      { deep: true, immediate: true }
+    );
+
+    // Computed property to check if this is a real-time alert
+    const isRealTime = computed(() => {
+      return props.formData.is_real_time === "true" || props.formData.is_real_time === true;
+    });
 
     // Load saved state from localStorage or use defaults
     const loadExpandState = () => {
@@ -186,10 +238,10 @@ export default defineComponent({
         return { flex: "0 0 auto" };
       } else if (expandState.summary) {
         // Both expanded: 50% each
-        return { flex: "1", minHeight: "0" };
+        return { flex: "1", minHeight: "250px" };
       } else {
         // Preview expanded, summary collapsed: take all space
-        return { flex: "1", minHeight: "0" };
+        return { flex: "1", minHeight: "250px" };
       }
     });
 
@@ -199,10 +251,10 @@ export default defineComponent({
         return { flex: "0 0 auto" };
       } else if (expandState.preview) {
         // Both expanded: 50% each
-        return { flex: "1", minHeight: "0" };
+        return { flex: "1", minHeight: "250px" };
       } else {
         // Summary expanded, preview collapsed: take all space
-        return { flex: "1", minHeight: "0" };
+        return { flex: "1", minHeight: "250px" };
       }
     });
 
@@ -214,12 +266,51 @@ export default defineComponent({
       }
     };
 
+    // Note: ResizeObserver in PanelSchemaRenderer should automatically detect size changes
+    // and resize the chart without any intervention. We're keeping this watcher commented
+    // to verify if manual intervention is needed.
+
+    // watch(
+    //   () => [expandState.preview, expandState.summary],
+    //   async () => {
+    //     // Wait for CSS transition to complete
+    //     await new Promise(resolve => setTimeout(resolve, 350));
+    //     if (previewAlertRef.value && expandState.preview) {
+    //       (previewAlertRef.value as any).resizeChart();
+    //     }
+    //   }
+    // );
+
+    // Handle window resize to rerender chart (without refetching data)
+    let resizeTimeout: NodeJS.Timeout;
+    const handleResize = () => {
+      // Debounce resize events to avoid excessive rerenders
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (previewAlertRef.value && expandState.preview) {
+          (previewAlertRef.value as any).resizeChart();
+        }
+      }, 300);
+    };
+
+    // Setup resize listener on mount
+    onMounted(() => {
+      window.addEventListener('resize', handleResize);
+    });
+
+    // Cleanup resize listener on unmount
+    onUnmounted(() => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
+    });
+
     // Expose the method to parent component
     expose({
       refreshData,
     });
 
     return {
+      t,
       store,
       previewAlertRef,
       expandState,
@@ -227,12 +318,19 @@ export default defineComponent({
       toggleSummary,
       previewSectionStyle,
       summarySectionStyle,
+      evaluationStatus,
+      isRealTime,
     };
   },
 });
 </script>
 
 <style scoped lang="scss">
+.right-column-container {
+  overflow-y: auto;
+  overflow-x: clip;
+}
+
 .collapsible-section {
   display: flex;
   flex-direction: column;
@@ -242,11 +340,11 @@ export default defineComponent({
   border-radius: 0.375rem;
   box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
   border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
-  overflow: hidden;
+  // overflow: hidden;
 
   .section-header {
     flex-shrink: 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    border-bottom: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
     transition: all 0.2s ease;
     border-radius: 0.375rem 0.375rem 0 0;
     user-select: none;
@@ -262,10 +360,18 @@ export default defineComponent({
 
   .section-content {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+
+  .summary-section-content {
+    flex: 1;
     overflow: hidden;
     display: flex;
     flex-direction: column;
   }
+
 
   .expand-toggle-btn {
     opacity: 0.5;
@@ -275,5 +381,41 @@ export default defineComponent({
       opacity: 1;
     }
   }
+}
+
+/* Status Indicator Styles */
+.alert-status-indicator {
+  border-left: 0.1875rem solid;
+  background: rgba(76, 175, 80, 0.08);
+  border-left-color: #4caf50;
+}
+
+.alert-status-indicator.status-would-not-trigger {
+  background: rgba(158, 158, 158, 0.08);
+  border-left-color: #9e9e9e;
+}
+
+.alert-status-indicator.status-indicator-light {
+  background: rgba(76, 175, 80, 0.04);
+}
+
+.alert-status-indicator.status-would-not-trigger.status-indicator-light {
+  background: rgba(158, 158, 158, 0.04);
+}
+
+.alert-status-indicator .status-separator {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.alert-status-indicator.status-indicator-light .status-separator {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+.alert-status-indicator span:last-child {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.alert-status-indicator.status-indicator-light span:last-child {
+  color: rgba(0, 0, 0, 0.6);
 }
 </style>

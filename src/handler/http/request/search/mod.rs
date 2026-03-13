@@ -35,7 +35,7 @@ use error_utils::map_error_to_http_response;
 use hashbrown::HashMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
-use utils::check_stream_permissions;
+use utils::{StreamPermissionResourceType, check_stream_permissions};
 
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
@@ -215,7 +215,8 @@ async fn can_use_distinct_stream(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Search data with SQL query, you can use `match_all('something')` to search with full text search, also you can use `str_match(field, 'something')` to search in a specific field; start_time, end_time can't be zero, need to valid micro timestamp.", "category": "search"}))
     )
 )]
 #[post("/{org_id}/_search")]
@@ -371,8 +372,14 @@ pub async fn search(
 
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
-        if let Some(res) =
-            check_stream_permissions(&stream_name, &org_id, user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            &stream_name,
+            &org_id,
+            user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
         {
             return Ok(res);
         }
@@ -534,7 +541,8 @@ pub async fn search(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp", "category": "search"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/_around")]
@@ -657,7 +665,8 @@ pub async fn around_v1(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/{stream_name}/_around")]
@@ -763,7 +772,8 @@ pub async fn around_v2(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get distinct values for a field", "category": "search"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/_values")]
@@ -1427,7 +1437,8 @@ async fn values_v1(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get search partitions then you can call _search api by partitions to give the result looks faster", "category": "search"}))
     )
 )]
 #[post("/{org_id}/_search_partition")]
@@ -1613,7 +1624,8 @@ pub async fn search_partition(
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get search history", "category": "search"}))
     )
 )]
 #[post("/{org_id}/_search_history")]
@@ -1782,7 +1794,7 @@ pub async fn search_history(
 pub async fn result_schema(
     org_id: web::Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    web::Query(query): web::Query<HashMap<String, String>>,
+    web::Query(url_query): web::Query<HashMap<String, String>>,
     web::Json(mut req): web::Json<Request>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
@@ -1808,10 +1820,10 @@ pub async fn result_schema(
 
     let user_id = &user_email.user_id;
 
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
 
-    let use_cache = get_use_cache_from_request(&query);
-    let is_streaming = query
+    let use_cache = get_use_cache_from_request(&url_query);
+    let is_streaming = url_query
         .get("is_streaming")
         .and_then(|v| v.to_lowercase().parse::<bool>().ok())
         .unwrap_or_default();
@@ -1822,7 +1834,7 @@ pub async fn result_schema(
 
     // set search event type
     if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&query) {
+        req.search_type = match get_search_type_from_request(&url_query) {
             Ok(v) => v,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
@@ -1831,7 +1843,7 @@ pub async fn result_schema(
         req.search_event_context = req
             .search_type
             .as_ref()
-            .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
+            .and_then(|event_type| get_search_event_context_from_request(event_type, &url_query));
     }
 
     // get stream name
@@ -1859,8 +1871,14 @@ pub async fn result_schema(
 
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
-        if let Some(res) =
-            check_stream_permissions(&stream_name, &org_id, user_id, &stream_type).await
+        if let Some(res) = check_stream_permissions(
+            &stream_name,
+            &org_id,
+            user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
         {
             return Ok(res);
         }
@@ -1939,9 +1957,102 @@ pub async fn result_schema(
         }
     };
 
+    // Cross-linking: if enabled and requested, load and filter cross-links
+    let cross_links = if get_config().common.enable_cross_linking
+        && url_query
+            .get("cross_linking")
+            .map(|v| v == "true")
+            .unwrap_or(false)
+    {
+        use std::collections::HashSet as StdHashSet;
+
+        use crate::service::db::organization::get_org_setting;
+
+        let field_alias_map = &res_schema.field_alias_map;
+
+        // Build set of all known field names (original + alias)
+        let all_field_names: StdHashSet<String> = field_alias_map
+            .keys()
+            .cloned()
+            .chain(field_alias_map.values().cloned())
+            .collect();
+
+        // Load org-level cross-links
+        let org_links = match get_org_setting(&org_id).await {
+            Ok(settings) => settings.cross_links,
+            Err(_) => vec![],
+        };
+
+        // Load stream-level cross-links (use first stream name)
+        let stream_links = if let Some(stream_name) = resolve_stream_names(&req.query.sql)
+            .ok()
+            .and_then(|names| names.into_iter().next())
+        {
+            infra::schema::get_settings(&org_id, &stream_name, stream_type)
+                .await
+                .map(|s| s.cross_links.clone())
+                .unwrap_or_default()
+        } else {
+            vec![]
+        };
+
+        // Filter and populate alias for stream cross-links
+        let filtered_stream: Vec<_> = stream_links
+            .into_iter()
+            .filter_map(|mut link| {
+                if !link.fields.is_empty() {
+                    let matched = link
+                        .fields
+                        .iter()
+                        .any(|f| all_field_names.contains(&f.name));
+                    if !matched {
+                        return None;
+                    }
+                }
+                for field in &mut link.fields {
+                    if let Some(alias) = field_alias_map.get(&field.name) {
+                        field.alias = Some(alias.to_string());
+                    }
+                }
+                Some(link)
+            })
+            .collect();
+
+        // Filter and populate alias for org cross-links
+        let filtered_org: Vec<_> = org_links
+            .into_iter()
+            .filter_map(|mut link| {
+                if !link.fields.is_empty() {
+                    let matched = link
+                        .fields
+                        .iter()
+                        .any(|f| all_field_names.contains(&f.name));
+                    if !matched {
+                        return None;
+                    }
+                }
+                for field in &mut link.fields {
+                    if let Some(alias) = field_alias_map.get(&field.name) {
+                        field.alias = Some(alias.to_string());
+                    }
+                }
+                Some(link)
+            })
+            .collect();
+
+        Some(config::meta::search::CrossLinksResponse {
+            stream_links: filtered_stream,
+            org_links: filtered_org,
+        })
+    } else {
+        None
+    };
+
     Ok(HttpResponse::Ok().json(ResultSchemaResponse {
         projections: res_schema.projections,
         group_by: res_schema.group_by.into_iter().collect(),
+        having: res_schema.having,
         timeseries_field: res_schema.timeseries,
+        cross_links,
     }))
 }
