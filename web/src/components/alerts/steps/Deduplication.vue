@@ -138,7 +138,7 @@ export default defineComponent({
     const store = useStore();
 
     const localDeduplication = ref({
-      enabled: true,
+      enabled: (props.deduplication?.fingerprint_fields?.length ?? 0) > 0,
       fingerprint_fields: props.deduplication?.fingerprint_fields || [],
       time_window_minutes: props.deduplication?.time_window_minutes || undefined,
     });
@@ -150,9 +150,10 @@ export default defineComponent({
       () => props.deduplication,
       (newVal) => {
         if (newVal) {
+          const fields = newVal.fingerprint_fields || [];
           localDeduplication.value = {
-            enabled: true,
-            fingerprint_fields: newVal.fingerprint_fields || [],
+            enabled: fields.length > 0,
+            fingerprint_fields: fields,
             time_window_minutes: newVal.time_window_minutes || undefined,
           };
         }
@@ -175,8 +176,9 @@ export default defineComponent({
     };
 
     const emitUpdate = () => {
+      const hasFields = localDeduplication.value.fingerprint_fields?.length > 0;
       emit("update:deduplication", {
-        enabled: true,
+        enabled: hasFields,
         fingerprint_fields: localDeduplication.value.fingerprint_fields,
         time_window_minutes: sanitizeTimeWindow(localDeduplication.value.time_window_minutes),
       });
