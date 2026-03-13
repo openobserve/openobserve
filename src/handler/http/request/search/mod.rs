@@ -180,6 +180,7 @@ async fn can_use_distinct_stream(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("type" = Option<String>, Query, description = "Stream type to search. Must be one of: logs, metrics, traces. Defaults to logs if not specified."),
         ("is_ui_histogram" = Option<bool>, Query, description = "Whether to return histogram data for UI (default: false)"),
         ("is_multi_stream_search" = Option<bool>, Query, description = "Indicate is search is for multi stream (default: false)"),
         ("validate" = Option<bool>, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS (default: false)"),
