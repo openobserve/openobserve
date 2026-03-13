@@ -1,5 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Cache cloud config to avoid re-reading on every call
 let _cachedCloudConfig = null;
@@ -9,7 +13,7 @@ export const getHeaders = () => {
   if (process.env.IS_CLOUD === 'true') {
     try {
       if (!_cachedCloudConfig) {
-        const configPath = path.join(process.cwd(), 'playwright-tests', 'utils', 'auth', 'cloud-config.json');
+        const configPath = path.join(__dirname, '..', 'playwright-tests', 'utils', 'auth', 'cloud-config.json');
         _cachedCloudConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       }
       if (_cachedCloudConfig.passcode) {

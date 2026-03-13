@@ -11,16 +11,17 @@ const authFile = path.join(__dirname, '../utils/auth/user.json');
 test.describe('Pipeline Dynamic Stream Names', { tag: ['@all', '@pipelines', '@pipelinesDynamic'] }, () => {
 
   let page;
+  let context;
   let pageManager;
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: authFile });
+    context = await browser.newContext({ storageState: authFile });
     page = await context.newPage();
     pageManager = new PageManager(page);
 
     // Navigate to base URL so the UI is loaded (required for storageState auth)
     await page.goto(`${process.env.ZO_BASE_URL}/web/?org_identifier=${process.env.ORGNAME}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle').catch(() => {});
   });
 
   test.beforeEach(async () => {
@@ -49,12 +50,11 @@ test.describe('Pipeline Dynamic Stream Names', { tag: ['@all', '@pipelines', '@p
 
   test.afterAll(async () => {
     // Add a wait before closing to ensure all operations are complete
-
-
     await page.waitForTimeout(2000);
     if (!page.isClosed()) {
       await page.close();
     }
+    await context.close();
   });
 
   test('Verify pipeline with dynamic destination name using kubernetes_container_name', async () => {
