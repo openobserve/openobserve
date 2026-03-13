@@ -2611,7 +2611,8 @@
     "errorGettingResults": "Sonuç alınırken hata oluştu",
     "discardChangesTitle": "Değişiklikleri Atma",
     "deleteNodeTitle": "Düğümü Sil",
-    "deleteNodeLlmEvalConfirm": "Bu LLM değerlendirme düğümünü silmek istediğinizden emin misiniz?"
+    "deleteNodeLlmEvalConfirm": "Bu LLM değerlendirme düğümünü silmek istediğinizden emin misiniz?",
+    "evalTemplates": "Değerlendirme Şablonları"
   },
   "reports": {
     "header": "Raporlar",

@@ -2632,7 +2632,8 @@
     "errorGettingResults": "結果を取得中にエラーが発生しました",
     "discardChangesTitle": "変更を破棄",
     "deleteNodeTitle": "ノードを削除",
-    "deleteNodeLlmEvalConfirm": "この LLM 評価ノードを削除してよろしいですか?"
+    "deleteNodeLlmEvalConfirm": "この LLM 評価ノードを削除してよろしいですか?",
+    "evalTemplates": "評価テンプレート"
   },
   "reports": {
     "header": "レポート",

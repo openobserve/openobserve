@@ -2609,7 +2609,8 @@
     "errorGettingResults": "Errore durante l'ottenimento dei risultati",
     "discardChangesTitle": "Ignora le modifiche",
     "deleteNodeTitle": "Elimina nodo",
-    "deleteNodeLlmEvalConfirm": "Sei sicuro di voler eliminare questo nodo di valutazione LLM?"
+    "deleteNodeLlmEvalConfirm": "Sei sicuro di voler eliminare questo nodo di valutazione LLM?",
+    "evalTemplates": "Modelli di valutazione"
   },
   "reports": {
     "header": "Rapporti",
