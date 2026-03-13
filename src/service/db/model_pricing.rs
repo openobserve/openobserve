@@ -28,7 +28,7 @@ use config::meta::model_pricing::{META_ORG, ModelPricingDefinition};
 use dashmap::DashMap;
 use infra::table;
 use once_cell::sync::Lazy;
-use regex::{Regex, RegexBuilder};
+use regex::Regex;
 
 const WATCHER_PREFIX: &str = "/model_pricing/";
 
@@ -39,12 +39,21 @@ pub struct CachedModelPricing {
     pub compiled_regex: Regex,
 }
 
-/// In-memory cache: org_id -> sorted Vec of enabled entries (pre-compiled regex).
-/// Wrapped in Arc so `get_org_pricing_entries` returns a cheap refcount bump
-/// instead of cloning every entry on every trace request.
-/// Populated at startup via `cache()` and kept current via `watch()`.
-static CACHE: Lazy<Arc<DashMap<String, Arc<Vec<CachedModelPricing>>>>> =
-    Lazy::new(|| Arc::new(DashMap::new()));
+/// Per-org raw entries: org_id -> sorted Vec of that org's own enabled entries.
+/// Updated by `reload_org` on startup and coordinator events.
+static CACHE: Lazy<DashMap<String, Arc<Vec<CachedModelPricing>>>> = Lazy::new(DashMap::new);
+
+/// Lazily-computed merged views: org_id -> (org source Arc, meta source Arc, merged result).
+/// Valid as long as the source `Arc` pointers haven't changed (checked via `Arc::ptr_eq`).
+/// This avoids re-merging on every span — the merge only happens once after a pricing change.
+static MERGED: Lazy<DashMap<String, MergedEntry>> = Lazy::new(DashMap::new);
+
+/// A cached merge of org + meta entries, valid while the source `Arc`s are unchanged.
+struct MergedEntry {
+    org_source: Arc<Vec<CachedModelPricing>>,
+    meta_source: Option<Arc<Vec<CachedModelPricing>>>,
+    merged: Arc<Vec<CachedModelPricing>>,
+}
 
 // ── Cache helpers ─────────────────────────────────────────────────────────────
 
@@ -53,23 +62,18 @@ fn build_entries(definitions: Vec<ModelPricingDefinition>) -> Vec<CachedModelPri
     let mut entries: Vec<CachedModelPricing> = definitions
         .into_iter()
         .filter(|d| d.enabled)
-        .filter_map(|def| {
-            match RegexBuilder::new(&def.match_pattern)
-                .size_limit(1 << 16)
-                .build()
-            {
-                Ok(re) => Some(CachedModelPricing {
-                    definition: def,
-                    compiled_regex: re,
-                }),
-                Err(e) => {
-                    log::warn!(
-                        "[model_pricing] invalid regex '{}' for model '{}': {e}",
-                        def.match_pattern,
-                        def.name,
-                    );
-                    None
-                }
+        .filter_map(|def| match Regex::new(&def.match_pattern) {
+            Ok(re) => Some(CachedModelPricing {
+                definition: def,
+                compiled_regex: re,
+            }),
+            Err(e) => {
+                log::warn!(
+                    "[model_pricing] invalid regex '{}' for model '{}': {e}",
+                    def.match_pattern,
+                    def.name,
+                );
+                None
             }
         })
         .collect();
@@ -99,37 +103,74 @@ async fn reload_org(org_id: &str) {
 // ── Public cache API ──────────────────────────────────────────────────────────
 
 /// Return the effective pricing entries for an org: org-specific entries merged with `META_ORG`
-/// entries. Both sets are treated equally — there is no automatic priority. Admins control
-/// which entries are active via the `enabled` flag. To customise an inherited entry, duplicate
-/// it into the org and disable the inherited one.
-///
-/// Returns an `Arc` so the caller gets a cheap refcount bump instead of cloning.
+/// entries, sorted by `sort_order`. The result is lazily cached — the merge only runs once
+/// after a pricing change, making the hot path a single `Arc::clone`.
 pub fn get_org_pricing_entries(org_id: &str) -> Arc<Vec<CachedModelPricing>> {
-    let org_entries = CACHE.get(org_id).map(|e| Arc::clone(e.value()));
-    let meta_entries = if org_id != META_ORG {
+    let org_arc = CACHE.get(org_id).map(|e| Arc::clone(e.value()));
+    let meta_arc = if org_id != META_ORG {
         CACHE.get(META_ORG).map(|e| Arc::clone(e.value()))
     } else {
         None
     };
 
-    match (org_entries, meta_entries) {
-        (Some(org), None) => org,
-        (None, Some(meta)) => meta,
-        (Some(org), Some(meta)) => {
-            let mut merged = Vec::with_capacity(org.len() + meta.len());
-            merged.extend_from_slice(&org);
-            merged.extend_from_slice(&meta);
-            // Re-sort so entries from both sets respect sort_order globally.
-            merged.sort_by(|a, b| {
-                a.definition
-                    .sort_order
-                    .cmp(&b.definition.sort_order)
-                    .then_with(|| a.definition.name.cmp(&b.definition.name))
-            });
-            Arc::new(merged)
-        }
-        (None, None) => Arc::default(),
+    // Fast path: no merge needed.
+    match (&org_arc, &meta_arc) {
+        (Some(org), None) => return Arc::clone(org),
+        (None, Some(meta)) => return Arc::clone(meta),
+        (None, None) => return Arc::default(),
+        _ => {}
     }
+
+    // Both org and meta exist — check the lazy merged cache.
+    let org_arc = org_arc.unwrap();
+    let meta_arc = meta_arc.unwrap();
+
+    if let Some(cached) = MERGED.get(org_id)
+        && Arc::ptr_eq(&cached.org_source, &org_arc)
+            && cached
+                .meta_source
+                .as_ref()
+                .is_some_and(|m| Arc::ptr_eq(m, &meta_arc))
+        {
+            return Arc::clone(&cached.merged);
+        }
+
+    // Stale or missing — recompute.
+    let merged = merge_entries(&org_arc, &meta_arc);
+    let result = Arc::clone(&merged);
+    MERGED.insert(
+        org_id.to_string(),
+        MergedEntry {
+            org_source: org_arc,
+            meta_source: Some(meta_arc),
+            merged,
+        },
+    );
+    result
+}
+
+/// Merge org entries (`a`) with meta entries (`b`) into a single sorted list.
+/// Org entries take priority over meta entries at the same sort_order.
+fn merge_entries(
+    org: &[CachedModelPricing],
+    meta: &[CachedModelPricing],
+) -> Arc<Vec<CachedModelPricing>> {
+    let mut merged = Vec::with_capacity(org.len() + meta.len());
+    merged.extend_from_slice(org);
+    merged.extend_from_slice(meta);
+    merged.sort_by(|x, y| {
+        x.definition
+            .sort_order
+            .cmp(&y.definition.sort_order)
+            .then_with(|| {
+                // Org-specific entries before meta entries at the same sort_order.
+                let x_is_meta = x.definition.org_id == META_ORG;
+                let y_is_meta = y.definition.org_id == META_ORG;
+                x_is_meta.cmp(&y_is_meta)
+            })
+            .then_with(|| x.definition.name.cmp(&y.definition.name))
+    });
+    Arc::new(merged)
 }
 
 /// Sync lookup: find the best matching pricing definition from pre-loaded entries.
@@ -797,7 +838,17 @@ mod tests {
         assert!(names.contains(&"gpt-4o-acme"));
         assert!(names.contains(&"gpt-4o-meta"));
 
+        // --- Case 4: Repeated call returns cached merge (Arc::ptr_eq) ---
+        let first = get_org_pricing_entries("test_merge_org_acme");
+        let second = get_org_pricing_entries("test_merge_org_acme");
+        assert!(
+            Arc::ptr_eq(&first, &second),
+            "repeated call should return same Arc"
+        );
+
         // Cleanup
+        MERGED.remove("test_merge_org_empty");
+        MERGED.remove("test_merge_org_acme");
         CACHE.remove(META_ORG);
         CACHE.remove("test_merge_org_acme");
     }

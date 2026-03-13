@@ -69,6 +69,16 @@ pub async fn put(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
 
     match existing {
         Some(existing) => {
+            // If the name changed, check that the new name doesn't conflict with another
+            // entry in the same org (the DB has a unique index on (org, name)).
+            if existing.name != item.name {
+                if let Some(_) = get_by_org_and_name(client, &item.org_id, &item.name).await? {
+                    return Err(Error::Message(format!(
+                        "A model pricing definition with name '{}' already exists in this organization",
+                        item.name
+                    )));
+                }
+            }
             let mut active: ActiveModel = existing.into();
             active.name = Set(item.name);
             active.match_pattern = Set(item.match_pattern);

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Full-page Import View -->
     <ImportModelPricing
       v-if="showImportModelPricingPage"
-      :existing-models="models.filter((m: any) => !m.inherited).map((m: any) => m.name)"
+      :existing-models="models.filter((m: any) => !isInherited(m)).map((m: any) => m.name)"
       @cancel:hideform="showImportModelPricingPage = false"
       @update:list="fetchModels"
     />
@@ -402,12 +402,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-tr
           :props="props"
-          :class="{ 'inherited-row': props.row.inherited }"
+          :class="{ 'inherited-row': isInherited(props.row) }"
         >
           <q-td v-for="col in columns" :key="col.name" :props="props" :style="col.style">
             <template v-if="col.name === 'select'">
               <q-checkbox
-                v-if="!props.row.inherited"
+                v-if="!isInherited(props.row)"
                 :model-value="selectedIds.has(props.row.id)"
                 dense
                 @update:model-value="toggleSelect(props.row.id)"
@@ -418,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="o2-table-cell-content tw:font-semibold tw:flex tw:items-center tw:gap-2">
                 {{ props.row.name }}
                 <q-badge
-                  v-if="props.row.inherited"
+                  v-if="isInherited(props.row)"
                   color="blue-grey-3"
                   text-color="blue-grey-8"
                   label="Inherited"
@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else-if="col.name === 'enabled'">
               <q-toggle
-                v-if="!props.row.inherited"
+                v-if="!isInherited(props.row)"
                 :model-value="props.row.enabled"
                 @update:model-value="(val: boolean) => toggleEnabled(props.row, val)"
                 dense
@@ -456,7 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else-if="col.name === 'actions'">
               <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
                 <!-- Own entries: edit + delete + duplicate + export -->
-                <template v-if="!props.row.inherited">
+                <template v-if="!isInherited(props.row)">
                   <q-btn
                     padding="sm"
                     unelevated
@@ -644,7 +644,7 @@ const resultTotal = computed(() => filteredModels.value.length);
 
 // Selection helpers — only own (non-inherited) models can be selected
 const selectableModels = computed(() =>
-  filteredModels.value.filter((m: any) => !m.inherited)
+  filteredModels.value.filter((m: any) => !isInherited(m))
 );
 const selectedCount = computed(() => selectedIds.value.size);
 const allSelected = computed(() =>
@@ -683,14 +683,14 @@ const filteredModels = computed(() => {
     );
   }
   // Sort: org-specific first, then inherited. Mark where inherited section starts.
-  const orgItems = items.filter((m: any) => !m.inherited);
-  const inheritedItems = items.filter((m: any) => m.inherited);
+  const orgItems = items.filter((m: any) => !isInherited(m));
+  const inheritedItems = items.filter((m: any) => isInherited(m));
   const sorted = [...orgItems, ...inheritedItems];
   // Mark the first inherited row so the template can render a section header
   let inheritedStartMarked = false;
   for (const item of sorted) {
     item.__inheritedSectionStart = false;
-    if (item.inherited && !inheritedStartMarked) {
+    if (isInherited(item) && !inheritedStartMarked) {
       item.__inheritedSectionStart = true;
       inheritedStartMarked = true;
     }
@@ -729,6 +729,11 @@ function formatPerMillion(pricePerToken: number | undefined): string {
 const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier || ""
 );
+
+/** True when a model entry comes from a different org (i.e. inherited from _meta). */
+function isInherited(model: any): boolean {
+  return model.org_id !== orgIdentifier.value;
+}
 
 async function fetchModels() {
   try {
@@ -882,7 +887,7 @@ async function toggleEnabled(model: any, enabled: boolean) {
 function duplicateModel(model: any) {
   const copy = JSON.parse(JSON.stringify(model));
   copy.id = null; // new entry
-  copy.inherited = false;
+  copy.org_id = orgIdentifier.value; // make it an org-specific entry
   copy.name = copy.name + " (Copy)";
   delete copy.__inheritedSectionStart;
   openEditor(copy);
@@ -938,7 +943,7 @@ function exportModel(model: any) {
 
 function exportSelected() {
   const selected = models.value.filter(
-    (m: any) => !m.inherited && selectedIds.value.has(m.id)
+    (m: any) => !isInherited(m) && selectedIds.value.has(m.id)
   );
   if (selected.length === 0) {
     q.notify({ type: "warning", message: "No models selected to export" });

@@ -37,12 +37,13 @@ fn status_label(status: i32) -> &'static str {
 /// from the integer `status` column.
 fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
     if let Some(obj) = val.as_object_mut()
-        && let Some(s) = obj.get("status").and_then(|v| v.as_i64()) {
-            obj.insert(
-                "status".to_string(),
-                serde_json::Value::String(status_label(s as i32).to_string()),
-            );
-        }
+        && let Some(s) = obj.get("status").and_then(|v| v.as_i64())
+    {
+        obj.insert(
+            "status".to_string(),
+            serde_json::Value::String(status_label(s as i32).to_string()),
+        );
+    }
     val
 }
 
@@ -83,24 +84,26 @@ pub async fn list_configs(org_id: &str) -> Result<Vec<serde_json::Value>> {
             let anomaly_id = model.anomaly_id.clone();
             let mut val = model_to_api_json(serde_json::to_value(model).unwrap_or_default());
             if let Some(obj) = val.as_object_mut()
-                && let Some(trigger) = trigger_map.get(&anomaly_id) {
-                    // last_detection_run: use trigger.start_time (last time trigger fired)
-                    // falling back to whatever is already in the config column.
-                    if let Some(start_time) = trigger.start_time {
-                        obj.insert(
-                            "last_detection_run".to_string(),
-                            serde_json::Value::Number(start_time.into()),
-                        );
-                    }
-                    // last_anomaly_detected_at: from trigger.data JSON
-                    if let Ok(td) = ScheduledTriggerData::from_json_string(&trigger.data)
-                        && let Some(sat) = td.last_satisfied_at {
-                            obj.insert(
-                                "last_anomaly_detected_at".to_string(),
-                                serde_json::Value::Number(sat.into()),
-                            );
-                        }
+                && let Some(trigger) = trigger_map.get(&anomaly_id)
+            {
+                // last_detection_run: use trigger.start_time (last time trigger fired)
+                // falling back to whatever is already in the config column.
+                if let Some(start_time) = trigger.start_time {
+                    obj.insert(
+                        "last_detection_run".to_string(),
+                        serde_json::Value::Number(start_time.into()),
+                    );
                 }
+                // last_anomaly_detected_at: from trigger.data JSON
+                if let Ok(td) = ScheduledTriggerData::from_json_string(&trigger.data)
+                    && let Some(sat) = td.last_satisfied_at
+                {
+                    obj.insert(
+                        "last_anomaly_detected_at".to_string(),
+                        serde_json::Value::Number(sat.into()),
+                    );
+                }
+            }
             val
         })
         .collect();
@@ -578,61 +581,63 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
         }
 
         // Send alert if anomalies found and alert is configured
-        if result.anomaly_count > 0 && config.alert_enabled
-            && let Some(ref dest_id) = config.alert_destination_id {
-                let anomaly_pts: Vec<_> = result
-                    .scored_points
-                    .iter()
-                    .filter(|p| p.is_anomaly)
-                    .collect();
-                let max_dev = anomaly_pts
-                    .iter()
-                    .map(|p| p.deviation_percent)
-                    .fold(0.0f64, f64::max);
-                let worst_val = anomaly_pts
-                    .iter()
-                    .max_by(|a, b| {
-                        a.deviation_percent
-                            .partial_cmp(&b.deviation_percent)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    })
-                    .map(|p| p.actual_value)
-                    .unwrap_or(0.0);
-                let window_start = result
-                    .scored_points
-                    .iter()
-                    .map(|p| p.timestamp)
-                    .min()
-                    .unwrap_or(start_time_us);
-                let window_end = result
-                    .scored_points
-                    .iter()
-                    .map(|p| p.timestamp)
-                    .max()
-                    .unwrap_or(end_time_us);
+        if result.anomaly_count > 0
+            && config.alert_enabled
+            && let Some(ref dest_id) = config.alert_destination_id
+        {
+            let anomaly_pts: Vec<_> = result
+                .scored_points
+                .iter()
+                .filter(|p| p.is_anomaly)
+                .collect();
+            let max_dev = anomaly_pts
+                .iter()
+                .map(|p| p.deviation_percent)
+                .fold(0.0f64, f64::max);
+            let worst_val = anomaly_pts
+                .iter()
+                .max_by(|a, b| {
+                    a.deviation_percent
+                        .partial_cmp(&b.deviation_percent)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .map(|p| p.actual_value)
+                .unwrap_or(0.0);
+            let window_start = result
+                .scored_points
+                .iter()
+                .map(|p| p.timestamp)
+                .min()
+                .unwrap_or(start_time_us);
+            let window_end = result
+                .scored_points
+                .iter()
+                .map(|p| p.timestamp)
+                .max()
+                .unwrap_or(end_time_us);
 
-                if let Err(e) = send_anomaly_alert(
-                    org_id.to_string(),
-                    dest_id.clone(),
-                    config.name.clone(),
-                    anomaly_id.to_string(),
-                    result.anomaly_count,
-                    config.stream_name.clone(),
-                    max_dev,
-                    worst_val,
-                    window_start,
-                    window_end,
-                )
-                .await
-                {
-                    log::warn!(
-                        "[anomaly_detection {}] failed to send alert to '{}': {}",
-                        anomaly_id,
-                        dest_id,
-                        e
-                    );
-                }
+            if let Err(e) = send_anomaly_alert(
+                org_id.to_string(),
+                dest_id.clone(),
+                config.name.clone(),
+                anomaly_id.to_string(),
+                result.anomaly_count,
+                config.stream_name.clone(),
+                max_dev,
+                worst_val,
+                window_start,
+                window_end,
+            )
+            .await
+            {
+                log::warn!(
+                    "[anomaly_detection {}] failed to send alert to '{}': {}",
+                    anomaly_id,
+                    dest_id,
+                    e
+                );
             }
+        }
 
         // Return only the anomalous points in the API response to keep it concise.
         let anomaly_points: Vec<_> = result
@@ -912,14 +917,15 @@ fn parse_search_results_to_timeseries(
     let mut skipped = 0usize;
 
     if let Some(first) = results.hits.first()
-        && let Some(obj) = first.as_object() {
-            let keys: Vec<&str> = obj.keys().map(|s| s.as_str()).collect();
-            log::info!(
-                "[anomaly_detection {}] result fields: {:?}",
-                anomaly_id,
-                keys
-            );
-        }
+        && let Some(obj) = first.as_object()
+    {
+        let keys: Vec<&str> = obj.keys().map(|s| s.as_str()).collect();
+        log::info!(
+            "[anomaly_detection {}] result fields: {:?}",
+            anomaly_id,
+            keys
+        );
+    }
 
     for hit in &results.hits {
         let timestamp_us = match extract_timestamp_from_hit(hit) {

@@ -19,7 +19,7 @@ use axum::{
     response::Response,
 };
 use config::meta::model_pricing::{META_ORG, ModelPricingDefinition};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::{UserEmail, check_permissions},
@@ -27,17 +27,6 @@ use {
 };
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::model_pricing};
-
-/// A model pricing definition enriched with an `inherited` flag for the API response.
-/// When `inherited` is true, this definition comes from the `_meta` org and applies
-/// as a fallback. The org can override it by creating their own definition for the same model.
-#[derive(Serialize)]
-struct ModelPricingResponse {
-    #[serde(flatten)]
-    definition: ModelPricingDefinition,
-    /// True if this definition is inherited from the `_meta` org (not org-specific).
-    inherited: bool,
-}
 
 /// ListModelPricing
 ///
@@ -77,42 +66,20 @@ pub async fn list(
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
     // Fetch org-specific entries
-    let org_items = match model_pricing::list(&org_id).await {
+    let mut items = match model_pricing::list(&org_id).await {
         Ok(items) => items,
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
-    // For the default org itself, no inheritance — just return its own entries.
-    if org_id == META_ORG {
-        let response: Vec<ModelPricingResponse> = org_items
-            .into_iter()
-            .map(|d| ModelPricingResponse {
-                definition: d,
-                inherited: false,
-            })
-            .collect();
-        return MetaHttpResponse::json(response);
+    // For non-meta orgs, also include inherited entries from the meta org.
+    if org_id != META_ORG {
+        match model_pricing::list(META_ORG).await {
+            Ok(meta_items) => items.extend(meta_items),
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        }
     }
 
-    // Fetch default org entries as inherited fallbacks.
-    let default_items = match model_pricing::list(META_ORG).await {
-        Ok(items) => items,
-        Err(e) => return MetaHttpResponse::internal_error(e),
-    };
-
-    let mut response: Vec<ModelPricingResponse> = org_items
-        .into_iter()
-        .map(|d| ModelPricingResponse {
-            definition: d,
-            inherited: false,
-        })
-        .collect();
-    response.extend(default_items.into_iter().map(|d| ModelPricingResponse {
-        definition: d,
-        inherited: true,
-    }));
-
-    MetaHttpResponse::json(response)
+    MetaHttpResponse::json(items)
 }
 
 /// GetModelPricing
@@ -207,7 +174,7 @@ pub async fn create(
 
     match model_pricing::set(item).await {
         Ok(saved) => MetaHttpResponse::json(saved),
-        Err(e) => MetaHttpResponse::internal_error(e),
+        Err(e) => map_set_error(e),
     }
 }
 
@@ -272,7 +239,7 @@ pub async fn update(
 
     match model_pricing::set(item).await {
         Ok(saved) => MetaHttpResponse::json(saved),
-        Err(e) => MetaHttpResponse::internal_error(e),
+        Err(e) => map_set_error(e),
     }
 }
 
@@ -375,9 +342,24 @@ pub struct BuiltInModelPricingResponse {
     ),
 )]
 pub async fn get_built_in(
-    Path(_org_id): Path<String>,
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Query(query): Query<BuiltInQuery>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &org_id,
+        &org_id,
+        &user_email.user_id,
+        "settings",
+        "LIST",
+        None,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
     use crate::service::github::GitHubDataService;
 
     let source_url = config::get_config().common.model_pricing_source_url.clone();
@@ -391,9 +373,9 @@ pub async fn get_built_in(
         Ok(m) => m,
         Err(e) => {
             log::error!("[model_pricing] failed to fetch built-in models from {source_url}: {e}");
-            return MetaHttpResponse::internal_error(format!(
-                "Failed to fetch built-in model pricing: {e}"
-            ));
+            return MetaHttpResponse::internal_error(
+                "Failed to fetch built-in model pricing. The source may be temporarily unavailable.",
+            );
         }
     };
 
@@ -418,9 +400,16 @@ pub async fn get_built_in(
     })
 }
 
-/// Max compiled NFA size for user-supplied regex patterns (64 KB).
-/// Prevents excessive memory/CPU usage from complex patterns.
-const REGEX_SIZE_LIMIT: usize = 1 << 16;
+/// Map errors from `model_pricing::set` to appropriate HTTP responses.
+/// Duplicate-name errors are returned as 400 Bad Request; everything else is 500.
+fn map_set_error(e: anyhow::Error) -> Response {
+    let msg = e.to_string();
+    if msg.contains("already exists") {
+        MetaHttpResponse::bad_request(msg)
+    } else {
+        MetaHttpResponse::internal_error(e)
+    }
+}
 
 fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     if item.name.trim().is_empty() {
@@ -432,10 +421,7 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     if item.match_pattern.len() > 512 {
         return Err("Match pattern must be 512 characters or fewer".to_string());
     }
-    if let Err(e) = regex::RegexBuilder::new(&item.match_pattern)
-        .size_limit(REGEX_SIZE_LIMIT)
-        .build()
-    {
+    if let Err(e) = regex::Regex::new(&item.match_pattern) {
         return Err(format!("Invalid regex pattern: {e}"));
     }
     if item.tiers.is_empty() {
