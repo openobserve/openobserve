@@ -218,7 +218,10 @@ export const useSearchQuery = () => {
    * @param readOnly - If true, prevents all mutations to searchObj (default: false)
    * @returns SearchRequestPayload - The constructed query payload, or null on error
    */
-  const buildSearch = (readOnly: boolean = false): SearchRequestPayload => {
+  const buildSearch = (
+    readOnly: boolean = false,
+    ignoreQuickMode: boolean = false,
+  ): SearchRequestPayload => {
     try {
       let query = searchObj.data.query.trim();
 
@@ -239,7 +242,7 @@ export const useSearchQuery = () => {
             searchObj.meta.resultGrid.rowsPerPage *
               (searchObj.data.resultGrid.currentPage - 1) || 0,
           size: searchObj.meta.resultGrid.rowsPerPage,
-          quick_mode: searchObj.meta.quickMode,
+          quick_mode: searchObj.meta.quickMode && !ignoreQuickMode,
         },
       };
 
@@ -279,7 +282,11 @@ export const useSearchQuery = () => {
       }
 
       // Replace field list placeholder with appropriate values
-      if (interestingFields.length > 0 && searchObj.meta.quickMode) {
+      if (
+        interestingFields.length > 0 &&
+        searchObj.meta.quickMode &&
+        !ignoreQuickMode
+      ) {
         if (searchObj.data.stream.selectedStream.length == 1) {
           req.query.sql = req.query.sql.replace(
             "[FIELD_LIST]",

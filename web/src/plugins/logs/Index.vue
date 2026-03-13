@@ -915,7 +915,7 @@ export default defineComponent({
       searchObj.loading = true;
 
       try {
-        const queryReq = buildSearch(false, false);
+        const queryReq = buildSearch(false, true);
         if (!queryReq) {
           console.log("[Index] No query request available");
           searchObj.loading = false;
@@ -925,6 +925,9 @@ export default defineComponent({
         // Set size to -1 to let backend determine sampling size based on config
         console.log("[Patterns] Using default sampling from backend configuration");
         queryReq.query.size = -1;
+
+        // Set quick_mode false for patterns explicitly
+        queryReq.query.quick_mode = false;
 
         const streamName = searchObj.data.stream.selectedStream[0];
         if (!streamName) {
