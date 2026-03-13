@@ -1632,7 +1632,13 @@
     "discountTag": "打折时",
     "enterpriseNote": "高容量需求？让我们来谈谈规模！联系我们获取量身定制的解决方案。",
     "contactSupport": "联系支持部门",
-    "totalUsage": "总使用量"
+    "totalUsage": "总使用量",
+    "aiCredits": "AI 积分",
+    "aiModeFree": "免费",
+    "aiModePayAsYouGo": "即用即付",
+    "aiModeExhausted": "精疲力",
+    "aiExhaustedMessage": "订阅即可继续使用 AI 功能",
+    "aiPaygMessage": "免费积分已用尽 — 使用量计入订阅账单"
   },
   "message": {
     "ServerInternalError": "错误：出了点问题。内部服务器错误。",

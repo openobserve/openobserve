@@ -1632,7 +1632,13 @@
     "discountTag": "Con descuento",
     "enterpriseNote": "¿Necesitas un gran volumen? ¡Hablemos de la escala! Póngase en contacto con nosotros para obtener soluciones a medida.",
     "contactSupport": "Comuníquese con el soporte",
-    "totalUsage": "Uso total"
+    "totalUsage": "Uso total",
+    "aiCredits": "Créditos de IA",
+    "aiModeFree": "Gratuito",
+    "aiModePayAsYouGo": "Paga sobre la marcha",
+    "aiModeExhausted": "Agotado",
+    "aiExhaustedMessage": "Suscríbete para seguir usando las funciones de IA",
+    "aiPaygMessage": "Créditos gratuitos agotados: el uso se factura a la suscripción"
   },
   "message": {
     "ServerInternalError": "Error: algo salió mal. Error interno del servidor.",
