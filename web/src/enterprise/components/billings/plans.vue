@@ -146,8 +146,14 @@ export default defineComponent({
             price: f.price ?? "",
             is_parent: !f.isSubItem,
           }));
-        const payAsYouGo = cloudPlans.find((p: any) => p.id === 1);
-        const enterprise = cloudPlans.find((p: any) => p.id === 3);
+        const payAsYouGo =
+          cloudPlans.find((p: any) =>
+            p.title?.toLowerCase().includes("pay as you go"),
+          ) ?? cloudPlans[0];
+        const enterprise =
+          cloudPlans.find((p: any) =>
+            p.title?.toLowerCase().includes("enterprise"),
+          ) ?? cloudPlans[1];
 
         const proFeatures = payAsYouGo?.features
           ? mapFeatures(payAsYouGo.features)
