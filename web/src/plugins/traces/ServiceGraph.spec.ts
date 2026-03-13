@@ -1585,9 +1585,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       const series = wrapper.vm.chartData.options.series[0];
       expect(series.left).toBe("3%");
-      expect(series.right).toBe("3%");
-      expect(series.top).toBe("1%");
-      expect(series.bottom).toBe("1%");
+      expect(series.right).toBe("20%");
+      expect(series.top).toBe("2%");
+      expect(series.bottom).toBe("2%");
     });
 
     it("should set tree bounds for vertical layout", async () => {
@@ -1599,10 +1599,10 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       await nextTick();
 
       const series = wrapper.vm.chartData.options.series[0];
-      expect(series.left).toBe("1%");
-      expect(series.right).toBe("1%");
-      expect(series.top).toBe("3%");
-      expect(series.bottom).toBe("3%");
+      expect(series.left).toBe("2%");
+      expect(series.right).toBe("2%");
+      expect(series.top).toBe("8%");
+      expect(series.bottom).toBe("8%");
     });
 
     it("should disable built-in ECharts tooltip for tree mode", async () => {
@@ -1624,7 +1624,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       await nextTick();
 
       const series = wrapper.vm.chartData.options.series[0];
-      expect(series.label.position).toBe("inside");
+      expect(series.label.position).toBe("right");
     });
   });
 });
