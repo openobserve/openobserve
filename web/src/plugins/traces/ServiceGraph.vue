@@ -104,7 +104,79 @@
       <!-- Graph Visualization -->
       <q-card flat bordered class="graph-card tw:h-[calc(100%-4rem)]">
         <q-card-section class="q-pa-none tw:h-full" style="height: 100%">
-          <div class="graph-container tw:h-full tw:bg-[var(--o2-bg)]">
+          <div class="graph-container tw:h-full tw:bg-[var(--o2-bg)]" style="position: relative;">
+            <!-- Legend info button -->
+            <q-btn
+              v-if="!loading && graphData.nodes.length"
+              round
+              flat
+              icon="info_outline"
+              size="sm"
+              class="sg-info-btn"
+              :class="$q.dark.isActive ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+            >
+              <q-tooltip
+                :delay="150"
+                anchor="bottom right"
+                self="top right"
+                :offset="[0, 8]"
+                class="sg-legend-tooltip"
+              >
+                <div class="sg-legend">
+                  <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
+                  <template v-if="visualizationType === 'graph'">
+                    <div class="sg-legend-title">Node Size <span class="sg-legend-subtitle">| Request Volume</span></div>
+                    <div class="sg-legend-row sg-legend-sizes">
+                      <div class="sg-legend-size-item">
+                        <div class="sg-legend-circle" style="width:22px;height:22px;border-color:#52c41a;"></div>
+                        <span class="sg-legend-label">Low</span>
+                      </div>
+                      <div class="sg-legend-size-dots">···</div>
+                      <div class="sg-legend-size-item">
+                        <div class="sg-legend-circle" style="width:42px;height:42px;border-color:#52c41a;"></div>
+                        <span class="sg-legend-label">High</span>
+                      </div>
+                    </div>
+
+                    <div class="sg-legend-divider"></div>
+                  </template>
+
+                  <!-- Border Color -->
+                  <div class="sg-legend-title">Border Color <span class="sg-legend-subtitle">| Error Rate</span></div>
+                  <div class="sg-legend-color-row">
+                    <div class="sg-legend-color-item">
+                      <div class="sg-legend-dot" style="border-color:#52c41a;"></div>
+                      <div>
+                        <div class="sg-legend-color-label">Healthy</div>
+                        <div class="sg-legend-color-value">&lt; 1%</div>
+                      </div>
+                    </div>
+                    <div class="sg-legend-color-item">
+                      <div class="sg-legend-dot" style="border-color:#faad14;"></div>
+                      <div>
+                        <div class="sg-legend-color-label">Degraded</div>
+                        <div class="sg-legend-color-value">1 – 5%</div>
+                      </div>
+                    </div>
+                    <div class="sg-legend-color-item">
+                      <div class="sg-legend-dot" style="border-color:#fa8c16;"></div>
+                      <div>
+                        <div class="sg-legend-color-label">Warning</div>
+                        <div class="sg-legend-color-value">5 – 10%</div>
+                      </div>
+                    </div>
+                    <div class="sg-legend-color-item">
+                      <div class="sg-legend-dot" style="border-color:#f5222d;"></div>
+                      <div>
+                        <div class="sg-legend-color-label">Critical</div>
+                        <div class="sg-legend-color-value">&gt; 10%</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </q-tooltip>
+            </q-btn>
+
             <div v-if="loading" class="flex flex-center tw:h-full">
               <div class="text-center tw:flex tw:flex-col tw:items-center">
                 <q-spinner-hourglass color="primary" size="4em" />
@@ -280,9 +352,6 @@ export default defineComponent({
     const selectedEdge = ref<any>(null);
     const showEdgeSidePanel = ref(false);
 
-    // Map of "from->to" -> { p50_avg, p95_avg, p99_avg } — populated on edge hover
-    const edgeBaselines = ref<Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>>(new Map());
-
     // Persist visualization type in localStorage
     const storedVisualizationType = localStorage.getItem(
       "serviceGraph_visualizationType",
@@ -368,7 +437,6 @@ export default defineComponent({
       if (visualizationType.value === "graph" &&
           lastChartOptions.value &&
           chartKey.value === lastChartOptions.value.key &&
-          edgeBaselines.value.size === (lastChartOptions.value.baselineCount ?? 0) &&
           !hasActiveFilters) {
         return {
           options: lastChartOptions.value.data.options,
@@ -384,7 +452,6 @@ export default defineComponent({
               filteredGraphData.value,
               layoutType.value,
               $q.dark.isActive,
-              edgeBaselines.value,
             )
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
@@ -392,7 +459,6 @@ export default defineComponent({
               new Map(),
               $q.dark.isActive,
               undefined,
-              edgeBaselines.value,
               graphContainerRef.value?.clientWidth  || 1200,
               graphContainerRef.value?.clientHeight || 700,
             );
@@ -403,7 +469,6 @@ export default defineComponent({
         lastChartOptions.value = {
           key: chartKey.value,
           data: newOptions,
-          baselineCount: edgeBaselines.value.size,
         };
       } else if (hasActiveFilters) {
         // Clear cache when filtering to ensure fresh render on filter removal
@@ -1154,19 +1219,6 @@ export default defineComponent({
           edges,
         };
 
-        // Populate edgeBaselines from topology prev-slot data for edge coloring
-        const newBaselines = new Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>();
-        for (const edge of edges) {
-          if (edge.baseline_p95_latency_ns != null) {
-            newBaselines.set(`${edge.from}->${edge.to}`, {
-              p50_avg: edge.baseline_p50_latency_ns ?? 0,
-              p95_avg: edge.baseline_p95_latency_ns ?? 0,
-              p99_avg: edge.baseline_p99_latency_ns ?? 0,
-            });
-          }
-        }
-        edgeBaselines.value = newBaselines;
-
         // Calculate stats
         const totalRequests = graphData.value.edges.reduce(
           (sum: number, e: any) => sum + e.total_requests,
@@ -1543,6 +1595,134 @@ export default defineComponent({
   width: 100%;
   border-radius: 4px;
   overflow: hidden;
+}
+
+.sg-info-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  transition: transform 0.2s ease;
+}
+
+.sg-info-btn:hover {
+  transform: scale(1.1);
+}
+
+:global(.sg-legend-tooltip),
+:global(.sg-legend-tooltip.q-tooltip) {
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+}
+
+:global(.sg-legend) {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px 16px;
+  min-width: 260px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  color: #374151;
+  font-size: 12px;
+}
+
+:global(.body--dark .sg-legend) {
+  background: #1f2937;
+  border-color: #374151;
+  color: #e5e7eb;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+:global(.sg-legend-title) {
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 10px;
+  color: inherit;
+}
+
+:global(.sg-legend-subtitle) {
+  font-weight: 400;
+  opacity: 0.55;
+}
+
+:global(.sg-legend-divider) {
+  border-top: 1px solid #e5e7eb;
+  margin: 12px 0;
+}
+
+:global(.body--dark .sg-legend-divider) {
+  border-color: #374151;
+}
+
+:global(.sg-legend-sizes) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0 6px;
+}
+
+:global(.sg-legend-size-item) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+:global(.sg-legend-circle) {
+  border-radius: 50%;
+  border-width: 3px;
+  border-style: solid;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+:global(.sg-legend-size-dots) {
+  opacity: 0.35;
+  font-size: 16px;
+  letter-spacing: 2px;
+  margin-bottom: 18px;
+}
+
+:global(.sg-legend-label) {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+:global(.sg-legend-color-row) {
+  display: flex;
+  gap: 12px;
+}
+
+:global(.sg-legend-color-item) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+}
+
+:global(.sg-legend-dot) {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border-width: 3px;
+  border-style: solid;
+  background: transparent;
+}
+
+:global(.sg-legend-color-label) {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  color: inherit;
+}
+
+:global(.sg-legend-color-value) {
+  font-size: 10px;
+  opacity: 0.55;
+  text-align: center;
 }
 
 .service-graph-container {

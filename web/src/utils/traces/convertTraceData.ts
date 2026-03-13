@@ -202,7 +202,6 @@ export const convertServiceGraphToTree = (
   graphData: { nodes: any[]; edges: any[] },
   layoutType: string = 'horizontal',
   isDarkMode: boolean = true,
-  _edgeBaselines?: Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>
 ) => {
   // Build adjacency map for edges
   const edgesMap = new Map<string, any[]>();
@@ -502,9 +501,12 @@ const computeForceLayout = (
   width: number,
   height: number
 ): Map<string, { x: number; y: number }> => {
-  const PAD = 110; // padding from canvas edge
-  const W = width  - PAD * 2;
-  const H = height - PAD * 2;
+  const PAD_LEFT = 110;
+  const PAD_RIGHT = 220; // extra right padding for label text overflow
+  const PAD_TOP = 110;
+  const PAD_BOTTOM = 200; // extra bottom padding so bottom-positioned labels don't clip
+  const W = width  - PAD_LEFT - PAD_RIGHT;
+  const H = height - PAD_TOP - PAD_BOTTOM;
   const n = nodes.length;
 
   if (n === 0) return new Map();
@@ -559,6 +561,29 @@ const computeForceLayout = (
       }
     }
 
+    // Node-on-edge repulsion: push nodes away from edges they are not endpoints of
+    const edgeRepelDist = k * 1.2; // min clearance between a node and a passing edge
+    ids.forEach((id: string) => {
+      const p = pos.get(id)!;
+      layoutEdges.forEach(({ u, v }) => {
+        if (id === u || id === v) return;
+        const pu = pos.get(u)!, pv = pos.get(v)!;
+        const ex = pv.x - pu.x, ey = pv.y - pu.y;
+        const len2 = ex * ex + ey * ey;
+        if (len2 < 1) return;
+        const t = Math.max(0, Math.min(1, ((p.x - pu.x) * ex + (p.y - pu.y) * ey) / len2));
+        const cx = pu.x + t * ex, cy = pu.y + t * ey;
+        const dx = p.x - cx, dy = p.y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        if (dist < edgeRepelDist) {
+          const force = ((edgeRepelDist - dist) / dist) * k * 0.8;
+          const d = disp.get(id)!;
+          d.x += (dx / dist) * force;
+          d.y += (dy / dist) * force;
+        }
+      });
+    });
+
     // Attractive forces — along edges only
     layoutEdges.forEach(({ u, v }) => {
       if (!pos.has(u) || !pos.has(v)) return;
@@ -597,8 +622,8 @@ const computeForceLayout = (
 
   // Scale uniformly so the layout fills without distortion, then centre
   const scale  = Math.min(W / rangeX, H / rangeY);
-  const offsetX = PAD + (W - rangeX * scale) / 2;
-  const offsetY = PAD + (H - rangeY * scale) / 2;
+  const offsetX = PAD_LEFT + (W - rangeX * scale) / 2;
+  const offsetY = PAD_TOP + (H - rangeY * scale) / 2;
 
   const result = new Map<string, { x: number; y: number }>();
   pos.forEach((p, id) => {
@@ -850,7 +875,6 @@ export const convertServiceGraphToNetwork = (
   cachedPositions?: Map<string, { x: number; y: number }>,
   isDarkMode: boolean = true,
   selectedNodeId?: string,
-  edgeBaselines?: Map<string, { p50_avg: number; p95_avg: number; p99_avg: number }>,
   canvasWidth: number = 1200,
   canvasHeight: number = 700
 ) => {
@@ -1049,28 +1073,7 @@ export const convertServiceGraphToNetwork = (
     const p95 = formatLatency(edge.p95_latency_ns || 0);
     const p99 = formatLatency(edge.p99_latency_ns || 0);
 
-    // Edge color is latency-only (error rate belongs on nodes, not edges)
-    const p95Ms = (edge.p95_latency_ns || 0) / 1000000;
-    const baselineKey = `${edge.from}->${edge.to}`;
-    const baseline = edgeBaselines?.get(baselineKey);
-    let edgeColor;
-    if (baseline && baseline.p95_avg > 0) {
-      // Baseline-relative coloring: only highlight degraded edges
-      const ratio = (edge.p95_latency_ns || 0) / baseline.p95_avg;
-      if (ratio > 2.0) {
-        edgeColor = "#ff7875"; // >2x baseline → red
-      } else if (ratio > 1.5) {
-        edgeColor = "#ffc069"; // 1.5–2x baseline → orange
-      } else {
-        edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3"; // within baseline → gray
-      }
-    } else if (p95Ms > 1000) {
-      edgeColor = "#ff7875"; // >1s → red
-    } else if (p95Ms > 500) {
-      edgeColor = "#ffc069"; // >500ms → orange
-    } else {
-      edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3"; // healthy → neutral gray
-    }
+    const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
 
     return {
       source: edge.from,
@@ -1092,9 +1095,10 @@ export const convertServiceGraphToNetwork = (
       },
       emphasis: {
         lineStyle: {
-          type: 'dashed', // becomes dashed on hover → triggers CSS animation
+          type: 'solid',
           width: 4,
           opacity: 1,
+          color: edgeColor,
         },
       },
     };
@@ -1121,6 +1125,35 @@ export const convertServiceGraphToNetwork = (
   if (hasPositions) {
     console.log('[convertServiceGraphToNetwork] Using cached positions for', cachedPositions.size, 'nodes');
   }
+
+  // Set per-node label position based on x/y to avoid canvas edge clipping.
+  // Must include all styling props since per-node label does not fully inherit series-level label.
+  const bottomThreshold = canvasHeight * 0.70;
+  const rightThreshold  = canvasWidth  * 0.72;
+  const baseLabelStyle = {
+    show: true,
+    distance: 8,
+    fontSize: 12,
+    fontWeight: 500,
+    color: isDarkMode ? '#e4e7eb' : '#374151',
+    textBorderColor: isDarkMode ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)',
+    textBorderWidth: 3,
+  };
+  nodes.forEach((node: any) => {
+    const x = node.x ?? 0;
+    const y = node.y ?? 0;
+    let position: string;
+    if (y >= bottomThreshold) {
+      // Bottom nodes: right side has leftover canvas space; bottom-right corner → right avoids bottom clip
+      position = 'bottom';
+    } else if (x >= rightThreshold) {
+      // Right-edge nodes: label goes below the node so it doesn't extend past the canvas right edge
+      position = 'bottom';
+    } else {
+      position = 'right';
+    }
+    node.label = { ...baseLabelStyle, position };
+  });
 
   // Use "none" layout when we have fixed positions (D3-force computed or cached)
   const layoutMode = "none";
@@ -1160,13 +1193,7 @@ export const convertServiceGraphToNetwork = (
         animationEasingUpdate: 'cubicOut',
         label: {
           show: true,
-          position: 'right',
-          distance: 8,
-          offset: [0, -14],
           formatter: (params: any) => params.data.name,
-          fontSize: 12,
-          fontWeight: 500,
-          color: isDarkMode ? '#e4e7eb' : '#374151',
         },
         emphasis: {
           focus: "adjacency",
