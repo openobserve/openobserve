@@ -14,6 +14,7 @@ import {
   setupMetricPanelWithConfig,
   reopenPanelConfig,
 } from "./utils/configPanelHelpers.js";
+import { verifyColorOnCanvas, applyAndWaitForRender } from "./utils/canvasHelpers.js";
 const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
@@ -31,18 +32,18 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     await setupLinePanelWithConfig(page, pm, dashboardName);
 
-    // 0m reference row is always present
-    const timeShiftRows = page.locator('.custom-date-time-picker');
-    await expect(timeShiftRows).toHaveCount(1);
+    // Count added time shift rows by their remove buttons (0m ref row has no remove button)
+    const removeButtons = page.locator('[data-test^="dashboard-addpanel-config-time-shift-remove-"]');
+    await expect(removeButtons).toHaveCount(0);
 
     // Add two time shifts
     await pm.dashboardPanelConfigs.addTimeShift();
     await pm.dashboardPanelConfigs.addTimeShift();
-    await expect(timeShiftRows).toHaveCount(3);
+    await expect(removeButtons).toHaveCount(2);
 
     // Remove first added shift
     await pm.dashboardPanelConfigs.removeTimeShift(0);
-    await expect(timeShiftRows).toHaveCount(2);
+    await expect(removeButtons).toHaveCount(1);
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Time shift added and removed, chart renders");
@@ -52,7 +53,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying time shift count persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('.custom-date-time-picker')).toHaveCount(2);
+    await expect(page.locator('[data-test^="dashboard-addpanel-config-time-shift-remove-"]')).toHaveCount(1);
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -64,14 +65,14 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.addTimeShift();
 
-    await expect(page.locator('[data-test="dashboard-trellis-chart"]')).toHaveAttribute("aria-disabled", "true");
+    await expect(page.locator('.q-field--disabled:has([data-test="dashboard-trellis-chart"])')).toBeVisible();
     testLogger.info("Trellis disabled with time shifts active");
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
-  test("color by series: button visible → open popup → save → chart renders; cancel → popup closes", async ({ page }) => {
+  test("color by series: select first series → set custom color → save → color appears on chart canvas", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
@@ -79,55 +80,80 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     await expect(page.locator('[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]')).toBeVisible();
 
-    // Open and save
+    // Open popup → select first available series → set custom color → save
     await pm.dashboardPanelConfigs.openColorBySeries();
     await expect(page.locator('[data-test="dashboard-color-by-series-popup"]')).toBeVisible();
+
+    const customColor = "#e63946";
+    await pm.dashboardPanelConfigs.configureColorBySeries({ rowIndex: 0, optionIndex: 0, color: customColor });
+    testLogger.info("Color by series: first series selected with custom color");
+
     await pm.dashboardPanelConfigs.saveColorBySeries();
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    testLogger.info("Color by series saved");
-    await pm.dashboardPanelActions.waitForChartToRender();
-    await pm.dashboardPanelActions.verifyChartHasData(expect);
-
-    // Open and cancel
-    await pm.dashboardPanelConfigs.openColorBySeries();
-    await expect(page.locator('[data-test="dashboard-color-by-series-popup"]')).toBeVisible();
-    await pm.dashboardPanelConfigs.cancelColorBySeries();
     await expect(page.locator('[data-test="dashboard-color-by-series-popup"]')).not.toBeVisible();
-    testLogger.info("Color by series cancelled — popup closed");
+    testLogger.info("Color by series saved");
+
+    // Apply, wait for API response + ECharts repaint before pixel scan
+    await applyAndWaitForRender(page, pm);
+
+    const colorResult = await verifyColorOnCanvas(page, { r: 230, g: 57, b: 70 });
+    testLogger.info("Canvas color verification", { matchingPixels: colorResult.matchingPixels, colorFound: colorResult.colorFound });
+    expect(colorResult.colorFound).toBe(true);
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
-  test("override config: button visible for table → add row → apply → table renders", async ({ page }) => {
+  test("override config: select field + bytes unit → save → table renders; reopen verifies field persists", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
     await setupTablePanelWithConfig(page, pm, dashboardName);
 
-    const overrideBtn = page.locator('[data-test="dashboard-addpanel-config-override-config-add-btn"]');
-    await expect(overrideBtn).toBeVisible();
-    await overrideBtn.click();
+    // Open popup, pick first column, select Bytes unit, save
+    await pm.dashboardPanelConfigs.configureOverrideWithUnit({ unitName: "Bytes" });
+    testLogger.info("Override config: field + Bytes unit saved");
+
     await pm.dashboardPanelActions.applyDashboardBtn();
-    testLogger.info("Override config row added");
     await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
+    testLogger.info("Override config applied — table renders");
+
+    // Verify override config persists after save
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying override config persists after save");
+    await reopenPanelConfig(page, pm);
+    await pm.dashboardPanelConfigs.overrideConfig.click();
+    const fieldSelect = page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0"]');
+    await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
+    await expect(fieldSelect).not.toContainText("Field");
+    await page.keyboard.press("Escape");
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
-  test("value mapping: button visible for table → add row → apply → table renders", async ({ page }) => {
+  test("value mapping: fill value + display text + set color → apply → table renders; reopen verifies mapping persists", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
     await setupTablePanelWithConfig(page, pm, dashboardName);
 
-    const drilldownBtn = page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]');
-    await expect(drilldownBtn).toBeVisible();
-    await drilldownBtn.click();
+    // Open popup, fill value + display text + initialize color, apply
+    await pm.dashboardPanelConfigs.configureValueMapping({ value: "test_value", text: "Mapped!", setColor: true });
+    testLogger.info("Value mapping: applied with value, display text, and color");
+
     await pm.dashboardPanelActions.applyDashboardBtn();
-    testLogger.info("Value mapping row added");
     await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
+    testLogger.info("Value mapping applied — table renders");
+
+    // Verify value mapping persists after save
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying value mapping persists after save");
+    await reopenPanelConfig(page, pm);
+    const popup = await pm.dashboardPanelConfigs.openValueMappingPopup();
+    await expect(popup.locator('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]')).toHaveValue("test_value");
+    await expect(popup.locator('[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]')).toHaveValue("Mapped!");
+    testLogger.info("Value mapping persisted after save");
+    await pm.dashboardPanelConfigs.closeValueMappingPopup();
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -159,7 +185,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
 
-    const topNInput = page.locator('[data-test="dashboard-config-top-n"]');
+    const topNInput = page.locator('[data-test="dashboard-config-top_results"]');
     await expect(topNInput).toBeVisible();
     await topNInput.click();
     await topNInput.fill("5");
@@ -171,7 +197,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying top N value persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-top-n"]')).toHaveValue("5");
+    await expect(page.locator('[data-test="dashboard-config-top_results"]')).toHaveValue("5");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

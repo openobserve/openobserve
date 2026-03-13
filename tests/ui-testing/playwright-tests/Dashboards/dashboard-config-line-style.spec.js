@@ -9,7 +9,6 @@ import { cleanupTestDashboard } from "./utils/dashCreation.js";
 import {
   generateDashboardName,
   setupLinePanelWithConfig,
-  setupAreaPanelWithConfig,
   reopenPanelConfig,
 } from "./utils/configPanelHelpers.js";
 const testLogger = require('../utils/test-logger.js');
@@ -23,7 +22,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await ingestion(page);
   });
 
-  test("symbol: visible → Circle → apply; No Symbol → apply; chart renders in both cases", async ({ page }) => {
+  test("symbol: visible → Yes (show) → apply; No (hide) → apply; chart renders in both cases", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
@@ -32,22 +31,22 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     const symbolDropdown = page.locator('[data-test="dashboard-config-show_symbol"]');
     await expect(symbolDropdown).toBeVisible();
 
-    await pm.dashboardPanelConfigs.selectSymbols("Circle");
+    await pm.dashboardPanelConfigs.selectSymbols("Yes");
     await pm.dashboardPanelActions.applyDashboardBtn();
-    testLogger.info("Symbol set to Circle");
+    testLogger.info("Symbol set to Yes (enabled)");
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
-    await pm.dashboardPanelConfigs.selectSymbols("No Symbol");
+    await pm.dashboardPanelConfigs.selectSymbols("No");
     await pm.dashboardPanelActions.applyDashboardBtn();
-    testLogger.info("Symbol set to No Symbol");
+    testLogger.info("Symbol set to No (disabled)");
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
     await pm.dashboardPanelActions.savePanel();
-    testLogger.info("Verifying symbol No Symbol persists after save");
+    testLogger.info("Verifying symbol No persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-show_symbol"]')).toContainText("No Symbol");
+    await expect(page.locator('[data-test="dashboard-config-show_symbol"]')).toContainText("No");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

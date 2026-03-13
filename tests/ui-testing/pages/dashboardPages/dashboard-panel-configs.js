@@ -180,7 +180,7 @@ export default class DashboardPanelConfigs {
   async selectValuePosition(position) {
     await this.valuePosition.waitFor({ state: "visible" });
     await this.valuePosition.click();
-    await this.page.getByRole("option", { name: position }).click();
+    await this.page.getByRole("option", { name: position, exact: true }).click();
   }
 
   // Value rotate
@@ -311,6 +311,94 @@ export default class DashboardPanelConfigs {
   async selectOverrideConfig() {
     await this.overrideConfig.waitFor({ state: "visible" });
     await this.overrideConfig.click();
+  }
+
+  /**
+   * Open override config popup, select a column (by name or first available) and a unit,
+   * then save. Popup auto-adds one row on open (onMounted).
+   * @param {Object} options
+   * @param {string|null} [options.columnName] - Column label to select; null = pick first option
+   * @param {string} [options.unitName] - Unit label to select (e.g. "Bytes", "Milliseconds")
+   */
+  async configureOverrideWithUnit({ columnName = null, unitName = "Bytes" } = {}) {
+    await this.scrollSidebarToElement(this.overrideConfig);
+    await this.overrideConfig.click();
+
+    const fieldSelect = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0"]');
+    await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
+    await fieldSelect.click();
+
+    if (columnName) {
+      await this.page.getByRole("option", { name: columnName }).first().waitFor({ state: "visible", timeout: 5000 });
+      await this.page.getByRole("option", { name: columnName }).first().click();
+    } else {
+      // Pick first available column when column name is unknown
+      await this.page.locator('.q-menu [role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
+      await this.page.locator('.q-menu [role="option"]').first().click();
+    }
+
+    const unitSelect = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-unit-0"]');
+    await unitSelect.waitFor({ state: "visible", timeout: 5000 });
+    await unitSelect.click();
+    await this.page.getByRole("option", { name: unitName, exact: true }).click();
+
+    // Scope to q-card__actions (OverrideConfigPopup footer) to avoid matching the panel Save btn
+    await this.page.locator('.q-card__actions').getByRole("button", { name: "Save" }).click();
+    await fieldSelect.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+  }
+
+  /**
+   * Open value mapping popup, fill one mapping row, then click Apply.
+   * Popup auto-adds one row on open (onMounted).
+   * @param {Object} options
+   * @param {string} [options.value] - Value to match (type=value row)
+   * @param {string} [options.text] - Display text to show
+   * @param {boolean} [options.setColor] - Whether to initialize the color (clicks "Set color")
+   */
+  async configureValueMapping({ value = "test_value", text = "Mapped!", setColor = true } = {}) {
+    // ValueMapping.vue shares data-test with Drilldown.vue — use last()
+    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').last();
+    await this.scrollSidebarToElement(valueMappingBtn);
+    await valueMappingBtn.click();
+
+    const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
+    await popup.waitFor({ state: "visible", timeout: 10000 });
+
+    const valueInput = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]');
+    await valueInput.waitFor({ state: "visible", timeout: 5000 });
+    await valueInput.fill(value);
+
+    const textInput = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]');
+    await textInput.fill(text);
+
+    if (setColor) {
+      await popup.getByText("Set color").click();
+      await popup.locator('.color-section input').first().waitFor({ state: "visible", timeout: 5000 });
+    }
+
+    await popup.locator('[data-test="dashboard-addpanel-config-value-mapping-apply-btn"]').click();
+    await popup.waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Open value mapping popup and return the popup locator (for external assertions).
+   */
+  async openValueMappingPopup() {
+    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').last();
+    await this.scrollSidebarToElement(valueMappingBtn);
+    await valueMappingBtn.click();
+    const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
+    await popup.waitFor({ state: "visible", timeout: 10000 });
+    return popup;
+  }
+
+  /**
+   * Close value mapping popup via the X button without saving.
+   */
+  async closeValueMappingPopup() {
+    const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
+    await popup.locator('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]').click();
+    await popup.waitFor({ state: "hidden", timeout: 5000 });
   }
 
   // Add and configure override with dynamic column and type

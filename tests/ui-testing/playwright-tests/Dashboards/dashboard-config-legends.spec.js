@@ -28,7 +28,7 @@ test.describe("ConfigPanel — Legends", () => {
 
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
-    const showLegendsToggle = page.locator('[data-test="dashboard-config-show-legends"]');
+    const showLegendsToggle = page.locator('[data-test="dashboard-config-show-legend"]');
     await expect(showLegendsToggle).toBeVisible();
     await showLegendsToggle.click();
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -40,7 +40,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying show legends toggle persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-show-legends"]')).toHaveAttribute("aria-checked", "false");
+    await expect(page.locator('[data-test="dashboard-config-show-legend"]')).toHaveAttribute("aria-checked", "false");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -50,6 +50,11 @@ test.describe("ConfigPanel — Legends", () => {
     const dashboardName = generateDashboardName();
 
     await setupBarPanelWithConfig(page, pm, dashboardName);
+
+    // Width input requires legends_type=plain AND legends_position=right — set type first
+    const legendTypeDropdown = page.locator('[data-test="dashboard-config-legends-scrollable"]');
+    await legendTypeDropdown.click();
+    await page.getByRole("option", { name: "Plain" }).click();
     await pm.dashboardPanelConfigs.legendPosition("Right");
 
     // Width input appears, height input does not
@@ -74,7 +79,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend position Right persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toContainText("Right");
+    await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toContainText("right");
     await expect(page.locator('[data-test="dashboard-config-legend-width"]')).toHaveValue("200");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -85,6 +90,11 @@ test.describe("ConfigPanel — Legends", () => {
     const dashboardName = generateDashboardName();
 
     await setupBarPanelWithConfig(page, pm, dashboardName);
+
+    // Height input requires legends_type=plain AND legends_position=bottom — set type first
+    const legendTypeDropdown = page.locator('[data-test="dashboard-config-legends-scrollable"]');
+    await legendTypeDropdown.click();
+    await page.getByRole("option", { name: "Plain" }).click();
     await pm.dashboardPanelConfigs.legendPosition("Bottom");
 
     // Height input appears, width input does not
@@ -109,7 +119,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend position Bottom persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toContainText("Bottom");
+    await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toContainText("bottom");
     await expect(page.locator('[data-test="dashboard-config-legend-height"]')).toHaveValue("100");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -142,7 +152,7 @@ test.describe("ConfigPanel — Legends", () => {
 
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
-    const legendTypeDropdown = page.locator('[data-test="dashboard-config-legend-type"]');
+    const legendTypeDropdown = page.locator('[data-test="dashboard-config-legends-scrollable"]');
     await expect(legendTypeDropdown).toBeVisible();
 
     await legendTypeDropdown.click();
@@ -162,7 +172,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend type Plain persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-legend-type"]')).toContainText("Plain");
+    await expect(page.locator('[data-test="dashboard-config-legends-scrollable"]')).toContainText("plain");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

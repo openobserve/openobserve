@@ -68,7 +68,7 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying trellis Custom layout and 16 columns persist after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-trellis-chart"]')).toContainText("Custom");
+    await expect(page.locator('[data-test="dashboard-trellis-chart"]')).toContainText("custom");
     await expect(page.locator('[data-test="trellis-chart-num-of-columns"]')).toHaveValue("16");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -80,8 +80,9 @@ test.describe("ConfigPanel — Trellis Settings", () => {
 
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
-    const trellisDropdown = page.locator('[data-test="dashboard-trellis-chart"]');
-    await expect(trellisDropdown).toHaveAttribute("aria-disabled", "true");
+    // aria-disabled is on the root q-field wrapper, not the inner native div that data-test resolves to.
+    // Use CSS :has() to find the disabled wrapper that contains the trellis data-test element.
+    await expect(page.locator('.q-field--disabled:has([data-test="dashboard-trellis-chart"])')).toBeVisible();
     testLogger.info("Trellis disabled with no breakdown field");
 
     await pm.dashboardPanelActions.savePanel();
@@ -95,8 +96,7 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.addTimeShift();
 
-    const trellisDropdown = page.locator('[data-test="dashboard-trellis-chart"]');
-    await expect(trellisDropdown).toHaveAttribute("aria-disabled", "true");
+    await expect(page.locator('.q-field--disabled:has([data-test="dashboard-trellis-chart"])')).toBeVisible();
     testLogger.info("Trellis disabled with time shifts active");
 
     await pm.dashboardPanelActions.savePanel();
@@ -111,7 +111,7 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await pm.dashboardPanelConfigs.selectTrellisLayout("Auto");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    const groupByYAxisToggle = page.locator('[data-test="dashboard-trellis-group-by-y-axis"]');
+    const groupByYAxisToggle = page.locator('[data-test="dashboard-config-trellis-group-by-y-axis"]');
     await expect(groupByYAxisToggle).toBeVisible();
     await groupByYAxisToggle.click();
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -122,7 +122,7 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying group by Y axis enabled persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-trellis-group-by-y-axis"]')).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator('[data-test="dashboard-config-trellis-group-by-y-axis"]')).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

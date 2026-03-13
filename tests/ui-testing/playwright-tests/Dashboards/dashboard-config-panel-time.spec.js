@@ -144,10 +144,11 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
 
     await pm.dashboardPanelTime.enablePanelTime();
     await page.locator('[data-test="dashboard-config-set-panel-time"]').click();
-    await pm.dashboardPanelTime.setPanelTimeAbsolute(1, 5);
-    testLogger.info("Absolute panel time set (day 1 to day 5)");
+    const today = new Date().getDate();
+    const startDay = Math.max(1, today - 4);
+    await pm.dashboardPanelTime.setPanelTimeAbsolute(startDay, today);
+    testLogger.info(`Absolute panel time set (day ${startDay} to day ${today})`);
 
-    await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 

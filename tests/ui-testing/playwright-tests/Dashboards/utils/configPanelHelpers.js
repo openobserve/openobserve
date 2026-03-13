@@ -5,6 +5,7 @@
  */
 
 import { setupTestDashboard } from "./dashCreation.js";
+import { ingestionForMaps } from "./dashIngestion.js";
 const testLogger = require('../../utils/test-logger.js');
 
 // ---------------------------------------------------------------------------
@@ -145,19 +146,37 @@ export async function setupGaugePanelWithConfig(page, pm, dashboardName, panelNa
 }
 
 /**
- * GeoMap chart panel — config sidebar opened and ready.
+ * GeoMap chart panel — ingests geo data, builds panel with lat/lon fields, opens config sidebar.
  */
 export async function setupGeomapPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
-  await buildPanel(page, pm, dashboardName, { chartType: "geomap", panelName });
+  await ingestionForMaps(page);
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType("geomap");
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream("geojson");
+  await pm.chartTypeSelector.searchAndAddField("lat", "latitude");
+  await pm.chartTypeSelector.searchAndAddField("lon", "longitude");
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Geomap panel with config ready", { dashboardName, panelName });
 }
 
 /**
- * Maps chart panel — config sidebar opened and ready.
+ * Maps chart panel — ingests geo data, builds panel with name+value fields, opens config sidebar.
  */
 export async function setupMapsPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
-  await buildPanel(page, pm, dashboardName, { chartType: "maps", panelName });
+  await ingestionForMaps(page);
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType("maps");
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream("geojson");
+  await pm.chartTypeSelector.searchAndAddField("country", "x");
+  await pm.chartTypeSelector.searchAndAddField("lat", "y");
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Maps panel with config ready", { dashboardName, panelName });
 }
