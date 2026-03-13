@@ -225,33 +225,13 @@ export const convertServiceGraphToTree = (
   const nodesWithIncoming = new Set(graphData.edges.map((e: any) => e.to));
   const rootNodes = graphData.nodes.filter((n: any) => !nodesWithIncoming.has(n.id));
 
-  // --- Compute adaptive baselines from the full dataset ---
-  const percentile = (sorted: number[], p: number): number => {
-    if (sorted.length === 0) return 0;
-    const idx = (p / 100) * (sorted.length - 1);
-    const lo = Math.floor(idx);
-    const hi = Math.ceil(idx);
-    return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
-  };
-
-  // Node error rates (from node-level data)
-  const allErrorRates = graphData.nodes
-    .map((n: any) => n.error_rate ?? (n.requests > 0 ? (n.errors / n.requests) * 100 : 0))
-    .filter((r: number) => r > 0)
-    .sort((a: number, b: number) => a - b);
-
-  const errP50 = percentile(allErrorRates, 50);
-  const errP75 = percentile(allErrorRates, 75);
-  const errP90 = percentile(allErrorRates, 90);
-
   const green = isDarkMode ? "#10b981" : "#52c41a";
 
-  // Node color: error rate relative to the tree's error baseline
+  // Node color: same absolute thresholds as Graph View so color matches tooltip error rate
   const getNodeColor = (errRate: number): string => {
-    if (allErrorRates.length === 0 || errRate === 0) return green;
-    if (errRate >= errP90) return "#f5222d";  // Red — top 10%
-    if (errRate >= errP75) return "#faad14";  // Orange — top 25%
-    if (errRate >= errP50) return "#ffc069";  // Light orange — above median
+    if (errRate > 10) return isDarkMode ? "#ef4444" : "#f5222d";  // Red — critical
+    if (errRate > 5)  return isDarkMode ? "#f97316" : "#fa8c16";  // Orange — warning
+    if (errRate > 1)  return isDarkMode ? "#fbbf24" : "#faad14";  // Yellow — degraded
     return green;
   };
 

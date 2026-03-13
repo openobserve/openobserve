@@ -822,36 +822,8 @@ export default defineComponent({
 
       const showNodeTooltip = (mouseX: number, mouseY: number, nodeName: string) => {
         resetToTextTooltip();
-        const edges = graphData.value?.edges || [];
 
-        // Find incoming edge for this node (direction-aware, matches tree label)
-        const incomingBezier = bezierEdges.find(b => b.childName === nodeName);
-        if (incomingBezier) {
-          const edge = findIncomingEdgeForNode(nodeName, incomingBezier.parentName, edges);
-          if (edge) {
-            const total = edge.total_requests || 0;
-            const failed = edge.failed_requests || 0;
-            const errRate = edge.error_rate ?? (total > 0 ? (failed / total) * 100 : 0);
-            tooltipEl.innerHTML = generateNodeTooltipContent(nodeName, total, failed, errRate);
-            positionTooltip(mouseX, mouseY);
-            return;
-          }
-        }
-
-        // Root node or no incoming edge: sum outgoing edges
-        const metrics = calculateRootNodeMetrics(nodeName, edges);
-        if (metrics.requests > 0) {
-          tooltipEl.innerHTML = generateNodeTooltipContent(
-            nodeName,
-            metrics.requests,
-            metrics.errors,
-            metrics.errorRate
-          );
-          positionTooltip(mouseX, mouseY);
-          return;
-        }
-
-        // Fallback: use node aggregate
+        // Always use node-level data for the tooltip — same source as border color
         const nodes = graphData.value?.nodes || [];
         const node = nodes.find((n: any) => (n.label || n.id) === nodeName);
         if (!node) { tooltipEl.style.display = 'none'; return; }
