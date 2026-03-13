@@ -247,7 +247,7 @@ export class PipelinesPage {
      */
     async clickStreamTypeSelect() {
         // Wait for the add pipeline dialog to be visible
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // The data-test attribute is on a wrapper div, the q-select is inside
@@ -278,7 +278,7 @@ export class PipelinesPage {
      */
     async clickInputNodeStreamTypeSelect() {
         // Wait for the stream form dialog to be visible
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         await this.page.waitForTimeout(500);
 
         // The data-test attribute is on a wrapper div, the q-select is inside
@@ -526,7 +526,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} - True if pipeline exists, false otherwise
      */
     async verifyPipelineExists(pipelineName) {
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         await this.page.waitForTimeout(2000);
         await this.searchPipeline(pipelineName);
         await this.page.waitForTimeout(2000);
@@ -2537,7 +2537,7 @@ export class PipelinesPage {
     async navigateToBackfillPage(orgName) {
         const backfillUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/backfill?org_identifier=${orgName}`;
         await this.page.goto(backfillUrl);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         testLogger.info('Navigated to backfill jobs page', { url: backfillUrl });
     }
 
@@ -2615,7 +2615,7 @@ export class PipelinesPage {
         } else {
             await this.page.goBack();
         }
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         testLogger.info('Navigated back from backfill page');
     }
 
@@ -2758,7 +2758,7 @@ export class PipelinesPage {
         } else {
             await this.page.goBack();
         }
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         testLogger.info('Navigated back from history page');
     }
 
@@ -3034,7 +3034,7 @@ export class PipelinesPage {
         const backBtn = this.page.locator('[data-test*="back-btn"], [data-test*="back"], button:has-text("Back"), .back-btn').first();
         if (await backBtn.isVisible().catch(() => false)) {
             await backBtn.click();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle').catch(() => {});
             testLogger.info('Clicked history back button');
         } else {
             await this.page.goBack();
