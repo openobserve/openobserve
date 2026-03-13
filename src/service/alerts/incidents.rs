@@ -297,48 +297,6 @@ pub async fn correlate_alert_to_incident(
     notify_rows: &[Map<String, Value>],
     triggered_at: i64,
 ) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
-    // AI credit check for incident creation (cloud only)
-    // All orgs try free quota first. On exhaustion, paid orgs overflow to
-    // Stripe billing; unpaid orgs skip incident creation (alerts still fire).
-    #[cfg(feature = "cloud")]
-    {
-        let deduction = crate::service::trial_quota::try_deduct(
-            &alert.org_id,
-            crate::service::trial_quota::TrialQuotaFeature::NewIncident,
-        )
-        .await;
-
-        let usage_ctx = crate::service::trial_quota::AiUsageContext {
-            user_email: "system@openobserve.ai".to_string(),
-            incident_id: None, // not yet created
-            ..Default::default()
-        };
-        match &deduction {
-            Ok(_) => {
-                crate::service::trial_quota::record_free_ai_usage(
-                    &alert.org_id,
-                    &usage_ctx,
-                    crate::service::trial_quota::TrialQuotaFeature::NewIncident,
-                );
-            }
-            Err(e) => {
-                if crate::service::trial_quota::org_has_active_subscription(&alert.org_id).await {
-                    crate::service::trial_quota::record_billable_ai_usage(
-                        &alert.org_id,
-                        &usage_ctx,
-                        crate::service::trial_quota::TrialQuotaFeature::NewIncident,
-                    );
-                } else {
-                    log::info!(
-                        "[INCIDENTS] Skipping incident for org {} because no free quota left: {e}",
-                        alert.org_id
-                    );
-                    return Ok(None);
-                }
-            }
-        }
-    }
-
     // Semantic groups from system_settings — the single source of truth,
     // configured via /settings/v2/semantic_field_groups API.
     let semantic_groups =
@@ -465,6 +423,47 @@ pub async fn correlate_alert_to_incident(
         upgrade_window_minutes,
     )
     .await?;
+
+    // AI credit deduction for incident creation (cloud only).
+    // Only deduct when a NEW incident is created — alerts joining an existing
+    // incident or repeated firings must not consume credits or post usage events.
+    #[cfg(feature = "cloud")]
+    if matches!(
+        outcome,
+        IncidentCorrelationOutcome::NewIncidentCreated { .. }
+    ) {
+        let deduction = crate::service::trial_quota::try_deduct(
+            &alert.org_id,
+            crate::service::trial_quota::TrialQuotaFeature::NewIncident,
+        )
+        .await;
+
+        let usage_ctx = crate::service::trial_quota::AiUsageContext {
+            user_email: "system@openobserve.ai".to_string(),
+            incident_id: Some(outcome.incident_id().to_string()),
+            ..Default::default()
+        };
+        match &deduction {
+            Ok(_) => {
+                crate::service::trial_quota::record_free_ai_usage(
+                    &alert.org_id,
+                    &usage_ctx,
+                    crate::service::trial_quota::TrialQuotaFeature::NewIncident,
+                );
+            }
+            Err(_) => {
+                if crate::service::trial_quota::org_has_active_subscription(&alert.org_id).await {
+                    crate::service::trial_quota::record_billable_ai_usage(
+                        &alert.org_id,
+                        &usage_ctx,
+                        crate::service::trial_quota::TrialQuotaFeature::NewIncident,
+                    );
+                }
+                // Note: incident is already created at this point — we don't roll it
+                // back on quota exhaustion. The deduction failure is logged by try_deduct.
+            }
+        }
+    }
 
     // Send incident notification unless rows are empty (manual trigger path)
     // or the outcome is a repeated alert (suppressed by design).
@@ -792,7 +791,7 @@ async fn find_or_create_incident(
                         if let Err(e) = trigger_rca_for_incident(
                             org_id_rca.clone(),
                             incident_id_rca.clone(),
-                            true, // lifecycle-triggered reanalysis — track usage
+                            true, // reanalysis — deduct credits and report usage
                             true, // begin already emitted above
                             "system@openobserve.ai".to_string(),
                         )
@@ -932,10 +931,10 @@ async fn find_or_create_incident(
                         if let Err(e) = trigger_rca_for_incident(
                             org_id_rca,
                             incident_id_rca.clone(),
-                            true,
-                            true,
+                            true, // reanalysis — deduct credits and report usage
+                            true, // begin already emitted above
                             "system@openobserve.ai".to_string(),
-                        ) // lifecycle reanalysis; begin already emitted above
+                        )
                         .await
                         {
                             log::debug!(
@@ -1734,16 +1733,16 @@ pub async fn update_status(
             )
             .await;
             tokio::spawn(async move {
-                // reanalysis=true: bypass cooldown — incident was closed, context is fresh
+                // reanalysis on reopen: deduct credits and report usage;
+                // begin_already_emitted=true skips cooldown/in-flight guards
                 if let Err(e) = trigger_rca_for_incident(
                     org_id_rca,
                     incident_id_rca.clone(),
-                    true,
-                    true,
+                    true, // reanalysis — deduct credits and report usage
+                    true, // begin already emitted above
                     "system@openobserve.ai".to_string(),
                 )
                 .await
-                // begin already emitted above
                 {
                     log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
                 }
