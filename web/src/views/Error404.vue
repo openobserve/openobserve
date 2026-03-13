@@ -23,6 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="text-h2" style="opacity: 0.4">Oops. Nothing here...</div>
 
+      <div class="q-mt-md" style="opacity: 0.7">
+        Redirecting to home in {{ countdown }} second{{ countdown !== 1 ? 's' : '' }}...
+      </div>
+
       <q-btn
         class="q-mt-xl"
         color="white"
@@ -37,9 +41,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, ref, onMounted, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "Error404",
+  setup() {
+    const router = useRouter();
+    const countdown = ref(10);
+    let timer: ReturnType<typeof setInterval>;
+
+    onMounted(() => {
+      timer = setInterval(() => {
+        countdown.value--;
+        if (countdown.value <= 0) {
+          clearInterval(timer);
+          router.push("/");
+        }
+      }, 1000);
+    });
+
+    onUnmounted(() => {
+      clearInterval(timer);
+    });
+
+    return { countdown };
+  },
 });
 </script>

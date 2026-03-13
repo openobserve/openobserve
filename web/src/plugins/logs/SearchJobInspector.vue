@@ -419,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed } from "vue";
+import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -734,6 +734,19 @@ export default defineComponent({
     const hasNoData = computed(() => {
       return !profileData.value || !profileData.value.events || profileData.value.events.length === 0;
     });
+
+    watch(
+      () => store.state.selectedOrganization?.identifier,
+      (newOrg, oldOrg) => {
+        if (oldOrg && newOrg !== oldOrg) {
+          router.push({
+            name: "logs",
+            query: { org_identifier: newOrg },
+          });
+        }
+      },
+      { flush: "sync" },
+    );
 
     const goBack = () => {
       router.back();
