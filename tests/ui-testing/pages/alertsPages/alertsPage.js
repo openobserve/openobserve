@@ -443,8 +443,9 @@ export class AlertsPage {
         const table = this.page.locator(this.locators.alertDetailsHistoryTable);
         const emptyState = this.page.locator('text=No history available').or(this.page.locator('.q-icon:has-text("history")'));
 
-        // Wait for either to appear
-        await expect(table.or(emptyState)).toBeVisible({ timeout: 10000 });
+        // Wait for either to appear — use .first() because .or() can match multiple elements
+        // (e.g. the history icon may appear in the dialog AND in navigation)
+        await expect(table.or(emptyState).first()).toBeVisible({ timeout: 10000 });
 
         if (await table.isVisible({ timeout: 1000 }).catch(() => false)) {
             testLogger.info('Alert details history table is visible');

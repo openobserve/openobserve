@@ -16,10 +16,13 @@ async function ingestTestData(page) {
 }
 
 async function applyQueryButton(pm) {
-  const search = pm.page.waitForResponse(logData.applyQuery);
-  await pm.page.waitForLoadState('domcontentloaded');
-  await pm.logsPage.clickRefreshButton();
-  await expect.poll(async () => (await search).status()).toBe(200);
+  const [response] = await Promise.all([
+    pm.page.waitForResponse(
+      resp => resp.url().includes('/_search') && resp.status() === 200,
+      { timeout: 60000 }
+    ),
+    pm.logsPage.clickRefreshButton(),
+  ]);
 }
 
 function removeUTFCharacters(text) {
