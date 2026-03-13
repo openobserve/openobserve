@@ -304,7 +304,11 @@ export default defineComponent({
     const currentPlanDetail = ref();
     const billingProvider = ref("");
     const aiUsage = ref<any>(null);
-    const aiIcon = getImageURL("images/common/ai_icon.svg");
+    const aiIcon = computed(() =>
+      store.state.theme === "dark"
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon.svg")
+    );
     const aiUsageRatio = computed(() => {
       if (!aiUsage.value || !aiUsage.value.credits_limit) return 0;
       return Math.min(aiUsage.value.credits_used / aiUsage.value.credits_limit, 1);
