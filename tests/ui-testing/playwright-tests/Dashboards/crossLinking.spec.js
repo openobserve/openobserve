@@ -6,7 +6,7 @@ const { ingestTestData: _ingestData } = require('../utils/data-ingestion.js');
 const STREAM_NAME = "e2e_automate";
 
 test.describe("Cross-Linking testcases", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
     let dataIngested = false;
 
@@ -425,6 +425,7 @@ test.describe("Cross-Linking testcases", () => {
         await page.waitForTimeout(2000);
 
         // Add kubernetes_container_name as an interesting field so it appears as a table column
+        await pm.logsPage.fillIndexFieldSearchInput('kubernetes_container_name');
         await pm.logsPage.clickInterestingFieldButton('kubernetes_container_name');
         await page.waitForTimeout(1000);
 
@@ -1237,6 +1238,7 @@ test.describe("Cross-Linking testcases", () => {
         await page.waitForTimeout(2000);
 
         // Add kubernetes_container_name as an interesting field so it appears as a table column
+        await pm.logsPage.fillIndexFieldSearchInput('kubernetes_container_name');
         await pm.logsPage.clickInterestingFieldButton('kubernetes_container_name');
         await page.waitForTimeout(1000);
 
