@@ -16,6 +16,7 @@ import { test, expect } from "../baseFixtures.js";
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
+// getHeaders import removed — cloud management APIs require OIDC session cookies via page.evaluate(fetch())
 const testLogger = require('../utils/test-logger.js');
 const path = require('path');
 const crypto = require('crypto');
@@ -31,16 +32,6 @@ test.use({
   }
 });
 
-// Helper: build Basic Auth headers for API calls (Node.js context, no page needed)
-function getApiHeaders() {
-  return {
-    'Authorization': 'Basic ' + Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString('base64'),
-    'Content-Type': 'application/json'
-  };
-}
-
 test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@backfill', '@pipelinesBackfill'] }, () => {
   let pageManager;
 
@@ -49,10 +40,16 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
   let testBackfillJobId = null;
   let backfillDataAvailable = false;
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({ browser }) => {
     const orgId = process.env["ORGNAME"];
-    const headers = getApiHeaders();
     const baseUrl = process.env.ZO_BASE_URL;
+
+    // Use browser context with stored auth for API calls
+    // (cloud management APIs require OIDC session cookies, not Basic Auth)
+    const setupContext = await browser.newContext({ storageState: authFile });
+    const setupPage = await setupContext.newPage();
+    await setupPage.goto(`${baseUrl}/web/?org_identifier=${orgId}`);
+    await setupPage.waitForLoadState('networkidle').catch(() => {});
 
     try {
       // Step 1: Create a simple pipeline (source: e2e_automate → dest: e2e_backfill_dest)
@@ -140,29 +137,31 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
         ]
       };
 
-      const createRes = await fetch(`${baseUrl}/api/${orgId}/pipelines`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(pipelinePayload)
-      });
+      const createResult = await setupPage.evaluate(async ({ orgId, payload }) => {
+        const r = await fetch(`/api/${orgId}/pipelines`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const body = await r.json().catch(() => ({}));
+        return { ok: r.ok, status: r.status, body };
+      }, { orgId, payload: pipelinePayload });
 
-      if (!createRes.ok) {
-        const errBody = await createRes.text().catch(() => '');
-        testLogger.warn(`Pipeline creation failed: ${createRes.status} — ${errBody}`);
+      if (!createResult.ok) {
+        testLogger.warn(`Pipeline creation failed: ${createResult.status}`);
         return;
       }
 
-      const createData = await createRes.json();
-      testLogger.info(`Pipeline create response: ${JSON.stringify(createData)}`);
+      testLogger.info(`Pipeline create response: ${JSON.stringify(createResult.body)}`);
 
       // API doesn't return the pipeline ID — list pipelines and find ours by name
-      const listRes = await fetch(`${baseUrl}/api/${orgId}/pipelines`, {
-        method: 'GET', headers
-      });
+      const listResult = await setupPage.evaluate(async ({ orgId }) => {
+        const r = await fetch(`/api/${orgId}/pipelines`);
+        return r.ok ? await r.json() : null;
+      }, { orgId });
 
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        const pipelines = listData.list || listData.pipelines || listData;
+      if (listResult) {
+        const pipelines = listResult.list || listResult.pipelines || listResult;
         const ours = (Array.isArray(pipelines) ? pipelines : []).find(
           p => p.name === pipelineName
         );
@@ -180,53 +179,65 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
       const nowMicro = Date.now() * 1000;
       const oneHourAgoMicro = nowMicro - (60 * 60 * 1000000);
 
-      const backfillRes = await fetch(`${baseUrl}/api/${orgId}/pipelines/${testPipelineId}/backfill`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          start_time: oneHourAgoMicro,
-          end_time: nowMicro,
-          chunk_period_minutes: 10,
-          delay_between_chunks_secs: 1,
-          delete_before_backfill: false
-        })
-      });
+      const backfillResult = await setupPage.evaluate(async ({ orgId, pipelineId, body }) => {
+        const r = await fetch(`/api/${orgId}/pipelines/${pipelineId}/backfill`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await r.json().catch(() => ({}));
+        return { ok: r.ok, status: r.status, data };
+      }, { orgId, pipelineId: testPipelineId, body: {
+        start_time: oneHourAgoMicro,
+        end_time: nowMicro,
+        chunk_period_minutes: 10,
+        delay_between_chunks_secs: 1,
+        delete_before_backfill: false
+      }});
 
-      if (!backfillRes.ok) {
-        const errBody = await backfillRes.text().catch(() => '');
-        testLogger.warn(`Backfill job creation failed: ${backfillRes.status} (enterprise-only API) — ${errBody}`);
+      if (!backfillResult.ok) {
+        testLogger.warn(`Backfill job creation failed: ${backfillResult.status} (enterprise-only API)`);
         return;
       }
 
-      const backfillData = await backfillRes.json();
-      testBackfillJobId = backfillData.job_id || backfillData.id;
+      testBackfillJobId = backfillResult.data.job_id || backfillResult.data.id;
       backfillDataAvailable = true;
-      testLogger.info(`Created backfill job: ${testBackfillJobId} (response: ${JSON.stringify(backfillData)})`);
+      testLogger.info(`Created backfill job: ${testBackfillJobId}`);
     } catch (error) {
       testLogger.warn(`Backfill data seeding failed: ${error.message}`);
+    } finally {
+      await setupPage.close();
+      await setupContext.close();
     }
   });
 
-  test.afterAll(async () => {
+  test.afterAll(async ({ browser }) => {
     const orgId = process.env["ORGNAME"];
-    const headers = getApiHeaders();
     const baseUrl = process.env.ZO_BASE_URL;
+
+    const cleanupContext = await browser.newContext({ storageState: authFile });
+    const cleanupPage = await cleanupContext.newPage();
+    await cleanupPage.goto(`${baseUrl}/web/?org_identifier=${orgId}`);
+    await cleanupPage.waitForLoadState('networkidle').catch(() => {});
 
     try {
       if (testBackfillJobId && testPipelineId) {
-        await fetch(`${baseUrl}/api/${orgId}/pipelines/${testPipelineId}/backfill/${testBackfillJobId}`, {
-          method: 'DELETE', headers
-        }).catch(() => {});
+        await cleanupPage.evaluate(async ({ orgId, pipelineId, jobId }) => {
+          await fetch(`/api/${orgId}/pipelines/${pipelineId}/backfill/${jobId}`, { method: 'DELETE' });
+        }, { orgId, pipelineId: testPipelineId, jobId: testBackfillJobId }).catch(() => {});
         testLogger.info(`Deleted backfill job: ${testBackfillJobId}`);
       }
       if (testPipelineId) {
-        await fetch(`${baseUrl}/api/${orgId}/pipelines/${testPipelineId}`, {
-          method: 'DELETE', headers
-        }).catch(() => {});
+        await cleanupPage.evaluate(async ({ orgId, pipelineId }) => {
+          await fetch(`/api/${orgId}/pipelines/${pipelineId}`, { method: 'DELETE' });
+        }, { orgId, pipelineId: testPipelineId }).catch(() => {});
         testLogger.info(`Deleted test pipeline: ${testPipelineId}`);
       }
     } catch (error) {
       testLogger.warn(`Backfill cleanup failed: ${error.message}`);
+    } finally {
+      await cleanupPage.close();
+      await cleanupContext.close();
     }
   });
 

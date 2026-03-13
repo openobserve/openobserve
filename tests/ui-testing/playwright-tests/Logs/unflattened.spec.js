@@ -66,16 +66,16 @@ test.describe("Unflattened testcases", () => {
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
   async function applyQueryButton(page) {
-    // click on the run query button
-    // Type the value of a variable into an input field
-    const search = page.waitForResponse(logData.applyQuery);
-    // Strategic 1000ms wait for complex operation completion - this is functionally necessary
-  await page.waitForTimeout(1000);
-    await pageManager.unflattenedPage.logsSearchBarRefreshButton.click({
-      force: true,
-    });
-    // get the data from the search variable
-    await expect.poll(async () => (await search).status()).toBe(200);
+    await page.waitForTimeout(1000);
+    await Promise.all([
+      page.waitForResponse(
+        resp => resp.url().includes('/_search') && resp.status() === 200,
+        { timeout: 60000 }
+      ),
+      pageManager.unflattenedPage.logsSearchBarRefreshButton.click({
+        force: true,
+      }),
+    ]);
   }
 
   test.beforeEach(async ({ page }) => {
