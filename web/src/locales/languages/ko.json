@@ -1632,7 +1632,13 @@
     "discountTag": "할인 시",
     "enterpriseNote": "대량 구매가 필요하신가요?스케일에 대해 얘기해 볼까요!맞춤형 솔루션을 원하시면 저희에게 문의하세요.",
     "contactSupport": "지원팀에 문의",
-    "totalUsage": "총 사용량"
+    "totalUsage": "총 사용량",
+    "aiCredits": "AI 크레딧",
+    "aiModeFree": "무료",
+    "aiModePayAsYouGo": "사용량에 따라 지불",
+    "aiModeExhausted": "지쳤다",
+    "aiExhaustedMessage": "구독하여 AI 기능을 계속 사용하세요",
+    "aiPaygMessage": "무료 크레딧 소진 — 사용량이 구독에 청구됨"
   },
   "message": {
     "ServerInternalError": "오류: 문제가 발생했습니다. 내부 서버 오류입니다.",

@@ -1649,7 +1649,13 @@
     "discountTag": "割引中",
     "enterpriseNote": "大量生産が必要ですか？スケールについて話そう！カスタマイズされたソリューションについてはお問い合わせください。",
     "contactSupport": "サポートに連絡",
-    "totalUsage": "合計使用量"
+    "totalUsage": "合計使用量",
+    "aiCredits": "AI クレジット",
+    "aiModeFree": "無料",
+    "aiModePayAsYouGo": "従量課金制",
+    "aiModeExhausted": "疲れ果てた",
+    "aiExhaustedMessage": "購読して引き続き AI 機能を使用する",
+    "aiPaygMessage": "無料クレジットを使い切りました — 使用量はサブスクリプションに請求されます"
   },
   "message": {
     "ServerInternalError": "エラー:問題が発生しました。内部サーバーエラー。",
