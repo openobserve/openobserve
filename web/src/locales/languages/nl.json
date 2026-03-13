@@ -2915,7 +2915,8 @@
     "rateLabel": "Tarief:",
     "timeRangeLabel": "Tijdbereik:",
     "analyzeTooltipTraces": "Analyseer de traceerdimensies voor snelheid, latentie en foutpatronen",
-    "insightsButtonLabel": "Inzichten"
+    "insightsButtonLabel": "Inzichten",
+    "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht"
   },
   "errorInsights": {
     "title": "Inzichten",

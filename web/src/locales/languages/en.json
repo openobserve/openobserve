@@ -1229,7 +1229,8 @@
     "analyzeTooltipTraces": "Analyze trace dimensions for rate, latency, and error patterns",
     "insightsButtonLabel": "Insights",
     "rateLabel": "Rate:",
-    "timeRangeLabel": "Time Range:"
+    "timeRangeLabel": "Time Range:",
+    "searchInspectionsLabel": "Inspect search job execution details"
   },
   "errorInsights": {
     "title": "Insights",

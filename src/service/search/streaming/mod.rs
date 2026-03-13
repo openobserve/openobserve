@@ -21,9 +21,10 @@
 use std::{collections::HashMap, time::Instant};
 
 use config::{
+    cluster::LOCAL_NODE,
     meta::{
         dashboards::usage_report::DashboardInfo,
-        search::{SearchEventType, StreamResponses, ValuesEventContext},
+        search::{ScanStats, SearchEventType, StreamResponses, ValuesEventContext},
         sql::OrderBy,
         stream::StreamType,
     },
@@ -44,7 +45,10 @@ use crate::{
         meta::search::{AuditContext, SearchResultType},
         utils::stream::get_max_query_range,
     },
-    service::search::cache as search_cache,
+    service::search::{
+        cache as search_cache,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    },
 };
 #[cfg(feature = "enterprise")]
 use crate::{
@@ -181,7 +185,7 @@ pub async fn process_search_stream_request(
     };
 
     let started_at = chrono::Utc::now().timestamp_micros();
-    let mut start = Instant::now();
+    let start = Instant::now();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
     // Disable caching when pattern extraction is requested since patterns are generated
     // dynamically from search results and cannot be cached
@@ -330,7 +334,6 @@ pub async fn process_search_stream_request(
                 remaining_query_range,
                 &req_order_by,
                 fallback_order_by_col,
-                &mut start,
                 sender.clone(),
                 values_ctx,
                 &all_streams,
@@ -408,7 +411,6 @@ pub async fn process_search_stream_request(
                 &user_id,
                 &mut accumulated_results,
                 max_query_range,
-                &mut start,
                 &req_order_by,
                 sender.clone(),
                 values_ctx,
@@ -543,7 +545,6 @@ pub async fn process_search_stream_request(
             &user_id,
             &mut accumulated_results,
             max_query_range,
-            &mut start,
             &req_order_by,
             sender.clone(),
             values_ctx,
@@ -595,11 +596,49 @@ pub async fn process_search_stream_request(
         }
     }
 
-    // Once all searches are complete, write the accumulated results to a file
-    log::info!(
-        "[HTTP2_STREAM trace_id {trace_id}] stream done, took {:?} ms",
-        start.elapsed().as_millis()
-    );
+    #[allow(unused_mut)]
+    let mut search_role = "leader".to_string();
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        search_role = "super".to_string();
+    }
+
+    // search is done
+    let took_time = start.elapsed().as_millis();
+    let mut accumulated_stats = ScanStats::default();
+    let mut accumulated_records = 0;
+    for result in &accumulated_results {
+        let (stats, hits) = result.stats();
+        accumulated_stats.add(&stats);
+        accumulated_records += hits;
+    }
+    let trace_id_clone = trace_id.clone();
+    async move {
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[HTTP2_STREAM trace_id {trace_id_clone}] search stream is done, took: {} ms",
+                    took_time,
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id_clone.to_string())
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("stream_summary".to_string())
+                    .search_role(search_role)
+                    .sql(req.query.sql.clone())
+                    .time_range((start_time.to_string(), end_time.to_string()))
+                    .scan_size(accumulated_stats.original_size as usize)
+                    .scan_records(accumulated_stats.records as usize)
+                    .data_records(accumulated_records)
+                    .duration(took_time as usize)
+                    .build()
+            )
+        );
+    }
+    .instrument(search_span)
+    .await;
 
     #[cfg(feature = "enterprise")]
     {

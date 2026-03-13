@@ -2915,7 +2915,8 @@
     "rateLabel": "Tarifa:",
     "timeRangeLabel": "Intervalo de tempo:",
     "analyzeTooltipTraces": "Analise as dimensões do rastreamento para padrões de taxa, latência e erro",
-    "insightsButtonLabel": "Percepções"
+    "insightsButtonLabel": "Percepções",
+    "searchInspectionsLabel": "Inspecione os detalhes da execução do trabalho de pesquisa"
   },
   "errorInsights": {
     "title": "Percepções",
