@@ -133,7 +133,7 @@ export default class DashboardPanelConfigs {
   async selectUnit(unit) {
     await this.unit.waitFor({ state: "visible" });
     await this.unit.click();
-    await this.page.getByRole("option", { name: unit }).click();
+    await this.page.getByRole("option", { name: unit, exact: true }).click();
   }
 
   //Decimals
