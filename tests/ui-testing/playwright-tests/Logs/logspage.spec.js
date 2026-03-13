@@ -16,7 +16,7 @@ async function ingestTestData(page) {
 }
 
 async function applyQueryButton(pm) {
-  const [response] = await Promise.all([
+  await Promise.all([
     pm.page.waitForResponse(
       resp => resp.url().includes('/_search') && resp.status() === 200,
       { timeout: 60000 }

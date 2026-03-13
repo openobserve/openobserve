@@ -67,7 +67,7 @@ test.describe("Unflattened testcases", () => {
   }
   async function applyQueryButton(page) {
     await page.waitForTimeout(1000);
-    const [response] = await Promise.all([
+    await Promise.all([
       page.waitForResponse(
         resp => resp.url().includes('/_search') && resp.status() === 200,
         { timeout: 60000 }
