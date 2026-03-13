@@ -23,7 +23,7 @@ use config::{
         stream::StreamType,
     },
     metrics,
-    utils::json,
+    utils::{json, time::now_micros},
 };
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
@@ -298,7 +298,7 @@ pub async fn get_latest_traces(
 
     if start_time_from_trace_id > 0 {
         start_time = start_time_from_trace_id - 60 * 1_000_000; //60 seconds earlier
-        end_time = start_time_from_trace_id + 3600 * 1_000_000; //1 hour later
+        end_time = std::cmp::min(now_micros(), start_time_from_trace_id + 3600 * 1_000_000); //1 hour later
     }
 
     let max_query_range = crate::common::utils::stream::get_max_query_range(
