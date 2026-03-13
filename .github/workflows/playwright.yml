@@ -494,7 +494,7 @@ jobs:
               "Logs-Core"|"Logs-Queries")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboards-Panel-Level-DateTime-Config")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings")
                 ACTUAL_FOLDER="Dashboards"
                 ;;
               *)
