@@ -109,7 +109,7 @@ export class CrossLinkPage {
 
     async expectCrossLinkListVisible() {
         testLogger.debug('Expecting cross-link list visible');
-        await expect(this.page.locator(this.crossLinkList)).toBeVisible();
+        await expect(this.page.locator(this.crossLinkList).first()).toBeVisible();
     }
 
     async expectCrossLinkItemVisible(idx) {
@@ -285,16 +285,17 @@ export class CrossLinkPage {
 
     /**
      * Delete all existing cross-links on the current page (stream or org settings).
-     * Useful for cleanup at the start/end of tests.
+     * Only deletes items that have a visible delete button (i.e., editable items).
+     * Org-level read-only items (which have no delete button) are skipped.
      */
     async deleteAllCrossLinks() {
         testLogger.debug('Deleting all existing cross-links');
-        let count = await this.page.locator('[data-test^="cross-link-item-"]').count();
+        let count = await this.page.locator('[data-test^="cross-link-delete-"]').count();
         while (count > 0) {
             await this.clickDeleteCrossLink(0);
             await this.page.waitForTimeout(500);
-            count = await this.page.locator('[data-test^="cross-link-item-"]').count();
+            count = await this.page.locator('[data-test^="cross-link-delete-"]').count();
         }
-        testLogger.debug('All cross-links deleted', { remaining: count });
+        testLogger.debug('All deletable cross-links deleted', { remaining: count });
     }
 }

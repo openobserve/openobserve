@@ -6,7 +6,7 @@ const { ingestTestData: _ingestData } = require('../utils/data-ingestion.js');
 const STREAM_NAME = "e2e_automate";
 
 test.describe("Cross-Linking testcases", () => {
-    test.describe.configure({ mode: 'parallel' });
+    test.describe.configure({ mode: 'default' });
     let pm;
     let dataIngested = false;
 
@@ -323,7 +323,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickCrossLinkingTab();
 
         // Create a link to delete if none exist
-        const linkList = page.locator('[data-test="cross-link-list"]');
+        const linkList = page.locator('[data-test="cross-link-list"]').first();
         const hasList = await linkList.isVisible().catch(() => false);
 
         if (!hasList) {
@@ -419,16 +419,21 @@ test.describe("Cross-Linking testcases", () => {
 
         testLogger.info('Cross-link created and saved');
 
-        // Step 2: Navigate to logs, add interesting field, and query the stream
+        // Step 2: Navigate to logs, run query first, then add interesting field
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_NAME);
         await page.waitForTimeout(2000);
 
-        // Add kubernetes_container_name as an interesting field so it appears as a table column
+        // Run query first so field list gets populated
+        await pm.logsPage.runQueryAndWaitForResults();
+        await page.waitForTimeout(2000);
+
+        // Now add kubernetes_container_name as an interesting field so it appears as a table column
         await pm.logsPage.fillIndexFieldSearchInput('kubernetes_container_name');
         await pm.logsPage.clickInterestingFieldButton('kubernetes_container_name');
         await page.waitForTimeout(1000);
 
+        // Run query again to refresh results with the interesting field column
         await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(2000);
 
@@ -1232,20 +1237,21 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickOrgSettingsSave();
         await page.waitForTimeout(2000);
 
-        // Step 2: Navigate to logs, add interesting field, and query the stream
+        // Step 2: Navigate to logs, run query first, then add interesting field
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_NAME);
         await page.waitForTimeout(2000);
 
-        // Add kubernetes_container_name as an interesting field so it appears as a table column
+        // Run query first so field list gets populated
+        await pm.logsPage.runQueryAndWaitForResults();
+        await page.waitForTimeout(2000);
+
+        // Now add kubernetes_container_name as an interesting field so it appears as a table column
         await pm.logsPage.fillIndexFieldSearchInput('kubernetes_container_name');
         await pm.logsPage.clickInterestingFieldButton('kubernetes_container_name');
         await page.waitForTimeout(1000);
 
-        await pm.logsPage.runQueryAndWaitForResults();
-        await page.waitForTimeout(2000);
-
-        // Run query again to ensure result_schema picks up the org cross-links
+        // Run query again to refresh results and ensure result_schema picks up the org cross-links
         await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(2000);
 
