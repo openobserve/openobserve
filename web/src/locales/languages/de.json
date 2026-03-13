@@ -1632,7 +1632,13 @@
     "discountTag": "Im Rabatt",
     "enterpriseNote": "Sie benötigen ein hohes Volumen? Lassen Sie uns über Skalierung sprechen! Kontaktieren Sie uns für maßgeschneiderte Lösungen.",
     "contactSupport": "Support kontaktieren",
-    "totalUsage": "Gesamtnutzung"
+    "totalUsage": "Gesamtnutzung",
+    "aiCredits": "KI-Credits",
+    "aiModeFree": "Kostenlos",
+    "aiModePayAsYouGo": "Bezahlen Sie nach Bedarf",
+    "aiModeExhausted": "Erschöpft",
+    "aiExhaustedMessage": "Abonnieren Sie, um KI-Funktionen weiterhin zu nutzen",
+    "aiPaygMessage": "Kostenlose Credits sind aufgebraucht — Nutzung wird dem Abonnement in Rechnung gestellt"
   },
   "message": {
     "ServerInternalError": "Fehler: Etwas ist schief gelaufen. Interner Serverfehler.",
@@ -2909,7 +2915,8 @@
     "rateLabel": "Rate:",
     "timeRangeLabel": "Zeitbereich:",
     "analyzeTooltipTraces": "Analysieren Sie die Trace-Dimensionen auf Rate, Latenz und Fehlermuster",
-    "insightsButtonLabel": "Einblicke"
+    "insightsButtonLabel": "Einblicke",
+    "searchInspectionsLabel": "Überprüfen Sie die Ausführungsdetails des Suchauftrags"
   },
   "errorInsights": {
     "title": "Einblicke",

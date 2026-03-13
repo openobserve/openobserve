@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:aecd261e-867a-4be8-838e-73a398e654a2" version="1">
+<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:fc6fd2cc-de5f-4b42-a16a-779c075ee4f1" version="1">
   <metadata>
-    <timestamp>2026-03-10T08:04:34.162769000Z</timestamp>
+    <timestamp>2026-03-11T07:47:27.687710000Z</timestamp>
     <tools>
       <tool>
         <vendor>CycloneDX</vendor>
@@ -9,7 +9,7 @@
         <version>0.5.7</version>
       </tool>
     </tools>
-    <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/proto#0.1.0">
+    <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/proto#0.1.0">
       <name>proto</name>
       <version>0.1.0</version>
       <scope>required</scope>
@@ -18,7 +18,7 @@
       </licenses>
       <purl>pkg:cargo/proto@0.1.0?download_url=file://.</purl>
       <components>
-        <component type="library" bom-ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/proto#0.1.0 bin-target-0">
+        <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/proto#0.1.0 bin-target-0">
           <name>proto</name>
           <version>0.1.0</version>
           <purl>pkg:cargo/proto@0.1.0?download_url=file://.#src/lib.rs</purl>
@@ -3135,19 +3135,26 @@
         </reference>
       </externalReferences>
     </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.5.0">
+    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.4.1">
+      <author>Without Boats &lt;woboats@gmail.com&gt;</author>
       <name>heck</name>
-      <version>0.5.0</version>
+      <version>0.4.1</version>
       <description>heck is a case conversion library.</description>
       <scope>excluded</scope>
       <hashes>
-        <hash alg="SHA-256">2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea</hash>
+        <hash alg="SHA-256">95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8</hash>
       </hashes>
       <licenses>
         <expression>MIT OR Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/heck@0.5.0</purl>
+      <purl>pkg:cargo/heck@0.4.1</purl>
       <externalReferences>
+        <reference type="documentation">
+          <url>https://docs.rs/heck</url>
+        </reference>
+        <reference type="website">
+          <url>https://github.com/withoutboats/heck</url>
+        </reference>
         <reference type="vcs">
           <url>https://github.com/withoutboats/heck</url>
         </reference>
@@ -5075,18 +5082,18 @@
         </reference>
       </externalReferences>
     </component>
-    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.13">
+    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.14">
       <name>quinn-proto</name>
-      <version>0.11.13</version>
+      <version>0.11.14</version>
       <description>State machine for the QUIC transport protocol</description>
       <scope>required</scope>
       <hashes>
-        <hash alg="SHA-256">f1906b49b0c3bc04b5fe5d86a77925ae6524a19b816ae38ce1e426255f1d8a31</hash>
+        <hash alg="SHA-256">434b42fec591c96ef50e21e886936e66d3cc3f737104fdb9b737c40ffb94c098</hash>
       </hashes>
       <licenses>
         <expression>MIT OR Apache-2.0</expression>
       </licenses>
-      <purl>pkg:cargo/quinn-proto@0.11.13</purl>
+      <purl>pkg:cargo/quinn-proto@0.11.14</purl>
       <externalReferences>
         <reference type="vcs">
           <url>https://github.com/quinn-rs/quinn</url>
@@ -7677,7 +7684,7 @@
     </component>
   </components>
   <dependencies>
-    <dependency ref="path+file:///Users/huaijinhao/gitrepo/openobserve/src/proto#0.1.0">
+    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/proto#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-trait@0.1.89" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#datafusion@52.2.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#datafusion-proto@52.2.0" />
@@ -8692,7 +8699,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#byteorder@1.5.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#num-traits@0.2.19" />
     </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.5.0" />
+    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.4.1" />
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#hex@0.4.3" />
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#http-body-util@0.1.3">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
@@ -9040,7 +9047,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#unicode-ident@1.0.24" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-build@0.14.3">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.5.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.4.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#itertools@0.14.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.29" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#multimap@0.10.1" />
@@ -9065,7 +9072,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-wkt-build@0.7.1">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.5.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#heck@0.4.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.14.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-build@0.14.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-types@0.14.3" />
@@ -9112,7 +9119,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#memchr@2.8.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228" />
     </dependency>
-    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.13">
+    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.14">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#lru-slab@0.1.2" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rand@0.9.2" />
@@ -9134,7 +9141,7 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.11.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#cfg_aliases@0.2.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#pin-project-lite@0.2.17" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.13" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quinn-proto@0.11.14" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#quinn-udp@0.5.14" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rustc-hash@2.1.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#rustls@0.23.37" />
@@ -9544,7 +9551,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#idna@1.1.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#percent-encoding@2.3.2" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde_derive@1.0.228" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#utf8_iter@1.0.4" />
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#uuid@1.21.0">

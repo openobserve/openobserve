@@ -16,7 +16,7 @@
 use std::collections::HashMap;
 
 use config::{
-    meta::self_reporting::usage::USAGE_STREAM,
+    meta::{destinations::Email, self_reporting::usage::USAGE_STREAM},
     utils::{
         json,
         time::{hour_micros, now_micros},
@@ -38,10 +38,23 @@ use crate::{
 // interval for checking and reporting no ingestion events
 const NO_INGESTION_REPORT_INTERVAL: u64 = 3600;
 
+/// DB flush interval for trial quota deductions (seconds).
+const TRIAL_QUOTA_FLUSH_INTERVAL: u64 = 10;
+
 pub fn start() {
     tokio::spawn(async move { run_no_ingestion_period().await });
     tokio::spawn(async move { run_no_ingestion_daily().await });
     tokio::spawn(async move { run_org_expiry_daily().await });
+    tokio::spawn(async move { run_ai_quota_check().await });
+}
+
+/// Start trial quota background jobs (flush + cluster sync).
+/// Must run on ALL nodes, not just alert_manager.
+pub fn start_trial_quota_jobs() {
+    tokio::spawn(async move { run_trial_quota_flush().await });
+    tokio::spawn(async move {
+        crate::service::trial_quota::subscribe_ha_queue().await;
+    });
 }
 
 async fn run_no_ingestion_period() {
@@ -125,6 +138,95 @@ async fn report_org_no_ingestion(start_hour: i64, duration: &str) {
         }
     }
     log::info!("check for no ingestion for duration {duration} completed");
+}
+
+async fn run_trial_quota_flush() {
+    let mut interval =
+        tokio::time::interval(tokio::time::Duration::from_secs(TRIAL_QUOTA_FLUSH_INTERVAL));
+    interval.tick().await; // skip first immediate tick
+    loop {
+        interval.tick().await;
+        crate::service::trial_quota::flush_to_db().await;
+    }
+}
+
+async fn run_ai_quota_check() {
+    let cfg = o2_enterprise::enterprise::common::config::get_config();
+    let interval_secs = cfg.cloud.ai_quota_check_interval;
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
+    interval.tick().await; // skip first immediate tick
+    loop {
+        interval.tick().await;
+        check_all_orgs_ai_quota().await;
+    }
+}
+
+async fn check_all_orgs_ai_quota() {
+    use crate::service::trial_quota;
+
+    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+
+    // Pre-fetch all notified checkpoints in a single GROUP-BY query to avoid
+    // one DB round-trip per org (N+1).
+    let all_checkpoints: HashMap<String, i16> =
+        match infra::table::trial_quota_usage::load_all_checkpoints().await {
+            Ok(rows) => rows.into_iter().collect(),
+            Err(e) => {
+                log::error!("[AI_QUOTA] Failed to load checkpoints: {e}");
+                return;
+            }
+        };
+
+    for org_id in orgs {
+        let already_notified = all_checkpoints.get(&org_id).copied().unwrap_or(0) as u8;
+        let pct = trial_quota::get_quota_percentage(&org_id);
+        let checkpoint = match trial_quota::pending_checkpoint_from(pct, already_notified) {
+            Some(cp) => cp,
+            None => continue,
+        };
+
+        // Atomically claim this checkpoint in DB — only one pod wins
+        if !trial_quota::mark_checkpoint_notified(&org_id, checkpoint).await {
+            // Another pod already sent this checkpoint email
+            continue;
+        }
+
+        // Get admin email for this org
+        let admin = match get_admin(&org_id).await {
+            Ok(u) => u,
+            Err(e) => {
+                log::error!("[AI_QUOTA] Failed to get admin for org={org_id}: {e}");
+                continue;
+            }
+        };
+
+        let is_paid = trial_quota::org_has_active_subscription(&org_id).await;
+        let used = trial_quota::get_used(&org_id);
+        let limit = trial_quota::get_limit(&org_id);
+
+        let (subject, body) =
+            trial_quota::build_quota_email_message(&org_id, checkpoint, is_paid, used, limit);
+
+        let email = Email {
+            recipients: vec![admin.email.clone()],
+        };
+
+        match crate::service::alerts::alert::send_email_notification(&subject, &email, body).await {
+            Ok(_) => {
+                log::info!(
+                    "[AI_QUOTA] Sent {}% checkpoint email to {} for org={org_id}",
+                    checkpoint,
+                    admin.email
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "[AI_QUOTA] Failed to send {}% checkpoint email for org={org_id}: {e}",
+                    checkpoint
+                );
+            }
+        }
+    }
 }
 
 async fn run_no_ingestion_daily() {
@@ -214,7 +316,7 @@ async fn run_org_expiry_daily() {
             };
 
             // if org is free, then report how many days for expiry
-            if subscription.is_none() || subscription.unwrap().subscription_type.is_free_sub() {
+            if subscription.is_none_or(|s| s.subscription_type.is_free_sub()) {
                 // org record is also cached in memory for most cases
                 let org_record = match infra::table::organizations::get(&org).await {
                     Ok(v) => v,

@@ -597,7 +597,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/_values", get(search::values))
         .route("/{org_id}/_search_history", post(search::search_history))
         .route("/{org_id}/result_schema", post(search::result_schema))
-        .route("/{org_id}/search/profile", get(search::search_inspector::get_search_profile))
 
         // Multi-stream search
         .route("/{org_id}/_search_multi", post(search::multi_streams::search_multi))
@@ -763,6 +762,10 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/query_manager/cancel", put(search::query_manager::cancel_multiple_query))
             .route("/{org_id}/query_manager/{query_id}/cancel", delete(search::query_manager::cancel_query))
 
+
+            // search inspector
+            .route("/{org_id}/search/profile", get(search::search_inspector::get_search_profile))
+
             // Keys
             .route("/{org_id}/cipher_keys", get(keys::list).post(keys::save))
             .route("/{org_id}/cipher_keys/bulk", delete(keys::delete_bulk))
@@ -856,6 +859,7 @@ pub fn service_routes() -> Router {
                 "/{org_id}/billings/billing_portal",
                 get(cloud::billings::create_billing_portal_session),
             )
+            .route("/{org_id}/ai/usage", get(cloud::billings::get_ai_usage))
             .route(
                 "/{org_id}/billings/data_usage/{usage_date}",
                 get(cloud::org_usage::get_org_usage),

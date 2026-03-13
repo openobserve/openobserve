@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-use axum::http::StatusCode;
 use axum::{
     Json,
     extract::{Path, Query},
-    http::HeaderMap,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use config::{
@@ -27,17 +25,12 @@ use config::{
         search::{Query as SearchQuery, SearchEventType},
         stream::StreamType,
     },
+    utils::time::now_micros,
 };
 use hashbrown::HashMap;
 use serde_json;
 use tracing::{Instrument, Span};
 
-#[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::{
-    StreamPermissionResourceType, check_stream_permissions,
-};
-#[cfg(feature = "enterprise")]
-use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
     common::{
         meta::{self},
@@ -47,8 +40,17 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::{extractors::Headers, request::search::error_utils},
-    service::{search::inspector::*, self_reporting::http_report_metrics},
+    handler::http::{
+        extractors::Headers,
+        request::search::{
+            error_utils,
+            utils::{StreamPermissionResourceType, check_stream_permissions},
+        },
+    },
+    service::{
+        search::{inspector::*, sql::visitor::cipher_key::get_cipher_key_names},
+        self_reporting::http_report_metrics,
+    },
 };
 
 /// GetSearchProfile
@@ -122,33 +124,37 @@ pub async fn get_search_profile(
 
     let stream_type = StreamType::Traces;
 
-    // Validate required parameters
-    let (query_trace_id, start_time, end_time) = match (
-        query.get("trace_id"),
-        query.get("start_time"),
-        query.get("end_time"),
-    ) {
-        (Some(query_trace_id), Some(start_time), Some(end_time)) => {
-            if query_trace_id.is_empty() || start_time.is_empty() || end_time.is_empty() {
-                return meta::http::HttpResponse::bad_request(
-                    "trace_id/start_time/end_time cannot be empty",
-                );
-            }
-            let start_time = start_time.parse::<i64>().unwrap_or(0);
-            let end_time = end_time.parse::<i64>().unwrap_or(0);
-            if start_time == 0 || end_time == 0 {
-                return meta::http::HttpResponse::bad_request(
-                    "start_time/end_time must be valid i64",
-                );
-            }
-            (query_trace_id, start_time, end_time)
-        }
+    let Some(query_trace_id) = query.get("trace_id") else {
+        return meta::http::HttpResponse::bad_request("trace_id is required");
+    };
+    let start_time_from_trace_id =
+        config::ider::get_start_time_from_trace_id(query_trace_id).unwrap_or(0);
+
+    let start_time = match query.get("start_time") {
+        Some(v) if !v.is_empty() => v.parse::<i64>().unwrap_or(0),
         _ => {
-            return meta::http::HttpResponse::bad_request(
-                "trace_id/start_time/end_time is required",
-            );
+            if start_time_from_trace_id > 0 {
+                start_time_from_trace_id - 60 * 1_000_000 // minus 1m
+            } else {
+                0
+            }
         }
     };
+    let end_time = match query.get("end_time") {
+        Some(v) if !v.is_empty() => v.parse::<i64>().unwrap_or(0),
+        _ => {
+            if start_time_from_trace_id > 0 {
+                std::cmp::min(now_micros(), start_time_from_trace_id + 3600 * 1_000_000) // plus 1h
+            } else {
+                0
+            }
+        }
+    };
+
+    // Validate required parameters
+    if start_time == 0 || end_time == 0 {
+        return meta::http::HttpResponse::bad_request("start_time/end_time must be valid i64");
+    }
 
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = config::meta::search::Request {
@@ -186,7 +192,6 @@ pub async fn get_search_profile(
     }
 
     // Check permissions on stream
-    #[cfg(feature = "enterprise")]
     if let Some(res) = check_stream_permissions(
         &stream_name,
         org_id,
@@ -199,72 +204,68 @@ pub async fn get_search_profile(
         return res;
     }
 
-    #[cfg(feature = "enterprise")]
-    {
-        let keys_used = match get_cipher_key_names(&req.query.sql) {
-            Ok(v) => v,
-            Err(e) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)),
-                )
-                    .into_response();
-            }
-        };
-        if !keys_used.is_empty() {
-            log::info!("keys used : {keys_used:?}");
+    let keys_used = match get_cipher_key_names(&req.query.sql) {
+        Ok(v) => v,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)),
+            )
+                .into_response();
         }
-        for key in keys_used {
-            // Check permissions on keys
-            {
-                use config::meta::user::DBUser;
-                use o2_openfga::meta::mapping::OFGA_MODELS;
+    };
+    if !keys_used.is_empty() {
+        log::info!("keys used : {keys_used:?}");
+    }
+    for key in keys_used {
+        // Check permissions on keys
+        {
+            use config::meta::user::DBUser;
+            use o2_openfga::meta::mapping::OFGA_MODELS;
 
-                use crate::common::{
-                    infra::config::USERS,
-                    utils::auth::{AuthExtractor, is_root_user},
+            use crate::common::{
+                infra::config::USERS,
+                utils::auth::{AuthExtractor, is_root_user},
+            };
+
+            if !is_root_user(&user_id) {
+                let user = match USERS
+                    .get(&format!("{org_id}/{user_id}"))
+                    .and_then(|user_record| {
+                        DBUser::from(&(user_record.clone())).get_user(org_id.to_string())
+                    }) {
+                    Some(user) => user,
+                    None => {
+                        return meta::http::HttpResponse::forbidden("User not found");
+                    }
                 };
 
-                if !is_root_user(&user_id) {
-                    let user =
-                        match USERS
-                            .get(&format!("{org_id}/{user_id}"))
-                            .and_then(|user_record| {
-                                DBUser::from(&(user_record.clone())).get_user(org_id.to_string())
-                            }) {
-                            Some(user) => user,
-                            None => {
-                                return meta::http::HttpResponse::forbidden("User not found");
-                            }
-                        };
-
-                    if !crate::handler::http::auth::validator::check_permissions(
-                        &user_id,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get("cipher_keys")
-                                    .map_or("cipher_keys", |model| model.key),
-                                key
-                            ),
-                            org_id: org_id.to_string(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                        },
-                        user.role,
-                        user.is_external,
-                    )
-                    .await
-                    {
-                        return crate::common::meta::http::HttpResponse::forbidden(
-                            "Unauthorized Access to key",
-                        );
-                    }
-                    // Check permissions on key ends
+                if !crate::handler::http::auth::validator::check_permissions(
+                    &user_id,
+                    AuthExtractor {
+                        auth: "".to_string(),
+                        method: "GET".to_string(),
+                        o2_type: format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get("cipher_keys")
+                                .map_or("cipher_keys", |model| model.key),
+                            key
+                        ),
+                        org_id: org_id.to_string(),
+                        bypass_check: false,
+                        parent_id: "".to_string(),
+                    },
+                    user.role,
+                    user.is_external,
+                )
+                .await
+                {
+                    return crate::common::meta::http::HttpResponse::forbidden(
+                        "Unauthorized Access to key",
+                    );
                 }
+                // Check permissions on key ends
             }
         }
     }
@@ -297,6 +298,9 @@ pub async fn get_search_profile(
                 events: vec![],
             };
 
+            let mut search_summary = Vec::new();
+            let mut stream_summary = Vec::new();
+
             for hit in res.hits {
                 if let Some(events_str) = hit.get("events")
                     && let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
@@ -311,14 +315,9 @@ pub async fn get_search_profile(
                                 extract_search_inspector_fields(event.name.as_str())
                             {
                                 if fields.component == Some("summary".to_string()) {
-                                    si.sql = fields.sql.unwrap();
-                                    let time_range = fields.time_range.unwrap_or_default();
-                                    si.start_time = time_range.0;
-                                    si.end_time = time_range.1;
-                                    si.total_duration = fields.duration.unwrap_or_default();
-                                    si.scan_size = fields.scan_size.unwrap_or_default();
-                                    si.scan_records = fields.scan_records.unwrap_or_default();
-                                    si.data_records = fields.data_records.unwrap_or_default();
+                                    search_summary.push(fields);
+                                } else if fields.component == Some("stream_summary".to_string()) {
+                                    stream_summary.push(fields);
                                 } else {
                                     fields.timestamp = Some(event._timestamp.to_string());
                                     inspectors.push(fields);
@@ -328,6 +327,38 @@ pub async fn get_search_profile(
                         .collect();
 
                     events.extend(inspectors);
+                }
+            }
+
+            if stream_summary.is_empty() {
+                for event in search_summary {
+                    si.sql = event.sql.unwrap_or_default();
+                    let time_range = event.time_range.unwrap_or_default();
+                    si.start_time = if si.start_time.is_empty() {
+                        time_range.0
+                    } else {
+                        si.start_time.clone().min(time_range.0)
+                    };
+                    si.end_time = si.end_time.clone().max(time_range.1);
+                    si.total_duration += event.duration.unwrap_or_default();
+                    si.scan_size += event.scan_size.unwrap_or_default();
+                    si.scan_records += event.scan_records.unwrap_or_default();
+                    si.data_records += event.data_records.unwrap_or_default();
+                }
+            } else {
+                for event in stream_summary {
+                    si.sql = event.sql.unwrap_or_default();
+                    let time_range = event.time_range.unwrap_or_default();
+                    si.start_time = if si.start_time.is_empty() {
+                        time_range.0
+                    } else {
+                        si.start_time.clone().min(time_range.0)
+                    };
+                    si.end_time = si.end_time.clone().max(time_range.1);
+                    si.total_duration += event.duration.unwrap_or_default();
+                    si.scan_size += event.scan_size.unwrap_or_default();
+                    si.scan_records += event.scan_records.unwrap_or_default();
+                    si.data_records += event.data_records.unwrap_or_default();
                 }
             }
 
@@ -363,9 +394,6 @@ pub async fn get_search_profile(
 /// the second level. Finally show the events which search_role is follower as third level and sort
 /// by _timestamp.
 fn organize_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspectorFields> {
-    #[cfg(not(feature = "enterprise"))]
-    let is_super_cluster = false;
-    #[cfg(feature = "enterprise")]
     let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled;
@@ -396,6 +424,13 @@ fn organize_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspectorFie
             summary.duration = Some(duration);
             summary.search_role = Some("leader".to_string());
             summary.events = Some(group_leader_events(nested));
+            if let Some(events) = summary.events.as_ref()
+                && let Some(event) = events
+                    .iter()
+                    .find(|e| e.component == Some("remote scan streaming".to_string()))
+            {
+                summary.desc = Some(event.desc.clone().unwrap_or_default());
+            }
             summary
         },
     );
@@ -425,6 +460,13 @@ fn group_leader_events(events: Vec<SearchInspectorFields>) -> Vec<SearchInspecto
             summary.duration = Some(duration);
             summary.search_role = Some("follower".to_string());
             summary.events = Some(sort_events_by_timestamp(nested));
+            if let Some(events) = summary.events.as_ref()
+                && let Some(event) = events
+                    .iter()
+                    .find(|e| e.component == Some("remote scan streaming".to_string()))
+            {
+                summary.desc = Some(event.desc.clone().unwrap_or_default());
+            }
             summary
         },
     );
@@ -475,7 +517,10 @@ where
         if entry.0.is_empty() || ts < entry.0 {
             entry.0 = ts;
         }
-        entry.1 += dur;
+        if event.component.is_none() || event.component.as_ref().unwrap() != "remote scan streaming"
+        {
+            entry.1 += dur;
+        }
         entry.2.push(event);
     }
     groups

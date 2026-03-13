@@ -1632,7 +1632,13 @@
     "discountTag": "À prix réduit",
     "enterpriseNote": "Vous avez besoin d'un volume élevé ? Parlons d'échelle ! Contactez-nous pour des solutions sur mesure.",
     "contactSupport": "Contacter le service d'assistance",
-    "totalUsage": "Utilisation totale"
+    "totalUsage": "Utilisation totale",
+    "aiCredits": "Crédits d'IA",
+    "aiModeFree": "Gratuit",
+    "aiModePayAsYouGo": "Payez au fur et à mesure",
+    "aiModeExhausted": "Épuisé",
+    "aiExhaustedMessage": "Abonnez-vous pour continuer à utiliser les fonctionnalités d'IA",
+    "aiPaygMessage": "Crédits gratuits épuisés — utilisation facturée à l'abonnement"
   },
   "message": {
     "ServerInternalError": "Erreur : une erreur s'est produite. Erreur interne au serveur.",
@@ -2909,7 +2915,8 @@
     "rateLabel": "Tarif :",
     "timeRangeLabel": "Plage de temps :",
     "analyzeTooltipTraces": "Analysez les dimensions des traces pour déterminer le taux, la latence et les modèles d'erreur",
-    "insightsButtonLabel": "Perspectives"
+    "insightsButtonLabel": "Perspectives",
+    "searchInspectionsLabel": "Inspectez les détails de l'exécution des tâches de recherche"
   },
   "errorInsights": {
     "title": "Perspectives",

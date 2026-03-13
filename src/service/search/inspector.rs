@@ -16,6 +16,7 @@
 use config::{cluster::LOCAL_NODE, get_config, meta::cluster::NodeInfo};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "enterprise")]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchInspectorEvent {
     pub name: String,
@@ -29,6 +30,7 @@ pub struct SearchInspectorEvent {
     pub level: Option<String>,
 }
 
+#[cfg(feature = "enterprise")]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchInspector {
     pub sql: String,
@@ -75,6 +77,7 @@ pub struct SearchInspectorFields {
     pub events: Option<Vec<SearchInspectorFields>>,
 }
 
+#[cfg(feature = "enterprise")]
 impl SearchInspectorFields {
     pub fn new() -> Self {
         Self::default()
@@ -193,6 +196,7 @@ fn search_inspector_fields_inner(msg: String, kvs: SearchInspectorFields) -> Str
     result
 }
 
+#[cfg(feature = "enterprise")]
 pub fn extract_search_inspector_fields(msg: &str) -> Option<SearchInspectorFields> {
     if let Some(start) = msg.find(" #{\"")
         && let Some(end) = msg[start..].find("}#")
@@ -225,6 +229,7 @@ mod tests {
         assert!(result.contains("\"component\":\"search\""));
     }
 
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_search_inspector_fields() {
         let msg = "[trace_id abc123] in leader task finish #{\"duration\":180}#";
@@ -234,18 +239,21 @@ mod tests {
         assert_eq!(fields.component, None);
     }
 
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_search_inspector_fields_empty() {
         let msg = "no fields here";
         assert!(extract_search_inspector_fields(msg).is_none());
     }
 
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_search_inspector_fields_invalid_json() {
         let msg = "invalid #{\"duration\":invalid}#";
         assert!(extract_search_inspector_fields(msg).is_none());
     }
 
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_search_inspector_fields_complex() {
         let msg = "[trace_id abc123] complex task #{\"duration\":200,\"component\":\"search\"}#";

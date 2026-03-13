@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::{search::Response, sql::OrderBy};
+use config::meta::{
+    search::{Response, ScanStats},
+    sql::OrderBy,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -119,6 +122,22 @@ pub enum SortStrategy {
     FallbackColumn(String, OrderBy),
     AutoDetermine(String, bool), // (column, is_string)
     NoSort,
+}
+
+impl SearchResultType {
+    pub fn stats(&self) -> (ScanStats, usize) {
+        let mut hits = 0;
+        let mut stats = ScanStats::default();
+        let resp = match self {
+            SearchResultType::Cached(resp) => resp,
+            SearchResultType::Search(resp) => resp,
+        };
+        stats.original_size += resp.scan_size as i64;
+        stats.idx_scan_size += resp.idx_scan_size as i64;
+        stats.records += resp.scan_records as i64;
+        hits += resp.hits.len();
+        (stats, hits)
+    }
 }
 
 #[cfg(test)]

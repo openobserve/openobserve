@@ -2127,31 +2127,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cloudevents-sdk"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47598c8e3f47e1cfb787750e1bef5de56cb288d757b7b753ace8b5f5b6a1c7f8"
-dependencies = [
- "async-trait",
- "axum",
- "base64 0.22.1",
- "bitflags 2.11.0",
- "bytes",
- "chrono",
- "delegate-attr",
- "hostname",
- "http 1.4.0",
- "http-body-util",
- "hyper 1.8.1",
- "serde",
- "serde_json",
- "snafu 0.8.9",
- "url",
- "uuid",
- "web-sys",
-]
-
-[[package]]
 name = "cmac"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3588,17 +3563,6 @@ name = "deflate64"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "807800ff3288b621186fe0a8f3392c4652068257302709c24efd918c3dffcdc2"
-
-[[package]]
-name = "delegate-attr"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51aac4c99b2e6775164b412ea33ae8441b2fde2dbf05a20bc0052a63d08c475b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
 
 [[package]]
 name = "der"
@@ -6938,7 +6902,6 @@ dependencies = [
  "chromiumoxide",
  "chrono",
  "clap",
- "cloudevents-sdk",
  "config",
  "console-subscriber",
  "cron",
@@ -11578,7 +11541,6 @@ dependencies = [
  "idna",
  "percent-encoding",
  "serde",
- "serde_derive",
 ]
 
 [[package]]

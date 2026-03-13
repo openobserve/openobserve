@@ -971,7 +971,8 @@ export default defineComponent({
     const isAnomalyDetectionEnabled = computed(
       () =>
         store.state.zoConfig.build_type !== "opensource" &&
-        (config.isEnterprise === "true" || config.isCloud === "true"),
+        config.isEnterprise === "true" && 
+        config.isCloud === "false",
     );
 
     // Initialize activeTab from URL query parameter, default to "all".

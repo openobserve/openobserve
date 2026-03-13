@@ -334,9 +334,9 @@ export class LogsPage {
 
     // Navigation methods
     async navigateToLogs(orgIdentifier) {
-        const logsUrl = '/web/logs'; // Using the same pattern as in test files
+        const baseUrl = process.env.ZO_BASE_URL;
         const orgId = orgIdentifier || getOrgIdentifier();
-        const fullUrl = `${logsUrl}?org_identifier=${orgId}&fn_editor=true`;
+        const fullUrl = `${baseUrl}/web/logs?org_identifier=${orgId}&fn_editor=true`;
 
 
         // Include fn_editor=true to ensure VRL editor is available for tests that need it
