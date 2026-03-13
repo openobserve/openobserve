@@ -58,17 +58,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-td :props="props" side>
           <q-btn
             :label="t('invitation.accept')"
-            class="q-mr-sm o2-primary-button"
+            class="q-ml-sm o2-primary-button"
             no-caps
-            dense
+            flat
             @click="acceptInvitation(props.row)"
             :data-test="`accept-invitation-${props.row.token}`"
           />
           <q-btn
             :label="t('invitation.reject')"
-            dense
             class="o2-secondary-button"
             no-caps
+            flat
             @click="rejectInvitation(props.row)"
             :data-test="`reject-invitation-${props.row.token}`"
           />
