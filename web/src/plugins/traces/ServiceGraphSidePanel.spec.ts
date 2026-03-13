@@ -18,7 +18,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers";
 import { Notify } from "quasar";
 import { nextTick } from "vue";
-import ServiceGraphSidePanel from "./ServiceGraphSidePanel.vue";
+import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
 
 installQuasar({
   plugins: [Notify],
