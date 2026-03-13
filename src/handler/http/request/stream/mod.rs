@@ -221,7 +221,7 @@ pub async fn create(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update stream settings", "category": "streams"}))
+        ("x-o2-mcp" = json!({"description": "Update stream settings", "category": "streams", "requires_confirmation": true}))
     )
 )]
 pub async fn update_settings(
